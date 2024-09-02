@@ -7,3 +7,6 @@ Dark Themed Commercial Invoice: https://ubuv6vvyv.github.io/dark.html
 
 
 Light Themed Commercial Invoice: http://ubuv6vvyv.github.io/ComInStyle.html
+
+Input field from highlight text: ubuv6vvyv.github.io
+/inputmaker.html
