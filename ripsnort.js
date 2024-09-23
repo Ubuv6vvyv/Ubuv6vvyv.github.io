@@ -211,7 +211,7 @@
         h3 { cursor: pointer; }
         ul { list-style-type: none; padding-left: 10px; }
         li { margin: 5px 0; }
-        .hidden { display: none; }
+        .hidden { display: block; }
         .collapsible { font-weight: bold; color: black; }
         a { font-size: 10px; text-decoration: none; }
         img { max-width: 50px; max-height: 50px; }
