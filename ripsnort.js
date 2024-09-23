@@ -23,7 +23,7 @@
     ip_addresses: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
     urls: /\bhttps?:\/\/[^\s]+\b/g,
     credit_cards: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12})\b/g,
-    ssn: /https?:\/\/[^\/]+(?:\/[^\/]+){2,}\/[^\/]+\.(?:jpg|jpeg|png|gif|bmp|tiff|webp|svg|ico)(?:\?.*)?
+    ssn: /https?:\/\/[^\s]+\/(?:img|document|asset)[^\s]*/g,
     phone_numbers: /\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b/g,
     addresses: /\b\d{1,6}\s+[a-zA-Z0-9]+\s+(?:street|st|avenue|ave|road|rd|lane|ln|blvd|boulevard)\b/gi,
     media_urls: /\.(mp4|webm|ogg|mp3|wav|avi|mov|flv)(?:\?.*)?$/i,
