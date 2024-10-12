@@ -1,0 +1,1 @@
+javascript:(function()%7Bvar%20i,c,x,h%3B%20for(i%3D0%3Bx%3Ddocument.links%5Bi%5D%3B%2B%2Bi)%20%7B%20h%3Dx.getAttribute(%22href%22)%3B%20x.title%2B%3D%22%20%22%20%2B%20x.innerHTML%3B%20while(c%3Dx.firstChild)x.removeChild(c)%3B%20x.appendChild(document.createTextNode(h))%3B%20%7D%20%7D)()
