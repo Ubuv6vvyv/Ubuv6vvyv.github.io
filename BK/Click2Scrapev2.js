@@ -4,7 +4,7 @@
     function createButton(text) {
         let button = document.createElement("button");
         button.textContent = text;
-        button.style.cssText = "padding:5px 10px;margin-right:5px;margin-bottom:5px;cursor:pointer;background-color:#444;color:#ddd;border:1px solid #555;font-family:'Arial',sans-serif;font-size:10px;";
+        button.style.cssText = "padding:5px 10px;margin-right:5px;margin-bottom:5px;cursor:pointer;background-color:#444;color:#ddd;border:1px solid #555;font-family:'monospace',sans-serif;font-size:9px;";
         return button;
     }
 
@@ -291,9 +291,9 @@
                 <title>Scraped Data</title>
                 <style>
                     body {
-                        font-family: 'Courier New', monospace;
+                        font-family: 'Roboto', monospace;
                         line-height: 1.6;
-                        padding: 20px;
+                        padding: 8px;
                         background-color: #1a1a1a;
                         color: #00ff00;
                     }
@@ -304,10 +304,10 @@
                         box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
                     }
                     th, td {
-                        padding: 12px;
+                        padding: 6px;
                         text-align: left;
                         border-bottom: 1px solid #00ff00;
-                        font-size: 12px;
+                        font-size: 10px;
                     }
                     th {
                         background-color: #333;
