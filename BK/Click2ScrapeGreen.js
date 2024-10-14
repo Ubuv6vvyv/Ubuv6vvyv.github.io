@@ -297,7 +297,7 @@
                         font-family: 'Courier New', monospace;
                         line-height: 1.6;
                         padding: 20px;
-                        background-color: #1a1a1a;
+                        background-color: #ffffff;
                         color: #00ff00;
                     }
                     table {
@@ -310,7 +310,7 @@
                         padding: 12px;
                         text-align: left;
                         border-bottom: 1px solid #00ff00;
-                        font-size: 12px;
+                        font-size: 10x;
                     }
                     th {
                         background-color: #333;
@@ -383,4 +383,4 @@
     }, true);
 
     console.log("Improved Multi-Select Scraper UI with selection control, CSP fallback, pagination support, and link collection added. Use the buttons to control the scraping process.");
-})();-
+})();
