@@ -9,19 +9,27 @@
     }
 
     function getElementSelector(element) {
-        if (element.id) return "#" + element.id;
-        if (element.className) return "." + Array.from(element.classList).join(".");
-        return element.tagName.toLowerCase();
+  if (element.className) {
+    let className = Array.from(element.classList).join(".");
+    return "." + className
+      .replace(/(\d+)/g, '') // Remove numbers
+      .replace(/-[a-zA-Z0-9]+/g, '') // Remove suffixes (e.g., `-desktop`)
+      .replace(/_[a-zA-Z0-9]+/g, ''); // Remove prefixes (e.g., `_price`)
+  }
+  return element.tagName.toLowerCase();
     }
 
     function getSimilarElements(element) {
-        let selector = getElementSelector(element);
-        let elements = Array.from(document.querySelectorAll(selector));
-        if (elements.length === 1) {
-            elements = Array.from(element.parentElement.children).filter(el => el.tagName === element.tagName);
-        }
-        return elements;
-    }
+  let selector = getElementSelector(element);
+  let elements = Array.from(document.querySelectorAll("[class*='" + selector.replace('.', '') + "']")); // Attribute selector
+  elements = elements.filter(el => {
+    return el.offsetParent !== null // Ignore hidden elements
+      && !el.hidden
+      && el.textContent.trim() !== '' // Ignore empty elements
+      && el.childElementCount > 0; // Ignore elements with no child elements
+  });
+  return elements;
+}
 
     function cleanAttributeValue(value) {
         if (typeof value !== 'string') return '';
