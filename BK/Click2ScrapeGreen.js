@@ -1,386 +1,263 @@
-(function() {
-    let selectedElements = [], isSelecting = false, isPaused = false, scrapedData = null, controlPanel, currentPage = 1, maxPages = 1, nextPageSelector = "", useInnerHTML = true;
-
-    function createButton(text) {
-        let button = document.createElement("button");
-        button.textContent = text;
-        button.style.cssText = "padding:5px 10px;margin-right:5px;margin-bottom:5px;cursor:pointer;background-color:#444;color:#ddd;border:1px solid #555;font-family:'Arial',sans-serif;font-size:12px;";
-        return button;
+javascript: (function () {
+    let e = [],
+        t = !1,
+        n = !1,
+        o = null,
+        l,
+        a = 1,
+        r = 1,
+        i = "",
+        c = !0;
+    function d(e) {
+        let t = document.createElement("button");
+        return (t.textContent = e), (t.style.cssText = "padding:5px 10px;margin-right:5px;margin-bottom:5px;cursor:pointer;background-color:#444;color:#ddd;border:1px solid #555;font-family:'Arial',sans-serif;font-size:12px;"), t;
     }
-
-    function getElementSelector(element) {
-  if (element.className) {
-    let className = Array.from(element.classList).join(".");
-    return "." + className
-      .replace(/(\d+)/g, '') // Remove numbers
-      .replace(/-[a-zA-Z0-9]+/g, '') // Remove suffixes (e.g., `-desktop`)
-      .replace(/_[a-zA-Z0-9]+/g, ''); // Remove prefixes (e.g., `_price`)
-  }
-  return element.tagName.toLowerCase();
+    function s(e) {
+        return e.id
+            ? "#" + e.id
+            : e.className
+            ? Array.from(e.classList)
+                  .map((e) => "." + e)
+                  .join("")
+            : e.tagName.toLowerCase();
     }
-
-    function getSimilarElements(element) {
-  let selector = getElementSelector(element);
-  let elements = Array.from(document.querySelectorAll("[class*='" + selector.replace('.', '') + "']")); // Attribute selector
-  elements = elements.filter(el => {
-    return el.offsetParent !== null // Ignore hidden elements
-      && !el.hidden
-      && el.textContent.trim() !== '' // Ignore empty elements
-      && el.childElementCount > 0; // Ignore elements with no child elements
-  });
-  return elements;
-}
-
-    function cleanAttributeValue(value) {
-        if (typeof value !== 'string') return '';
-        return value.replace(/\\\"/g, '"').replace(/\\'/g, "'").trim();
+    function u(e) {
+        let t = s(e),
+            n = Array.from(document.querySelectorAll(t));
+        return 1 === n.length && (n = Array.from(e.parentElement.children).filter((t) => t.tagName === e.tagName)), n;
     }
-
-    function extractElementInfo(element) {
-        if (!element) return null;
-        const isSVG = element instanceof SVGElement;
-        let attributes = {};
-        try {
-            attributes = Object.fromEntries(
-                Array.from(element.attributes || [])
-                    .map(attr => [attr.name, cleanAttributeValue(attr.value)])
-                    .filter(([name]) => !isSVG || !['d', 'transform', 'cx', 'cy', 'r', 'width', 'height', 'viewBox'].includes(name))
-            );
-        } catch (error) {
-            console.error('Error processing attributes:', error);
-        }
-
-        return {
-            text: isSVG ? '' : (element.innerText || '').trim(),
-            href: element.href || element.getAttribute('href') || element.querySelector('a')?.href || '',
-            src: getElementSrc(element),
-            outerHTML: element.outerHTML || '',
-            attributes: attributes,
-            tagName: element.tagName.toLowerCase()
-        };
+    function m(e) {
+        return { text: e.innerText.trim(), href: e.href || e.querySelector("a")?.href || "", src: p(e), outerHTML: e.outerHTML, attributes: Object.fromEntries(Array.from(e.attributes).map((e) => [e.name, e.value])) };
     }
-
-    function getElementSrc(element) {
-        if (!element) return '';
-        if (element instanceof SVGElement) {
-            return element.getAttribute('href') || '';
-        }
-        let src = element.src || element.getAttribute('src') || element.querySelector('img')?.src || element.querySelector('img')?.getAttribute('src');
-        if (src) return src;
-        let bgImage = window.getComputedStyle(element).backgroundImage;
-        return bgImage && bgImage !== 'none' ? bgImage.slice(4, -1).replace(/["']/g, '') : element.getAttribute('data-src') || '';
+    function p(e) {
+        let t = e.src || e.querySelector("img")?.src;
+        if (t) return t;
+        let n = window.getComputedStyle(e).backgroundImage;
+        return n && "none" !== n ? n.slice(4, -1).replace(/["']/g, "") : e.getAttribute("data-src") || "";
     }
-
-    async function startScraping(output) {
-        if (selectedElements.length === 0) {
-            return void logOutput(output, "Please select at least one element first.");
-        }
-        maxPages = parseInt(document.getElementById("maxPages").value) || 1;
-        nextPageSelector = document.getElementById("nextPageSelector").value.trim();
-        scrapedData = [];
-        currentPage = 1;
-
-        while (currentPage <= maxPages) {
-            logOutput(output, `Scraping page ${currentPage}...`);
-            try {
-                let pageData = selectedElements.map(element => {
-                    let similarElements = getSimilarElements(element);
-                    return similarElements.map(el => {
-                        try {
-                            return extractElementInfo(el);
-                        } catch (error) {
-                            console.error('Error processing element:', el, error);
-                            return null;
-                        }
-                    }).filter(Boolean);
+    async function f(t) {
+        if (0 === e.length) return void h(t, "Please select at least one element first.");
+        (r = parseInt(document.getElementById("maxPages").value) || 1), (i = document.getElementById("nextPageSelector").value.trim()), (o = []), (a = 1);
+        while (a <= r) {
+            h(t, `Scraping page ${a}...`);
+            let n = e.map((e) => {
+                    let t = u(e);
+                    return t.map(m);
+                }),
+                l = n[0].map((e, t) => {
+                    let o = {};
+                    return (
+                        n.forEach((e, n) => {
+                            o[`selection${n + 1}`] = e[t] || null;
+                        }),
+                        o
+                    );
                 });
-
-                let combinedData = pageData[0].map((_, index) => {
-                    let item = {};
-                    pageData.forEach((selection, selIndex) => {
-                        item[`selection${selIndex + 1}`] = selection[index] || null;
-                    });
-                    return item;
-                });
-
-                scrapedData = scrapedData.concat(combinedData);
-
-                if (currentPage < maxPages && nextPageSelector) {
-                    let nextButton = document.querySelector(nextPageSelector);
-                    if (!nextButton) {
-                        logOutput(output, "Next page button not found. Stopping pagination.");
-                        break;
-                    }
-                    nextButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+            if (((o = o.concat(l)), a < r && i)) {
+                let e = document.querySelector(i);
+                if (!e) {
+                    h(t, "Next page button not found. Stopping pagination.");
+                    break;
                 }
-            } catch (error) {
-                logOutput(output, `An error occurred during scraping: ${error.message}`);
-                console.error('Scraping error:', error);
-                break;
+                e.click(), await new Promise((e) => setTimeout(e, 2e3));
             }
-            currentPage++;
+            a++;
         }
-
-        logOutput(output, `Scraped ${scrapedData.length} total items across ${currentPage - 1} pages`);
-        logOutput(output, JSON.stringify(scrapedData.slice(0, 3), null, 2) + "...");
+        h(t, `Scraped ${o.length} total items across ${a - 1} pages`), h(t, JSON.stringify(o.slice(0, 3), null, 2) + "...");
     }
-
-    function collectPageLinks() {
-        let links = Array.from(document.getElementsByTagName("a")).map(a => a.href);
-        return [...new Set(links)];
+    function g() {
+        let e = Array.from(document.getElementsByTagName("a")).map((e) => e.href);
+        return [...new Set(e)];
     }
-
-    function createControlPanel() {
-        let panel = document.createElement("div");
-        panel.style.cssText = "position:fixed;top:20px;right:20px;background-color:#333;border:1px solid #555;padding:10px;z-index:10000;font-family:'Arial',sans-serif;box-shadow:0 0 10px rgba(0,0,0,0.5);color:#ddd;max-width:400px;width:100%;opacity:0.95;";
-        
-        let toggleButton = createButton("Start Selection");
-        let pauseResumeButton = createButton("Pause Selection");
-        let startCrawlButton = createButton("Start Crawl");
-        let cancelButton = createButton("Cancel");
-        let clearSelectionsButton = createButton("Clear Selections");
-        let downloadJSONButton = createButton("Download JSON");
-        let downloadCSVButton = createButton("Download CSV");
-        let downloadHTMLButton = createButton("Download HTML");
-        let collectLinksButton = createButton("Collect Page Links");
-
-        let controls = document.createElement("div");
-        controls.style.marginTop = "10px";
-        controls.innerHTML = `
-            <label for="maxPages">Max Pages:</label>
-            <input type="number" id="maxPages" value="1" min="1" style="width: 50px; margin-right: 10px;">
-            <label for="nextPageSelector">Next Page Selector:</label>
-            <input type="text" id="nextPageSelector" placeholder="e.g., .next-button" style="width: 150px;">
-        `;
-
-        let output = document.createElement("div");
-        output.style.cssText = "width:100%;height:200px;overflow-y:auto;border:1px solid #555;padding:5px;margin-top:10px;font-size:12px;background-color:#222;";
-
-        panel.append(toggleButton, pauseResumeButton, startCrawlButton, cancelButton, clearSelectionsButton, downloadJSONButton, downloadCSVButton, downloadHTMLButton, collectLinksButton, controls, output);
-        document.body.appendChild(panel);
-
-        return {panel, toggleButton, pauseResumeButton, startCrawlButton, cancelButton, clearSelectionsButton, downloadJSONButton, downloadCSVButton, downloadHTMLButton, collectLinksButton, output};
+    function y() {
+        let e = document.createElement("div");
+        e.style.cssText =
+            "position:fixed;top:20px;right:20px;background-color:#333;border:1px solid #555;padding:10px;z-index:10000;font-family:'Arial',sans-serif;box-shadow:0 0 10px rgba(0,0,0,0.5);color:#ddd;max-width:400px;width:100%;opacity:0.95;";
+        let t = d("Start Selection"),
+            n = d("Pause Selection"),
+            o = d("Start Crawl"),
+            l = d("Cancel"),
+            a = d("Download JSON"),
+            r = d("Download CSV"),
+            i = d("Clear Selections"),
+            c = d("Download HTML"),
+            s = d("Collect Page Links"),
+            u = document.createElement("div");
+        (u.style.marginTop = "10px"),
+            (u.innerHTML =
+                '\n            <label for="maxPages">Max Pages:</label>\n            <input type="number" id="maxPages" value="1" min="1" style="width: 50px; margin-right: 10px;">\n            <label for="nextPageSelector">Next Page Selector:</label>\n            <input type="text" id="nextPageSelector" placeholder="e.g., .next-button" style="width: 150px;">\n        ');
+        let m = document.createElement("div");
+        return (
+            (m.style.cssText = "width:100%;height:200px;overflow-y:auto;border:1px solid #555;padding:5px;margin-top:10px;font-size:12px;background-color:#222;"),
+            e.append(t, n, o, l, i, a, r, c, s, u, m),
+            document.body.appendChild(e),
+            { panel: e, toggleButton: t, pauseResumeButton: n, startCrawlButton: o, cancelButton: l, clearSelectionsButton: i, downloadJSONButton: a, downloadCSVButton: r, downloadHTMLButton: c, collectLinksButton: s, output: m }
+        );
     }
-
-    function logOutput(element, message) {
-        if (useInnerHTML) {
+    function h(e, t) {
+        if (c)
             try {
-                element.innerHTML += "<p>" + message + "</p>";
-            } catch (error) {
-                console.log("CSP detected, falling back to DOM methods");
-                useInnerHTML = false;
-                let p = document.createElement("p");
-                p.textContent = message;
-                element.appendChild(p);
+                e.innerHTML += "<p>" + t + "</p>";
+            } catch (n) {
+                console.log("CSP detected, falling back to DOM methods"), (c = !1);
+                let o = document.createElement("p");
+                (o.textContent = t), e.appendChild(o);
             }
-        } else {
-            let p = document.createElement("p");
-            p.textContent = message;
-            element.appendChild(p);
+        else {
+            let l = document.createElement("p");
+            (l.textContent = t), e.appendChild(l);
         }
     }
-
-    function handleClick(event) {
-        if (!controlPanel.contains(event.target)) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
+    let { panel: b, toggleButton: v, pauseResumeButton: w, startCrawlButton: x, cancelButton: k, clearSelectionsButton: E, downloadJSONButton: S, downloadCSVButton: $, downloadHTMLButton: C, collectLinksButton: H, output: T } = y();
+    function L(e) {
+        l.contains(e.target) || (e.preventDefault(), e.stopPropagation());
     }
-
-    let {panel, toggleButton, pauseResumeButton, startCrawlButton, cancelButton, clearSelectionsButton, downloadJSONButton, downloadCSVButton, downloadHTMLButton, collectLinksButton, output} = createControlPanel();
-
-    controlPanel = panel;
-
-    toggleButton.addEventListener("click", () => {
-        isSelecting = !isSelecting;
-        isPaused = false;
-        document.body.style.cursor = isSelecting ? "crosshair" : "default";
-        toggleButton.textContent = isSelecting ? "Stop Selection" : "Start Selection";
-        pauseResumeButton.textContent = "Pause Selection";
-        logOutput(output, isSelecting ? "Selection started. Click on elements to select them for scraping." : "Selection stopped.");
-        if (isSelecting) {
-            document.body.addEventListener("click", handleClick, true);
-        } else {
-            document.body.removeEventListener("click", handleClick, true);
-        }
-    });
-
-    pauseResumeButton.addEventListener("click", () => {
-        if (isSelecting) {
-            isPaused = !isPaused;
-            document.body.style.cursor = isPaused ? "default" : "crosshair";
-            pauseResumeButton.textContent = isPaused ? "Resume Selection" : "Pause Selection";
-            logOutput(output, isPaused ? "Selection paused. You can interact with the page normally." : "Selection resumed. Click on elements to select them for scraping.");
-            if (isPaused) {
-                document.body.removeEventListener("click", handleClick, true);
-            } else {
-                document.body.addEventListener("click", handleClick, true);
-            }
-        } else {
-            logOutput(output, "Please start selection first.");
-        }
-    });
-
-    startCrawlButton.addEventListener("click", () => startScraping(output));
-
-    cancelButton.addEventListener("click", () => {
-        isSelecting = false;
-        isPaused = false;
-        selectedElements = [];
-        scrapedData = null;
-        document.body.style.cursor = "default";
-        toggleButton.textContent = "Start Selection";
-        pauseResumeButton.textContent = "Pause Selection";
-        logOutput(output, "Operation cancelled. Start over by clicking 'Start Selection'.");
-        document.body.removeEventListener("click", handleClick, true);
-    });
-
-    clearSelectionsButton.addEventListener("click", () => {
-        selectedElements = [];
-        logOutput(output, "All selections cleared. You can start selecting new elements.");
-    });
-
-    downloadJSONButton.addEventListener("click", function() {
-        if (!scrapedData || scrapedData.length === 0) return void alert("No data to download. Please perform a crawl first.");
-        let jsonString = JSON.stringify(scrapedData, null, 2);
-        let dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(jsonString);
-        let link = document.createElement("a");
-        link.setAttribute("href", dataUri);
-        link.setAttribute("download", "scraped_data.json");
-        link.click();
-    });
-
-    downloadCSVButton.addEventListener("click", function() {
-        if (!scrapedData || scrapedData.length === 0) return void alert("No data to download. Please perform a crawl first.");
-        let headers = Object.keys(scrapedData[0]).flatMap(key => [`${key} Text`, `${key} Href`, `${key} Src`]);
-        let csv = headers.join(",") + "\n";
-        scrapedData.forEach(item => {
-            let row = Object.values(item).flatMap(value => [
-                `"${(value?.text || '').replace(/"/g, '""')}"`,
-                `"${value?.href || ''}"`,
-                `"${value?.src || ''}"`
-            ]);
-            csv += row.join(",") + "\n";
-        });
-        let dataUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-        let link = document.createElement("a");
-        link.setAttribute("href", dataUri);
-        link.setAttribute("download", "scraped_data.csv");
-        link.click();
-    });
-
-    downloadHTMLButton.addEventListener("click", function() {
-        if (!scrapedData || scrapedData.length === 0) return void alert("No data to download. Please perform a crawl first.");
-        let headers = Object.keys(scrapedData[0]).flatMap(key => [`${key} Text`, `${key} Href`, `${key} Src`]);
-        let tableHtml = `
-            <table>
-                <tr>${headers.map(header => `<th>${header}</th>`).join("")}</tr>
-                ${scrapedData.map(item => `
-                    <tr>${Object.values(item).flatMap(value => [
-                        `<td>${value?.text || ''}</td>`,
-                        `<td>${value?.href ? `<a href="${value.href}" target="_blank">${value.href}</a>` : ""}</td>`,
-                        `<td>${value?.src ? `<a href="${value.src}" target="_blank"><img src="${value.src}" alt="Thumbnail"></a>` : ""}</td>`
-                    ]).join("")}</tr>
-                `).join("")}
-            </table>
-        `;
-        let htmlContent = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Scraped Data</title>
-                <style>
-                    body {
-                        font-family: 'Courier New', monospace;
-                        line-height: 1.6;
-                        padding: 20px;
-                        background-color: #ffffff;
-                        color: #00ff00;
-                    }
+    (l = b),
+        v.addEventListener("click", () => {
+            (t = !t),
+                (n = !1),
+                (document.body.style.cursor = t ? "crosshair" : "default"),
+                (v.textContent = t ? "Stop Selection" : "Start Selection"),
+                (w.textContent = "Pause Selection"),
+                h(T, t ? "Selection started. Click on elements to select them for scraping." : "Selection stopped."),
+                t ? document.body.addEventListener("click", L, !0) : document.body.removeEventListener("click", L, !0);
+        }),
+        w.addEventListener("click", () => {
+            t
+                ? ((n = !n),
+                  (document.body.style.cursor = n ? "default" : "crosshair"),
+                  (w.textContent = n ? "Resume Selection" : "Pause Selection"),
+                  h(T, n ? "Selection paused. You can interact with the page normally." : "Selection resumed. Click on elements to select them for scraping."),
+                  n ? document.body.removeEventListener("click", L, !0) : document.body.addEventListener("click", L, !0))
+                : h(T, "Please start selection first.");
+        }),
+        x.addEventListener("click", () => f(T)),
+        k.addEventListener("click", () => {
+            (t = !1),
+                (n = !1),
+                (e = []),
+                (o = null),
+                (document.body.style.cursor = "default"),
+                (v.textContent = "Start Selection"),
+                (w.textContent = "Pause Selection"),
+                h(T, "Operation cancelled. Start over by clicking 'Start Selection'."),
+                document.body.removeEventListener("click", L, !0);
+        }),
+        E.addEventListener("click", () => {
+            (e = []), h(T, "All selections cleared. You can start selecting new elements.");
+        }),
+        S.addEventListener("click", function () {
+            if (!o) return void alert("No data to download. Please perform a crawl first.");
+            let e = JSON.stringify(o, null, 2),
+                t = "data:application/json;charset=utf-8," + encodeURIComponent(e),
+                n = document.createElement("a");
+            n.setAttribute("href", t), n.setAttribute("download", "scraped_data.json"), n.click();
+        }),
+        $.addEventListener("click", function () {
+            if (!o) return void alert("No data to download. Please perform a crawl first.");
+            let e = Object.keys(o[0]).flatMap((e) => [`${e} Text`, `${e} Href`, `${e} Src`]),
+                t = e.join(",") + "\n";
+            o.forEach((e) => {
+                let n = Object.values(e).flatMap((e) => [`"${e.text.replace(/"/g, '""')}"`, `"${e.href}"`, `"${e.src}"`]);
+                t += n.join(",") + "\n";
+            });
+            let n = "data:text/csv;charset=utf-8," + encodeURIComponent(t),
+                l = document.createElement("a");
+            l.setAttribute("href", n), l.setAttribute("download", "scraped_data.csv"), l.click();
+        }),
+C.addEventListener("click", function() {
+    if (!o) return void alert("No data to download. Please perform a crawl first.");
+    let e = Object.keys(o[0]).flatMap(e => [`${e} Text`, `${e} Href`, `${e} Src`]),
+        t = `
+        <table>
+            <tr>${e.map(e => `<th>${e}</th>`).join("")}</tr>
+            ${o.map(e => `
+                <tr>${Object.values(e).flatMap(e => [`<td>${e.text}</td>`, `<td>${e.href ? `<a href="${e.href}" target="_blank">${e.href}</a>` : ""}</td>`, `<td>${e.src ? `<a href="${e.src}" target="_blank"><img src="${e.src}" alt="Thumbnail"></a>` : ""}</td>`]).join("")}</tr>
+            `).join("")}
+        </table>
+    `;
+    let n = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Scraped Data</title>
+            <style>
+                body {
+                    font-family: 'Courier New', monospace;
+                    line-height: 1.6;
+                    padding: 20px;
+                    background-color: #1a1a1a;
+                    color: #00ff00;
+                }
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    background-color: #222;
+                    box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+                }
+                th, td {
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid #00ff00;
+                    font-size: 12px;
+                }
+                th {
+                    background-color: #333;
+                    color: #00ff00;
+                    font-weight: bold;
+                }
+                tr:hover {
+                    background-color: #2a2a2a;
+                }
+                img {
+                    max-width: 50px;
+                    max-height: 50px;
+                    object-fit: cover;
+                }
+                a {
+                    color: #00ccff;
+                    text-decoration: none;
+                    word-break: break-all;
+                }
+                a:hover {
+                    text-decoration: underline;
+                }
+                @media (max-width: 600px) {
                     table {
-                        border-collapse: collapse;
-                        width: 100%;
-                        background-color: #222;
-                        box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+                        font-size: 10px;
                     }
                     th, td {
-                        padding: 12px;
-                        text-align: left;
-                        border-bottom: 1px solid #00ff00;
-                        font-size: 10x;
+                        padding: 8px;
                     }
-                    th {
-                        background-color: #333;
-                        color: #00ff00;
-                        font-weight: bold;
-                    }
-                    tr:hover {
-                        background-color: #2a2a2a;
-                    }
-                    img {
-                        max-width: 50px;
-                        max-height: 50px;
-                        object-fit: cover;
-                    }
-                    a {
-                        color: #00ccff;
-                        text-decoration: none;
-                        word-break: break-all;
-                    }
-                    a:hover {
-                        text-decoration: underline;
-                    }
-                    @media (max-width: 600px) {
-                        table {
-                            font
-                            
-                            
-                            }
-                        th, td {
-                            padding: 8px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                ${tableHtml}
-            </body>
-            </html>
-        `;
-        let blob = new Blob([htmlContent], {type: "text/html"});
-        let url = URL.createObjectURL(blob);
-        let link = document.createElement("a");
-        link.href = url;
-        link.download = "scraped_data.html";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    });
+                }
+            </style>
+        </head>
+        <body>
+            ${t}
+        </body>
+        </html>
+    `;
+    let newWindow = window.open();
+    newWindow.document.write(n);
+    newWindow.document.close();
+});
 
-    collectLinksButton.addEventListener("click", function() {
-        let links = collectPageLinks();
-        logOutput(output, `Collected ${links.length} unique links:`);
-        links.forEach(link => logOutput(output, link));
-        scrapedData = links.map(link => ({link}));
-    });
-
-    document.addEventListener("click", event => {
-        if (isSelecting && !isPaused && !controlPanel.contains(event.target)) {
-            event.preventDefault();
-            event.stopPropagation();
-            let selector = getElementSelector(event.target);
-            if (selectedElements.some(el => getElementSelector(el) === selector)) {
-                logOutput(output, "Element already selected: " + selector);
-            } else {
-                selectedElements.push(event.target);
-                logOutput(output, "Element selected: " + selector);
-            }
-        }
-    }, true);
-
-    console.log("Improved Multi-Select Scraper UI with selection control, CSP fallback, pagination support, and link collection added. Use the buttons to control the scraping process.");
+        H.addEventListener("click", function () {
+            let e = g();
+            h(T, `Collected ${e.length} unique links:`), e.forEach((e) => h(T, e)), (o = e.map((e) => ({ link: e })));
+        }),
+        document.addEventListener(
+            "click",
+            (n) => {
+                if (t && !l.contains(n.target)) {
+                    n.preventDefault(), n.stopPropagation();
+                    let o = s(n.target);
+                    e.some((e) => s(e) === o) ? h(T, "Element already selected: " + o) : (e.push(n.target), h(T, "Element selected: " + o));
+                }
+            },
+            !0
+        ),
+        console.log("Improved Multi-Select Scraper UI with selection control, CSP fallback, pagination support, and link collection added. Use the buttons to control the scraping process.");
 })();
