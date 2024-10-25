@@ -1,4 +1,3 @@
-//text to link urls and anchors and image embeds
 javascript:(function() {
     const styles = `
         #url-converter-toolbar {
@@ -176,3 +175,5 @@ javascript:(function() {
 
     console.log('URL Converter Toolbar added. Use the buttons to convert URLs or create an image gallery.');
 })();
+//text to link urls and anchors gallery
+//javascript:(function(){window.s0=document.createElement('script');window.s0.setAttribute('type','text/javascript');window.s0.setAttribute('src','https://bookmarkify.it/bookmarklets/67088/raw');document.getElementsByTagName('body')[0].appendChild(window.s0);})();
