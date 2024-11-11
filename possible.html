@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>yeehaw</title>
+    <style>
+        #map {
+            height: 70vh;
+            width: 100%;
+        }
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+        .content {
+            padding: 10px;
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>yeehaw</h1>
+        <p>Explore the optimized route starting in Italy, continuing through Switzerland, the Netherlands, UK, and Spain, looping back to Italy. Wawa!</p>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        function initMap() {
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 6,
+                center: { lat: 48.8566, lng: 2.3522 }
+            });
+
+            var directionsService = new google.maps.DirectionsService();
+            var directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map,
+                polylineOptions: {
+                    strokeColor: '#0000FF',
+                    strokeWeight: 5
+                }
+            });
+
+            var waypoints = [
+                { location: "Milan, Italy", stopover: true },
+                { location: "Lake Como, Italy", stopover: true },
+                { location: "Verona, Italy", stopover: true },
+                { location: "Zurich, Switzerland", stopover: true },
+                { location: "Lucerne, Switzerland", stopover: true },
+                { location: "Interlaken, Switzerland", stopover: true },
+                { location: "Lauterbrunnen, Switzerland", stopover: true },
+                { location: "Amsterdam, Netherlands", stopover: true },
+                { location: "London, UK", stopover: true },
+                { location: "Madrid, Spain", stopover: true },
+                { location: "Barcelona, Spain", stopover: true },
+                { location: "Seville, Spain", stopover: true },
+                { location: "Florence, Italy", stopover: true },
+                { location: "Pisa, Italy", stopover: true },
+                { location: "Cinque Terre, Italy", stopover: true },
+                { location: "Positano, Italy", stopover: true },
+                { location: "Rome, Italy", stopover: true }
+            ];
+
+            var request = {
+                origin: "Milan, Italy",
+                destination: "Rome, Italy",
+                waypoints: waypoints,
+                travelMode: google.maps.TravelMode.DRIVING,
+                optimizeWaypoints: true
+            };
+
+            directionsService.route(request, function(result, status) {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    directionsRenderer.setDirections(result);
+
+                    let routePath = result.routes[0].overview_path;
+                    let countryColors = {
+                        "Italy": "#FF5733",
+                        "Switzerland": "#4CAF50",
+                        "Netherlands": "#2196F3",
+                        "UK": "#9C27B0",
+                        "Spain": "#FFC107"
+                    };
+
+                    function colorRoute(startIndex, endIndex, country) {
+                        let polylineOptions = {
+                            path: routePath.slice(startIndex, endIndex),
+                            strokeWeight: 6,
+                            strokeOpacity: 1.0,
+                            strokeColor: countryColors[country]
+                        };
+                        new google.maps.Polyline(polylineOptions).setMap(map);
+                    }
+
+                    colorRoute(0, 5, "Italy");
+                    colorRoute(6, 10, "Switzerland");
+                    colorRoute(11, 12, "Netherlands");
+                    colorRoute(13, 14, "UK");
+                    colorRoute(15, 17, "Spain");
+                    colorRoute(18, 22, "Italy");
+                } else {
+                    alert("Directions request failed due to " + status);
+                }
+            });
+        }
+    </script>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap" async defer></script>
+</body>
+</html>
