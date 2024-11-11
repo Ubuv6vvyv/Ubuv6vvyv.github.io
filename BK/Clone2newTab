@@ -1,0 +1,73 @@
+javascript:(function(){
+    // Prompt user to enter the full JavaScript path
+    const jsPath = prompt("Enter the JavaScript path (e.g., document.querySelector('body > div').shadowRoot.querySelector('div > main'))");
+
+    if (!jsPath) {
+        alert("No path provided. Aborting...");
+        return;
+    }
+
+    try {
+        // Log the JavaScript path entered to help with debugging
+        console.log("Evaluating JS Path: " + jsPath);
+
+        // Try evaluating the JS path
+        const element = eval(jsPath);
+
+        // Check if the element is found
+        if (!element) {
+            alert("Element not found. Please check the JavaScript path.");
+            return;
+        }
+
+        // Log the element to ensure it's correct
+        console.log("Element found: ", element);
+
+        // Clone the element and its contents
+        const clonedElement = element.cloneNode(true);
+
+        // Open a new blank window to insert the cloned element
+        const newWindow = window.open("", "_blank");
+
+        if (newWindow) {
+            // Add the buttons for "View DOM source" and "Save page as HTML"
+            newWindow.document.write("<html><head><title>Cloned Element</title></head><body>");
+            newWindow.document.write("<h1>Cloned Element</h1>");
+
+            // View DOM source button
+            newWindow.document.write('<button id="view-dom">View DOM source</button>');
+            newWindow.document.write('<button id="save-page">Save Page as HTML</button><br><br>');
+
+            // Event listener for "View DOM source"
+            newWindow.document.getElementById("view-dom").addEventListener("click", function() {
+                const domSource = newWindow.document.documentElement.outerHTML;
+                const domWindow = newWindow.open("", "_blank");
+                domWindow.document.write("<html><head><title>DOM Source</title></head><body><pre>" + domSource + "</pre></body></html>");
+                domWindow.document.close();
+            });
+
+            // Event listener for "Save Page as HTML"
+            newWindow.document.getElementById("save-page").addEventListener("click", function() {
+                const htmlContent = newWindow.document.documentElement.outerHTML;
+                const blob = new Blob([htmlContent], { type: "text/html" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "cloned_page.html";
+                link.click();
+                URL.revokeObjectURL(url);
+            });
+
+            // Insert the cloned element below the buttons
+            newWindow.document.write("<div>" + clonedElement.outerHTML + "</div>");
+            newWindow.document.write("</body></html>");
+            newWindow.document.close();
+        } else {
+            alert("Failed to open a new window. Please check your browser settings.");
+        }
+    } catch (error) {
+        // Catch any errors in the eval process
+        console.error("Error occurred while evaluating the JavaScript path:", error);
+        alert("An error occurred: " + error.message);
+    }
+})();
