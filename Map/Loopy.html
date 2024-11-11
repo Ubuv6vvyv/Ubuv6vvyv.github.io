@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Headache Europe Route</title>
+    <style>
+        body{font-family:system-ui;background:#f5f5f5;padding:10px;margin:0}
+        #map{height:75vh;width:100%;margin:10px 0;border-radius:8px}
+        .ctrl{display:flex;gap:10px;margin-bottom:10px}
+        .btn{padding:8px 16px;border:none;border-radius:4px;cursor:pointer;background:#e0e0e0;transition:.3s}
+        .btn.active{background:#2196F3;color:#fff}
+        .legend{position:fixed;top:10px;right:10px;background:#fff;padding:8px;border-radius:4px;box-shadow:0 2px 4px #0003}
+        .line-item{display:flex;align-items:center;margin:3px 0}
+        .line{width:20px;height:2px;margin-right:8px}
+        .l-flight{border-top:2px dashed #f48}
+        .l-train{background:#4a5}
+        .l-car{background:#29f}
+        .info{margin:10px 0;padding:10px;background:#fff;border-radius:4px}
+    </style>
+</head>
+<body>
+    <h1>Italy-First Europe Route</h1>
+    <div class="info">Start: Milan (MXP) | Duration: 28-32 days</div>
+    <div class="ctrl">
+        <button class="btn active" onclick="setRoute('italian')">Italian Focus</button>
+        <button class="btn" onclick="setRoute('efficient')">Time Efficient</button>
+        <button class="btn" onclick="setRoute('scenic')">Scenic Priority</button>
+    </div>
+    <div id="map"></div>
+    <div class="legend">
+        <div class="line-item"><div class="line l-flight"></div>Flight</div>
+        <div class="line-item"><div class="line l-train"></div>Train</div>
+        <div class="line-item"><div class="line l-car"></div>Local/Bus</div>
+    </div>
+    <script>
+const r={italian:[
+    // Start with Northern Italy (4-5 days)
+    {p:["Milan","Lake Como","Verona"],t:"t"},
+    // Central Italy (6-7 days)
+    {p:["Verona","Florence"],t:"t"},
+    {p:["Florence","Siena","Pienza","Asciano"],t:"c"},
+    {p:["Florence","Pisa","Cinque Terre"],t:"t"},
+    // Southern Italy (4-5 days)
+    {p:["Cinque Terre","Positano"],t:"t"},
+    {p:["Positano","Capri"],t:"c"},
+    // Switzerland Phase (5-6 days)
+    {p:["Positano","Zurich"],t:"f"},
+    {p:["Zurich","Lucerne","Interlaken","Lauterbrunnen","Grindelwald"],t:"t"},
+    // Netherlands & UK (6-7 days)
+    {p:["Zurich","Amsterdam"],t:"f"},
+    {p:["Amsterdam","London"],t:"f"},
+    // Spain Final Leg (7 days)
+    {p:["London","Barcelona"],t:"f"},
+    {p:["Barcelona","Madrid","Seville"],t:"t"}
+],efficient:[
+    // North Italy Quick (3-4 days)
+    {p:["Milan","Lake Como","Verona"],t:"t"},
+    // Fast Track Central (4-5 days)
+    {p:["Verona","Florence"],t:"t"},
+    {p:["Florence","Pisa"],t:"t"},
+    // Switzerland Direct (4-5 days)
+    {p:["Florence","Zurich"],t:"f"},
+    {p:["Zurich","Lucerne","Interlaken","Lauterbrunnen"],t:"t"},
+    // Quick Netherlands/UK (5-6 days)
+    {p:["Interlaken","Amsterdam"],t:"f"},
+    {p:["Amsterdam","London"],t:"f"},
+    // South Italy Return (5-6 days)
+    {p:["London","Positano"],t:"f"},
+    {p:["Positano","Capri"],t:"c"},
+    // Spain Finale (7 days)
+    {p:["Capri","Barcelona"],t:"f"},
+    {p:["Barcelona","Madrid","Seville"],t:"t"}
+],scenic:[
+    // Relaxed North Italy (5-6 days)
+    {p:["Milan","Lake Como","Verona"],t:"t"},
+    // Tuscany Leisure (6-7 days)
+    {p:["Verona","Florence"],t:"t"},
+    {p:["Florence","Siena","Pienza"],t:"c"},
+    {p:["Pienza","Pisa","Cinque Terre"],t:"t"},
+    // Amalfi Experience (4-5 days)
+    {p:["Cinque Terre","Positano"],t:"t"},
+    {p:["Positano","Capri"],t:"c"},
+    // Swiss Alps (6-7 days)
+    {p:["Capri","Zurich"],t:"f"},
+    {p:["Zurich","Lucerne","Interlaken","Lauterbrunnen","Grindelwald"],t:"t"},
+    // Benelux & UK (5-6 days)
+    {p:["Interlaken","Amsterdam"],t:"f"},
+    {p:["Amsterdam","London"],t:"f"},
+    // Spanish Adventure (7 days)
+    {p:["London","Barcelona"],t:"f"},
+    {p:["Barcelona","Madrid","Seville"],t:"t"}
+]},
+c={
+    "Milan":[45.4642,9.1900],"Lake Como":[45.8151,9.0825],"Verona":[45.4384,10.9916],
+    "Florence":[43.7696,11.2558],"Pisa":[43.7228,10.4017],"Cinque Terre":[44.1461,9.6439],
+    "Siena":[43.3188,11.3305],"Pienza":[43.0776,11.6789],"Asciano":[43.2343,11.5579],
+    "Positano":[40.6333,14.6029],"Capri":[40.5532,14.2222],"Zurich":[47.3769,8.5417],
+    "Lucerne":[47.0502,8.3093],"Interlaken":[46.6863,7.8632],"Amsterdam":[52.3676,4.9041],
+    "London":[51.5074,-0.1278],"Barcelona":[41.3851,2.1734],"Madrid":[40.4168,-3.7038],
+    "Seville":[37.3891,-5.9845],"Lauterbrunnen":[46.5937,7.9090],"Grindelwald":[46.6244,8.0345]
+};
+
+let m,k=[],l=[];
+
+function initMap(){
+    m=new google.maps.Map(document.getElementById('map'),{
+        zoom:5,center:{lat:45.4642,lng:9.1900}, // Centered on Milan
+        mapTypeControl:false
+    });
+    setRoute('italian');
+}
+
+function clear(){
+    k.forEach(m=>m.setMap(null));
+    l.forEach(l=>l.setMap(null));
+    k=[];l=[];
+}
+
+function showRoute(t){
+    clear();
+    let n=1;
+    r[t].forEach(s=>{
+        s.p.forEach((p,i)=>{
+            if(c[p]){
+                k.push(new google.maps.Marker({
+                    position:{lat:c[p][0],lng:c[p][1]},
+                    map:m,label:n.toString(),
+                    title:`${n}. ${p}`
+                }));
+                n++;
+                if(i<s.p.length-1&&c[s.p[i+1]]){
+                    const y=s.t==='f'?{
+                        path:'M 0,-1 0,1',
+                        strokeOpacity:1,
+                        scale:3
+                    }:null;
+                    l.push(new google.maps.Polyline({
+                        path:[
+                            {lat:c[p][0],lng:c[p][1]},
+                            {lat:c[s.p[i+1]][0],lng:c[s.p[i+1]][1]}
+                        ],
+                        strokeColor:s.t==='f'?'#f48':s.t==='t'?'#4a5':'#29f',
+                        strokeOpacity:s.t==='f'?0:1,
+                        strokeWeight:3,
+                        icons:s.t==='f'?[{icon:y,offset:'0',repeat:'20px'}]:null,
+                        map:m
+                    }));
+                }
+            }
+        });
+    });
+}
+
+function setRoute(t){
+    document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+    event.target.classList.add('active');
+    showRoute(t);
+}
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap" async defer></script>
+</body>
+</html>
