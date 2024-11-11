@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Italy Trip Planner</title>
+    <style>
+        body { font-family: system-ui; background: #f5f5f5; padding: 10px; margin: 0; }
+        #map { height: 75vh; width: 100%; margin: 10px 0; border-radius: 8px; }
+        .legend { position: fixed; top: 10px; right: 10px; background: #fff; padding: 8px; border-radius: 4px; box-shadow: 0 2px 4px #0003; }
+        .line-item { display: flex; align-items: center; margin: 3px 0; }
+        .line { width: 20px; height: 2px; margin-right: 8px; }
+        .l-train { background: #4a5; }
+        .l-car { background: #29f; }
+    </style>
+</head>
+<body>
+    <h1>Italy Trip Planner</h1>
+    <div id="map"></div>
+    <div class="legend">
+        <div class="line-item"><div class="line l-train"></div>Train</div>
+        <div class="line-item"><div class="line l-car"></div>Car</div>
+    </div>
+    <script>
+const coordinates = {
+    "Rome": [41.9028, 12.4964],
+    "Positano": [40.6333, 14.6029],
+    "Ravello": [40.6495, 14.6126],
+    "Capri": [40.5532, 14.2222],
+    "Pienza": [43.0776, 11.6789],
+    "Asciano": [43.2343, 11.5579],
+    "Siena": [43.3188, 11.3305],
+    "Florence": [43.7696, 11.2558],
+    "Pisa": [43.7228, 10.4017],
+    "Cinque Terre": [44.1461, 9.6439],
+    "Portofino": [44.3034, 9.2116],
+    "Milan": [45.4642, 9.1900],
+    "Lake Como": [45.8151, 9.0825],
+    "Verona": [45.4384, 10.9916]
+};
+
+let map, markers = [], polylines = [];
+
+function initMap() {
+    map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 6,
+        center: { lat: 42.5, lng: 12.5 },
+        mapTypeControl: false,
+        fullscreenControl: true  // Enables fullscreen option
+    });
+
+    const route = [
+        { location: "Rome", days: 1, label: "Day 1: Rome" },
+        { location: "Positano", days: 3, label: "Days 2-4: Positano" },
+        { location: "Ravello", days: 0, label: "On the way: Ravello" },
+        { location: "Capri", days: 0, label: "Day Trip: Capri (Optional)" },
+        { location: "Pienza", days: 1, label: "Day 5: Pienza" },
+        { location: "Asciano", days: 0, label: "On the way: Asciano" },
+        { location: "Siena", days: 0, label: "On the way: Siena" },
+        { location: "Florence", days: 2, label: "Days 6-7: Florence" },
+        { location: "Pisa", days: 0, label: "On the way: Pisa" },
+        { location: "Cinque Terre", days: 1, label: "Day 8: Cinque Terre" },
+        { location: "Portofino", days: 0, label: "Optional: Portofino" },
+        { location: "Milan", days: 3, label: "Days 9-11: Milan" },
+        { location: "Lake Como", days: 0, label: "Day Trip: Lake Como" },
+        { location: "Verona", days: 0, label: "Day Trip: Verona" }
+    ];
+
+    let labelIndex = 1;
+    route.forEach((stop, index) => {
+        if (coordinates[stop.location]) {
+            const marker = new google.maps.Marker({
+                position: { lat: coordinates[stop.location][0], lng: coordinates[stop.location][1] },
+                map: map,
+                label: labelIndex.toString(),
+                title: `${labelIndex}. ${stop.label}`
+            });
+            markers.push(marker);
+            labelIndex++;
+            if (index < route.length - 1 && coordinates[route[index + 1].location]) {
+                const lineColor = index < 6 ? "#4a5" : "#29f";
+                const polyline = new google.maps.Polyline({
+                    path: [
+                        { lat: coordinates[stop.location][0], lng: coordinates[stop.location][1] },
+                        { lat: coordinates[route[index + 1].location][0], lng: coordinates[route[index + 1].location][1] }
+                    ],
+                    strokeColor: lineColor,
+                    strokeOpacity: 1,
+                    strokeWeight: 3,
+                    map: map
+                });
+                polylines.push(polyline);
+            }
+        }
+    });
+}
+
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap" async defer></script>
+</body>
+</html>
