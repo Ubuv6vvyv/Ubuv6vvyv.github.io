@@ -99,3 +99,250 @@ SMELSI00058141 | //<![CDATA[ var theForm = document.forms['Form1']; if (!theForm
 SMELSI00058139 | //<![CDATA[ var theForm = document.forms['Form1']; if (!theForm) { theForm = document.Form1; } function __doPostBack(eventTarget, eventArgument) { if (!theForm.onsubmit || (theForm.onsubmit() != false)) { theForm.__EVENTTARGET.value = eventTarget; theForm.__EVENTARGUMENT.value = eventArgument; theForm.submit(); } } //]]> function AttachToScrollEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("scroll", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("scroll", EventHandlerFunction, false); } else if("onscroll" in self) // MSIE 6, 7 and MSIE 8 { var oldonscroll = self.onscroll; if (typeof self.onscroll != 'function') { self.onscroll = EventHandlerFunction; } else { self.onscroll = function() { if (oldonscroll) { oldonscroll(); } EventHandlerFunction(); } } }; } function AttachToResizeEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("resize", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("resize", EventHandlerFunction, false); } else if("onresize" in self) // MSIE 6, 7 and MSIE 8 { var oldonresize = self.onscroll; if (typeof self.onresize != 'function') { self.onresize = EventHandlerFunction; } else { self.onresize = function() { if (oldonresize) { oldonresize(); } EventHandlerFunction(); } } }; } function DisablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { var DocumentSize = documentSize(); $(PageSmokeScreen).setStyle('left', '0px'); $(PageSmokeScreen).setStyle('top', '0px'); $(PageSmokeScreen).setStyle('width', DocumentSize.width + 'px'); $(PageSmokeScreen).setStyle('height', DocumentSize.height + 'px'); $(PageSmokeScreen).setStyle('z-index', '1500'); $(PageSmokeScreen).setStyle('display', 'block'); } } function EnablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { $(PageSmokeScreen).setStyle('z-index', 0); $(PageSmokeScreen).setStyle('display', 'none'); } } function DebugConsole_NewMessage(Message) { } function DebugConsole_Clear() { } function PositionLightBox() { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxLeft = posLeft()+(pageWidth()-parseInt(LightBox.getStyle('width')))/2; var LightBoxTop = posTop()+300; if (LightBoxLeft<0) { LightBoxLeft=0; } $(LightBox).setStyle('left', LightBoxLeft + 'px'); $(LightBox).setStyle('top', LightBoxTop + 'px'); } } function ShowLightBox(Title, Message, Buttons, ResponseHolderID, AutoPostBack, ImageURL) { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxMessage = $('MessageBox'); var TitleBoxMessage = $('TitleBox'); var LightBoxButtons = $('ButtonBox'); if (LightBoxMessage && LightBoxButtons && TitleBoxMessage) { TitleBoxMessage.innerHTML = Title; var MessageHTML = '<span class="LightBoxMessageText">' + Message + '</span>'; if (ImageURL!=null && ImageURL!='') { MessageHTML='<table cellpading="0" cellspacing="0"><tr><td valign="top" valign="center" width="50"><img src="' + ImageURL + '" alt=""></td><td valign="top" align="center">' + MessageHTML + '</td></tr></table>'; } LightBoxMessage.innerHTML = MessageHTML; var ButtonElement; var ButtonsHTML = ''; var ButtonID = ''; var FirstButtonID = ''; for(var i=0; i<Buttons.length; i++) { ButtonID = 'ButtonBox_' + i; if (i==0) { FirstButtonID=ButtonID; } ButtonElement = '<input type="button" id="' + ButtonID + '" value="' + Buttons[i].caption + '" style="width: 100px;height:25px;margin:5px;" onclick="HideLightBox(); ' + Buttons[i].onclick + '">'; ButtonsHTML = ButtonsHTML + ButtonElement; } LightBoxButtons.innerHTML = ButtonsHTML; DisablePage(); PositionLightBox(); $(LightBox).setStyle('z-index', '1700'); $(LightBox).setStyle('display', 'block'); setTimeout("SetFocusOnLightBoxButton('" + FirstButtonID + "');", 500); } } } function SetFocusOnLightBoxButton(ButtonID) { try { $(ButtonID).focus(); } catch(e) {} } AttachToScrollEvent(PositionLightBox); AttachToResizeEvent(PositionLightBox); function HideLightBox() { var LightBox = $('_LightBox'); if (LightBox) { $(LightBox).setStyle('display', 'none'); } EnablePage(); } var originalDoPostBack; function customDoPostBack(eventTarget, eventArgument) { var performPostBack = true; if (getElement(eventTarget)) { try { var postbackCondition = getElement(eventTarget).getProperty('postbackCondition'); performPostBack = evaluateTrueFalseFunction(postbackCondition) } catch(e){} } if (performPostBack) { PositionIndicatorImage(); originalDoPostBack(eventTarget, eventArgument); } } function evaluateTrueFalseFunction(functionCode) { if (functionCode && functionCode!='' && functionCode!='undefined') { var newFunction = new Function(functionCode); try { return newFunction(); } catch(e){} } return true; } function setupPostBackHandlers() { originalDoPostBack = __doPostBack; __doPostBack = customDoPostBack; } addLoadEvent(setupPostBackHandlers); function PositionIndicatorImage() { try { var Indicator = $('ctl00_img'); if (Indicator) { Indicator.style.top = (posTop() + (pageHeight()-20)/2) + "px"; Indicator.style.left = (posLeft() + (pageWidth()-20)/2) + "px"; } } catch(err) {} } function ClearValidation(NotificationID) { var Notification=getElement(NotificationID); if (Notification!=null) { Notification.setStyle('display', 'none'); } return true; } function autoSizeIframe(frameId){ try{ var iframe = parent.document.getElementById(frameId); var innerDoc = (iframe.contentDocument) ? iframe.contentDocument : iframe.contentWindow.document; var objToResize = (iframe.style) ? iframe.style : iframe; objToResize.height = innerDoc.body.offsetHeight + GetMarginsSize(innerDoc.body); } catch(err){ window.status = err.message; } } function GetMarginsSize(control){ var margins = 0; var marginTop; var marginBottom; if (control.currentStyle){ marginTop = control.currentStyle.marginTop; marginBottom = control.currentStyle.marginBottom; } else { marginTop = control.getStyle('margin-Top'); marginBottom = control.getStyle('margin-Bottom'); } if (marginTop){ margins = parseInt(marginTop); } if (marginBottom){ margins = margins + parseInt(marginBottom); } return margins; } var intervalset = window.setInterval('Redirect()',3600000); function Redirect() { if (window.location.href.toLowerCase().indexOf('login.aspx') < 0) { window.clearInterval(intervalset); alert('Your session has expired due to inactivity.'); window.parent.location.replace('/Logout.aspx'); } } var DisabledButtons = new Array(); DisabledButtons[0]='DeliveryPanel_SaveConfirmations'; //<![CDATA[ Sys.WebForms.PageRequestManager._initialize('ctl00$sm', 'Form1', ['tctl00$ctl01','','tDeliveryPanel$DeliveryUnpdatePanel','','tTransportGridController$UpdatePanelID','','tPackLinesGridController$UpdatePanelID','','tOrdersGridController$UpdatePanelID','','tContainerGridController$UpdatePanelID','','tReferenceDataGridController$UpdatePanelID','','tCustomsEntriesDataGridController$UpdatePanelID',''], [], [], 300, ''); //]]> Shipment # SMELSI00058139 Bill: SHGS24040536 Shipper's Ref#: Owner's Ref#: AEG240372CN Origin: Shanghai (CNSHA) ETD: 10-Oct-24 Destination: Melbourne (AUMEL) ETA: 30-Oct-24 Order Ref#: SSHGS24040536 Service Level: Standard (STD) Goods Description: GREENWORKS 60V CHAINSAW SKIN Release Type: Express Bill of Lading On Board: Shipped Charges Apply: No Charges showing Estimated Pickup: Pickup Required By: Pickup Cartage Advised: Goods Picked Up: Availability: 31-Oct-24 10:46 Storage Commences: 31-Oct-24 10:46 Estimated Delivery: 04-Nov-24 12:00 Delivery Required By: Delivery Cartage Advised: 11-Oct-24 12:03 Goods Delivered: 06-Nov-24 15:18 Milestones (Completed only) Parent JobDescriptionDateStatus C00065575Departure from First Load Port 10-Oct-24 01:13 Completed SMELSI00058139Send Local Transport Booking 11-Oct-24 11:57 Completed SMELSI00058139Cargo Report Accepted 11-Oct-24 11:59 Completed SMELSI00058139All Import Documents Received 22-Oct-24 13:03 Completed SMELSI00058139Customs Commenced 25-Oct-24 16:32 Completed SMELSI00058139Customs Cleared 27-Oct-24 23:56 Completed C00065575Cargo Available 31-Oct-24 00:01 Completed C00065575Arrival at Final Discharge Port 31-Oct-24 01:29 Completed KOCU5010538Container Estimated Delivery 06-Nov-24 09:00 Completed KOCU4350220Container Estimated Delivery 06-Nov-24 12:00 Completed SMELSI00058139Delivery Cartage Complete/Finalised 06-Nov-24 15:18 Completed SMELSI00058139Transport Group 06-Nov-24 15:18 Completed KOCU5010538Dehire 06-Nov-24 16:24 Completed KOCU4350220Dehire 13-Nov-24 07:10 Completed TransportExport to ExcelCustomise Columns LegModeTypeParentBillVesselVoyage/FlightLoadDischargeDepartureArrivalStatusCarrier 1SEAMain VesselC00065575HDMUSHAO15183300EVER UNICORN0169SShanghaiMelbourne 31-Oct-24 ArrivedHYUMER_AU Goods / PacksExport to ExcelCustomise Columns PiecesPack TypeDescriptionContainer 482CartonGREENWORKS 60V CHAINSAW SKIN GREENWORKS OPTIMUS 82V 22‘’ SELF-PROPELLED MOWER SKIN MULCH KIT 32‘’ OPTIMUS CATCHER ASSEMBLY - TO SUIT GREENWORKS 42" ZTR & TRACTOR GREENWORKS 60V EDGER ATTACHMENT RIM 12*8.5 REAR SUITS OPTIMUS 60" CUP CAP GREENWORKSKOCU4350220 174CartonGREENWORKS 60V CHAINSAW SKIN GREENWORKS OPTIMUS 82V 22‘’ SELF-PROPELLED MOWER SKIN MULCH KIT 32‘’ OPTIMUS CATCHER ASSEMBLY - TO SUIT GREENWORKS 42" ZTR & TRACTOR GREENWORKS 60V EDGER ATTACHMENT RIM 12*8.5 REAR SUITS OPTIMUS 60" CUP CAP GREENWORKSKOCU5010538 OrdersExport to ExcelCustomise Columns Order #Transport ModeStatusOrder Date SSHGS24040536SEADelivered12-Sep-24 ContainersExport to ExcelCustomise Columns Container #Seal #Container TypeContainer ModeEmpty Returned OnDelivery ModeEst. DeliveryEst. ReturnAct. Return KOCU435022024H094563040HCFCL 13-Nov-24 07:06 CY/CY06-Nov-24 12:0007-Nov-24 10:4613-Nov-24 07:06 KOCU501053824H094563840HCFCL 06-Nov-24 16:16 CY/CY06-Nov-24 09:0007-Nov-24 16:0506-Nov-24 16:16 No records found Reference NumbersExport to ExcelCustomise Columns Country/RegionNumber TypeNumberType Description No records found Customs entriesExport to ExcelCustomise Columns Reference #Entry #Message StatusEntry advice SMELSI00058139/1AE9PH7YXFCPYAuthority to Deal Notes 10-Oct-24 08:45 - Detailed Goods DescriptionGREENWORKS 60V CHAINSAW SKINGREENWORKS OPTIMUS 82V 22‘’ SELF-PROPELLED MOWER SKINMULCH KIT 32‘’ OPTIMUS CATCHER ASSEMBLY - TO SUIT GREENWORKS 42" ZTR & TRACTORGREENWORKS 60V EDGER ATTACHMENT RIM 12*8.5 REAR SUITS OPTIMUS 60"CUPCAPGREENWORKS 60V GARDEN CARTGREENWORKS 60V POLE SAW/CHAINSAW ATTACHMENT10-Oct-24 08:45 - Marks & NumbersN/M © WiseTech Global 2024. All rights reserved. //<![CDATA[ theForm.oldSubmit = theForm.submit; theForm.submit = WebForm_SaveScrollPositionSubmit; theForm.oldOnSubmit = theForm.onsubmit; theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit; Sys.Application.add_init(function() { $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":200,"dynamicLayout":true}, null, null, $get("ctl00_updProgress")); }); //]]> You do not have javascript enabled. This site requires javascript in order to operate correctly. Please enable javascript or add this site to the list of trusted sites. To enable javascript, do the following: Select the Tools Menu in Internet Explorer Select Internet Options Select the Security tab Click the Custom Level button Scroll down to the Scripting heading Select the enable option of Active Scripting Click OK in all open dialogs For more detailed instructions regarding configuring trusted sites please click here.
 SMELSI00058143 | //<![CDATA[ var theForm = document.forms['Form1']; if (!theForm) { theForm = document.Form1; } function __doPostBack(eventTarget, eventArgument) { if (!theForm.onsubmit || (theForm.onsubmit() != false)) { theForm.__EVENTTARGET.value = eventTarget; theForm.__EVENTARGUMENT.value = eventArgument; theForm.submit(); } } //]]> function AttachToScrollEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("scroll", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("scroll", EventHandlerFunction, false); } else if("onscroll" in self) // MSIE 6, 7 and MSIE 8 { var oldonscroll = self.onscroll; if (typeof self.onscroll != 'function') { self.onscroll = EventHandlerFunction; } else { self.onscroll = function() { if (oldonscroll) { oldonscroll(); } EventHandlerFunction(); } } }; } function AttachToResizeEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("resize", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("resize", EventHandlerFunction, false); } else if("onresize" in self) // MSIE 6, 7 and MSIE 8 { var oldonresize = self.onscroll; if (typeof self.onresize != 'function') { self.onresize = EventHandlerFunction; } else { self.onresize = function() { if (oldonresize) { oldonresize(); } EventHandlerFunction(); } } }; } function DisablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { var DocumentSize = documentSize(); $(PageSmokeScreen).setStyle('left', '0px'); $(PageSmokeScreen).setStyle('top', '0px'); $(PageSmokeScreen).setStyle('width', DocumentSize.width + 'px'); $(PageSmokeScreen).setStyle('height', DocumentSize.height + 'px'); $(PageSmokeScreen).setStyle('z-index', '1500'); $(PageSmokeScreen).setStyle('display', 'block'); } } function EnablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { $(PageSmokeScreen).setStyle('z-index', 0); $(PageSmokeScreen).setStyle('display', 'none'); } } function DebugConsole_NewMessage(Message) { } function DebugConsole_Clear() { } function PositionLightBox() { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxLeft = posLeft()+(pageWidth()-parseInt(LightBox.getStyle('width')))/2; var LightBoxTop = posTop()+300; if (LightBoxLeft<0) { LightBoxLeft=0; } $(LightBox).setStyle('left', LightBoxLeft + 'px'); $(LightBox).setStyle('top', LightBoxTop + 'px'); } } function ShowLightBox(Title, Message, Buttons, ResponseHolderID, AutoPostBack, ImageURL) { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxMessage = $('MessageBox'); var TitleBoxMessage = $('TitleBox'); var LightBoxButtons = $('ButtonBox'); if (LightBoxMessage && LightBoxButtons && TitleBoxMessage) { TitleBoxMessage.innerHTML = Title; var MessageHTML = '<span class="LightBoxMessageText">' + Message + '</span>'; if (ImageURL!=null && ImageURL!='') { MessageHTML='<table cellpading="0" cellspacing="0"><tr><td valign="top" valign="center" width="50"><img src="' + ImageURL + '" alt=""></td><td valign="top" align="center">' + MessageHTML + '</td></tr></table>'; } LightBoxMessage.innerHTML = MessageHTML; var ButtonElement; var ButtonsHTML = ''; var ButtonID = ''; var FirstButtonID = ''; for(var i=0; i<Buttons.length; i++) { ButtonID = 'ButtonBox_' + i; if (i==0) { FirstButtonID=ButtonID; } ButtonElement = '<input type="button" id="' + ButtonID + '" value="' + Buttons[i].caption + '" style="width: 100px;height:25px;margin:5px;" onclick="HideLightBox(); ' + Buttons[i].onclick + '">'; ButtonsHTML = ButtonsHTML + ButtonElement; } LightBoxButtons.innerHTML = ButtonsHTML; DisablePage(); PositionLightBox(); $(LightBox).setStyle('z-index', '1700'); $(LightBox).setStyle('display', 'block'); setTimeout("SetFocusOnLightBoxButton('" + FirstButtonID + "');", 500); } } } function SetFocusOnLightBoxButton(ButtonID) { try { $(ButtonID).focus(); } catch(e) {} } AttachToScrollEvent(PositionLightBox); AttachToResizeEvent(PositionLightBox); function HideLightBox() { var LightBox = $('_LightBox'); if (LightBox) { $(LightBox).setStyle('display', 'none'); } EnablePage(); } var originalDoPostBack; function customDoPostBack(eventTarget, eventArgument) { var performPostBack = true; if (getElement(eventTarget)) { try { var postbackCondition = getElement(eventTarget).getProperty('postbackCondition'); performPostBack = evaluateTrueFalseFunction(postbackCondition) } catch(e){} } if (performPostBack) { PositionIndicatorImage(); originalDoPostBack(eventTarget, eventArgument); } } function evaluateTrueFalseFunction(functionCode) { if (functionCode && functionCode!='' && functionCode!='undefined') { var newFunction = new Function(functionCode); try { return newFunction(); } catch(e){} } return true; } function setupPostBackHandlers() { originalDoPostBack = __doPostBack; __doPostBack = customDoPostBack; } addLoadEvent(setupPostBackHandlers); function PositionIndicatorImage() { try { var Indicator = $('ctl00_img'); if (Indicator) { Indicator.style.top = (posTop() + (pageHeight()-20)/2) + "px"; Indicator.style.left = (posLeft() + (pageWidth()-20)/2) + "px"; } } catch(err) {} } function ClearValidation(NotificationID) { var Notification=getElement(NotificationID); if (Notification!=null) { Notification.setStyle('display', 'none'); } return true; } function autoSizeIframe(frameId){ try{ var iframe = parent.document.getElementById(frameId); var innerDoc = (iframe.contentDocument) ? iframe.contentDocument : iframe.contentWindow.document; var objToResize = (iframe.style) ? iframe.style : iframe; objToResize.height = innerDoc.body.offsetHeight + GetMarginsSize(innerDoc.body); } catch(err){ window.status = err.message; } } function GetMarginsSize(control){ var margins = 0; var marginTop; var marginBottom; if (control.currentStyle){ marginTop = control.currentStyle.marginTop; marginBottom = control.currentStyle.marginBottom; } else { marginTop = control.getStyle('margin-Top'); marginBottom = control.getStyle('margin-Bottom'); } if (marginTop){ margins = parseInt(marginTop); } if (marginBottom){ margins = margins + parseInt(marginBottom); } return margins; } var intervalset = window.setInterval('Redirect()',3600000); function Redirect() { if (window.location.href.toLowerCase().indexOf('login.aspx') < 0) { window.clearInterval(intervalset); alert('Your session has expired due to inactivity.'); window.parent.location.replace('/Logout.aspx'); } } var DisabledButtons = new Array(); DisabledButtons[0]='DeliveryPanel_SaveConfirmations'; //<![CDATA[ Sys.WebForms.PageRequestManager._initialize('ctl00$sm', 'Form1', ['tctl00$ctl01','','tDeliveryPanel$DeliveryUnpdatePanel','','tTransportGridController$UpdatePanelID','','tPackLinesGridController$UpdatePanelID','','tOrdersGridController$UpdatePanelID','','tContainerGridController$UpdatePanelID','','tReferenceDataGridController$UpdatePanelID','','tCustomsEntriesDataGridController$UpdatePanelID',''], [], [], 300, ''); //]]> Shipment # SMELSI00058143 Bill: QDGS24090231 Shipper's Ref#: Owner's Ref#: P014804 Origin: Qingdao Pt (CNQDG) ETD: 06-Oct-24 Destination: Melbourne (AUMEL) ETA: 09-Nov-24 Order Ref#: P014804 Service Level: Standard (STD) Goods Description: TRAMPOLINE Release Type: Express Bill of Lading On Board: Shipped Charges Apply: No Charges showing Estimated Pickup: Pickup Required By: Pickup Cartage Advised: Goods Picked Up: Availability: 10-Nov-24 06:00 Storage Commences: 10-Nov-24 06:00 Estimated Delivery: 11-Nov-24 13:00 Delivery Required By: Delivery Cartage Advised: Goods Delivered: 11-Nov-24 14:37 Milestones (Completed only) Parent JobDescriptionDateStatus C00065579Departure from First Load Port 06-Oct-24 18:44 Completed SMELSI00058143Send Local Transport Booking 16-Oct-24 13:53 Completed SMELSI00058143Cargo Report Accepted 16-Oct-24 13:56 Completed SMELSI00058143All Import Documents Received 17-Oct-24 00:56 Completed SMELSI00058143Customs Commenced 29-Oct-24 14:01 Completed SMELSI00058143Customs Cleared 07-Nov-24 00:04 Completed C00065579Arrival at Final Discharge Port 09-Nov-24 17:15 Completed C00065579Cargo Available 10-Nov-24 06:00 Completed C00065579All Containers Released from Wharf 11-Nov-24 10:29 Completed PCIU9004157Container Estimated Delivery 11-Nov-24 13:00 Completed PIDU4186529Container Estimated Delivery 11-Nov-24 13:00 Completed SMELSI00058143Delivery Cartage Complete/Finalised 11-Nov-24 14:37 Completed SMELSI00058143Transport Group 11-Nov-24 14:37 Completed PCIU9004157Dehire 12-Nov-24 09:53 Completed PIDU4186529Dehire 12-Nov-24 14:24 Completed C00065579All Empty Containers Returned 12-Nov-24 14:24 Completed TransportExport to ExcelCustomise Columns LegModeTypeParentBillVesselVoyage/FlightLoadDischargeDepartureArrivalStatusCarrier 1SEAMain VesselC00065579TABI40201700TS CHENNAI2406SQingdao PtMelbourne 09-Nov-24 ArrivedPACASI_AU Goods / PacksExport to ExcelCustomise Columns PiecesPack TypeDescriptionContainer 779PackageTRAMPOLINE ,TRAMPOLINE PAD,WATER MISTER. TRAMPOLINE MAT,TRAMPOLINE SPRINGSPIDU4186529 1,084PackageTRAMPOLINEPCIU9004157 OrdersExport to ExcelCustomise Columns Order #Transport ModeStatusOrder Date P014804SEADelivered20-Aug-24 ContainersExport to ExcelCustomise Columns Container #Seal #Container TypeContainer ModeEmpty Returned OnDelivery ModeEst. DeliveryEst. ReturnAct. Return PCIU9004157CQ091413840HCFCL 12-Nov-24 09:36 CY/CY11-Nov-24 13:0017-Nov-24 19:3212-Nov-24 09:36 PIDU4186529CQ091768640HCFCL 12-Nov-24 14:33 CY/CY11-Nov-24 13:0017-Nov-24 04:2212-Nov-24 14:33 No records found Reference NumbersExport to ExcelCustomise Columns Country/RegionNumber TypeNumberType Description No records found Customs entriesExport to ExcelCustomise Columns Reference #Entry #Message StatusEntry advice SMELSI00058143/1AE9RCJHTACPYAuthority to Deal Notes 20-Oct-13 23:12 - Import Delivery Instructions• DELIVER TO 80 TUCKER ST, FRONT OF SHED• REVERSE IN WITH DOORS TO BE BEHIND THE CABIN • SAME DAY EMPTY COLLECTION REQUIRED BETWEEN 9PM - 6AM• IF SINGLE CONTAINER THEN DELIVERY CAN BE DURING BUSINESS HOURS• WE WILL UNLOAD REASONABLY PROMPTLY• COLLECTION IS PREFFERED BE OUT OF REGULAR WORKING HOURS DUE TO CONTAINER BLOCKING OTHER BUSINESSES CUS 31-Oct-23 12:12 GMT+11:00: We have 2 locations in Breakwater to deliver to.We will advise the Transport Co-Ordinator per container on local delivery details prior to delivery.10-Oct-24 09:08 - Marks & NumbersN/M10-Oct-24 09:08 - Detailed Goods DescriptionTRAMPOLINETRAMPOLINE MATTRAMPOLINE SPRINGSSHREDDER（CARDBOARD RECYCLING MACHINE） © WiseTech Global 2024. All rights reserved. //<![CDATA[ theForm.oldSubmit = theForm.submit; theForm.submit = WebForm_SaveScrollPositionSubmit; theForm.oldOnSubmit = theForm.onsubmit; theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit; Sys.Application.add_init(function() { $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":200,"dynamicLayout":true}, null, null, $get("ctl00_updProgress")); }); //]]> You do not have javascript enabled. This site requires javascript in order to operate correctly. Please enable javascript or add this site to the list of trusted sites. To enable javascript, do the following: Select the Tools Menu in Internet Explorer Select Internet Options Select the Security tab Click the Custom Level button Scroll down to the Scripting heading Select the enable option of Active Scripting Click OK in all open dialogs For more detailed instructions regarding configuring trusted sites please click here.
 SMELSI00058140 | //<![CDATA[ var theForm = document.forms['Form1']; if (!theForm) { theForm = document.Form1; } function __doPostBack(eventTarget, eventArgument) { if (!theForm.onsubmit || (theForm.onsubmit() != false)) { theForm.__EVENTTARGET.value = eventTarget; theForm.__EVENTARGUMENT.value = eventArgument; theForm.submit(); } } //]]> function AttachToScrollEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("scroll", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("scroll", EventHandlerFunction, false); } else if("onscroll" in self) // MSIE 6, 7 and MSIE 8 { var oldonscroll = self.onscroll; if (typeof self.onscroll != 'function') { self.onscroll = EventHandlerFunction; } else { self.onscroll = function() { if (oldonscroll) { oldonscroll(); } EventHandlerFunction(); } } }; } function AttachToResizeEvent(EventHandlerFunction) { if(window.addEventListener) // Firefox 1+, Opera 9, Safari 3+, etc. { window.addEventListener("resize", EventHandlerFunction, false); } else if(document.addEventListener) // Opera 7, Opera 8 { document.addEventListener("resize", EventHandlerFunction, false); } else if("onresize" in self) // MSIE 6, 7 and MSIE 8 { var oldonresize = self.onscroll; if (typeof self.onresize != 'function') { self.onresize = EventHandlerFunction; } else { self.onresize = function() { if (oldonresize) { oldonresize(); } EventHandlerFunction(); } } }; } function DisablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { var DocumentSize = documentSize(); $(PageSmokeScreen).setStyle('left', '0px'); $(PageSmokeScreen).setStyle('top', '0px'); $(PageSmokeScreen).setStyle('width', DocumentSize.width + 'px'); $(PageSmokeScreen).setStyle('height', DocumentSize.height + 'px'); $(PageSmokeScreen).setStyle('z-index', '1500'); $(PageSmokeScreen).setStyle('display', 'block'); } } function EnablePage() { var PageSmokeScreen = $('_PageSmokeScreen'); if (PageSmokeScreen) { $(PageSmokeScreen).setStyle('z-index', 0); $(PageSmokeScreen).setStyle('display', 'none'); } } function DebugConsole_NewMessage(Message) { } function DebugConsole_Clear() { } function PositionLightBox() { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxLeft = posLeft()+(pageWidth()-parseInt(LightBox.getStyle('width')))/2; var LightBoxTop = posTop()+300; if (LightBoxLeft<0) { LightBoxLeft=0; } $(LightBox).setStyle('left', LightBoxLeft + 'px'); $(LightBox).setStyle('top', LightBoxTop + 'px'); } } function ShowLightBox(Title, Message, Buttons, ResponseHolderID, AutoPostBack, ImageURL) { var LightBox = $('_LightBox'); if (LightBox) { var LightBoxMessage = $('MessageBox'); var TitleBoxMessage = $('TitleBox'); var LightBoxButtons = $('ButtonBox'); if (LightBoxMessage && LightBoxButtons && TitleBoxMessage) { TitleBoxMessage.innerHTML = Title; var MessageHTML = '<span class="LightBoxMessageText">' + Message + '</span>'; if (ImageURL!=null && ImageURL!='') { MessageHTML='<table cellpading="0" cellspacing="0"><tr><td valign="top" valign="center" width="50"><img src="' + ImageURL + '" alt=""></td><td valign="top" align="center">' + MessageHTML + '</td></tr></table>'; } LightBoxMessage.innerHTML = MessageHTML; var ButtonElement; var ButtonsHTML = ''; var ButtonID = ''; var FirstButtonID = ''; for(var i=0; i<Buttons.length; i++) { ButtonID = 'ButtonBox_' + i; if (i==0) { FirstButtonID=ButtonID; } ButtonElement = '<input type="button" id="' + ButtonID + '" value="' + Buttons[i].caption + '" style="width: 100px;height:25px;margin:5px;" onclick="HideLightBox(); ' + Buttons[i].onclick + '">'; ButtonsHTML = ButtonsHTML + ButtonElement; } LightBoxButtons.innerHTML = ButtonsHTML; DisablePage(); PositionLightBox(); $(LightBox).setStyle('z-index', '1700'); $(LightBox).setStyle('display', 'block'); setTimeout("SetFocusOnLightBoxButton('" + FirstButtonID + "');", 500); } } } function SetFocusOnLightBoxButton(ButtonID) { try { $(ButtonID).focus(); } catch(e) {} } AttachToScrollEvent(PositionLightBox); AttachToResizeEvent(PositionLightBox); function HideLightBox() { var LightBox = $('_LightBox'); if (LightBox) { $(LightBox).setStyle('display', 'none'); } EnablePage(); } var originalDoPostBack; function customDoPostBack(eventTarget, eventArgument) { var performPostBack = true; if (getElement(eventTarget)) { try { var postbackCondition = getElement(eventTarget).getProperty('postbackCondition'); performPostBack = evaluateTrueFalseFunction(postbackCondition) } catch(e){} } if (performPostBack) { PositionIndicatorImage(); originalDoPostBack(eventTarget, eventArgument); } } function evaluateTrueFalseFunction(functionCode) { if (functionCode && functionCode!='' && functionCode!='undefined') { var newFunction = new Function(functionCode); try { return newFunction(); } catch(e){} } return true; } function setupPostBackHandlers() { originalDoPostBack = __doPostBack; __doPostBack = customDoPostBack; } addLoadEvent(setupPostBackHandlers); function PositionIndicatorImage() { try { var Indicator = $('ctl00_img'); if (Indicator) { Indicator.style.top = (posTop() + (pageHeight()-20)/2) + "px"; Indicator.style.left = (posLeft() + (pageWidth()-20)/2) + "px"; } } catch(err) {} } function ClearValidation(NotificationID) { var Notification=getElement(NotificationID); if (Notification!=null) { Notification.setStyle('display', 'none'); } return true; } function autoSizeIframe(frameId){ try{ var iframe = parent.document.getElementById(frameId); var innerDoc = (iframe.contentDocument) ? iframe.contentDocument : iframe.contentWindow.document; var objToResize = (iframe.style) ? iframe.style : iframe; objToResize.height = innerDoc.body.offsetHeight + GetMarginsSize(innerDoc.body); } catch(err){ window.status = err.message; } } function GetMarginsSize(control){ var margins = 0; var marginTop; var marginBottom; if (control.currentStyle){ marginTop = control.currentStyle.marginTop; marginBottom = control.currentStyle.marginBottom; } else { marginTop = control.getStyle('margin-Top'); marginBottom = control.getStyle('margin-Bottom'); } if (marginTop){ margins = parseInt(marginTop); } if (marginBottom){ margins = margins + parseInt(marginBottom); } return margins; } var intervalset = window.setInterval('Redirect()',3600000); function Redirect() { if (window.location.href.toLowerCase().indexOf('login.aspx') < 0) { window.clearInterval(intervalset); alert('Your session has expired due to inactivity.'); window.parent.location.replace('/Logout.aspx'); } } var DisabledButtons = new Array(); DisabledButtons[0]='DeliveryPanel_SaveConfirmations'; //<![CDATA[ Sys.WebForms.PageRequestManager._initialize('ctl00$sm', 'Form1', ['tctl00$ctl01',''], [], [], 300, ''); //]]> Shipment # You are not authorised to view this page. Please contact your system administrator to request access rights. Shipment was not found in the database or you don't have rights to view it. © WiseTech Global 2024. All rights reserved. //<![CDATA[ theForm.oldSubmit = theForm.submit; theForm.submit = WebForm_SaveScrollPositionSubmit; theForm.oldOnSubmit = theForm.onsubmit; theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit; Sys.Application.add_init(function() { $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":200,"dynamicLayout":true}, null, null, $get("ctl00_updProgress")); }); //]]> You do not have javascript enabled. This site requires javascript in order to operate correctly. Please enable javascript or add this site to the list of trusted sites. To enable javascript, do the following: Select the Tools Menu in Internet Explorer Select Internet Options Select the Security tab Click the Custom Level button Scroll down to the Scripting heading Select the enable option of Active Scripting Click OK in all open dialogs For more detailed instructions regarding configuring trusted sites please click here.
+
+
+
+(function() {
+  let trackingNumbers = [];
+  for (let i = 0; i < 10; i++) {
+    let number = parseInt(trackingNumbers[0].match(/(\d+)/)[0]) - i;
+    let prefix = trackingNumbers[0].match(/(\w+)/)[1];
+    trackingNumbers.push(`${prefix}${number.toString().padStart(8, '0')}`);
+  }
+  trackingNumbers.reverse(); // Ensure the numbers are in descending order
+
+  let currentIndex = 0;
+  let results = [];
+  let batchSize = 10;
+
+  function sendBatchRequest() {
+    let batch = trackingNumbers.slice(currentIndex, currentIndex + batchSize);
+    return Promise.all(batch.map(sendRequest))
+      .then(() => {
+        currentIndex += batchSize;
+        if (currentIndex < trackingNumbers.length) {
+          return sendBatchRequest();
+        } else {
+          downloadResults();
+        }
+      })
+      .catch(error => {
+        console.error("Error in batch processing:", error);
+        alert("An error occurred during processing. Please check the console.");
+      });
+  }
+
+  function sendRequest(trackingNumber) {
+    return fetchTrackingData(trackingNumber)
+      .then(resultText => {
+        results.push({ trackingNumber, result: resultText });
+      })
+      .catch(error => {
+        console.error("Error processing tracking number:", trackingNumber, error);
+      });
+  }
+
+  function fetchTrackingData(trackingNumber) {
+    const formData = new FormData();
+    formData.append("__EVENTTARGET", "");
+    formData.append("__EVENTARGUMENT", "");
+    formData.append("__VIEWSTATE", "zaG7GOQMcTfTlvzOklwySpbiP0aZWjVfkFdFs+MUa9lSsp/ZFehEl3dCENSjKg5ovYRbgHZTSjezssDvRBcCKqr9409HnAi6lNAdXfG6mhmkq1eri31YNu+/MfOZ+E+0Fs75wzL5xlbdIeI7uA6FNqeEoUQ=");
+    formData.append("Testing", "");
+    formData.append("__LASTFOCUSID", "FindBtn");
+    formData.append("LoginNameTextBox", "");
+    formData.append("PasswordTextBox", "");
+    formData.append("ShipmentHousebillNumberTextbox", trackingNumber);
+    formData.append("ContainerNumberTextBox", "");
+    formData.append("FindBtn", "Find");
+    formData.append("__VIEWSTATEGENERATOR", "1806D926");
+    formData.append("__SCROLLPOSITIONX", "0");
+    formData.append("__SCROLLPOSITIONY", "0");
+    formData.append("__VIEWSTATEENCRYPTED", "");
+    formData.append("__EVENTVALIDATION", "+eOaASlyoGoCNFKGsXgEA8S9CciE12RfkKmKkEfGIazBDDRSzEAY10bsdFD1gnZcYU0W4OXB0Uuf4pKrjk/aJiCw+RC3F46HLREfXezkPRGYRSPAzmQ0QcxvQdh0I6/70c0sh7lTmXufvxpsIPvHX36zZjxWrxYAJFNJZ1aAB9nV0eBzLesESYr+Wr/Gu5osc47OT7sh8VEHWwsdIa3aLosAYPBj5W0ohqkr+AYIv6VR1SJm2+883d4fZtg3j6UUJ2+OJVek8kvBAVQa+C6bSouhfR0490jv2CsJ1a6VNJhOcZe53T2O+ACSaSfYOPXN15rjYA==");
+
+    return fetch("https://mcehst.webtracker.wisegrid.net/Login/Login.aspx?ReturnUrl=%2fDefault.aspx", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "en-AU,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Not-A.Brand\";v=\"99\", \"Chromium\";v=\"124\"",
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": "\"Android\"",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1"
+      },
+      referrer: "https://mcehst.webtracker.wisegrid.net/Login/Login.aspx?ReturnUrl=%2fDefault.aspx",
+      referrerPolicy: "strict-origin-when-cross-origin",
+      mode: "cors",
+      credentials: "include"
+    })
+    .then(response => response.text())
+    .then(data => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data, "text/html");
+      return doc.querySelector("body").innerText.trim();
+    });
+  }
+
+  function downloadResults() {
+    let output = "Tracking Number | Result\n";
+    results.forEach(item => {
+      output += `${item.trackingNumber} | ${item.result}\n`;
+    });
+
+    const blob = new Blob([output], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "tracking_results.txt";
+    link.click();
+  }
+
+  // Start processing tracking numbers in batches
+  sendBatchRequest();
+})();
+
+
+
+
+
+// javascript:(function() {
+//     // Get the page content
+//     let content = document.body.innerText;
+    
+//     // Find all shipping entries using regex
+//     const entries = content.match(/SMELSI\d+\s*\|[\s\S]*?(?=SMELSI\d+\s*\||$)/g);
+    
+//     if (!entries) {
+//        alert('No shipping entries found!');
+//        return;
+//     }
+    
+//     // Helper function to safely extract data
+//     const extractField = (entry, fieldName) => {
+//        const match = entry.match(new RegExp(`${fieldName}:\\s*([^\\n]+)`));
+//        return match ? match[1].trim() : '';
+//     };
+    
+//     // Clean and format each entry
+//     const cleanedEntries = entries.map(entry => {
+//        const trackingNumber = entry.match(/SMELSI\d+/)[0];
+        
+//        // Create formatted sections
+//        const basicInfo = [
+//             `**Shipment # ${trackingNumber}**`,
+//             `**Bill:** ${extractField(entry, 'Bill')}`,
+//             `**Shipper's Ref#:** ${extractField(entry, "Shipper's Ref#")}`,
+//             `**Owner's Ref#:** ${extractField(entry, "Owner's Ref#")}`,
+//             '',
+//             '**Shipping Details:**',
+//             `Origin: ${extractField(entry, 'Origin')}`,
+//             `Destination: ${extractField(entry, 'Destination')}`,
+//             `ETD: ${extractField(entry, 'ETD')}`,
+//             `ETA: ${extractField(entry, 'ETA')}`,
+//             '',
+//             '**Cargo Information:**',
+//             `Order Ref#: ${extractField(entry, 'Order Ref#')}`,
+//             `Goods Description: ${extractField(entry, 'Goods Description')}`,
+//             `Service Level: ${extractField(entry, 'Service Level')}`,
+//             `Release Type: ${extractField(entry, 'Release Type')}`,
+//             `On Board: ${extractField(entry, 'On Board')}`,
+//             `Charges Apply: ${extractField(entry, 'Charges Apply')}`,
+//             `Charges showing: ${extractField(entry, 'Charges showing')}`,
+//             '',
+//             '**Timing Information:**',
+//             `Availability: ${extractField(entry, 'Availability')}`,
+//             `Storage Commences: ${extractField(entry, 'Storage Commences')}`,
+//             `Estimated Delivery: ${extractField(entry, 'Estimated Delivery')}`,
+//             `Actual Delivery: ${extractField(entry, 'Goods Delivered')}`
+//        ].filter(line => !line.endsWith(': ')); // Remove empty fields
+        
+//        // Extract Milestones
+//        const milestones = [];
+//        const milestoneMatch = entry.match(/Milestones \(Completed only\)([\s\S]*?)(?=Transport|$)/);
+//        if (milestoneMatch) {
+//             milestones.push('', '**Milestones:**');
+//             const milestoneLines = milestoneMatch[1].match(/[^\n]*Completed/g);
+//             if (milestoneLines) {
+//                 milestoneLines.forEach(milestone => {
+//                    const [description, date] = milestone.split(/\d{2}-\w{3}-\d{2}/);
+//                    const dateMatch = milestone.match(/\d{2}-\w{3}-\d{2}/);
+//                    if (dateMatch) {
+//                         milestones.push(`  ${description.trim()}`);
+//                         milestones.push(`    Date: ${dateMatch[0]}`);
+//                    }
+//                 });
+//             }
+//        }
+        
+//        // Extract Container Information
+//        const containerInfo = [];
+//        const containerMatch = entry.match(/Container #([\s\S]*?)(?=Reference Numbers|$)/);
+//        if (containerMatch) {
+//             containerInfo.push('', '**Container Details:**');
+//             const containerLines = containerMatch[0].split('\n')
+//                 .filter(line => line.includes('#') || line.includes('Seal'))
+//                 .map(line => '  ' + line.trim())
+//                 .filter(line => line.length > 2);
+//             containerInfo.push(...containerLines);
+//        }
+        
+//        // Extract Notes
+//        const notes = [];
+//        const notesMatch = entry.match(/Notes([\s\S]*?)(?=\s{4}|$)/);
+//        if (notesMatch) {
+//             notes.push('', '**Notes:**');
+//             const noteLines = notesMatch[1].split('\n')
+//                 .filter(line => line.trim().length > 0)
+//                 .map(line => '  ' + line.trim());
+//             notes.push(...noteLines);
+//        }
+        
+//        return [...basicInfo, ...milestones, ...containerInfo, ...notes].join('\n');
+//     });
+    
+//     // Create a new window with formatted content
+//     const newWindow = window.open();
+//     newWindow.document.write(`
+//        <html>
+//        <head>
+//             <style>
+//                 body {
+//                    font-family: monospace;
+//                    padding: 20px;
+//                    background-color: #f5f5f5;
+//                    line-height: 1.4;
+//                 }
+//                 .entry {
+//                    background-color: white;
+//                    padding: 20px;
+//                    margin-bottom: 20px;
+//                    border-radius: 5px;
+//                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+//                 }
+//                 .separator {
+//                    border-top: 2px dashed #ccc;
+//                    margin: 20px 0;
+//                 }
+//                 @media print {
+//                    body {
+//                         background-color: white;
+//                    }
+//                    .entry {
+//                         box-shadow: none;
+//                         border: 1px solid #ccc;
+//                    }
+//                 }
+//             </style>
+//        </head>
+//        <body>
+//             ${cleanedEntries.map(entry => `<div class="entry"><pre>${entry}</pre></div>`).join('')}
+//        </body>
+//        </html>
+//     `);
+// })();
