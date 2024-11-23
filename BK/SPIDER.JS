@@ -25,7 +25,7 @@ javascript:(function() {
                     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b/gi, // Email
                     /\b\d{3}-\d{2}-\d{4}\b/, // SSN pattern
                     /\b\d{13,16}\b/, // Credit card pattern
-                    /\b\$[\d,]+(?:\.\d{2})?\b/ // Price detection
+                    /\b\$[\d,]+(?:\.\d{2})?\b/, 
 					/["']?zopim[_-]?account[_-]?key["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
 					/["']?zhuliang[_-]?gh[_-]?token["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
 					/["']?zensonatypepassword["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
@@ -496,8 +496,8 @@ javascript:(function() {
 					/["']?fossa[_-]?api[_-]?key["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
 					/["']?flickr[_-]?api[_-]?secret["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
 					/["']?flickr[_-]?api[_-]?key["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
-					/["']?flask[_-]?secret[_-]?key["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi,
-					/["']?firefox[_-]?secret["'
+					/["']?flask[_-]?secret[_-]?key["']?[^\S\r\n]*[=:][^\S\r\n]*["']?[\w-]+["']?/gi
+					
                 ]
             },
             urls: {
