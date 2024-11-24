@@ -1,28 +1,210 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html>
+  <head>
     <title>Italy Trip Planner</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA"></script>
     <style>
-        body { font-family: system-ui; background: #f5f5f5; padding: 10px; margin: 0; }
-        #map { height: 75vh; width: 100%; margin: 10px 0; border-radius: 8px; }
-        .legend { position: fixed; top: 10px; right: 10px; background: #fff; padding: 8px; border-radius: 4px; box-shadow: 0 2px 4px #0003; }
-        .line-item { display: flex; align-items: center; margin: 3px 0; }
-        .line { width: 20px; height: 2px; margin-right: 8px; }
-        .l-train { background: #4a5; }
-        .l-car { background: #29f; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 70vh;
+        width: 100%;
+      }
+      #controls {
+        padding: 10px;
+        background: #f4f4f4;
+        text-align: center;
+      }
+      .btn {
+        padding: 10px 20px;
+        margin: 5px;
+        border: 1px solid #ccc;
+        background: #e0e0e0;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+      .btn:hover {
+        background: #d0d0d0;
+      }
+      #details {
+        padding: 15px;
+        background: #ffffff;
+        border-top: 1px solid #ccc;
+      }
+      .route-description {
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      .route-description h3 {
+        margin: 0 0 10px;
+      }
     </style>
-</head>
-<body>
-    <h1>Italy Trip Planner</h1>
-    <div id="map"></div>
-    <div class="legend">
-        <div class="line-item"><div class="line l-train"></div>Train</div>
-        <div class="line-item"><div class="line l-car"></div>Car</div>
-    </div>
     <script>
-const coordinates = {
+      let map;
+      const scenarioRoutes = [
+        {
+          name: "Scenario 1",
+          description: `
+            Start in Milan, head to Positano for 3 days. Visit nearby villages, then proceed to Siena, Asciano, and Pienza. 
+            Spend time in Florence (2 days), include Pisa as a stop, and visit Vernazza before returning to Milan.`,
+          waypoints: [
+            { location: "Milan, Italy" },
+            { location: "Positano, 84017 SA, Italy" },
+            { location: "Siena, Italy" },
+            { location: "Asciano, Italy" },
+            { location: "Pienza, Italy" },
+            { location: "Florence, Italy" },
+            { location: "Pisa, Italy" },
+            { location: "Vernazza, Italy" },
+            { location: "Milan, Italy" },
+          ],
+          color: "#FF5733", // Orange
+        },
+        {
+          name: "Scenario 2",
+          description: `
+            Fly into Milan. Visit Florence, Pisa, Siena, Asciano, and Pienza. Head south to Positano and nearby villages.
+            Stop at Vernazza before returning to Milan.`,
+          waypoints: [
+            { location: "Milan, Italy" },
+            { location: "Florence, Italy" },
+            { location: "Pisa, Italy" },
+            { location: "Siena, Italy" },
+            { location: "Asciano, Italy" },
+            { location: "Pienza, Italy" },
+            { location: "Positano, 84017 SA, Italy" },
+            { location: "Vernazza, Italy" },
+            { location: "Milan, Italy" },
+          ],
+          color: "#33FF57", // Green
+        },
+        {
+          name: "Scenario 3",
+          description: `
+            Land in Rome, proceed directly to Positano for 3 days. Continue to Pienza, Asciano, Siena, Florence, and Pisa.
+            Visit Vernazza before ending in Milan.`,
+          waypoints: [
+            { location: "Rome, Italy" },
+            { location: "Positano, 84017 SA, Italy" },
+            { location: "Pienza, Italy" },
+            { location: "Asciano, Italy" },
+            { location: "Siena, Italy" },
+            { location: "Florence, Italy" },
+            { location: "Pisa, Italy" },
+            { location: "Vernazza, Italy" },
+            { location: "Milan, Italy" },
+          ],
+          color: "#3357FF", // Blue
+        },
+        {
+          name: "Scenario 4",
+          description: `
+            Land in Naples. Explore Positano and nearby villages. Visit Siena, Asciano, and Pienza. Continue to Florence and Pisa.
+            Explore Vernazza before finishing in Milan.`,
+          waypoints: [
+            { location: "Naples, Italy" },
+            { location: "Positano, 84017 SA, Italy" },
+            { location: "Siena, Italy" },
+            { location: "Asciano, Italy" },
+            { location: "Pienza, Italy" },
+            { location: "Florence, Italy" },
+            { location: "Pisa, Italy" },
+            { location: "Vernazza, Italy" },
+            { location: "Milan, Italy" },
+          ],
+          color: "#FF33A1", // Pink
+        },
+        {
+          name: "Scenario 5",
+          description: `
+            Start in Milan. Travel to Vernazza, Pisa, Florence, Siena, Asciano, and Pienza. Head south to Positano before returning to Milan.`,
+          waypoints: [
+            { location: "Milan, Italy" },
+            { location: "Vernazza, Italy" },
+            { location: "Pisa, Italy" },
+            { location: "Florence, Italy" },
+            { location: "Siena, Italy" },
+            { location: "Asciano, Italy" },
+            { location: "Pienza, Italy" },
+            { location: "Positano, 84017 SA, Italy" },
+            { location: "Milan, Italy" },
+          ],
+          color: "#FFC300", // Yellow
+        },
+      ];
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 5,
+          center: { lat: 42.5, lng: 12.5 }, // Center of Italy
+        });
+
+        // Render buttons for scenarios
+        const controls = document.getElementById("controls");
+        const details = document.getElementById("details");
+        scenarioRoutes.forEach((route, index) => {
+          const button = document.createElement("button");
+          button.className = "btn";
+          button.textContent = `Show ${route.name}`;
+          button.onclick = () => {
+            drawScenario(route);
+            details.innerHTML = renderRouteDetails(route);
+          };
+          controls.appendChild(button);
+        });
+      }
+
+      function drawScenario(route) {
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+          map: map,
+          polylineOptions: {
+            strokeColor: route.color,
+            strokeWeight: 6,
+          },
+          suppressMarkers: false,
+        });
+
+        directionsService.route(
+          {
+            origin: route.waypoints[0].location,
+            destination: route.waypoints[route.waypoints.length - 1].location,
+            waypoints: route.waypoints.slice(1, -1),
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (response, status) => {
+            if (status === "OK") {
+              directionsRenderer.setDirections(response);
+            } else {
+              console.error(`Failed to render ${route.name}: ${status}`);
+            }
+          }
+        );
+      }
+
+      function renderRouteDetails(route) {
+        return `
+          <div class="route-description">
+            <h3>${route.name}</h3>
+            <p>${route.description}</p>
+          </div>
+        `;
+      }
+    </script>
+  </head>
+  <body onload="initMap()">
+    <div id="controls"></div>
+    <div id="map"></div>
+    <div id="details">
+      <p>Select a scenario to see its route details.
+      const coordinates = {
     "Rome": [41.9028, 12.4964],
     "Positano": [40.6333, 14.6029],
     "Ravello": [40.6495, 14.6126],
@@ -37,65 +219,7 @@ const coordinates = {
     "Milan": [45.4642, 9.1900],
     "Lake Como": [45.8151, 9.0825],
     "Verona": [45.4384, 10.9916]
-};
-
-let map, markers = [], polylines = [];
-
-function initMap() {
-    map = new google.maps.Map(document.getElementById("map"), {
-        zoom: 6,
-        center: { lat: 42.5, lng: 12.5 },
-        mapTypeControl: false,
-        fullscreenControl: true  // Enables fullscreen option
-    });
-
-    const route = [
-        { location: "Rome", days: 1, label: "Day 1: Rome" },
-        { location: "Positano", days: 3, label: "Days 2-4: Positano" },
-        { location: "Ravello", days: 0, label: "On the way: Ravello" },
-        { location: "Capri", days: 0, label: "Day Trip: Capri (Optional)" },
-        { location: "Pienza", days: 1, label: "Day 5: Pienza" },
-        { location: "Asciano", days: 0, label: "On the way: Asciano" },
-        { location: "Siena", days: 0, label: "On the way: Siena" },
-        { location: "Florence", days: 2, label: "Days 6-7: Florence" },
-        { location: "Pisa", days: 0, label: "On the way: Pisa" },
-        { location: "Cinque Terre", days: 1, label: "Day 8: Cinque Terre" },
-        { location: "Portofino", days: 0, label: "Optional: Portofino" },
-        { location: "Milan", days: 3, label: "Days 9-11: Milan" },
-        { location: "Lake Como", days: 0, label: "Day Trip: Lake Como" },
-        { location: "Verona", days: 0, label: "Day Trip: Verona" }
-    ];
-
-    let labelIndex = 1;
-    route.forEach((stop, index) => {
-        if (coordinates[stop.location]) {
-            const marker = new google.maps.Marker({
-                position: { lat: coordinates[stop.location][0], lng: coordinates[stop.location][1] },
-                map: map,
-                label: labelIndex.toString(),
-                title: `${labelIndex}. ${stop.label}`
-            });
-            markers.push(marker);
-            labelIndex++;
-            if (index < route.length - 1 && coordinates[route[index + 1].location]) {
-                const lineColor = index < 6 ? "#4a5" : "#29f";
-                const polyline = new google.maps.Polyline({
-                    path: [
-                        { lat: coordinates[stop.location][0], lng: coordinates[stop.location][1] },
-                        { lat: coordinates[route[index + 1].location][0], lng: coordinates[route[index + 1].location][1] }
-                    ],
-                    strokeColor: lineColor,
-                    strokeOpacity: 1,
-                    strokeWeight: 3,
-                    map: map
-                });
-                polylines.push(polyline);
-            }
-        }
-    });
-}
-
-    </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap" async defer></script>
-</body>
+      </p>
+    </div>
+  </body>
 </html>
