@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Data Parser</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        :root { --primary-bg: #f4f4f4; --secondary-bg: #e9ecef; }
+        body { font-family: Arial, sans-serif; background-color: var(--primary-bg); }
+        .table-theme-light { background-color: #ffffff; }
+        .table-theme-dark { background-color: #212529; color: #f8f9fa; }
+        .table-theme-banded tbody tr:nth-child(even) { background-color: rgba(0,0,0,0.05); }
+        .table-theme-grid { border: 2px solid #dee2e6; border-collapse: separate; border-radius: 5px; }
+        .table-theme-material { box-shadow: 0 3px 1px -2px rgba(0,0,0,.2), 0 2px 2px 0 rgba(0,0,0,.14), 0 1px 5px 0 rgba(0,0,0,.12); }
+        .inverted-staircase tbody {
+display: flex;
+flex-direction: column;
+align-items: flex-end;
+}
+
+.inverted-staircase {
+background-color: #1a1a1a;
+color: #666ff;
+}
+
+.inverted-staircase tbody {
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+.inverted-staircase tr {
+width: 200px;
+margin-bottom: 20px;
+background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
+padding: 10px;
+border-radius: 10px;
+box-shadow: 0 0 10px #000, 0 0 20px #ff0;
+}
+
+.inverted-staircase th, .inverted-staircase td {
+color: #666ff;
+text-shadow: 0 0 10px #fff, 0 0 20px #ff0, 0 0 30px #ff0;
+}
+
+.inverted-staircase::before {
+content: "";
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: linear-gradient(to bottom, rgba(255, 255, 0, 0.5), rgba(255, 255, 0, 1)));
+opacity: 0;
+animation: pulse 5s infinite;
+box-shadow: 0 0 50px rgba(255, 255, 0, 1);
+}
+
+@keyframes pulse {
+0% {
+opacity: 0;
+box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+}
+50% {
+opacity: 1;
+box-shadow: 0 0 50px rgba(255, 255, 0, 1);
+}
+90% {
+opacity: 1;
+box-shadow: 0 0 100px rgba(255, 255, 0, 1);
+}
+100% {
+opacity: 0;
+box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+}
+}
+       .squashed-pyramid tbody {
+display: flex;
+flex-direction: column;
+align-items: center;
+perspective: 500px;
+background: linear-gradient(45deg, #ff69b4, #33cc33);
+}
+
+.squashed-pyramid tr {
+width: calc(100% - 20px * var(--row-index));
+margin-bottom: -40px;
+z-index: calc(100 - var(--row-index));
+transform: scale(0.9) rotateX(10deg * var(--row-index)) skewY(5deg);
+transform-origin: center top;
+background: linear-gradient(45deg, #6666ff, #ff9966);
+box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.5), 0px 0px 20px rgba(0, 255, 0, 0.5);
+animation: glow 2s infinite;
+}
+
+.squashed-pyramid tr:hover {
+transform: scale(1.1) rotateX(15deg * var(--row-index)) skewY(10deg);
+box-shadow: 0px 0px 20px rgba(255, 255, 0, 0.8), 0px 0px 30px rgba(255, 0, 255, 0.8);
+}
+
+@keyframes glow {
+0% {
+box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.5), 0px 0px 20px rgba(0, 255, 0, 0.5);
+}
+50% {
+box-shadow: 0px 0px 20px rgba(255, 255, 0, 0.8), 0px 0px 30px rgba(255, 0, 255, 0.8);
+}
+100% {
+box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.5), 0px 0px 20px rgba(0, 255, 0, 0.5);
+}
+}
+
+        .rotating-axis { perspective: 1000px; transform-style: preserve-3d; }
+        .rotating-axis tr { transition: transform 0.3s ease; transform: rotateZ(calc(5deg * var(--row-index))); }
+        
+        @media (max-width: 768px) {
+            .table-responsive-stack tr { 
+                display: flex; 
+                flex-direction: column; 
+                margin-bottom: 1rem; 
+                border: 1px solid #ddd; 
+            }
+            .table-responsive-stack td { 
+                display: block; 
+                text-align: right; 
+            }
+            .table-responsive-stack td:before { 
+                content: attr(data-label); 
+                float: left; 
+                font-weight: bold; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid p-4">
+        <h1 class="mb-4">Advanced Data Parser</h1>
+        
+        <div class="row">
+            <div class="col-md-8 mb-3">
+                <textarea id="inputData" class="form-control" placeholder="Paste JSON, CSV, HTML, or free-form text here..." rows="10"></textarea>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <label for="themeSelect" class="form-label">Table Theme:</label>
+                        <select id="themeSelect" class="form-select mb-3">
+                            <option value="default">Default</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="banded">Banded</option>
+                            <option value="grid">Grid</option>
+                            <option value="material">Material</option>
+                            <option value="squashed-pyramid">Glowing Trash</option>
+                            <option value="inverted-staircase">Crappy Lighthouse</option>
+                            <option value="rotating-axis">Rotating Axis</option>
+                        </select>
+                        <div class="d-grid gap-2">
+                            <button id="processBtn" class="btn btn-primary">Parse Data</button>
+                            <button id="clearBtn" class="btn btn-secondary">Clear</button>
+                            <button id="downloadBtn" class="btn btn-success">Download Results</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="errorContainer" class="text-danger mt-3"></div>
+        <div id="tableContainer" class="mt-4"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    class DataParser {
+        static preprocessInput(input) {
+            return input.replace(/\r\n/g, "\n").replace(/\t+/g, "\t").trim();
+        }
+
+        static detectFormat(input) {
+            if (this.isValidJSON(input)) return "JSON";
+            if (this.isCSV(input)) return "CSV";
+            if (this.isHTML(input)) return "HTML";
+            return "UNSTRUCTURED";
+        }
+
+        static isValidJSON(input) {
+            try {
+                const parsed = JSON.parse(input);
+                return parsed !== null && typeof parsed === 'object';
+            } catch { return false; }
+        }
+
+        static isCSV(input) {
+            const lines = input.split("\n");
+            return lines.length > 1 && lines.every(line => line.includes(",") || line.includes("\t"));
+        }
+
+        static isHTML(input) {
+            return input.trim().startsWith("<") && 
+                   (input.includes("<table") || input.includes("<tr") || input.includes("<td>"));
+        }
+
+        static recursiveFlatten(obj, prefix = '') {
+            const result = {};
+            for (const [key, value] of Object.entries(obj)) {
+                const newKey = prefix ? `${prefix}.${key}` : key;
+                if (value && typeof value === 'object') {
+                    Object.assign(result, 
+                        Array.isArray(value) 
+                            ? { [newKey]: value.map(v => typeof v === 'object' ? this.recursiveFlatten(v) : v) }
+                            : this.recursiveFlatten(value, newKey)
+                    );
+                } else {
+                    result[newKey] = value;
+                }
+            }
+            return result;
+        }
+
+        static parse(input) {
+            const preprocessed = this.preprocessInput(input);
+            const format = this.detectFormat(preprocessed);
+
+            try {
+                switch (format) {
+                    case "JSON":
+                        const parsed = JSON.parse(preprocessed);
+                        return Array.isArray(parsed) 
+                            ? parsed.map(item => this.recursiveFlatten(item))
+                            : [this.recursiveFlatten(parsed)];
+                    case "CSV":
+                        return this.parseCSV(preprocessed);
+                    case "HTML":
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(preprocessed, 'text/html');
+                        const table = doc.querySelector('table');
+                        return table ? this.parseHTMLTable(table) : [];
+                    default:
+                        return this.parseUnstructured(preprocessed);
+                }
+            } catch (error) {
+                console.error("Parsing error:", error);
+                return [{ Error: error.message }];
+            }
+        }
+
+        static parseCSV(input) {
+            const delimiter = input.includes('\t') ? '\t' : ',';
+            const lines = input.split('\n');
+            const headers = lines[0].split(delimiter).map(h => h.trim());
+            
+            return lines.slice(1)
+                .map(line => line.split(delimiter).map(cell => cell.trim()))
+                .map(cells => 
+                    headers.reduce((obj, header, index) => {
+                        obj[header] = cells[index] || '';
+                        return obj;
+                    }, {})
+                );
+        }
+
+        static parseHTMLTable(table) {
+            const headers = Array.from(table.querySelectorAll('th, thead td'))
+                .map(h => h.textContent.trim() || `Column ${h.cellIndex + 1}`);
+            
+            const rows = table.querySelectorAll('tr');
+            
+            return Array.from(rows).slice(headers.length > 0 ? 1 : 0)
+                .map(row => {
+                    const cells = Array.from(row.querySelectorAll('td'));
+                    return headers.reduce((obj, header, index) => {
+                        obj[header] = cells[index] ? cells[index].textContent.trim() : '';
+                        return obj;
+                    }, {});
+                });
+        }
+
+        static parseUnstructured(input) {
+            return input.split('\n')
+                .filter(line => line.trim())
+                .map(line => ({ Content: line.trim() }));
+        }
+
+        static formatCellValue(value) {
+            if (value === null || value === undefined) return '';
+            return typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
+
+        const processBtn = $('#processBtn');
+        const clearBtn = $('#clearBtn');
+        const downloadBtn = $('#downloadBtn');
+        const inputData = $('#inputData');
+        const errorContainer = $('#errorContainer');
+        const tableContainer = $('#tableContainer');
+        const themeSelect = $('#themeSelect');
+
+        const createThemedTable = (data, theme, blockIndex) => {
+            if (!data || data.length === 0) return "<p>No data to display</p>";
+
+            const columns = Object.keys(data[0]);
+            const themeClasses = {
+                'light': 'table-theme-light',
+                'dark': 'table-theme-dark',
+                'banded': 'table-theme-banded',
+                'grid': 'table-theme-grid',
+                'material': 'table-theme-material',
+                'squashed-pyramid': 'squashed-pyramid table-borderless',
+                'inverted-staircase': 'inverted-staircase table-borderless',
+                'rotating-axis': 'rotating-axis table-borderless'
+            };
+
+            const tableClass = `table table-striped table-hover ${themeClasses[theme] || ''}`;
+            const tableId = `dataTable${blockIndex}`;
+
+            let table = `
+                <table id="${tableId}" class="${tableClass}" ${theme !== 'default' ? 'style="--row-index: 0;"' : ''}>
+                    <thead>
+                        <tr>${columns.map(col => `<th>${col}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                        ${data.map((row, rowIndex) => `
+                            <tr ${theme !== 'default' ? `style="--row-index: ${rowIndex}"` : ''}>
+                                ${columns.map(col => `<td>${DataParser.formatCellValue(row[col])}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Async DataTables initialization
+            setTimeout(() => {
+                $(`#${tableId}`)?.DataTable({
+                    responsive: true,
+                    pageLength: 10,
+                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]]
+                });
+            }, 0);
+
+            return table;
+        };
+
+        processBtn.addEventListener('click', () => {
+            const input = inputData.value;
+            const selectedTheme = themeSelect.value;
+            
+            errorContainer.innerHTML = '';
+            tableContainer.innerHTML = '';
+
+            if (!input.trim()) {
+                errorContainer.textContent = 'Please enter some data to parse.';
+                return;
+            }
+
+            const dataBlocks = input.split(/\n\s*\n/).filter(block => block.trim());
+
+            dataBlocks.forEach((block, index) => {
+                try {
+                    const parsedData = DataParser.parse(block);
+                    const tableHTML = createThemedTable(parsedData, selectedTheme, index);
+                    
+                    const blockDiv = document.createElement('div');
+                    blockDiv.innerHTML = `
+                        <div class="block-header bg-light p-2 mb-2">
+                            Block ${index + 1} (Detected Format)
+                        </div>
+                        ${tableHTML}
+                    `;
+                    
+                    tableContainer.appendChild(blockDiv);
+                } catch (error) {
+                    const errorP = document.createElement('p');
+                    errorP.textContent = `Error processing block ${index + 1}: ${error.message}`;
+                    errorContainer.appendChild(errorP);
+                }
+            });
+        });
+
+        clearBtn.addEventListener('click', () => {
+            inputData.value = '';
+            tableContainer.innerHTML = '';
+            errorContainer.innerHTML = '';
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const content = tableContainer.innerHTML;
+            const blob = new Blob([`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Parsed Data Results</title>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <style>${document.querySelector('style').textContent}</style>
+                </head>
+                <body>
+                    ${content}
+                </body>
+                </html>
+            `], { type: 'text/html' });
+            
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'parsed_data_results.html';
+            a.click();
+        });
+    });
+    </script>
+</body>
+</html>
