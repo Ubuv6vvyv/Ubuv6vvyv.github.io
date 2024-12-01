@@ -100,28 +100,25 @@
 
         // Calculate and display distances (car and train)
         function calculateDistances() {
-            const origins = locations.map(loc => new google.maps.LatLng(loc.lat, loc.lng));
-            const destinations = origins.slice(1); // Exclude first point for now
-
-            const service = new google.maps.DistanceMatrixService();
             const output = document.getElementById('distance-info');
             output.innerHTML = "<h3>Distances and Travel Times:</h3>"; // Clear previous data
+
             let table = '<table><tr><th>From</th><th>To</th><th>Distance (Car)</th><th>Time (Car)</th><th>Distance (Train)</th><th>Time (Train)</th></tr>';
+            const service = new google.maps.DistanceMatrixService();
 
             let totalRequests = 0;
             let completedRequests = 0;
 
+            // Loop through all location pairs to calculate distances
             locations.forEach((origin, i) => {
-                if (i === locations.length - 1) return; // Skip the last location (no destination)
-
                 locations.slice(i + 1).forEach((destination, j) => {
                     totalRequests += 1;
 
                     // Get Car (DRIVING) distance and time
                     service.getDistanceMatrix(
                         {
-                            origins: [origins[i]],
-                            destinations: [origins[i + j + 1]], // dynamic destination
+                            origins: [{ lat: origin.lat, lng: origin.lng }],
+                            destinations: [{ lat: destination.lat, lng: destination.lng }],
                             travelMode: google.maps.TravelMode.DRIVING, // Car travel mode
                             unitSystem: google.maps.UnitSystem.METRIC
                         },
@@ -133,8 +130,8 @@
                                 // Get Train (TRANSIT) distance and time
                                 service.getDistanceMatrix(
                                     {
-                                        origins: [origins[i]],
-                                        destinations: [origins[i + j + 1]], // dynamic destination
+                                        origins: [{ lat: origin.lat, lng: origin.lng }],
+                                        destinations: [{ lat: destination.lat, lng: destination.lng }],
                                         travelMode: google.maps.TravelMode.TRANSIT, // Train travel mode
                                         unitSystem: google.maps.UnitSystem.METRIC
                                     },
@@ -150,6 +147,7 @@
                                         table += `<tr><td>${origin.name}</td><td>${destination.name}</td><td>${drivingDistance}</td><td>${drivingDuration}</td><td>${transitDistance}</td><td>${transitDuration}</td></tr>`;
 
                                         completedRequests += 1;
+
                                         // Once all requests are completed, render the table
                                         if (completedRequests === totalRequests) {
                                             table += '</table>';
