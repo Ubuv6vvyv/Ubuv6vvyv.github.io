@@ -104,59 +104,66 @@
             const destinations = origins.slice(1); // Exclude first point for now
 
             const service = new google.maps.DistanceMatrixService();
-            service.getDistanceMatrix(
-                {
-                    origins: origins,
-                    destinations: destinations,
-                    travelMode: google.maps.TravelMode.DRIVING, // Car travel mode
-                    unitSystem: google.maps.UnitSystem.METRIC
-                },
-                (response, status) => {
-                    if (status === google.maps.DistanceMatrixStatus.OK) {
-                        const output = document.getElementById('distance-info');
-                        output.innerHTML = "<h3>Distances and Travel Times:</h3>";
-                        const rows = response.rows;
-                        let table = '<table><tr><th>From</th><th>To</th><th>Distance (Car)</th><th>Time (Car)</th><th>Distance (Train)</th><th>Time (Train)</th></tr>';
+            const output = document.getElementById('distance-info');
+            output.innerHTML = "<h3>Distances and Travel Times:</h3>"; // Clear previous data
+            let table = '<table><tr><th>From</th><th>To</th><th>Distance (Car)</th><th>Time (Car)</th><th>Distance (Train)</th><th>Time (Train)</th></tr>';
 
-                        rows.forEach((row, i) => {
-                            row.elements.forEach((element, j) => {
-                                const origin = locations[i].name;
-                                const destination = locations[j + 1].name; // Shift index for destination
+            let totalRequests = 0;
+            let completedRequests = 0;
 
-                                // Add information for car (DRIVING)
-                                let drivingDistance = element.distance.text;
-                                let drivingDuration = element.duration.text;
+            locations.forEach((origin, i) => {
+                if (i === locations.length - 1) return; // Skip the last location (no destination)
 
-                                // Request for TRANSIT (Train) information
+                locations.slice(i + 1).forEach((destination, j) => {
+                    totalRequests += 1;
+
+                    // Get Car (DRIVING) distance and time
+                    service.getDistanceMatrix(
+                        {
+                            origins: [origins[i]],
+                            destinations: [origins[i + j + 1]], // dynamic destination
+                            travelMode: google.maps.TravelMode.DRIVING, // Car travel mode
+                            unitSystem: google.maps.UnitSystem.METRIC
+                        },
+                        (carResponse, carStatus) => {
+                            if (carStatus === google.maps.DistanceMatrixStatus.OK) {
+                                const drivingDistance = carResponse.rows[0].elements[0].distance.text;
+                                const drivingDuration = carResponse.rows[0].elements[0].duration.text;
+
+                                // Get Train (TRANSIT) distance and time
                                 service.getDistanceMatrix(
                                     {
                                         origins: [origins[i]],
-                                        destinations: [origins[j + 1]],
+                                        destinations: [origins[i + j + 1]], // dynamic destination
                                         travelMode: google.maps.TravelMode.TRANSIT, // Train travel mode
                                         unitSystem: google.maps.UnitSystem.METRIC
                                     },
-                                    (transitResponse, transitStatus) => {
-                                        if (transitStatus === google.maps.DistanceMatrixStatus.OK) {
-                                            const transitElement = transitResponse.rows[0].elements[0];
-                                            const transitDistance = transitElement.distance.text;
-                                            const transitDuration = transitElement.duration.text;
+                                    (trainResponse, trainStatus) => {
+                                        let transitDistance = 'N/A';
+                                        let transitDuration = 'N/A';
+                                        if (trainStatus === google.maps.DistanceMatrixStatus.OK) {
+                                            transitDistance = trainResponse.rows[0].elements[0].distance.text;
+                                            transitDuration = trainResponse.rows[0].elements[0].duration.text;
+                                        }
 
-                                            table += `<tr><td>${origin}</td><td>${destination}</td><td>${drivingDistance}</td><td>${drivingDuration}</td><td>${transitDistance}</td><td>${transitDuration}</td></tr>`;
-                                            output.innerHTML = output.innerHTML + table; // Dynamically update the table
-                                        } else {
-                                            console.error('Error with Transit request:', transitStatus);
+                                        // Add the row to the table after both car and train data are available
+                                        table += `<tr><td>${origin.name}</td><td>${destination.name}</td><td>${drivingDistance}</td><td>${drivingDuration}</td><td>${transitDistance}</td><td>${transitDuration}</td></tr>`;
+
+                                        completedRequests += 1;
+                                        // Once all requests are completed, render the table
+                                        if (completedRequests === totalRequests) {
+                                            table += '</table>';
+                                            output.innerHTML += table;
                                         }
                                     }
                                 );
-                            });
-                        });
-
-                        table += '</table>';
-                    } else {
-                        console.error('Error with Distance Matrix request:', status);
-                    }
-                }
-            );
+                            } else {
+                                console.error('Error with Car request:', carStatus);
+                            }
+                        }
+                    );
+                });
+            });
         }
 
         // Event listeners for city buttons
