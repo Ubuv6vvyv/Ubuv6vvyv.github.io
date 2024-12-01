@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wikipedia API Query Builder & Explorer</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-light: #f5f5f5;
+            --border: #e5e7eb;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.5;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-light);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .query-builder {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        pre {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        .output {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+
+        .final-query {
+            background: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            word-break: break-all;
+        }
+
+        .preset-queries {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .preset-query {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+        }
+
+        .preset-query:hover {
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <h1>Wikipedia API Query Builder & Explorer</h1>
+    
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('builder')">Query Builder</div>
+        <div class="tab" onclick="switchTab('presets')">Preset Queries</div>
+    </div>
+
+    <div id="builder-tab">
+        <div class="query-builder">
+            <h2>Build Your Query</h2>
+            <div class="form-group">
+                <label>Action Type:</label>
+                <select id="action-type" onchange="updateQueryBuilder()">
+                    <option value="query">Query (get content)</option>
+                    <option value="opensearch">Open Search (search titles)</option>
+                    <option value="geosearch">Geo Search (find nearby)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="query-options">
+                <label>Query Type:</label>
+                <select id="query-type" onchange="updateQueryBuilder()">
+                    <option value="categorymembers">Category Members</option>
+                    <option value="search">Full Text Search</option>
+                    <option value="coordinates">Get Coordinates</option>
+                    <option value="pageimages">Page Images</option>
+                    <option value="extracts">Page Extracts</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Search Term / Category:</label>
+                <input type="text" id="search-term" placeholder="Enter search term or category name" onchange="updateQueryBuilder()">
+            </div>
+
+            <div class="form-group">
+                <label>Limit Results:</label>
+                <input type="number" id="limit" value="10" min="1" max="500" onchange="updateQueryBuilder()">
+            </div>
+
+            <div class="final-query" id="final-query">
+                Your query will appear here...
+            </div>
+
+            <button onclick="executeQuery()">Execute Query</button>
+        </div>
+
+        <div class="output" id="query-output">
+            Results will appear here...
+        </div>
+    </div>
+
+    <div id="presets-tab" style="display: none;">
+        <h2>Preset Queries</h2>
+        <div class="preset-queries">
+            <div class="preset-query" onclick="loadPreset('countries')">
+                <h3>Countries</h3>
+                <p>List of all countries by continent</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('mountains')">
+                <h3>Mountains</h3>
+                <p>Highest mountains in the world</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('languages')">
+                <h3>Languages</h3>
+                <p>World languages by family</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('cities')">
+                <h3>Cities</h3>
+                <p>Largest cities by population</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('rivers')">
+                <h3>Rivers</h3>
+                <p>Longest rivers in the world</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('animals')">
+                <h3>Animals</h3>
+                <p>Endangered species list</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('landmarks')">
+                <h3>Landmarks</h3>
+                <p>Famous landmarks by country</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('scientists')">
+                <h3>Scientists</h3>
+                <p>Notable scientists by field</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('inventions')">
+                <h3>Inventions</h3>
+                <p>Major inventions by century</p>
+            </div>
+            <div class="preset-query" onclick="loadPreset('space')">
+                <h3>Space</h3>
+                <p>Solar system objects</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const presetQueries = {
+            countries: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Countries_by_continent',
+                limit: 300
+            },
+            mountains: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Mountains_by_height',
+                limit: 100
+            },
+            languages: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Languages_by_family',
+                limit: 200
+            },
+            cities: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Cities_by_population',
+                limit: 100
+            },
+            rivers: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Longest_rivers',
+                limit: 50
+            },
+            animals: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:IUCN_Red_List_critically_endangered_species',
+                limit: 100
+            },
+            landmarks: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:World_Heritage_Sites',
+                limit: 100
+            },
+            scientists: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Scientists_by_field',
+                limit: 100
+            },
+            inventions: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Inventions_by_century',
+                limit: 100
+            },
+            space: {
+                action: 'query',
+                type: 'categorymembers',
+                term: 'Category:Solar_System',
+                limit: 50
+            }
+        };
+
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('builder-tab').style.display = tab === 'builder' ? 'block' : 'none';
+            document.getElementById('presets-tab').style.display = tab === 'presets' ? 'block' : 'none';
+        }
+
+        function loadPreset(presetName) {
+            const preset = presetQueries[presetName];
+            document.getElementById('action-type').value = preset.action;
+            document.getElementById('query-type').value = preset.type;
+            document.getElementById('search-term').value = preset.term;
+            document.getElementById('limit').value = preset.limit;
+            
+            switchTab('builder');
+            updateQueryBuilder();
+        }
+
+        function updateQueryBuilder() {
+            const action = document.getElementById('action-type').value;
+            const queryType = document.getElementById('query-type').value;
+            const searchTerm = document.getElementById('search-term').value;
+            const limit = document.getElementById('limit').value;
+
+            let queryParams = new URLSearchParams();
+            queryParams.append('action', action);
+            queryParams.append('format', 'json');
+            queryParams.append('origin', '*');
+
+            if (action === 'query') {
+                queryParams.append('list', queryType);
+                if (queryType === 'categorymembers') {
+                    queryParams.append('cmtitle', searchTerm);
+                    queryParams.append('cmlimit', limit);
+                } else if (queryType === 'search') {
+                    queryParams.append('srsearch', searchTerm);
+                    queryParams.append('srlimit', limit);
+                }
+            } else if (action === 'opensearch') {
+                queryParams.append('search', searchTerm);
+                queryParams.append('limit', limit);
+            } else if (action === 'geosearch') {
+                queryParams.append('gscoord', searchTerm);
+                queryParams.append('gslimit', limit);
+            }
+
+            const finalQuery = 'https://en.wikipedia.org/w/api.php?' + queryParams.toString();
+            document.getElementById('final-query').textContent = finalQuery;
+        }
+
+        function executeQuery() {
+            const outputDiv = document.getElementById('query-output');
+            outputDiv.innerHTML = '<div class="loading">Loading...</div>';
+
+            const queryUrl = document.getElementById('final-query').textContent;
+
+            fetch(queryUrl)
+                .then(response => response.json())
+                .then(data => {
+                    let formattedOutput = '';
+                    
+                    if (data.query && data.query.categorymembers) {
+                        formattedOutput = data.query.categorymembers
+                            .map(item => `• ${item.title}`)
+                            .join('\n');
+                    } else if (data.query && data.query.search) {
+                        formattedOutput = data.query.search
+                            .map(item => `• ${item.title}\n  ${item.snippet}`)
+                            .join('\n\n');
+                    } else if (Array.isArray(data)) {
+                        formattedOutput = data[1]
+                            .map(item => `• ${item}`)
+                            .join('\n');
+                    } else {
+                        formattedOutput = JSON.stringify(data, null, 2);
+                    }
+                    
+                    outputDiv.innerHTML = `<pre>${formattedOutput}</pre>`;
+                })
+                .catch(error => {
+                    outputDiv.innerHTML = `Error: ${error.message}`;
+                });
+        }
+
+        // Initialize the query builder
+        updateQueryBuilder();
+    </script>
+</body>
+</html>
