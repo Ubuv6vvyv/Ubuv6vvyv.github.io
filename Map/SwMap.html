@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Switzerland Map</title>
+    <style>
+        #map {
+            height: 1000px;
+            width: 100%;
+            border: 1px solid black;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <button id="interlaken-btn">Interlaken</button>
+    <button id="lauterbrunnen-btn">Lauterbrunnen</button>
+    <button id="grindelwald-btn">Grindelwald</button>
+    <button id="lucerne-btn">Lucerne</button>
+    <button id="zurich-btn">Zurich</button>
+    <button id="distances-btn">Calculate Distances</button>
+    <div id="wiki-content"></div>
+    <div id="distance-info"></div> <!-- For displaying distances and times -->
+
+    <script>
+        let map;
+        let markers = [];
+        let locations = [
+            { name: "Interlaken", lat: 46.68667, lng: 7.86389 },
+            { name: "Lauterbrunnen", lat: 46.59722, lng: 7.90694 },
+            { name: "Grindelwald", lat: 46.62361, lng: 8.03472 },
+            { name: "Lucerne", lat: 47.05051, lng: 8.30923 },
+            { name: "Zurich", lat: 47.37689, lng: 8.54169 }
+        ];
+
+        function initMap() {
+            const switzerland = { lat: 46.8182, lng: 8.2275 };
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 8,
+                center: switzerland,
+            });
+
+            locations.forEach(location => {
+                const marker = new google.maps.Marker({
+                    position: { lat: location.lat, lng: location.lng },
+                    map: map,
+                    title: location.name,
+                });
+                markers.push(marker);
+            });
+        }
+
+        // Fetch and display Wikipedia content
+        function getWikiContent(city) {
+            const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${city}&format=json&origin=*`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const wikiContent = document.getElementById('wiki-content');
+                    wikiContent.innerHTML = ''; // Clear previous content
+
+                    const content = data.parse.text['*'];
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(content, 'text/html');
+
+                    const links = doc.querySelectorAll('a');
+                    const list = document.createElement('ul');
+
+                    links.forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href && href.startsWith('/wiki/')) {
+                            const li = document.createElement('li');
+                            const linkElement = document.createElement('a');
+                            linkElement.setAttribute('href', `https://en.wikipedia.org${href}`);
+                            linkElement.textContent = link.textContent;
+                            li.appendChild(linkElement);
+                            list.appendChild(li);
+                        }
+                    });
+
+                    wikiContent.appendChild(list);
+                })
+                .catch(error => console.error('Error fetching Wikipedia content:', error));
+        }
+
+        // Calculate and display distances (car and train)
+        function calculateDistances() {
+            const origins = locations.map(loc => new google.maps.LatLng(loc.lat, loc.lng));
+            const destinations = origins.slice(1); // Exclude first point for now
+
+            const service = new google.maps.DistanceMatrixService();
+            service.getDistanceMatrix(
+                {
+                    origins: origins,
+                    destinations: destinations,
+                    travelMode: google.maps.TravelMode.DRIVING, // Car travel mode
+                    unitSystem: google.maps.UnitSystem.METRIC
+                },
+                (response, status) => {
+                    if (status === google.maps.DistanceMatrixStatus.OK) {
+                        const output = document.getElementById('distance-info');
+                        output.innerHTML = "<h3>Distances and Travel Times:</h3>";
+                        const rows = response.rows;
+                        let table = '<table><tr><th>From</th><th>To</th><th>Distance (Car)</th><th>Time (Car)</th><th>Distance (Train)</th><th>Time (Train)</th></tr>';
+
+                        rows.forEach((row, i) => {
+                            row.elements.forEach((element, j) => {
+                                const origin = locations[i].name;
+                                const destination = locations[j + 1].name; // Shift index for destination
+
+                                // Add information for car (DRIVING)
+                                let drivingDistance = element.distance.text;
+                                let drivingDuration = element.duration.text;
+
+                                // Request for TRANSIT (Train) information
+                                service.getDistanceMatrix(
+                                    {
+                                        origins: [origins[i]],
+                                        destinations: [origins[j + 1]],
+                                        travelMode: google.maps.TravelMode.TRANSIT, // Train travel mode
+                                        unitSystem: google.maps.UnitSystem.METRIC
+                                    },
+                                    (transitResponse, transitStatus) => {
+                                        if (transitStatus === google.maps.DistanceMatrixStatus.OK) {
+                                            const transitElement = transitResponse.rows[0].elements[0];
+                                            const transitDistance = transitElement.distance.text;
+                                            const transitDuration = transitElement.duration.text;
+
+                                            table += `<tr><td>${origin}</td><td>${destination}</td><td>${drivingDistance}</td><td>${drivingDuration}</td><td>${transitDistance}</td><td>${transitDuration}</td></tr>`;
+                                            output.innerHTML = output.innerHTML + table; // Dynamically update the table
+                                        } else {
+                                            console.error('Error with Transit request:', transitStatus);
+                                        }
+                                    }
+                                );
+                            });
+                        });
+
+                        table += '</table>';
+                    } else {
+                        console.error('Error with Distance Matrix request:', status);
+                    }
+                }
+            );
+        }
+
+        // Event listeners for city buttons
+        const cities = ["Interlaken", "Lauterbrunnen", "Grindelwald", "Lucerne", "Zurich"];
+        cities.forEach(city => {
+            document.getElementById(`${city.toLowerCase()}-btn`).addEventListener('click', () => getWikiContent(city));
+        });
+
+        // Event listener for "Distances" button
+        document.getElementById('distances-btn').addEventListener('click', () => calculateDistances());
+
+    </script>
+
+    <!-- Google Maps API: Replace your Google Maps API key here -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap"></script>
+</body>
+</html>
