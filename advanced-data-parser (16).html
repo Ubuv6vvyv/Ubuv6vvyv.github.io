@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Data Parser</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-accent: #00ff00;
+            --border-color: #444;
+            --highlight-color: #333;
+            --error-bg: #f8d7da;
+            --error-border: #f5c6cb;
+            --error-text: #721c24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Roboto', monospace; 
+            background-color: var(--bg-primary); 
+            color: var(--text-primary); 
+            line-height: 1.6; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background-color: var(--bg-secondary); 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+        }
+        textarea, select, button, input[type="file"] { 
+            width: 100%; 
+            background-color: var(--highlight-color); 
+            color: var(--text-accent); 
+            border: 1px solid var(--border-color); 
+            padding: 10px; 
+            font-family: 'Courier New', monospace; 
+            margin-bottom: 10px; 
+        }
+        textarea { 
+            min-height: 400px; 
+            resize: vertical; 
+        }
+        .data-table-container { 
+            overflow-x: auto; 
+            max-width: 100%; 
+            margin-top: 20px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 10px; 
+        }
+        table th, table td { 
+            border: 1px solid var(--border-color); 
+            padding: 8px; 
+            text-align: left; 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        table th { 
+            background-color: var(--highlight-color); 
+            color: var(--text-accent); 
+            position: sticky; 
+            top: 0; 
+            z-index: 1; 
+        }
+        #error-container, #warning-container {
+            color: red;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #warning-container {
+            color: orange;
+            border: 1px solid orange;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Data Parser</h1>
+        
+        <div class="controls">
+            <select id="file-type">
+                <option value="auto">Auto Detect</option>
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+                <option value="text">Plain Text</option>
+                <option value="excel">Excel</option>
+                <option value="html">HTML</option>
+            </select>
+        </div>
+
+        <input type="file" id="file-input" accept=".json,.csv,.txt,.xls,.xlsx,.html">
+        
+        <textarea id="data-input" placeholder="Paste your data here or use file upload..."></textarea>
+
+        <div id="error-container" style="display:none;"></div>
+        <div id="warning-container" style="display:none;"></div>
+
+        <div class="controls">
+            <button id="parse-btn">Parse Data</button>
+            <button id="download-btn" style="display:none;">Download HTML</button>
+            <button id="clear-btn">Clear</button>
+        </div>
+
+        <div class="data-table-container">
+            <table id="parsed-data-table"></table>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/he/1.2.0/he.min.js"></script>
+
+    <script>
+    $(document).ready(function() {
+        // Enhanced Data Detection and Parsing
+        function detectDataType(rawData) {
+            rawData = rawData.trim();
+            
+            // Comprehensive type detection with enhanced regex
+            if (/^\s*[\{\[].*[\}\]]$/s.test(rawData)) return 'json';
+            if (/^[^\n\r]+,/.test(rawData)) return 'csv';
+            if (/^<(!DOCTYPE\s*html|html\s+lang)/i.test(rawData)) return 'html';
+            if (/\t/.test(rawData)) return 'excel';
+            
+            return 'text';
+        }
+
+        // Robust JSON Parsing with Nested Structure Support
+        function robustJSONParse(rawData) {
+            const cleanseData = (data) => {
+                if (Array.isArray(data)) {
+                    return data.filter(item => typeof item === 'object' && item !== null);
+                }
+                if (typeof data === 'object' && data !== null) {
+                    const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]));
+                    return arrayKeys.length > 0 ? data[arrayKeys[0]] : [data];
+                }
+                return [];
+            };
+
+            const parseStrategies = [
+                // Direct parsing
+                () => {
+                    try {
+                        const parsed = JSON.parse(rawData);
+                        return cleanseData(parsed);
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                // Remove trailing/leading commas and whitespace
+                () => {
+                    try {
+                        const cleaned = rawData
+                            .replace(/,\s*]/g, ']')
+                            .replace(/,\s*}/g, '}')
+                            .trim();
+                        const parsed = JSON.parse(cleaned);
+                        return cleanseData(parsed);
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                // Attempt to repair JSON
+                () => {
+                    try {
+                        const repaired = rawData
+                            .replace(/(['"])?([a-z0-9A-Z_]+)(['"])?:/g, '"$2":')
+                            .replace(/'/g, '"');
+                        const parsed = JSON.parse(repaired);
+                        return cleanseData(parsed);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            ];
+
+            for (let strategy of parseStrategies) {
+                const result = strategy();
+                if (result && result.length > 0) return result;
+            }
+
+            throw new Error('Unable to parse JSON');
+        }
+
+        // Intelligent Pattern Detection for Unstructured Data
+        function extractTableFromText(rawData) {
+            const dataRows = [];
+            const lines = rawData.split('\n');
+            
+            const extractors = [
+                { 
+                    name: 'Price', 
+                    regex: /\$?(\d+(\.\d{1,2})?)/g,
+                    transform: matches => matches.join(', ')
+                },
+                { 
+                    name: 'Date', 
+                    regex: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g,
+                    transform: matches => matches.join(', ')
+                },
+                { 
+                    name: 'Email', 
+                    regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+                    transform: matches => matches.join(', ')
+                }
+            ];
+
+            lines.forEach(line => {
+                const extractedData = { Raw: line };
+                
+                extractors.forEach(extractor => {
+                    const matches = line.match(extractor.regex) || [];
+                    if (matches.length > 0) {
+                        extractedData[extractor.name] = extractor.transform(matches);
+                    }
+                });
+
+                if (Object.keys(extractedData).length > 1) {
+                    dataRows.push(extractedData);
+                }
+            });
+
+            return dataRows;
+        }
+
+        // Enhanced HTML Parsing
+        function parseHTML(rawData) {
+            const $ = $($.parseHTML(rawData));
+            const tableData = [];
+
+            // Try multiple table parsing strategies
+            $('table, .table, .table-responsive').each(function() {
+                const rows = $(this).find('tr');
+                const parsedRows = [];
+
+                rows.each(function() {
+                    const rowData = {};
+                    const cells = $(this).find('th, td');
+                    
+                    cells.each(function(index) {
+                        const columnName = `Column${index + 1}`;
+                        rowData[columnName] = he.decode($(this).text().trim());
+                    });
+
+                    if (Object.keys(rowData).length > 0) {
+                        parsedRows.push(rowData);
+                    }
+                });
+
+                tableData.push(...parsedRows);
+            });
+
+            // Fallback parsing for divs and other elements
+            if (tableData.length === 0) {
+                $('div, p, span').each(function() {
+                    const text = he.decode($(this).text().trim());
+                    if (text) {
+                        tableData.push({ 'Content': text });
+                    }
+                });
+            }
+
+            return tableData;
+        }
+
+        // Enhanced Excel Parsing with Error Handling
+        function parseExcel(rawData) {
+            try {
+                const workbook = XLSX.read(rawData, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Convert sheet to JSON with fallback
+                return XLSX.utils.sheet_to_json(worksheet, { 
+                    defval: '',  // Use empty string for missing values
+                    blankrows: false  // Skip blank rows
+                });
+            } catch (error) {
+                console.error('Excel parsing error:', error);
+                throw new Error('Unable to parse Excel file');
+            }
+        }
+
+        // Enhanced Error Handling and Warnings
+        function displayWarning(message) {
+            $('#warning-container')
+                .text('Warning: ' + message)
+                .show();
+        }
+
+        function displayError(message) {
+            $('#error-container')
+                .text('Error: ' + message)
+                .show();
+        }
+
+        // Flexible Parsing and Display
+        function displayTable(data) {
+            if (!data || data.length === 0) {
+                displayWarning('No parseable data found');
+                return;
+            }
+
+            // Intelligent column extraction
+            const columns = [...new Set(data.flatMap(obj => Object.keys(obj)))];
+
+            const headerHtml = '<thead><tr>' + 
+                columns.map(col => `<th>${he.encode(col)}</th>`).join('') + 
+                '</tr></thead>';
+
+            const bodyHtml = '<tbody>' + 
+                data.map(row => 
+                    '<tr>' + 
+                    columns.map(col => {
+                        const cellValue = row[col] !== undefined ? row[col] : '';
+                        return `<td title="${he.encode(String(cellValue))}">${he.encode(String(cellValue))}</td>`;
+                    }).join('') + 
+                    '</tr>'
+                ).join('') + 
+                '</tbody>';
+
+            $('#parsed-data-table').html(headerHtml + bodyHtml);
+        }
+
+        // File Input Handling
+        $('#file-input').on('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                $('#data-input').val(event.target.result);
+            };
+
+            // Different reading methods based on file type
+            if (file.type.includes('excel') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                reader.readAsBinaryString(file);
+            } else {
+                reader.readAsText(file);
+            }
+        });
+
+        // Main Parse Button Handler
+        $('#parse-btn').on('click', function() {
+            $('#error-container, #warning-container').hide();
+            $('#parsed-data-table').empty();
+
+            const rawData = $('#data-input').val().trim();
+            const fileType = $('#file-type').val() === 'auto' 
+                ? detectDataType(rawData) 
+                : $('#file-type').val();
+
+            try {
+                let parsedData;
+                switch(fileType) {
+                    case 'json':
+                        parsedData = robustJSONParse(rawData);
+                        break;
+                    case 'csv':
+                        parsedData = Papa.parse(rawData, { 
+                            header: true, 
+                            skipEmptyLines: true 
+                        }).data;
+                        break;
+                    case 'html':
+                        parsedData = parseHTML(rawData);
+                        break;
+                    case 'text':
+                        parsedData = extractTableFromText(rawData);
+                        break;
+                    case 'excel':
+                        parsedData = parseExcel(rawData);
+                        break;
+                    default:
+                        throw new Error('Unsupported file type');
+                }
+
+                displayTable(parsedData);
+
+            } catch (error) {
+                console.error('Parsing error:', error);
+                displayError(error.message || 'An unknown error occurred during parsing');
+            }
+        });
+
+        // Additional utilities
+        $('#clear-btn').on('click', function() {
+            $('#data-input').val('');
+            $('#parsed-data-table').empty();
+            $('#error-container, #warning-container').hide();
+        });
+    });
+    </script>
+</body>
+</html>
