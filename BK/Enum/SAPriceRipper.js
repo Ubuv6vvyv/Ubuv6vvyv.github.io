@@ -100,23 +100,23 @@ javascript:(function() {
 
 
 
-javascript:(function(){
-  var text = document.documentElement.innerText;
-  var jsonData = JSON.parse(text);
-  var results = [];
-  for (var month in jsonData) {
-    if (jsonData[month].data && jsonData[month].data.histogramResponse && jsonData[month].data.histogramResponse.fares) {
-      var fares = jsonData[month].data.histogramResponse.fares;
-      fares.forEach(function(item) {
-        results.push({date: item.departureDate, fare: item.fare});
-      });
-    }
-  }
-  results.sort(function(a, b) {
-    return new Date(a.date) - new Date(b.date);
-  });
-  var output = results.map(function(item) {
-    return `${item.date}: $${item.fare}`;
-  });
-  console.log(output);
-})();
+//javascript:(function(){
+//  var text = document.documentElement.innerText;
+//  var jsonData = JSON.parse(text);
+//  var results = [];
+//  for (var month in jsonData) {
+//    if (jsonData[month].data && jsonData[month].data.histogramResponse && jsonData[month].data.histogramResponse.fares) {
+//      var fares = jsonData[month].data.histogramResponse.fares;
+//      fares.forEach(function(item) {
+//        results.push({date: item.departureDate, fare: item.fare});
+//      });
+//    }
+//  }
+//  results.sort(function(a, b) {
+//    return new Date(a.date) - new Date(b.date);
+//  });
+//  var output = results.map(function(item) {
+//    return `${item.date}: $${item.fare}`;
+//  });
+//  console.log(output);
+//})();
