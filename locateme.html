@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Geolocation with Google Maps</title>
+	<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			background-color: #121212;
+			color: #00ff00;
+			font-family: 'Fira Code', monospace;
+			font-size: 12px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 100vh;
+			overflow: hidden;
+		}
+
+		h1 {
+			color: #0aff0a;
+			text-shadow: 0 0 10px #0aff0a;
+			animation: glow 2s infinite alternate;
+		}
+
+		#fetchLocation {
+			background-color: transparent;
+			border: 2px solid #0aff0a;
+			color: #0aff0a;
+			padding: 10px 20px;
+			font-size: 16px;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			text-shadow: 0 0 5px #00ff00;
+			box-shadow: 0 0 15px #00ff00;
+		}
+
+		#fetchLocation:hover {
+			background-color: #0aff0a;
+			color: #121212;
+			text-shadow: none;
+			box-shadow: 0 0 30px #0aff0a;
+		}
+
+		#output, #map, #search-panel {
+			width: 80%;
+			max-width: 800px;
+			margin-top: 20px;
+			padding: 20px;
+			border: 1px solid #00ff00;
+			border-radius: 10px;
+			box-shadow: 0 0 20px #00ff00;
+			background: rgba(0, 0, 0, 0.8);
+			animation: fadeIn 1s ease-out;
+		}
+
+		#output p {
+			margin: 5px 0;
+			color: #0aff0a;
+		}
+
+		#map {
+			height: 400px;
+		}
+
+		#toggle-search {
+			cursor: pointer;
+			color: #0aff0a;
+			text-shadow: 0 0 5px #00ff00;
+			margin-top: 10px;
+		}
+
+		#search-panel {
+			display: none;
+			flex-direction: column;
+			gap: 10px;
+		}
+
+		input[type="text"] {
+			background-color: #121212;
+			border: 2px solid #00ff00;
+			color: #0aff0a;
+			padding: 8px;
+			font-family: 'Fira Code', monospace;
+			font-size: 14px;
+			width: calc(50% - 16px);
+			text-shadow: 0 0 5px #00ff00;
+		}
+
+		#searchButton {
+			background-color: transparent;
+			border: 2px solid #0aff0a;
+			color: #0aff0a;
+			padding: 8px 16px;
+			cursor: pointer;
+			text-shadow: 0 0 5px #00ff00;
+			box-shadow: 0 0 10px #00ff00;
+			transition: all 0.3s ease;
+		}
+
+		#searchButton:hover {
+			background-color: #0aff0a;
+			color: #121212;
+			box-shadow: 0 0 20px #0aff0a;
+		}
+
+		@keyframes glow {
+			from {
+				text-shadow: 0 0 10px #0aff0a, 0 0 20px #0aff0a;
+			}
+			to {
+				text-shadow: 0 0 20px #00ff00, 0 0 40px #0aff0a;
+			}
+		}
+
+		@keyframes fadeIn {
+			from {
+				opacity: 0;
+				transform: scale(0.95);
+			}
+			to {
+				opacity: 1;
+				transform: scale(1);
+			}
+		}
+	</style>
+	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA"></script>
+</head>
+<body>
+
+	<h1>Geolocation Finder</h1>
+	<button id="fetchLocation">Fetch Location</button>
+		<div id="toggle-search">
+		▼ Advanced Search (Lat/Lon)
+	</div>
+	<div id="search-panel">
+		<input type="text" id="latitude" placeholder="Enter Latitude">
+		<input type="text" id="longitude" placeholder="Enter Longitude">
+		<button id="searchButton">Search</button>
+	</div>
+	<div id="output"></div>
+	<div id="map"></div>
+
+
+
+	<script>
+		async function getGeocode(lat, lon) {
+			const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+			const data = await response.json();
+			return data.display_name;
+		}
+
+		function initializeMap(lat, lon) {
+			const map = new google.maps.Map(document.getElementById('map'), {
+				center: {
+					lat, lng: lon
+				},
+				zoom: 15,
+				styles: [{
+					elementType: 'geometry', stylers: [{
+						color: '#242f3e'
+					}]
+				},
+					{
+						elementType: 'labels.text.stroke', stylers: [{
+							color: '#242f3e'
+						}]
+					},
+					{
+						elementType: 'labels.text.fill', stylers: [{
+							color: '#746855'
+						}]
+					},
+				],
+			});
+
+			new google.maps.Marker({
+				position: {
+					lat, lng: lon
+				},
+				map,
+				title: 'Location',
+			});
+		}
+
+		document.getElementById('fetchLocation').addEventListener('click', async () => {
+			const output = document.getElementById('output');
+			output.innerHTML = 'Fetching location...';
+
+			navigator.geolocation.getCurrentPosition(async (position) => {
+				const reverseGeocode = await getGeocode(position.coords.latitude, position.coords.longitude);
+				output.innerHTML = `<strong>Location:</strong> ${reverseGeocode}`;
+				initializeMap(position.coords.latitude, position.coords.longitude);
+			});
+		});
+
+		document.getElementById('toggle-search').addEventListener('click', () => {
+			const panel = document.getElementById('search-panel');
+			panel.style.display = panel.style.display === 'none' ? 'flex': 'none';
+		});
+
+		document.getElementById('searchButton').addEventListener('click', async () => {
+			const lat = parseFloat(document.getElementById('latitude').value);
+			const lon = parseFloat(document.getElementById('longitude').value);
+			if (!isNaN(lat) && !isNaN(lon)) {
+				const output = document.getElementById('output');
+				output.innerHTML = 'Fetching location...';
+
+				const reverseGeocode = await getGeocode(lat, lon);
+				output.innerHTML = `<strong>Location:</strong> ${reverseGeocode}`;
+				initializeMap(lat, lon);
+			} else {
+				alert('Please enter valid latitude and longitude!');
+			}
+		});
+	</script>
+
+</body>
+</html>
