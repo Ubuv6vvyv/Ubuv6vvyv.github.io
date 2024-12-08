@@ -1,0 +1,38 @@
+(() => {
+    async function getRedditVideoUrl(url) {
+        try {
+            // Fetch Reddit JSON data by appending '.json' to the URL
+            const response = await fetch(url + '.json');
+            const data = await response.json();
+
+            // Extract and return the Reddit video URL
+            const videoUrl = data[0]?.data?.children[0]?.data?.secure_media?.reddit_video?.fallback_url;
+            return videoUrl;
+        } catch (error) {
+            console.error('Error fetching Reddit video:', error);
+            return null;
+        }
+    }
+
+    // Function to download the video or open the link
+    async function handleVideo(url) {
+        let videoUrl = await getRedditVideoUrl(url);
+        if (videoUrl) {
+            const a = document.createElement('a');
+            a.href = videoUrl;
+            a.download = videoUrl.split('/').pop();
+            a.click();
+        } else {
+            window.open(url, '_blank');
+        }
+    }
+
+    // Create a download button on the page
+    const button = document.createElement('button');
+    button.textContent = '⬇️ Download Video';
+    button.style.cssText = 'position:fixed;top:10px;right:10px;z-index:10000;padding:10px;background:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer';
+    button.onclick = () => handleVideo(window.location.href);
+
+    // Add the button to the page
+    document.body.appendChild(button);
+})();
