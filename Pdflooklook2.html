@@ -1,432 +1,881 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate PDF Analysis Toolkit</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
+
+    <title>Analyzer</title>
+<style>
+    /* Base body styling */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #181818;
+        color: #eaeaea;
+        margin: 20px;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        flex-direction: column;
+        height: 100%;
+        text-align: center;
+        overflow-x: hidden;
+    }
+
+    /* Main heading styling */
+    h1 {
+        font-size: 1.5em;
+        color: #f7f7f7;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    /* Button Styling */
+    button {
+        background-color: #4a90e2;
+        color: #fff;
+        border: none;
+        padding: 5px 15px;
+        font-size: 1em;
+        cursor: pointer;
+        border-radius: 4px;
+        margin: 10px;
+        transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+        background-color: #357ab7;
+    }
+
+    /* Input and textarea styling */
+    input[type="file"], textarea {
+        background-color: #2a2a2a;
+        color: #eaeaea;
+        border: 1px solid #444;
+        border-radius: 5px;
+        padding: 15px;
+        width: 90%;
+        margin-bottom: 25px;
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    input[type="file"]:hover, textarea:hover {
+        border-color: #4a90e2;
+    }
+
+    /* Ensure textarea resizes properly */
+    textarea {
+        resize: vertical;
+        min-height: 150px;
+        font-size: 1em;
+    }
+
+    /* Output sections styling */
+    .output-section {
+        width: 90%;
+        max-width: 1000px;
+        margin-top: 20px;
+        padding: 20px;
+        background-color: #333;
+        border-radius: 5px;
+        overflow: auto;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+    }
+
+    #pdf-preview {
+        background-color: #444;
+        padding: 10px;
+        text-align: left;
+    }
+
+    #metadata-output {
+        background-color: #555;
+        padding: 10px;
+    }
+
+    #text-output, #markdown-output, #html-output {
+        background-color: #444;
+        padding: 15px;
+        font-size: 1.1em;
+        border-radius: 5px;
+        box-sizing: border-box;
+        margin-bottom: 25px;
+        width: 90%;
+    }
+
+    /* Regex search section styling */
+    #regex-search {
+        width: 90%;
+        max-width: 1000px;
+        margin-top: 30px;
+        padding: 20px;
+        border-radius: 10px;
+        background-color: #2a2a2a;
+    }
+
+    #regex-search h3 {
+        color: #f7f7f7;
+        font-size: 1.6em;
+        margin-bottom: 20px;
+    }
+
+    #regex-search textarea {
+        width: 100%;
+        min-height: 150px;
+        font-size: 1.1em;
+        margin-bottom: 15px;
+        resize: vertical;
+    }
+
+    #regex-output h4 {
+        font-size: 1.5em;
+        color: #f7f7f7;
+        margin-top: 20px;
+        text-align: left;
+    }
+
+    #regex-output ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+
+    #regex-output li {
+        color: #cfcfcf;
+        font-size: 1em;
+        margin: 5px 0;
+    }
+
+    /* Hover effects for the regex matches */
+    #regex-output li:hover {
+        background-color: #444;
+        border-radius: 5px;
+        padding: 5px;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .copy-btn {
+        background-color: #4a90e2;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        font-size: 1em;
+        cursor: pointer;
+        border-radius: 4px;
+        margin: 10px;
+        transition: background-color 0.3s ease;
+    }
+
+    .copy-btn:hover {
+        background-color: #357ab7;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
         body {
-            background-color: #f4f6f9;
-            font-family: 'Arial', sans-serif;
+            padding: 10px;
+            align-items: center;
         }
-        .feature-card {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
+
+        h1 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
         }
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+
+        button {
+            font-size: 1.1em;
+            padding: 8px 16px;
         }
-        .preview-container {
-            max-height: 500px;
-            overflow-y: auto;
-            background-color: #f8f9fa;
-            border-radius: 8px;
+
+        input[type="file"], textarea {
+            width: 100%;
+            font-size: 1em;
+        }
+
+        #regex-search {
+            width: 100%;
             padding: 15px;
         }
-        #progressContainer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 1000;
+
+        #regex-search h3 {
+            font-size: 1.4em;
         }
-    </style>
+
+        #regex-search textarea {
+            width: 100%;
+            font-size: 1.1em;
+        }
+
+        .output-section {
+            width: 95%;
+            max-width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #333;
+        }
+
+        pre {
+            font-size: 1em;
+            min-height: 350px;
+            max-height: 500px;
+            margin-bottom: 20px;
+        }
+    }
+
+    /* PDF Print Styling */
+    @media print {
+        body {
+            background-color: #fff;
+            color: #000;
+            padding: 0;
+            margin: 0;
+        }
+
+        .output-section {
+            width: 100%;
+            max-width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 0;
+        }
+
+        pre {
+            font-size: 0.9em;
+            padding: 10px;
+            border-radius: 0;
+            max-height: none;
+            overflow: visible;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
+        .no-print {
+            display: none;
+        }
+    }
+</style>
+
+
+
+
+
+
+
 </head>
+
 <body>
-    <div id="progressContainer" class="progress" style="display:none;">
-        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+
+    <h1>PDF CURIOUSITY TOOL</h1>
+
+    <input type="file" id="pdf-input" accept=".pdf">
+
+    <div id="pdf-preview" class="output-section">PDF Preview</div>
+
+    <div id="metadata-output" class="output-section">Metadata</div>
+
+    <div class="action-buttons">
+
+        <button class="copy-btn" onclick="copyContent('metadata-output')">Copy Metadata</button>
+
     </div>
 
-    <div class="container-fluid px-4 py-5">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="display-5 fw-bold text-center mb-4">
-                    Advanced PDF Analysis Toolkit
-                </h1>
-                <div class="text-center mb-4">
-                    <input type="file" id="pdfFileInput" accept=".pdf" class="form-control form-control-lg w-50 mx-auto">
-                    <div id="errorContainer" class="text-danger mt-2"></div>
-                </div>
-            </div>
-        </div>
+    <textarea id="text-output" readonly>All Text</textarea>
 
-        <div class="row" id="featureSection" style="display:none;">
-            <div class="col-md-4">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Comprehensive Metadata</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="metadataContainer" class="preview-container"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Extracted Images</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="imagesContainer" class="preview-container row g-2"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Text Extraction</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="textContainer" class="preview-container"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="action-buttons">
 
-        <div class="row mt-4" id="advancedSection" style="display:none;">
-            <div class="col-md-6">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Structural HTML Conversion</h5>
-                    </div>
-                    <div class="card-body">
-                        <textarea id="htmlContainer" class="form-control" rows="10" readonly></textarea>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Markdown Rendering</h5>
-                    </div>
-                    <div class="card-body">
-                        <textarea id="markdownContainer" class="form-control" rows="10" readonly></textarea>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <button class="copy-btn" onclick="copyContent('text-output')">Copy Text</button>
 
-        <!-- New section for PDF Structure Information -->
-        <div class="row mt-4" id="structureSection" style="display:none;">
-            <div class="col-12">
-                <div class="card feature-card">
-                    <div class="card-header">
-                        <h5 class="card-title">PDF Structure Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="outputArea" class="preview-container"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/turndown@7.1.1/dist/turndown.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <textarea id="markdown-output" readonly>Markdown Representation</textarea>
+
+    <div class="action-buttons">
+
+        <button class="copy-btn" onclick="copyContent('markdown-output')">Copy Markdown</button>
+
+    </div>
+
+    <textarea id="html-output" readonly>HTML Representation</textarea>
+
+    <div class="action-buttons">
+
+        <button class="copy-btn" onclick="copyContent('html-output')">Copy HTML</button>
+
+        <button onclick="openInNewTab('html-output')">Open in New Tab</button>
+
+        <button onclick="downloadAsFile('html-output', 'html_representation.html')">Download HTML</button>
+
+    </div>
+
+    <div id="regex-search">
+
+        <h3>Regex Pattern Search</h3>
+
+        <textarea id="regex-input" rows="4" cols="50" placeholder="Paste or type text here for regex search..."></textarea>
+
+        <button onclick="performRegexSearch()">Search</button>
+
+        <div id="regex-output"></div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 
     <script>
-        // Explicitly set PDF.js worker source
-        if (window.pdfjsLib) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
-        } else {
-            console.error('PDF.js library failed to load');
-            document.getElementById('errorContainer').textContent = 'Failed to load PDF processing library.';
-        }
 
-        document.getElementById('pdfFileInput').addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            const errorContainer = document.getElementById('errorContainer');
-            errorContainer.textContent = '';
+        // Prebuilt Regex Patterns
 
-            if (file) {
-                try {
-                    // Clear previous results
-                    document.getElementById('metadataContainer').innerHTML = '';
-                    document.getElementById('imagesContainer').innerHTML = '';
-                    document.getElementById('textContainer').innerHTML = '';
-                    document.getElementById('htmlContainer').value = '';
-                    document.getElementById('markdownContainer').value = '';
-                    document.getElementById('outputArea').innerHTML = '';
+        const regexPatterns = {
 
-                    await processPDF(file);
-                } catch (error) {
-                    console.error('PDF Processing Error:', error);
-                    errorContainer.textContent = `Processing Error: ${error.message}`;
-                }
-            }
-        });
+            email: /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6})/g,
 
-        async function processPDF(file) {
-            const progressContainer = document.getElementById('progressContainer');
-            const progressBar = document.getElementById('progressBar');
-            progressContainer.style.display = 'block';
+            url: /(https?:\/\/[^\s]+)/g,
 
-            try {
-                const pdf = await pdfjsLib.getDocument({
-                    data: await file.arrayBuffer(),
-                    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
-                    cMapPacked: true
-                }).promise;
+            phone: /(\+?\d{1,4}[\s-]?)?(\(?\d{1,3}\)?[\s-]?)?[\d\s-]{7,15}/g,
 
-                // Metadata Extraction
-                await extractDetailedMetadata(pdf);
+            name: /([A-Z][a-z]+ [A-Z][a-z]+)/g
 
-                // Image Extraction
-                await extractAdvancedImages(pdf);
+        };
 
-                // Text Extraction
-                await extractStructuredText(pdf);
+        // Function to perform regex search
 
-                // HTML Conversion
-                await convertToAdvancedHTML(pdf);
+        function performRegexSearch() {
 
-                // Markdown Conversion
-                await convertToAdvancedMarkdown(pdf);
+            const inputText = document.getElementById('regex-input').value;
 
-                // Structure Information Extraction
-                await generatePdfStructureInfo(pdf);
+            const regexOutput = document.getElementById('regex-output');
 
-                // Show Sections
-                document.getElementById('featureSection').style.display = 'flex';
-                document.getElementById('advancedSection').style.display = 'flex';
-                document.getElementById('structureSection').style.display = 'flex';
+            regexOutput.innerHTML = '';
 
-            } catch (error) {
-                console.error(error);
-                document.getElementById('errorContainer').textContent = `Failed to process PDF: ${error.message}`;
-            } finally {
-                progressContainer.style.display = 'none';
-            }
-        }
-        
-        async function extractAdvancedImages(pdf) {
-    const imagesContainer = document.getElementById('imagesContainer');
-    imagesContainer.innerHTML = '';
+            // Perform regex search for each prebuilt pattern
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const ops = await page.getOperatorList();
+            for (const [label, pattern] of Object.entries(regexPatterns)) {
 
-        const imagePromises = ops.fnArray.reduce((images, fn, index) => {
-            if (fn === pdfjsLib.OPS.paintImageXObject) {
-                const imgIndex = ops.argsArray[index][0];
-                images.push(new Promise((resolve) => {
-                    page.objs.get(imgIndex, (img) => resolve({
-                        src: img.src,
-                        page: pageNum
-                    }));
-                }));
-            }
-            return images;
-        }, []);
+                const matches = inputText.match(pattern);
 
-        const pageImages = await Promise.all(imagePromises);
-        pageImages.forEach(({ src, page }) => {
-            const col = document.createElement('div');
-            col.className = 'col-6 col-md-4';
-            col.innerHTML = `
-                <div class="card">
-                    <img src="${src}" class="card-img-top" alt="Image from Page ${page}">
-                    <div class="card-footer text-muted text-center">
-                        Page ${page}
-                    </div>
-                </div>
-            `;
-            imagesContainer.appendChild(col);
-        });
-    }
-}
+                const resultList = matches ? matches.map(match => `<li>${match}</li>`).join('') : `<li>No ${label}s found</li>`;
 
+                
 
-        async function generatePdfStructureInfo(pdf) {
-            const outputArea = document.getElementById('outputArea');
-            const structureInfo = [];
+                const section = document.createElement('div');
 
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                const textItems = await extractPageTextItems(page); // Custom function assumed to extract text
+                section.innerHTML = `<h4>${label.charAt(0).toUpperCase() + label.slice(1)}s:</h4><ul>${resultList}</ul>`;
 
-                structureInfo.push({
-                    pageNumber: pageNum,
-                    width: page.view[2],
-                    height: page.view[3],
-                    textItems: textItems
-                });
+                regexOutput.appendChild(section);
+
             }
 
-            outputArea.innerHTML = `<pre>${JSON.stringify(structureInfo, null, 2)}</pre>`;
-        }
-async function extractStructuredText(pdf) {
-    const textContainer = document.getElementById('textContainer');
-    let structuredText = '';
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-
-        const processedPageText = textContent.items
-            .map(item => item.str)
-            .filter(text => text.trim() !== '')
-            .join('\n');
-
-        structuredText += `
-            <div class="page-section mb-3">
-                <h5 class="text-muted">Page ${pageNum}</h5>
-                <pre class="bg-light p-2 rounded">${processedPageText}</pre>
-            </div>
-        `;
-    }
-
-    textContainer.innerHTML = structuredText;
-}
-async function convertToAdvancedHTML(pdf) {
-    const htmlContainer = document.getElementById('htmlContainer');
-    let htmlContent = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<title>PDF Content</title>\n';
-    htmlContent += '<style>body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; line-height: 1.6; }</style>\n';
-    htmlContent += '</head>\n<body>\n';
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-
-        const processedPageText = textContent.items
-            .map(item => item.str)
-            .filter(text => text.trim() !== '')
-            .join(' ');
-
-        htmlContent += `
-            <section class="page">
-                <h2>Page ${pageNum}</h2>
-                <p>${processedPageText}</p>
-            </section>\n
-        `;
-    }
-
-    htmlContent += '</body>\n</html>';
-    htmlContainer.value = htmlContent;
-}
-async function convertToAdvancedMarkdown(pdf) {
-    const markdownContainer = document.getElementById('markdownContainer');
-    const turndownService = new TurndownService();
-    let markdownContent = '# PDF Content\n\n';
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-
-        const processedPageText = textContent.items
-            .map(item => item.str)
-            .filter(text => text.trim() !== '')
-            .join(' ');
-
-        markdownContent += `## Page ${pageNum}\n\n${processedPageText}\n\n`;
-    }
-
-    markdownContainer.value = markdownContent;
-}
-
-// Visualize PDF Structure
-document.getElementById('structure-btn').addEventListener('click', async () => {
-    if (!currentPdfDoc) {
-        alert('Please render a PDF first');
-        return;
-    }
-
-    try {
-        const structureInfo = [];
-        for (let i = 1; i <= currentPdfDoc.numPages; i++) {
-            const page = await currentPdfDoc.getPage(i);
-            const operatorList = await page.getOperatorList();
-            const streams = await extractStreamsFromPage(page);
-
-            structureInfo.push({
-                pageNumber: i,
-                width: page.view[2],
-                height: page.view[3],
-                operators: operatorList.fnArray.length,
-                streams: streams,
-            });
         }
 
-        // Check length and decide whether to filter
-        const structureOutput = JSON.stringify(structureInfo, null, 2);
-        if (structureOutput.length > 10000) {
-            outputArea.innerHTML = `<pre>Structure too large to display. Showing filtered output with streams and metadata:</pre>`;
-            const filteredOutput = structureInfo.map(page => ({
-                pageNumber: page.pageNumber,
-                streams: page.streams.slice(0, 5), // Limit streams for readability
-            }));
-            outputArea.innerHTML += `<pre>${JSON.stringify(filteredOutput, null, 2)}</pre>`;
-        } else {
-            outputArea.innerHTML = `<pre>${structureOutput}</pre>`;
-        }
-    } catch (error) {
-        console.error('Error visualizing PDF structure:', error);
-        alert('Failed to visualize structure. Check console for details.');
-    }
-});
-
-// Helper function to extract streams from a PDF page
-async function extractStreamsFromPage(page) {
-    const contentStream = await page.streamTextContent();
-    const textItems = contentStream.items.map(item => item.str).filter(str => str.trim() !== '');
-    return textItems;
-}
-
-
-async function extractDetailedMetadata(pdf) {
-            const metadata = await pdf.getMetadata();
-            const metadataContainer = document.getElementById('metadataContainer');
-
-            const enhancedMetadata = {
-                'Basic Information': [
-                    { label: 'Title', value: metadata.info.Title || 'Not Available' },
-                    { label: 'Author', value: metadata.info.Author || 'Not Available' },
-                    { label: 'Creator', value: metadata.info.Creator || 'Not Available' },
-                    { label: 'Producer', value: metadata.info.Producer || 'Not Available' }
-                ],
-                'Temporal Details': [
-                    { label: 'Creation Date', value: metadata.info.CreationDate || 'Not Available' },
-                    { label: 'Modification Date', value: metadata.info.ModDate || 'Not Available' }
-                ],
-                'Document Characteristics': [
-                    { label: 'Total Pages', value: pdf.numPages },
-                    { label: 'PDF Version', value: metadata.contentDispositionFilename || 'Unknown' }
-                ],
-                'Encryption & Permissions': [
-                    { label: 'Is Encrypted', value: pdf.isEncrypted ? 'Yes' : 'No' }
-                ]
-            };
-
-            let metadataHTML = Object.entries(enhancedMetadata).map(([category, details]) => `
-                <h6 class="mt-3">${category}</h6>
-                <ul class="list-group">
-                    ${details.map(item => `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            ${item.label}
-                            <span class="badge bg-primary rounded-pill">${item.value}</span>
-                        </li>
-                    `).join('')}
-                </ul>
-            `).join('');
-
-            metadataContainer.innerHTML = metadataHTML;
-        }
-
-
+        // PDF Analysis Code (Same as before, omitted for brevity)
 
     </script>
+
+    <div id="image-output" class="output-section">Images</div>
+
+    <div id="analysis-output" class="output-section">Detailed Analysis</div>
+
+    <div class="action-buttons">
+
+        <button class="copy-btn" onclick="copyContent('analysis-output')">Copy Analysis</button>
+
+    </div>
+
+    <!-- Required Libraries -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/turndown@7.1.1/dist/turndown.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+
+        let currentPdfDoc = null;
+
+        const turndownService = new TurndownService();
+
+        document.getElementById('pdf-input').addEventListener('change', async (e) => {
+
+            const file = e.target.files[0];
+
+            if (!file) return;
+
+            const fileReader = new FileReader();
+
+            fileReader.onload = async (event) => {
+
+                const typedArray = new Uint8Array(event.target.result);
+
+                try {
+
+                    currentPdfDoc = await pdfjsLib.getDocument(typedArray).promise;
+
+                    // Perform all actions
+
+                    await renderPDFPreview(currentPdfDoc);
+
+                    await extractMetadata(currentPdfDoc);
+
+                    await extractText(currentPdfDoc);
+
+                    await convertToMarkdown(currentPdfDoc);
+
+                    await convertToHTML(currentPdfDoc);
+
+                    await extractImages(currentPdfDoc);
+
+                    await detailedAnalysis(currentPdfDoc);
+
+                    await generatePdfStructureInfo(currentPdfDoc);
+
+                    await extractXMPMetadata(file);
+
+                } catch (error) {
+
+                    console.error('Error processing PDF:', error);
+
+                }
+
+            };
+
+            fileReader.readAsArrayBuffer(file);
+
+        });
+
+        // Render PDF Preview
+
+        async function renderPDFPreview(pdfDoc) {
+
+            try {
+
+                const page = await pdfDoc.getPage(1);
+
+                const viewport = page.getViewport({ scale: 1.5 });
+
+                const canvas = document.createElement('canvas');
+
+                canvas.width = viewport.width;
+
+                canvas.height = viewport.height;
+
+                const renderContext = {
+
+                    canvasContext: canvas.getContext('2d'),
+
+                    viewport: viewport,
+
+                };
+
+                await page.render(renderContext).promise;
+
+                document.getElementById('pdf-preview').innerHTML = '';
+
+                document.getElementById('pdf-preview').appendChild(canvas);
+
+            } catch (error) {
+
+                document.getElementById('pdf-preview').textContent = 'Error rendering PDF preview.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Enhanced Metadata Extraction (handles various metadata fields)
+
+        async function extractMetadata(pdfDoc) {
+
+            try {
+
+                const metadata = await pdfDoc.getMetadata();
+
+                const isEncrypted = pdfDoc.isEncrypted ? 'Yes' : 'No';
+
+                const pdfVersion = pdfDoc.pdfInfo && pdfDoc.pdfInfo.version ? pdfDoc.pdfInfo.version : 'Unknown';
+
+                const enhancedMetadata = {
+
+                    'Basic Information': [
+
+                        { label: 'Title', value: metadata.info.Title || 'Not Available' },
+
+                        { label: 'Author', value: metadata.info.Author || 'Not Available' },
+
+                        { label: 'Creator', value: metadata.info.Creator || 'Not Available' },
+
+                        { label: 'Producer', value: metadata.info.Producer || 'Not Available' }
+
+                    ],
+
+                    'Temporal Details': [
+
+                        { label: 'Creation Date', value: metadata.info.CreationDate || 'Not Available' },
+
+                        { label: 'Modification Date', value: metadata.info.ModDate || 'Not Available' }
+
+                    ],
+
+                    'Document Characteristics': [
+
+                        { label: 'Total Pages', value: pdfDoc.numPages },
+
+                        { label: 'PDF Version', value: pdfVersion },
+
+                        { label: 'Encrypted', value: isEncrypted }
+
+                    ]
+
+                };
+
+                let metadataHTML = Object.entries(enhancedMetadata).map(([category, details]) => `
+
+                    <h6 class="mt-3">${category}</h6>
+
+                    <ul class="list-group">
+
+                        ${details.map(item => `
+
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                                ${item.label}
+
+                                <span class="badge bg-primary rounded-pill">${item.value}</span>
+
+                            </li>
+
+                        `).join('')}
+
+                    </ul>
+
+                `).join('');
+
+                document.getElementById('metadata-output').innerHTML = metadataHTML;
+
+            } catch (error) {
+
+                document.getElementById('metadata-output').textContent = 'Error extracting metadata.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Extract All Text
+
+        async function extractText(pdfDoc) {
+
+            try {
+
+                let text = '';
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+
+                    const page = await pdfDoc.getPage(i);
+
+                    const textContent = await page.getTextContent();
+
+                    text += `Page ${i}:\n${textContent.items.map(item => item.str).join(' ')}\n\n`;
+
+                }
+
+                document.getElementById('text-output').value = text;
+
+            } catch (error) {
+
+                document.getElementById('text-output').value = 'Error extracting text.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Convert to Markdown
+
+        async function convertToMarkdown(pdfDoc) {
+
+            try {
+
+                let markdown = '';
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+
+                    const page = await pdfDoc.getPage(i);
+
+                    const textContent = await page.getTextContent();
+
+                    markdown += `## Page ${i}\n\n${textContent.items.map(item => item.str).join(' ')}\n\n`;
+
+                }
+
+                document.getElementById('markdown-output').value = turndownService.turndown(markdown);
+
+            } catch (error) {
+
+                document.getElementById('markdown-output').value = 'Error converting to Markdown.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Convert to HTML
+
+        async function convertToHTML(pdfDoc) {
+
+            try {
+
+                let html = '<!DOCTYPE html><html><body>';
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+
+                    const page = await pdfDoc.getPage(i);
+
+                    const textContent = await page.getTextContent();
+
+                    html += `<h2>Page ${i}</h2><p>${textContent.items.map(item => item.str).join(' ')}</p>`;
+
+                }
+
+                html += '</body></html>';
+
+                document.getElementById('html-output').value = html;
+
+            } catch (error) {
+
+                document.getElementById('html-output').value = 'Error converting to HTML.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Extract Images
+
+        async function extractImages(pdfDoc) {
+
+            try {
+
+                const imageOutput = document.getElementById('image-output');
+
+                imageOutput.innerHTML = '';
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+
+                    const page = await pdfDoc.getPage(i);
+
+                    const ops = await page.getOperatorList();
+
+                    for (let j = 0; j < ops.fnArray.length; j++) {
+
+                        const fn = ops.fnArray[j];
+
+                        if (fn === pdfjsLib.OPS.paintImageXObject) {
+
+                            const imgIndex = ops.argsArray[j][0];
+
+                            const img = await page.objs.get(imgIndex);
+
+                            const imgDataUrl = await pdfLib.PDFImageToDataUrl(img);
+
+                            const imgElement = document.createElement('img');
+
+                            imgElement.src = imgDataUrl;
+
+                            imageOutput.appendChild(imgElement);
+
+                        }
+
+                    }
+
+                }
+
+            } catch (error) {
+
+                document.getElementById('image-output').textContent = 'Error extracting images.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Detailed Analysis (like word count, frequency analysis)
+
+        async function detailedAnalysis(pdfDoc) {
+
+            try {
+
+                const wordCount = {};
+
+                let totalWords = 0;
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+
+                    const page = await pdfDoc.getPage(i);
+
+                    const textContent = await page.getTextContent();
+
+                    textContent.items.forEach(item => {
+
+                        const words = item.str.split(/\s+/);
+
+                        words.forEach(word => {
+
+                            word = word.toLowerCase();
+
+                            wordCount[word] = (wordCount[word] || 0) + 1;
+
+                            totalWords++;
+
+                        });
+
+                    });
+
+                }
+
+                let analysisHTML = `<h6>Word Count: ${totalWords}</h6><ul>`;
+
+                Object.entries(wordCount).forEach(([word, count]) => {
+
+                    analysisHTML += `<li>${word}: ${count}</li>`;
+
+                });
+
+                analysisHTML += '</ul>';
+
+                document.getElementById('analysis-output').innerHTML = analysisHTML;
+
+            } catch (error) {
+
+                document.getElementById('analysis-output').textContent = 'Error performing detailed analysis.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Extract XMP Metadata (for detailed file-level information)
+
+        async function extractXMPMetadata(file) {
+
+            try {
+
+                const reader = new FileReader();
+
+                reader.onload = function(event) {
+
+                    const arrayBuffer = event.target.result;
+
+                    const xmpData = parseXMP(arrayBuffer);
+
+                    const xmpHtml = `<h6>XMP Metadata:</h6><pre>${xmpData}</pre>`;
+
+                    document.getElementById('analysis-output').innerHTML = xmpHtml;
+
+                };
+
+                reader.readAsArrayBuffer(file);
+
+            } catch (error) {
+
+                document.getElementById('analysis-output').textContent = 'Error extracting XMP metadata.';
+
+                console.error(error);
+
+            }
+
+        }
+
+        // Helper function to parse XMP (simple implementation, could be expanded)
+
+        function parseXMP(arrayBuffer) {
+
+            // Simplified XMP parsing (just an example)
+
+            const xmp = new TextDecoder().decode(arrayBuffer);
+
+            const start = xmp.indexOf('<xmpmeta');
+
+            const end = xmp.indexOf('</xmpmeta>');
+
+            if (start !== -1 && end !== -1) {
+
+                return xmp.slice(start, end + 10);
+
+            }
+
+            return 'XMP Metadata not found.';
+
+        }
+
+        // Utility Functions for Copying Content and Downloads
+
+        function copyContent(elementId) {
+
+            const element = document.getElementById(elementId);
+
+            element.select();
+
+            document.execCommand('copy');
+
+        }
+
+        function openInNewTab(elementId) {
+
+            const content = document.getElementById(elementId).value;
+
+            const newWindow = window.open();
+
+            newWindow.document.write(content);
+
+        }
+
+        function downloadAsFile(elementId, filename) {
+
+            const content = document.getElementById(elementId).value;
+
+            const blob = new Blob([content], { type: 'text/plain' });
+
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+
+            link.href = url;
+
+            link.download = filename;
+
+            link.click();
+
+        }
+
+    </script>
+
 </body>
+
 </html>
 
- 
