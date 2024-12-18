@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Pitched Sine Wave Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f3f3f3;
+        }
+        h1 {
+            text-align: center;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-container label {
+            margin-right: 10px;
+        }
+        .slider-container input {
+            width: 300px;
+        }
+        .slider-container span {
+            margin-left: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        #visualizer {
+            width: 100%;
+            height: 100px;
+            background-color: #000;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>High-Pitched Sine Wave Generator</h1>
+
+<div class="control-group">
+    <h2>Sine Wave Controls</h2>
+    <div class="slider-container">
+        <label for="frequencySlider">Frequency (Hz)</label>
+        <input type="range" id="frequencySlider" min="1000" max="20000" step="1" value="10000">
+        <span id="frequencyValue">10000</span> Hz
+    </div>
+    <div class="slider-container">
+        <label for="detuneSlider">Detune (Cents)</label>
+        <input type="range" id="detuneSlider" min="-1000" max="1000" step="1" value="0">
+        <span id="detuneValue">0</span> cents
+    </div>
+    <div class="slider-container">
+        <label for="modulationFreqSlider">Modulation Frequency (Hz)</label>
+        <input type="range" id="modulationFreqSlider" min="0" max="50" step="0.01" value="10">
+        <span id="modulationFreqValue">10</span> Hz
+    </div>
+    <div class="slider-container">
+        <label for="modulationDepthSlider">Modulation Depth</label>
+        <input type="range" id="modulationDepthSlider" min="-0.5" max="1" step="0.01" value="0.5">
+        <span id="modulationDepthValue">0.5</span>
+    </div>
+</div>
+
+<div class="control-group">
+    <h2>Annoyance Level</h2>
+    <div class="slider-container">
+        <label for="volumeSlider">Volume</label>
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.5">
+        <span id="volumeValue">0.5</span>
+    </div>
+    <div class="slider-container">
+        <label for="gainSlider">Gain</label>
+        <input type="range" id="gainSlider" min="0" max="1" step="0.01" value="0.5">
+        <span id="gainValue">0.5</span>
+    </div>
+</div>
+
+<div class="control-group">
+    <button id="playButton">Start Sine Wave</button>
+    <button id="stopButton">Stop Sine Wave</button>
+    <button id="autoToggleButton">Auto Toggle</button>
+</div>
+
+<div class="control-group">
+    <button id="annoyingTone1">Pre1</button>
+    <button id="annoyingTone2">Pre2</button>
+    <button id="annoyingTone3">Pre3</button>
+    <button id="annoyingTone4">Pre4</button>
+    <button id="highPitchTone1">High-Pitch 1</button>
+    <button id="highPitchTone2">High-Pitch 2</button>
+    <button id="highPitchTone3">High-Pitch 3</button>
+    <button id="dogTone">Dog's Worst Nightmare</button>
+    <button id="detuneButton">Start Slow Detune</button>
+    <button id="detuneRandomButton">Detune Random</button>
+    <button id="startButton">Start Evasive Sound Mode</button>
+</div>
+
+<canvas id="visualizer"></canvas>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+    const frequencySlider = document.getElementById('frequencySlider');
+    const detuneSlider = document.getElementById('detuneSlider');
+    const modulationFreqSlider = document.getElementById('modulationFreqSlider');
+    const modulationDepthSlider = document.getElementById('modulationDepthSlider');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const gainSlider = document.getElementById('gainSlider');
+
+    const frequencyValueSpan = document.getElementById('frequencyValue');
+    const detuneValueSpan = document.getElementById('detuneValue');
+    const modulationFreqValueSpan = document.getElementById('modulationFreqValue');
+    const modulationDepthValueSpan = document.getElementById('modulationDepthValue');
+    const volumeValueSpan = document.getElementById('volumeValue');
+    const gainValueSpan = document.getElementById('gainValue');
+
+    const playButton = document.getElementById('playButton');
+    const stopButton = document.getElementById('stopButton');
+    const autoToggleButton = document.getElementById('autoToggleButton');
+    const annoyingTone1Button = document.getElementById('annoyingTone1');
+    const annoyingTone2Button = document.getElementById('annoyingTone2');
+    const annoyingTone3Button = document.getElementById('annoyingTone3');
+    const annoyingTone4Button = document.getElementById('annoyingTone4');
+    const highPitchTone1Button = document.getElementById('highPitchTone1');
+    const highPitchTone2Button = document.getElementById('highPitchTone2');
+    const highPitchTone3Button = document.getElementById('highPitchTone3');
+    const dogToneButton = document.getElementById('dogTone');
+    const detuneRandomButton = document.getElementById('detuneRandomButton');
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+
+    let isAutoToggle = false;
+    let autoToggleInterval;
+    let oscillator;
+    let gainNode;
+    let modulationOscillator;
+    let modulationGainNode;
+
+    // Set up Web Audio API
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    function setupOscillator() {
+        oscillator = audioContext.createOscillator();
+        gainNode = audioContext.createGain();
+        modulationOscillator = audioContext.createOscillator();
+        modulationGainNode = audioContext.createGain();
+
+        oscillator.type = "sine";
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        modulationOscillator.connect(modulationGainNode);
+        modulationGainNode.connect(gainNode.gain);
+
+        oscillator.start();
+        modulationOscillator.start();
+    }
+
+    function updateSound() {
+        const frequency = parseFloat(frequencySlider.value);
+        const detune = parseFloat(detuneSlider.value);
+        const modulationFreq = parseFloat(modulationFreqSlider.value);
+        const modulationDepth = parseFloat(modulationDepthSlider.value);
+        const volume = parseFloat(volumeSlider.value);
+        const gain = parseFloat(gainSlider.value);
+
+        // Update oscillator frequency and detune
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        oscillator.detune.setValueAtTime(detune, audioContext.currentTime);
+
+        // Update modulation oscillator
+        modulationOscillator.frequency.setValueAtTime(modulationFreq, audioContext.currentTime);
+        modulationGainNode.gain.setValueAtTime(modulationDepth, audioContext.currentTime);
+
+        // Update volume and gain
+        gainNode.gain.setValueAtTime(volume * gain, audioContext.currentTime);
+
+        // Update UI values
+        frequencyValueSpan.textContent = frequency;
+        detuneValueSpan.textContent = detune;
+        modulationFreqValueSpan.textContent = modulationFreq;
+        modulationDepthValueSpan.textContent = modulationDepth;
+        volumeValueSpan.textContent = volume;
+        gainValueSpan.textContent = gain;
+    }
+
+    // Event listeners for controls
+    frequencySlider.addEventListener('input', updateSound);
+    detuneSlider.addEventListener('input', updateSound);
+    modulationFreqSlider.addEventListener('input', updateSound);
+    modulationDepthSlider.addEventListener('input', updateSound);
+    volumeSlider.addEventListener('input', updateSound);
+    gainSlider.addEventListener('input', updateSound);
+
+    // Start sine wave generation
+    playButton.addEventListener('click', function () {
+        if (audioContext.state !== 'running') {
+            audioContext.resume();
+        }
+        setupOscillator();
+        updateSound();
+    });
+
+    // Stop sine wave generation
+    stopButton.addEventListener('click', function () {
+        if (oscillator) {
+            oscillator.stop();
+            modulationOscillator.stop();
+        }
+        oscillator = null;
+        modulationOscillator = null;
+    });
+
+    // Auto Toggle Button Logic
+    autoToggleButton.addEventListener('click', function () {
+        isAutoToggle = !isAutoToggle;
+        if (isAutoToggle) {
+            autoToggleButton.textContent = "Stop Auto Toggle";
+            startAutoToggle();
+        } else {
+            autoToggleButton.textContent = "Start Auto Toggle";
+            clearInterval(autoToggleInterval);
+        }
+    });
+
+    function startAutoToggle() {
+        autoToggleInterval = setInterval(() => {
+            // Gradually adjust sliders towards a new tone
+            frequencySlider.value = Math.random() * (20000 - 1000) + 1000;
+            detuneSlider.value = Math.random() * 2000 - 1000;
+            modulationFreqSlider.value = Math.random() * 50;
+            modulationDepthSlider.value = Math.random();
+            volumeSlider.value = Math.random();
+            gainSlider.value = Math.random();
+
+            updateSound();
+        }, 2000); // Change values every 2 seconds
+    }
+
+    // Annoying tone effects
+    function generateAnnoyingTone(frequency, detune, volume) {
+        frequencySlider.value = frequency;
+        detuneSlider.value = detune;
+        volumeSlider.value = volume;
+        updateSound();
+    }
+
+    // Tone 1: 10 kHz, high-pitched and disorienting
+annoyingTone1Button.addEventListener('click', function () {
+    generateAnnoyingTone(10000, 200, 1); // Frequency lowered to 10kHz
+});
+
+// Tone 2: 12 kHz, even higher pitch, uncomfortable
+annoyingTone2Button.addEventListener('click', function () {
+    generateAnnoyingTone(12000, 300, 1); // Frequency lowered to 12kHz
+});
+
+// Tone 3: 14 kHz, aggressive high-pitched sound
+annoyingTone3Button.addEventListener('click', function () {
+    generateAnnoyingTone(11000, 400, 1); // Frequency lowered to 14kHz
+});
+
+// Tone 4: 16 kHz, ear-piercing, unsettling
+annoyingTone4Button.addEventListener('click', function () {
+    generateAnnoyingTone(10000, 500, 1); // Frequency lowered to 16kHz
+});
+
+// Dog tone: Audible ultrasonic sound for dogs, more noticeable to humans
+dogToneButton.addEventListener('click', function () {
+    generateAnnoyingTone(12000, 190, 1); // Adjusted to 15kHz for better human audibility
+});
+
+// High pitch tone 1: 19.5 kHz, disorienting and aggressive
+highPitchTone1Button.addEventListener('click', function () {
+    generateAnnoyingTone(12500, 350, 1); // Higher frequency
+});
+
+// High pitch tone 2: 20 kHz, uncomfortable to hear
+highPitchTone2Button.addEventListener('click', function () {
+    generateAnnoyingTone(13000, 200, 1); // Higher frequency
+});
+
+// High pitch tone 3: 20 kHz, more piercing sound
+highPitchTone3Button.addEventListener('click', function () {
+    generateAnnoyingTone(11000, 400, 1); // Higher frequency
+});
+
+
+
+    // Detune randomly
+    detuneRandomButton.addEventListener('click', function () {
+        detuneSlider.value = Math.random() * 2000 - 1000;
+        updateSound();
+    });
+});
+</script>
+
+</body>
+</html>
