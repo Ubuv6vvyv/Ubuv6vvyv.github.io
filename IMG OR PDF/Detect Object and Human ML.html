@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <title>Image Analysis Tool with Optional Dynamic Threshold</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+<style>
+    :root {
+        --primary: #1E3A8A; /* Dark blue for primary theme */
+        --secondary: #1E40AF; /* Slightly darker blue for accents */
+        --background: #F3F4F6; /* Soft light background */
+        --text: #111827; /* Dark gray for text */
+        --button-bg: #2563EB; /* Vibrant blue for buttons */
+        --button-hover: #1D4ED8; /* Darker blue for hover */
+        --border: #E5E7EB; /* Subtle gray for borders */
+    }
+
+    body {
+        font-family: 'Roboto', sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--background);
+        color: var(--text);
+    }
+
+    .container {
+        max-width: 700px;
+        margin: 20px auto;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.1);
+    }
+
+    h1, h2, h3 {
+        font-weight: 700;
+        color: var(--text);
+        margin: 0 0 16px;
+        text-align: center;
+    }
+
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 20px 0;
+        justify-content: center;
+    }
+
+    button {
+        flex: 1 1 auto;
+        padding: 12px;
+        background: var(--button-bg);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 11px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover:not(:disabled) {
+        background: var(--button-hover);
+        transform: scale(1.05);
+    }
+
+    button:active {
+        transform: scale(0.95);
+    }
+
+    button:disabled {
+        background: #A5B4FC;
+        color: #E0E7FF;
+        cursor: not-allowed;
+    }
+
+    .image-container {
+        position: relative;
+        margin: 20px auto;
+        width: 100%;
+        max-width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #EFF6FF;
+        text-align: center;
+    }
+
+    img {
+        max-width: 100%;
+        display: block;
+        border-radius: 8px;
+    }
+
+    canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none; /* Allows interaction with the image below */
+    }
+
+    #results {
+        margin-top: 20px;
+        padding: 16px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    #imageInput {
+        padding: 14px;
+        border: 2px dashed var(--border);
+        border-radius: 8px;
+        width: 100%;
+        box-sizing: border-box;
+        background: white;
+        text-align: center;
+        transition: border-color 0.3s ease;
+    }
+
+    #imageInput:hover {
+        border-color: var(--primary);
+    }
+
+    .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(17, 24, 39, 0.9);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 12px;
+        text-align: center;
+        z-index: 1000;
+        display: none;
+    }
+
+    .status {
+        padding: 12px;
+        margin: 12px 0;
+        border-radius: 8px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .status-loading {
+        background: #E0F2FE;
+        color: #0369A1;
+    }
+
+    .status-ready {
+        background: #DCFCE7;
+        color: #15803D;
+    }
+
+    .status-error {
+        background: #FFE4E6;
+        color: #991B1B;
+    }
+
+    .checkbox {
+        display: flex;
+        align-items: center;
+        margin: 8px 0;
+        justify-content: center;
+    }
+
+    .checkbox input {
+        margin-right: 8px;
+    }
+
+    label {
+        font-size: 12px;
+    }
+
+    a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="container">
+    <h1>Image Analysis Tool</h1>
+    <div id="modelStatus" class="status-loading">Loading models...</div>
+    <input type="file" id="imageInput" accept="image/*">
+    <div class="controls">
+        <button id="detectObjects" disabled>Detect Objects</button>
+        <button id="detectPeople" disabled>Detect People</button>
+        <button id="detectPeopleLarge" disabled>Detect Large Crowds</button>
+        <button id="clearCanvas" disabled>Clear Analysis</button>
+    </div>
+    <div class="checkbox">
+        <input type="checkbox" id="dynamicThresholdToggle" checked>
+        <label for="dynamicThresholdToggle">Enable Dynamic Threshold</label>
+    </div>
+    <div class="image-container">
+        <img id="uploadedImage" style="display: none;">
+        <canvas id="outputCanvas"></canvas>
+    </div>
+    <div id="results"></div>
+</div>
+<div class="loading" id="loadingIndicator">Processing...</div>
+
+    <script>
+        let cocoModel = null;
+        let poseModel = null;
+        let currentImage;
+        const modelStatus = document.getElementById('modelStatus');
+        const dynamicThresholdToggle = document.getElementById('dynamicThresholdToggle');
+
+        async function initModels() {
+            try {
+                modelStatus.textContent = 'Loading models...';
+                modelStatus.className = 'status-loading';
+                
+                const [cocoResult, poseResult] = await Promise.allSettled([
+                    cocoSsd.load(),
+                    poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+                        modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING
+                    })
+                ]);
+                
+                if (cocoResult.status === 'fulfilled') cocoModel = cocoResult.value;
+                if (poseResult.status === 'fulfilled') poseModel = poseResult.value;
+                
+                if (!cocoModel && !poseModel) throw new Error('No models loaded');
+                
+                modelStatus.textContent = cocoModel && poseModel ? 'All models ready!' : 'Partial models loaded';
+                modelStatus.className = 'status-ready';
+                return true;
+            } catch (error) {
+                console.error('Model loading error:', error);
+                modelStatus.textContent = 'Error loading models';
+                modelStatus.className = 'status-error';
+                return false;
+            }
+        }
+
+        function calculateCrowdDensity(predictions) {
+            return predictions.length; // Number of people or poses detected
+        }
+
+        function getThreshold(crowdDensity) {
+            if (dynamicThresholdToggle.checked) {
+                return Math.max(0.3, 1 / (crowdDensity + 1));
+            }
+            return 0.5; // Default fixed threshold when dynamic is off
+        }
+
+        async function detectObjects() {
+            if (!cocoModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                drawPredictions(predictions);
+                displayResults(predictions);
+            } catch (error) {
+                console.error(error);
+                alert('Detection error');
+            }
+            hideLoading();
+        }
+
+        async function detectPeople() {
+            if (!cocoModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                console.log("Raw Predictions:", predictions);
+                const peoplePredictions = predictions.filter(p => p.class === 'person');
+                
+                const crowdDensity = calculateCrowdDensity(peoplePredictions);
+                const threshold = getThreshold(crowdDensity);
+                const filteredPredictions = peoplePredictions.filter(p => p.score > threshold);
+
+                filteredPredictions.length > 10
+                    ? drawHeatmap(filteredPredictions)
+                    : drawPredictions(filteredPredictions);
+                
+                displayResults([{ class: 'people detected', score: filteredPredictions.length }]);
+            } catch (error) {
+                console.error(error);
+                alert('Detection error');
+            }
+            hideLoading();
+        }
+
+        async function detectPeopleLarge() {
+            if (!poseModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const poses = await poseModel.estimatePoses(currentImage, {
+                    maxPoses: 20,
+                    flipHorizontal: false
+                });
+
+                const crowdDensity = calculateCrowdDensity(poses);
+                const threshold = getThreshold(crowdDensity);
+                const filteredPoses = poses.filter(pose =>
+                    pose.keypoints.some(keypoint => keypoint.score > threshold)
+                );
+
+                drawPoses(filteredPoses);
+                displayResults([{ class: 'poses detected', score: filteredPoses.length }]);
+            } catch (error) {
+                console.error('Pose detection error:', error);
+                alert('Pose detection error');
+            }
+            hideLoading();
+        }
+
+        function drawPredictions(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            predictions.forEach(pred => {
+                const [x, y, w, h] = pred.bbox;
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillText(`${pred.class} ${Math.round(pred.score * 100)}%`, x, y > 10 ? y - 5 : 10);
+            });
+        }
+
+        function drawHeatmap(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            predictions.forEach(pred => {
+                const [x, y, w, h] = pred.bbox;
+                const gradient = ctx.createRadialGradient(x + w / 2, y + h / 2, 0, x + w / 2, y + h / 2, 50);
+                gradient.addColorStop(0, 'rgba(255,0,0,0.2)');
+                gradient.addColorStop(1, 'rgba(255,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x - 50, y - 50, w + 100, h + 100);
+            });
+        }
+
+        function drawPoses(poses) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            poses.forEach(pose => {
+                pose.keypoints.forEach(point => {
+                    if (point.score > 0.2) {
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'red';
+                        ctx.fill();
+                    }
+                });
+            });
+        }
+
+        function displayResults(predictions) {
+            document.getElementById('results').innerHTML = `<h3>Results:</h3>${
+                predictions.map(p => `<p>${p.class}: ${
+                    p.class.includes('detected') ? p.score : Math.round(p.score * 100) + '%'
+                }</p>`).join('')
+            }`;
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        function setupEventListeners() {
+            document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+            document.getElementById('detectObjects').addEventListener('click', () => safeDetect(detectObjects));
+            document.getElementById('detectPeople').addEventListener('click', () => safeDetect(detectPeople));
+            document.getElementById('detectPeopleLarge').addEventListener('click', () => safeDetect(detectPeopleLarge));
+            document.getElementById('clearCanvas').addEventListener('click', clearCanvas);
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.getElementById('uploadedImage');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    currentImage = img;
+                    img.onload = () => {
+                        setupCanvas();
+                        enableButtons();
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function setupCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+        }
+
+        function enableButtons() {
+            document.getElementById('detectObjects').disabled = !cocoModel;
+            document.getElementById('detectPeople').disabled = !cocoModel;
+            document.getElementById('detectPeopleLarge').disabled = !poseModel;
+            document.getElementById('clearCanvas').disabled = false;
+        }
+
+        async function safeDetect(detectFunction) {
+            const requiredModel = detectFunction.name === 'detectPeopleLarge' ? poseModel : cocoModel;
+            if (!requiredModel) {
+                alert('Required model not available');
+                return;
+            }
+            await detectFunction();
+        }
+
+        window.addEventListener('load', async () => {
+            await initModels();
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>
