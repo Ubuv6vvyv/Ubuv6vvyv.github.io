@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Analysis Tool</title>
+    <!-- PDF.js for PDF rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- TensorFlow.js for image analysis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.14.0/tf.min.js"></script>
+    <!-- ExifReader for metadata extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .image-container {
+            flex: 1;
+            padding: 20px;
+            border: 1px solid #ccc;
+        }
+        .analysis-container {
+            flex: 1;
+            padding: 20px;
+            border: 1px solid #ccc;
+        }
+        .button-group {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #imageDisplay {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        #analysisResults {
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Analysis Tool</h1>
+    
+    <div class="button-group">
+        <input type="file" id="fileInput" accept="image/*,.pdf" style="display: none">
+        <button onclick="document.getElementById('fileInput').click()">Upload File</button>
+        <button onclick="analyzeImage()" id="analyzeBtn">Analyze</button>
+        <button onclick="showMetadata()">Show Metadata</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+
+    <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="container">
+        <div class="image-container">
+            <h2>Image Preview</h2>
+            <img id="imageDisplay" />
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <div class="analysis-container">
+            <h2>Analysis Results</h2>
+            <div id="analysisResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Initialize PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            currentFile = file;
+            updateProgress(0);
+            
+            if (file.type === 'application/pdf') {
+                await handlePDF(file);
+            } else {
+                await handleImage(file);
+            }
+            
+            updateProgress(100);
+        });
+
+        async function handlePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 1.5 });
+            
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            await page.render({
+                canvasContext: ctx,
+                viewport: viewport
+            }).promise;
+            
+            document.getElementById('imageDisplay').src = canvas.toDataURL();
+        }
+
+        async function handleImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        document.getElementById('imageDisplay').src = e.target.result;
+                        resolve();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function analyzeImage() {
+            if (!currentFile) {
+                alert('Please upload an image first');
+                return;
+            }
+
+            const results = [];
+            updateProgress(0);
+
+            // 1. Basic file analysis
+            results.push(`File Analysis:`);
+            results.push(`- Name: ${currentFile.name}`);
+            results.push(`- Size: ${(currentFile.size / 1024).toFixed(2)} KB`);
+            results.push(`- Type: ${currentFile.type}`);
+            
+            updateProgress(20);
+
+            // 2. Image analysis
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            results.push(`\nImage Properties:`);
+            results.push(`- Dimensions: ${canvas.width}x${canvas.height}`);
+            
+            // 3. Color analysis
+            const colorStats = analyzeColors(imageData);
+            results.push(`\nColor Analysis:`);
+            results.push(`- Average RGB: (${colorStats.avgRed}, ${colorStats.avgGreen}, ${colorStats.avgBlue})`);
+            results.push(`- Color variance: ${colorStats.variance.toFixed(2)}`);
+            
+            updateProgress(40);
+
+            // 4. Error Level Analysis (ELA)
+            const elaResults = await performELA();
+            results.push(`\nError Level Analysis:`);
+            results.push(`- Compression artifacts detected: ${elaResults.artifactsDetected}`);
+            results.push(`- Average error level: ${elaResults.averageError.toFixed(2)}`);
+            
+            updateProgress(60);
+
+            // 5. Edge Detection
+            const edgeResults = detectEdges(imageData);
+            results.push(`\nEdge Analysis:`);
+            results.push(`- Edge density: ${edgeResults.density.toFixed(2)}%`);
+            results.push(`- Sharp transitions: ${edgeResults.sharpTransitions}`);
+            
+            updateProgress(80);
+
+            // Display results
+            document.getElementById('analysisResults').textContent = results.join('\n');
+            updateProgress(100);
+        }
+
+        function analyzeColors(imageData) {
+            const data = imageData.data;
+            let totalRed = 0, totalGreen = 0, totalBlue = 0;
+            const pixels = data.length / 4;
+
+            for (let i = 0; i < data.length; i += 4) {
+                totalRed += data[i];
+                totalGreen += data[i + 1];
+                totalBlue += data[i + 2];
+            }
+
+            const avgRed = Math.round(totalRed / pixels);
+            const avgGreen = Math.round(totalGreen / pixels);
+            const avgBlue = Math.round(totalBlue / pixels);
+
+            // Calculate color variance
+            let variance = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                variance += Math.abs(data[i] - avgRed);
+                variance += Math.abs(data[i + 1] - avgGreen);
+                variance += Math.abs(data[i + 2] - avgBlue);
+            }
+            variance /= (pixels * 3);
+
+            return { avgRed, avgGreen, avgBlue, variance };
+        }
+
+        async function performELA() {
+            const quality = 0.95;
+            const originalData = canvas.toDataURL('image/jpeg', quality);
+            
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                    const recompressedData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const originalImg = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    let totalError = 0;
+                    let artifactsCount = 0;
+                    
+                    for (let i = 0; i < originalImg.data.length; i += 4) {
+                        const error = Math.abs(originalImg.data[i] - recompressedData.data[i]) +
+                                    Math.abs(originalImg.data[i + 1] - recompressedData.data[i + 1]) +
+                                    Math.abs(originalImg.data[i + 2] - recompressedData.data[i + 2]);
+                        
+                        totalError += error;
+                        if (error > 20) artifactsCount++;
+                    }
+                    
+                    resolve({
+                        artifactsDetected: artifactsCount > (originalImg.data.length / 16),
+                        averageError: totalError / (originalImg.data.length / 4)
+                    });
+                };
+                img.src = originalData;
+            });
+        }
+
+        function detectEdges(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            let edgeCount = 0;
+            let sharpTransitions = 0;
+            
+            for (let y = 1; y < imageData.height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = (y * width + x) * 4;
+                    const rightIdx = idx + 4;
+                    const bottomIdx = ((y + 1) * width + x) * 4;
+                    
+                    const horizontalDiff = Math.abs(data[idx] - data[rightIdx]) +
+                                         Math.abs(data[idx + 1] - data[rightIdx + 1]) +
+                                         Math.abs(data[idx + 2] - data[rightIdx + 2]);
+                                         
+                    const verticalDiff = Math.abs(data[idx] - data[bottomIdx]) +
+                                       Math.abs(data[idx + 1] - data[bottomIdx + 1]) +
+                                       Math.abs(data[idx + 2] - data[bottomIdx + 2]);
+                    
+                    if (horizontalDiff > 100 || verticalDiff > 100) edgeCount++;
+                    if (horizontalDiff > 200 || verticalDiff > 200) sharpTransitions++;
+                }
+            }
+            
+            return {
+                density: (edgeCount / (imageData.width * imageData.height)) * 100,
+                sharpTransitions
+            };
+        }
+
+        async function showMetadata() {
+            if (!currentFile) {
+                alert('Please upload an image first');
+                return;
+            }
+
+            const results = ['Metadata Analysis:'];
+            
+            if (currentFile.type === 'application/pdf') {
+                // PDF metadata extraction
+                const arrayBuffer = await currentFile.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const metadata = await pdf.getMetadata();
+                
+                if (metadata && metadata.info) {
+                    Object.entries(metadata.info).forEach(([key, value]) => {
+                        results.push(`- ${key}: ${value}`);
+                    });
+                }
+            } else {
+                // Image metadata extraction using EXIF.js
+                EXIF.getData(currentFile, function() {
+                    const exifData = EXIF.getAllTags(this);
+                    Object.entries(exifData).forEach(([key, value]) => {
+                        results.push(`- ${key}: ${value}`);
+                    });
+                    document.getElementById('analysisResults').textContent = results.join('\n');
+                });
+                return;
+            }
+            
+            document.getElementById('analysisResults').textContent = results.join('\n');
+        }
+
+        function clearAll() {
+            currentFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('imageDisplay').src = '';
+            document.getElementById('analysisResults').textContent = '';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateProgress(0);
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.width = `${percent}%`;
+        }
+    </script>
+</body>
+</html>
