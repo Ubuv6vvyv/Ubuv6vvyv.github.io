@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Analysis Tool</title>
+    <script async src="https://cdn.jsdelivr.net/npm/opencv.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f3f4f6;
+            color: #111827;
+            line-height: 1.0;
+            font-size: 0.7em;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .toolbar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .tool-section {
+            background: #f8fafc;
+            padding: 5px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .tool-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #1e40af;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 3px 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #1e40af;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .slider-group {
+            margin: 10px 0;
+        }
+
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #4b5563;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .value-display {
+            font-size: 0.9em;
+            color: #6b7280;
+            text-align: right;
+        }
+
+        #canvas {
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            background: #e0f2fe;
+            color: #0369a1;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+
+        .detection-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        #fileInput {
+            margin: 10px 0;
+        }
+
+        .mode-select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Analysis Tool</h1>
+        <div id="status">Loading OpenCV and TensorFlow models...</div>
+        
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <div class="toolbar">
+            <div class="tool-section">
+                <h3>Image Adjustments</h3>
+                <div class="slider-group">
+                    <label>Brightness</label>
+                    <input type="range" id="brightness" min="-100" max="100" value="0">
+                    <div class="value-display">0</div>
+                </div>
+                <div class="slider-group">
+                    <label>Contrast</label>
+                    <input type="range" id="contrast" min="-100" max="100" value="0">
+                    <div class="value-display">0</div>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h3>Threshold & Edge Detection</h3>
+                <select id="detectionMode" class="mode-select">
+                    <option value="none">Select Mode</option>
+                    <option value="simple">Simple Threshold</option>
+                    <option value="adaptive">Adaptive Threshold</option>
+                    <option value="otsu">Otsu Threshold</option>
+                    <option value="edge">Edge Detection</option>
+                </select>
+                
+                <div class="slider-group">
+                    <label>Threshold Value</label>
+                    <input type="range" id="thresholdValue" min="0" max="255" value="127">
+                    <div class="value-display">127</div>
+                </div>
+                
+                <div class="slider-group">
+                    <label>Block Size (Adaptive)</label>
+                    <input type="range" id="blockSize" min="3" max="99" step="2" value="11">
+                    <div class="value-display">11</div>
+                </div>
+
+                <div class="slider-group">
+                    <label>C Value (Adaptive)</label>
+                    <input type="range" id="cValue" min="-10" max="10" value="2">
+                    <div class="value-display">2</div>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h3>Object Detection</h3>
+                <button id="detectButton">Detect Objects</button>
+            </div>
+        </div>
+
+        <button id="resetButton" style="background: #dc2626;">Reset Image</button>
+
+        <canvas id="canvas"></canvas>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        class ImageAnalyzer {
+            constructor() {
+                this.elements = {};
+                this.originalImage = null;
+                this.objectDetector = null;
+                this.isProcessing = false;
+                
+                this.init();
+            }
+
+            async init() {
+                this.bindElements();
+                this.setupEventListeners();
+                await this.loadModels();
+            }
+
+            bindElements() {
+                ['canvas', 'fileInput', 'status', 'results', 'detectButton', 
+                 'resetButton', 'brightness', 'contrast', 'thresholdValue',
+                 'blockSize', 'cValue', 'detectionMode'].forEach(id => {
+                    this.elements[id] = document.getElementById(id);
+                });
+
+                // Bind value displays for all sliders
+                document.querySelectorAll('.slider-group').forEach(group => {
+                    const slider = group.querySelector('input[type="range"]');
+                    const display = group.querySelector('.value-display');
+                    if (slider && display) {
+                        slider.addEventListener('input', () => {
+                            display.textContent = slider.value;
+                            this.processImage();
+                        });
+                    }
+                });
+            }
+
+            async loadModels() {
+                try {
+                    this.objectDetector = await cocoSsd.load();
+                    this.elements.status.textContent = 'Ready to analyze images';
+                    this.enableButtons();
+                } catch (error) {
+                    console.error('Error loading models:', error);
+                    this.elements.status.textContent = 'Error loading models';
+                }
+            }
+
+            setupEventListeners() {
+                this.elements.fileInput.addEventListener('change', e => this.handleImageUpload(e));
+                this.elements.detectButton.addEventListener('click', () => this.detectObjects());
+                this.elements.resetButton.addEventListener('click', () => this.resetImage());
+                this.elements.detectionMode.addEventListener('change', () => this.processImage());
+            }
+
+            enableButtons() {
+                ['detectButton', 'resetButton'].forEach(id => {
+                    this.elements[id].disabled = false;
+                });
+            }
+
+            async handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = e => {
+                    this.originalImage = new Image();
+                    this.originalImage.onload = () => {
+                        this.setupCanvas();
+                        this.drawImage();
+                    };
+                    this.originalImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            setupCanvas() {
+                const canvas = this.elements.canvas;
+                const maxDimension = 800;
+                let width = this.originalImage.naturalWidth;
+                let height = this.originalImage.naturalHeight;
+
+                if (width > height && width > maxDimension) {
+                    height = (height * maxDimension) / width;
+                    width = maxDimension;
+                } else if (height > maxDimension) {
+                    width = (width * maxDimension) / height;
+                    height = maxDimension;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+            }
+
+            drawImage() {
+                const ctx = this.elements.canvas.getContext('2d');
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.drawImage(this.originalImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+            }
+
+            async processImage() {
+                if (!this.originalImage || this.isProcessing) return;
+                this.isProcessing = true;
+
+                try {
+                    this.drawImage();
+                    
+                    // Apply brightness and contrast
+                    const brightness = parseInt(this.elements.brightness.value);
+                    const contrast = parseInt(this.elements.contrast.value);
+
+                    if (brightness !== 0 || contrast !== 0) {
+                        const src = cv.imread(this.elements.canvas);
+                        const dst = new cv.Mat();
+                        
+                        const alpha = 1 + (contrast / 100);
+                        const beta = brightness;
+                        
+                        src.convertTo(dst, -1, alpha, beta);
+                        cv.imshow('canvas', dst);
+                        
+                        src.delete();
+                        dst.delete();
+                    }
+
+                    // Apply threshold or edge detection based on mode
+                    const mode = this.elements.detectionMode.value;
+                    if (mode !== 'none') {
+                        const src = cv.imread(this.elements.canvas);
+                        const dst = new cv.Mat();
+                        
+                        cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+
+                        switch (mode) {
+                            case 'simple':
+                                cv.threshold(src, dst, 
+                                    parseInt(this.elements.thresholdValue.value),
+                                    255,
+                                    cv.THRESH_BINARY
+                                );
+                                break;
+                                
+                            case 'adaptive':
+                                cv.adaptiveThreshold(src, dst,
+                                    255,
+                                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv.THRESH_BINARY,
+                                    parseInt(this.elements.blockSize.value),
+                                    parseInt(this.elements.cValue.value)
+                                );
+                                break;
+                                
+                            case 'otsu':
+                                cv.threshold(src, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                                break;
+                                
+                            case 'edge':
+                                const threshold = parseInt(this.elements.thresholdValue.value);
+                                cv.Canny(src, dst, threshold, threshold * 2, 3, false);
+                                break;
+                        }
+                        
+                        cv.imshow('canvas', dst);
+                        src.delete();
+                        dst.delete();
+                    }
+                } catch (error) {
+                    console.error('Processing error:', error);
+                } finally {
+                    this.isProcessing = false;
+                }
+            }
+
+            async detectObjects() {
+                if (!this.originalImage || !this.objectDetector) return;
+                
+                try {
+                    const predictions = await this.objectDetector.detect(this.elements.canvas);
+                    this.drawDetections(predictions);
+                    this.displayResults(predictions);
+                } catch (error) {
+                    console.error('Detection error:', error);
+                }
+            }
+
+            drawDetections(predictions) {
+                const ctx = this.elements.canvas.getContext('2d');
+                
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.bbox;
+                    
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    ctx.fillStyle = '#00ff00';
+                    ctx.font = '16px Arial';
+                    const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+                    const textWidth = ctx.measureText(text).width;
+                    ctx.fillRect(x, y - 20, textWidth + 10, 20);
+                    
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(text, x + 5, y - 5);
+                });
+            }
+
+            displayResults(predictions) {
+                this.elements.results.innerHTML = `
+                    <h3>Detection Results</h3>
+                    ${predictions.map(p => `
+                        <div class="detection-item">
+                            <strong>${p.class}</strong>: ${(p.score * 100).toFixed(1)}% confidence
+                        </div>
+                    `).join('')}
+                `;
+            }
+
+            resetImage() {
+                if (this.originalImage) {
+                    this.drawImage();
+                    this.elements.results.innerHTML = '';
+                    this.elements.detectionMode.value = 'none';
+                    
+                    // Reset all sliders
+                    const sliders = {
+                        'brightness': 0,
+                        'contrast': 0,
+                        'thresholdValue': 127,
+                        'blockSize': 11,
+                        'cValue': 2
+                    };
+
+                    Object.entries(sliders).forEach(([id, value]) => {
+                        const slider = this.elements[id];
+                        const display = slider.parentElement.querySelector('.value-display');
+                        slider.value = value;
+                        display.textContent = value;
+                    });
+                }
+            }
+        }
+
+        // Initialize when OpenCV is ready
+        window.onload = () => {
+            if (typeof cv !== 'undefined') {
+                new ImageAnalyzer();
+            } else {
+                // Wait for OpenCV.js to initialize
+                cv['onRuntimeInitialized'] = () => {
+                    new ImageAnalyzer();
+                };
+            }
+                        
+        };
+    </script>
+</body>
+</html>
