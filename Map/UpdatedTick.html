@@ -1,232 +1,403 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Packing List</title>
-
-
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cairns Packing List</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
 <style>
-body {
-font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-margin: 0;
-padding: 0;
-font-size: 13px;
-background: #f7f7f7;
-color: #3498db;
-line-height: 1.4;
-}
+  /* General body styling */
+  body {
+    background: white;
+    font-size: 16px;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+  }
 
-.container {
-max-width: 700px;
-margin: 20px auto;
-padding: 24px;
-background: #fff;
-border-radius: 8px;
-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
+  /* Container styling */
+  .container {
+    padding: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
 
-h1 {
-text-align: center;
-font-size: 22px;
-color: #e74c3c;
-margin: 0 0 20px;
-font-weight: 600;
-}
+  /* Grid layout for categories */
+  #categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
 
-h2 {
-margin: 16px 0 12px;
-font-size: 16px;
-color: #2ecc71;
-border-bottom: 1px solid #edf2f7;
-padding-bottom: 4px;
-}
+  /* Styling for category cards */
+  .category-card {
+    border: 1px solid #ccc;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    transition: transform 0.2s ease-in-out;
+  }
 
-ul {
-list-style: none;
-padding: 0;
-margin: 0;
-}
+  .category-card:hover {
+    transform: scale(1.02);
+  }
 
-li {
-display: flex;
-align-items: center;
-margin-bottom: 6px;
-padding: 4px 8px;
-border-radius: 4px;
-transition: all 0.2s;
-}
+  /* Category header */
+  .category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 1rem;
+    font-weight: bold;
+    background: black;
+    color: white;
+    padding: 12px;
+    border-radius: 4px 4px 0 0;
+  }
 
-li:hover {
-background: #f8fafc;
-}
+  .delete-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: color 0.2s;
+  }
 
-.item-content {
-flex: 1;
-display: flex;
-align-items: center;
-}
+  .delete-btn:hover {
+    color: #ff6961;
+  }
 
-label {
-font-size: 13px;
-margin-left: 6px;
-color: #4a5568;
-}
+  /* Input fields */
+  input[type="text"] {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    width: 100%;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+  }
 
-input[type="checkbox"] {
-margin: 0 4px;
-transform: scale(0.95);
-}
+  input[type="text"]:focus {
+    border-color: blue;
+    outline: none;
+  }
 
-.checked {
-color: #2ecc71;
-}
+  /* Buttons */
+  .add-item,
+  #add-category-btn,
+  #save-btn {
+    background: black;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+  }
 
-      .remove-btn {
-        opacity: 0;
-        padding: 2px 6px;
-        font-size: 12px;
-        color: #e53e3e;
-        background: 0 0;
-        border: none;
-        cursor: pointer;
-        transition: all .2s;
-        border-radius: 3px
-      }
+  .add-item:hover,
+  #add-category-btn:hover,
+  #save-btn:hover {
+    background: gray;
+  }
 
-      .remove-btn:hover {
-        background: #fee2e2
-      }
+  .add-item:active,
+  #add-category-btn:active,
+  #save-btn:active {
+    transform: scale(0.95);
+  }
 
-      li:hover .remove-btn {
-        opacity: 1
-      }
+  /* Items list */
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
 
-      .input-group {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 20px
-      }
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 0.875rem;
+  }
 
-      #new-item-input {
-        flex: 1;
-        padding: 6px 12px;
-        border: 1px solid #e2e8f0;
-        border-radius: 4px;
-        font-size: 13px;
-        transition: all .2s
-      }
+  li input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin-right: 8px;
+    cursor: pointer;
+  }
 
-      #new-item-input:focus {
-        outline: 0;
-        border-color: #4299e1;
-        box-shadow: 0 0 0 1px #4299e1
-      }
+  li button {
+    background: none;
+    border: none;
+    color: red;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
 
-      button {
-        padding: 6px 12px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        border: none;
-        border-radius: 4px;
-        transition: all .15s;
-        background: #4299e1;
-        color: #fff
-      }
+  li button:hover {
+    color: darkred;
+  }
 
-      button:hover {
-        background: #3182ce
-      }
+  /* Mobile responsive adjustments */
+  @media (max-width: 600px) {
+    #categories-grid {
+      grid-template-columns: 1fr;
+    }
 
-      #save-btn {
-        background: #48bb78
-      }
+    .category-header {
+      font-size: 0.875rem;
+    }
 
-      #save-btn:hover {
-        background: #38a169
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Packing List</h1>
-      <div class="input-group">
-        <input type="text" id="new-item-input" placeholder="Add new item...">
-        <button type="button" id="add-item-btn">Add</button>
-        <button type="button" id="save-btn">Save</button>
+    input[type="text"],
+    .add-item {
+      font-size: 0.8rem;
+      padding: 8px;
+    }
+  }
+</style>
+
+</head>
+<body>
+  <div class="container mx-auto p-4 max-w-6xl">
+    <h1 class="text-xl font-bold text-center text-black mb-6">Cairns Trip Packing List</h1>
+    
+    <div class="mb-6 flex gap-4">
+      <div class="flex-1">
+        <input type="text" id="category-input" placeholder="Add new category..." 
+               class="w-full px-3 py-2 border border-black rounded-none text-xs">
       </div>
-      <form id="packing-form"></form>
+      <button id="add-category-btn" 
+              class="px-4 py-2 bg-black text-white rounded-none text-xs hover:bg-gray-800 transition-colors">
+        Add Category
+      </button>
+      <button id="save-btn" 
+              class="px-4 py-2 bg-blue-900 text-white rounded-none text-xs hover:bg-blue-800 transition-colors">
+        Save
+      </button>
     </div>
-    <script>
-      const packingItems = {
-          Outfits: ["Airport outfit (1)", "Fitzroy Island outfit (1)", "Karunda outfit (1)", "Beach + City Tour outfit (1)", "Nightsuits (1-2)"],
-          Swimwear: ["Swimsuits (2-3)"],
-          "Evening attire": ["Evening outfit for Dec 25th (maybe)", "Evening outfit for Dec 26th (maybe)", "Evening outfit for Dec 27th"],
-          "Other items": ["Undergarments and socks", "Comfortable walking shoes/sneakers", "Sandals/flip-flops", "Light jacket or sweater (depending on the weather)", "Toiletries", "Beach towel", "Sunscreen and sun hat", "Insect repellent", "Power adapter and charger", "Travel documents (passport, ID, etc.)", "Sunglasses", "Power Bank", "Bandaids", "Medicine", "Empty Plastic Bag"]
-        },
-        form = document.getElementById("packing-form"),
-        newItemInput = document.getElementById("new-item-input"),
-        addItemBtn = document.getElementById("add-item-btn"),
-        saveBtn = document.getElementById("save-btn");
 
-      function createPackingSection(e, t, n = []) {
-        const a = document.createElement("section"),
-          i = document.createElement("h2");
-        i.textContent = e, a.appendChild(i);
-        const r = document.createElement("ul");
-        t.forEach(t => {
-          const a = document.createElement("li"),
-            i = document.createElement("div");
-          i.className = "item-content";
-          const o = document.createElement("input");
-          o.type = "checkbox", o.checked = n.includes(t), o.id = `item-${t.replace(/\s+/g,"-").toLowerCase()}`;
-          const c = document.createElement("label");
-          c.textContent = t, c.htmlFor = o.id;
-          const d = document.createElement("button");
-          d.className = "remove-btn", d.textContent = "×", d.onclick = function() {
-            removeItem(e, t)
-          }, i.appendChild(o), i.appendChild(c), a.appendChild(i), a.appendChild(d), r.appendChild(a)
-        }), a.appendChild(r), form.appendChild(a)
+    <div id="categories-grid" class="grid grid-cols-2 gap-4"></div>
+  </div>
+
+  <template id="category-template">
+    <div class="category-card bg-white p-4 rounded-none shadow">
+      <div class="category-header flex justify-between items-center">
+        <h2 class="text-sm font-semibold"></h2>
+        <button class="delete-category delete-btn hover:text-gray-300">×</button>
+      </div>
+      <div class="mb-4 flex gap-2">
+        <input type="text" placeholder="Add item..." 
+               class="flex-1 px-3 py-1 border border-black rounded-none text-xs">
+        <button class="add-item px-3 py-1 bg-blue-900 text-white rounded-none text-xs hover:bg-blue-800">+</button>
+      </div>
+      <ul class="space-y-2"></ul>
+    </div>
+  </template>
+
+  <script>
+    const defaultCategories = {
+      "Daily Outfits": [
+        "Airport outfit (1)",
+        "Fitzroy Island outfit (1)",
+        "Kuranda outfit (1)",
+        "Beach + City Tour outfit (1)",
+        "Nightsuits (2)",
+        "Extra outfit in case oopsie",
+        "Light raincoat/bag"
+      ],
+      "Swimwear": [
+        "Swimsuits (2-3)",
+        "Singlet",
+        "Wet bags for damp clothes"
+      ],
+      "Evening Attire": [
+        "Evening outfit for Dec 25th",
+        "Evening outfit for Dec 26th",
+        "Evening outfit for Dec 27th"
+      ],
+      "Footwear": [
+        "Comfortable walking shoes/sneakers",
+        "Fashion Totes",
+        "Flip-flops for beach",
+        "Extra socks",
+        "Water shoes"
+      ],
+      "Beach Stuff": [
+        "Beach towel",
+        "High SPF sunscreen",
+        "After-sun care",
+        "Sun hat",
+        "Waterproof phone case",
+        "Dry bag for electronics"
+      ],
+      "Health & Protection": [
+        "Insect repellent",
+        "First-aid basics",
+        "Motion sickness pills",
+        "Hydration tablets",
+        "Reef-safe sunscreen",
+        "Hand sanitizer",
+        "Basic medications",
+        "Bandaids"
+      ],
+      "Electronics": [
+        "Phone charger",
+        "Power bank",
+        "Camera",
+"Wall thing"
+      ],
+      "Documents & Money": [
+        "Passport",
+        "Tour bookings",
+        "Cash + Cards",
+        "Emergency contacts",
+        "Hotel bookings",
+        "Flight tickets"
+      ],
+      "Toiletries": [
+        "Toothbrush + paste",
+        "Shampoo + Conditioner",
+        "Body wash",
+        "Deodorant",
+        "Hair ties/clips",
+        "Razor",
+        "Moisturizer with SPF",
+        "Insect bite cream"
+      ],
+      "Random Shit": [
+        "Zip-lock bags (wet clothes)",
+        "Portable fan",
+        "Reusable water bottle",
+        "Snack pack",
+        "Microfiber towel"
+      ]
+    };
+
+    class PackingList {
+      constructor() {
+        this.categoriesGrid = document.getElementById('categories-grid');
+        this.template = document.getElementById('category-template');
+        this.setupEventListeners();
+        this.loadData();
       }
 
-      function loadSavedData() {
-        const e = JSON.parse(localStorage.getItem("packingItems")) || packingItems,
-          t = JSON.parse(localStorage.getItem("selections")) || {};
-        form.innerHTML = "";
-        for (const [n, a] of Object.entries(e)) createPackingSection(n, a, t[n] || [])
+      setupEventListeners() {
+        document.getElementById('add-category-btn').onclick = () => this.addCategory();
+        document.getElementById('save-btn').onclick = () => this.saveData();
+        document.getElementById('category-input').onkeypress = (e) => {
+          if (e.key === 'Enter') this.addCategory();
+        };
       }
 
-      function savePackingData() {
-        const e = {},
-          t = {},
-          n = form.querySelectorAll("section");
-        n.forEach(n => {
-          const a = n.querySelector("h2").textContent,
-            i = Array.from(n.querySelectorAll("label")).map(e => e.textContent),
-            r = Array.from(n.querySelectorAll('input[type="checkbox"]')).filter(e => e.checked).map((e, t) => i[t]);
-          e[a] = i, t[a] = r
-        }), localStorage.setItem("packingItems", JSON.stringify(e)), localStorage.setItem("selections", JSON.stringify(t));
-        const a = saveBtn,
-          i = a.textContent;
-        a.textContent = "Saved", setTimeout(() => {
-          a.textContent = i
-        }, 1e3)
+      loadData() {
+        const savedData = JSON.parse(localStorage.getItem('packingCategories')) || defaultCategories;
+        Object.entries(savedData).forEach(([category, items]) => {
+          this.createCategoryCard(category, items);
+        });
       }
 
-      function removeItem(e, t) {
-        const n = JSON.parse(localStorage.getItem("packingItems")) || packingItems;
-        n[e] = n[e].filter(e => e !== t), localStorage.setItem("packingItems", JSON.stringify(n)), loadSavedData()
+      createCategoryCard(categoryName, items = []) {
+        const card = this.template.content.cloneNode(true).children[0];
+        card.querySelector('h2').textContent = categoryName;
+        
+        const itemInput = card.querySelector('input');
+        const addItemBtn = card.querySelector('.add-item');
+        const itemsList = card.querySelector('ul');
+        
+        items.forEach(item => this.addItemToList(itemsList, item));
+        
+        card.querySelector('.delete-category').onclick = () => {
+          if (confirm('Delete this category?')) card.remove();
+        };
+        
+        addItemBtn.onclick = () => {
+          if (itemInput.value.trim()) {
+            this.addItemToList(itemsList, itemInput.value);
+            itemInput.value = '';
+          }
+        };
+        
+        itemInput.onkeypress = (e) => {
+          if (e.key === 'Enter' && itemInput.value.trim()) {
+            this.addItemToList(itemsList, itemInput.value);
+            itemInput.value = '';
+          }
+        };
+
+        this.categoriesGrid.appendChild(card);
       }
-      addItemBtn.addEventListener("click", () => {
-        const e = newItemInput.value.trim();
-        if (e) {
-          const t = JSON.parse(localStorage.getItem("packingItems")) || packingItems;
-          t["Other items"].push(e), localStorage.setItem("packingItems", JSON.stringify(t)), newItemInput.value = "", loadSavedData()
+
+      addItemToList(list, itemText) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2';
+        li.innerHTML = `
+          <input type="checkbox" class="form-checkbox h-3 w-3 text-blue-900 rounded-none checkbox-custom">
+          <span class="flex-1 text-xs text-content">${itemText}</span>
+          <button class="text-red-600 hover:text-red-800 text-xs">×</button>
+        `;
+        
+        const checkbox = li.querySelector('input[type="checkbox"]');
+        const span = li.querySelector('span');
+        
+        checkbox.onchange = () => {
+          if (checkbox.checked) {
+            span.style.textDecoration = 'line-through';
+            span.style.color = '#666';
+          } else {
+            span.style.textDecoration = 'none';
+            span.style.color = 'black';
+          }
+        };
+        
+        li.querySelector('button').onclick = () => li.remove();
+        list.appendChild(li);
+      }
+
+      addCategory() {
+        const input = document.getElementById('category-input');
+        const category = input.value.trim();
+        
+        if (category) {
+          this.createCategoryCard(category);
+          input.value = '';
         }
-      }), newItemInput.addEventListener("keypress", e => {
-        "Enter" === e.key && (e.preventDefault(), addItemBtn.click())
-      }), saveBtn.addEventListener("click", savePackingData), loadSavedData()
-    </script>
-  </body>
+      }
+
+      saveData() {
+        const data = {};
+        this.categoriesGrid.querySelectorAll('.category-card').forEach(card => {
+          const category = card.querySelector('h2').textContent;
+          const items = Array.from(card.querySelectorAll('li span')).map(span => span.textContent);
+          data[category] = items;
+        });
+        
+        localStorage.setItem('packingCategories', JSON.stringify(data));
+        
+        const saveBtn = document.getElementById('save-btn');
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saved!';
+        saveBtn.style.backgroundColor = '#22543d';
+        
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.backgroundColor = '';
+        }, 1000);
+      }
+    }
+
+    new PackingList();
+  </script>
+</body>
 </html>
