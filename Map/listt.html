@@ -82,9 +82,9 @@
             ]
         };
 
-        const form = document.querySelector('form');
+        const form = document.querySelector('#packing-list-form');
 
-        // Function to create checkboxes dynamically
+        // Function to create packing sections dynamically
         function createPackingSection(title, items) {
             const section = document.createElement('section');
             const header = document.createElement('h2');
@@ -109,10 +109,38 @@
             form.appendChild(section);
         }
 
+        // Function to add a new item to the list
+        function addNewItem() {
+            const itemName = document.querySelector('#item-name').value.trim();
+            const itemCategory = document.querySelector('#item-category').value;
+
+            if (itemName) {
+                const itemId = itemName.toLowerCase().replace(/ /g, "-");
+                const newItem = { id: itemId, label: `${itemName}` };
+
+                // Add the new item to the corresponding category
+                packingItems[itemCategory].push(newItem);
+
+                // Re-render the packing list with the new item
+                document.querySelector('#packing-list-form').innerHTML = '';
+                for (const [category, items] of Object.entries(packingItems)) {
+                    createPackingSection(category, items);
+                }
+
+                // Clear the input fields
+                document.querySelector('#item-name').value = '';
+            } else {
+                alert('Please enter a valid item name.');
+            }
+        }
+
         // Loop through the packing items and create sections dynamically
         for (const [category, items] of Object.entries(packingItems)) {
             createPackingSection(category, items);
         }
+
+        // Add event listener for adding a new item
+        document.querySelector('#add-item').addEventListener('click', addNewItem);
 
         // Add event listener to checkboxes
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
