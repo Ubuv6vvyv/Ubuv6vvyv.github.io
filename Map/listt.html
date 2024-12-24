@@ -43,7 +43,7 @@
             width: 70%;
             padding: 5px;
         }
-        #add-item-btn {
+        #add-item-btn, #save-btn {
             padding: 5px 10px;
             cursor: pointer;
         }
@@ -57,6 +57,7 @@
         </form>
         <input type="text" id="new-item-input" placeholder="New item">
         <button type="button" id="add-item-btn">Add Item</button>
+        <button type="button" id="save-btn">Save</button>
     </div>
 
     <script>
@@ -95,9 +96,10 @@
         const form = document.querySelector('form');
         const newItemInput = document.getElementById('new-item-input');
         const addItemBtn = document.getElementById('add-item-btn');
+        const saveBtn = document.getElementById('save-btn');
 
         // Function to create checkboxes dynamically
-        function createPackingSection(title, items) {
+        function createPackingSection(title, items, savedSelections = []) {
             const section = document.createElement('section');
             const header = document.createElement('h2');
             header.textContent = title;
@@ -108,6 +110,8 @@
                 const li = document.createElement('li');
                 const checkbox = document.createElement('input');
                 checkbox.type = "checkbox";
+                checkbox.checked = savedSelections.includes(item); // Set checkbox state based on saved data
+
                 const label = document.createElement('label');
                 label.textContent = item;
                 li.appendChild(checkbox);
@@ -119,20 +123,43 @@
             form.appendChild(section);
         }
 
-        // Loop through the packing items and create sections dynamically
-        for (const [category, items] of Object.entries(packingItems)) {
-            createPackingSection(category, items);
+        // Load saved packing list and selections from localStorage
+        function loadSavedData() {
+            const savedPackingItems = JSON.parse(localStorage.getItem('packingItems')) || packingItems;
+            const savedSelections = JSON.parse(localStorage.getItem('selections')) || {};
+
+            for (const [category, items] of Object.entries(savedPackingItems)) {
+                createPackingSection(category, items, savedSelections[category] || []);
+            }
         }
 
-        // Add event listener to checkboxes
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach((checkbox) => {
-            checkbox.addEventListener('change', (event) => {
-                console.log(`Checkbox ${(event.target.id)} is ${event.target.checked ? 'checked' : 'unchecked'}`);
-            });
-        });
+        // Save packing list and selections to localStorage
+        function savePackingData() {
+            const savedPackingItems = {};
+            const savedSelections = {};
 
-        // Function to add new item dynamically
+            const sections = form.querySelectorAll('section');
+            sections.forEach(section => {
+                const category = section.querySelector('h2').textContent;
+                const checkboxes = section.querySelectorAll('input[type="checkbox"]');
+                const selectedItems = [];
+
+                checkboxes.forEach((checkbox, index) => {
+                    if (checkbox.checked) {
+                        selectedItems.push(section.querySelectorAll('label')[index].textContent);
+                    }
+                });
+
+                savedPackingItems[category] = Array.from(section.querySelectorAll('label')).map(label => label.textContent);
+                savedSelections[category] = selectedItems;
+            });
+
+            localStorage.setItem('packingItems', JSON.stringify(savedPackingItems));
+            localStorage.setItem('selections', JSON.stringify(savedSelections));
+            alert('Packing list saved!');
+        }
+
+        // Add event listener to Add Item button
         addItemBtn.addEventListener('click', () => {
             const newItemText = newItemInput.value.trim();
             if (newItemText) {
@@ -144,11 +171,17 @@
 
                 // Re-render the "Other items" section
                 form.innerHTML = ''; // Clear the form
-                for (const [category, items] of Object.entries(packingItems)) {
-                    createPackingSection(category, items);
-                }
+                loadSavedData();
             }
         });
+
+        // Add event listener to Save button
+        saveBtn.addEventListener('click', () => {
+            savePackingData();
+        });
+
+        // Initially load saved data or default packing items
+        loadSavedData();
     </script>
 </body>
 </html>
