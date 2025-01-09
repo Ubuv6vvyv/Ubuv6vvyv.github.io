@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Image Threshold Tool</title>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            margin: 0;
+            color: #333;
+        }
+        
+        .tips-section {
+            background: #fff;
+            padding: 5px;
+            border-radius: 8px;
+            margin: 5px 0;
+            max-width: 600px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .tip {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 3px solid #4675fc;
+            background: #f8f9fa;
+        }
+        
+        .workflow {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .canvas-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        #canvas {
+            border: 2px solid #ddd;
+            max-width: 90vw;
+            max-height: 60vh;
+            background: #fff;
+            border-radius: 4px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 5px;
+            max-width: 800px;
+            width: 100%;
+            padding: 5px;
+        }
+        
+        .control-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .control-group .description {
+            font-size: 0.6em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .value-display {
+            font-size: 0.6em;
+            color: #666;
+            text-align: right;
+        }
+        
+        .mode-toggle {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            gap: 20px;
+        }
+        
+        button, input[type="file"] {
+            background: #4675fc;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+        
+        button:hover {
+            background: #3461d6;
+        }
+        
+        #resetBtn {
+            background: #dc3545;
+        }
+        
+        #resetBtn:hover {
+            background: #c82333;
+        }
+        
+        .performance-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border-radius: 5px;
+            font-size: 0.6em;
+        }
+        guidance-section {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .scenario {
+            border-left: 4px solid #4675fc;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .scenario h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .workflow-steps {
+            margin-left: 20px;
+            color: #555;
+        }
+
+        .tool-explanation {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Who Cares Threshold</h1>
+    
+    
+
+    <div class="mode-toggle">
+        <label><input type="checkbox" id="fineTuneMode"> Fine-Tune Mode</label>
+        <label><input type="checkbox" id="performanceMode" checked> Performance Mode</label>
+    </div>
+
+    <input type="file" id="imageInput" accept="image/*">
+    <button id="resetBtn">Reset</button>
+
+    <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+        <div id="loading" class="loading">Processing...</div>
+    </div>
+
+   
+    <div class="controls">
+        <div class="control-group">
+            <label>Threshold Method</label>
+            <div class="description">Choose how the image is converted to black and white</div>
+            <select id="thresholdMethod">
+                <option value="binary">Regular</option>
+                <option value="adaptive">Adaptive</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Threshold Level</label>
+            <div class="description">Adjusts the cutoff point between black and white</div>
+            <input type="range" id="thresholdIntensity" min="0" max="255" value="127" step="8">
+            <span class="value-display">127</span>
+        </div>
+
+        <div class="control-group">
+            <label>Adaptive Sensitivity (C)</label>
+            <div class="description">Fine-tunes how adaptive threshold responds to local contrast</div>
+            <input type="range" id="adaptiveC" min="-10" max="10" value="2" step="2">
+            <span class="value-display">2</span>
+        </div>
+
+        <div class="control-group">
+            <label>Brightness</label>
+            <div class="description">Adjusts overall image brightness before thresholding</div>
+            <input type="range" id="brightness" min="-100" max="100" value="0" step="10">
+            <span class="value-display">0</span>
+        </div>
+
+        <div class="control-group">
+            <label>Contrast</label>
+            <div class="description">Adjusts image contrast before thresholding</div>
+            <input type="range" id="contrast" min="-100" max="100" value="0" step="10">
+            <span class="value-display">0</span>
+        </div>
+
+        <div class="control-group">
+            <label>Edge Enhancement</label>
+            <div class="description">Emphasizes edges in the image</div>
+            <input type="range" id="edgeEnhancement" min="0" max="100" value="0" step="10">
+            <span class="value-display">0</span>
+        </div>
+
+        <div class="control-group">
+            <label>Invert</label>
+            <div class="description">Switches black and white</div>
+            <input type="checkbox" id="invertColors">
+        </div>
+    </div>
+
+    <script>
+        let isOpenCvReady = false;
+        let srcImage = null;
+        let displayImage = null;
+        let isProcessing = false;
+        let processingTimeout = null;
+        let grayImage = null;
+        let tempImage = null;
+        let processingDelay = 100;
+
+        function onOpenCvReady() {
+            isOpenCvReady = true;
+            showStatus("Ready", "success");
+        }
+
+        function showStatus(message, type) {
+            const status = document.createElement('div');
+            status.style.position = 'fixed';
+            status.style.top = '20px';
+            status.style.right = '20px';
+            status.style.padding = '10px';
+            status.style.borderRadius = '5px';
+            status.style.backgroundColor = type === 'success' ? '#4CAF50' : '#f44336';
+            status.style.color = 'white';
+            status.textContent = message;
+            document.body.appendChild(status);
+            setTimeout(() => status.remove(), 2000);
+        }
+
+        function updateValueDisplay(input) {
+            const display = input.parentElement.querySelector('.value-display');
+            if (display) {
+                display.textContent = input.value;
+            }
+        }
+
+        function scheduleProcessing() {
+            if (processingTimeout) clearTimeout(processingTimeout);
+            processingTimeout = setTimeout(processImage, processingDelay);
+        }
+
+        function cleanupImages() {
+            [srcImage, displayImage, grayImage, tempImage].forEach(img => {
+                if (img) img.delete();
+            });
+        }
+
+        function processImage() {
+            if (!displayImage || isProcessing) return;
+            isProcessing = true;
+            
+            const startTime = performance.now();
+            
+            try {
+                const params = {
+                    threshold: parseInt(document.getElementById('thresholdIntensity').value),
+                    brightness: parseInt(document.getElementById('brightness').value),
+                    contrast: parseInt(document.getElementById('contrast').value),
+                    edgeEnhancement: parseInt(document.getElementById('edgeEnhancement').value),
+                    thresholdMethod: document.getElementById('thresholdMethod').value,
+                    adaptiveC: parseInt(document.getElementById('adaptiveC').value),
+                    invert: document.getElementById('invertColors').checked
+                };
+
+                const processed = new cv.Mat();
+                const gray = new cv.Mat();
+
+                srcImage.copyTo(processed);
+
+                // Apply brightness and contrast
+                if (params.brightness !== 0 || params.contrast !== 0) {
+                    const alpha = 1 + params.contrast / 100;
+                    processed.convertTo(processed, -1, alpha, params.brightness);
+                }
+
+                // Convert to grayscale
+                cv.cvtColor(processed, gray, cv.COLOR_RGBA2GRAY);
+
+                // Apply edge enhancement if needed
+                if (params.edgeEnhancement > 0) {
+                    const edges = new cv.Mat();
+                    cv.Canny(gray, edges, params.edgeEnhancement, params.edgeEnhancement * 2, 3, false);
+                    cv.addWeighted(gray, 1, edges, 0.5, 0, gray);
+                    edges.delete();
+                }
+
+                // Apply threshold
+                if (params.thresholdMethod === 'adaptive') {
+                    cv.adaptiveThreshold(
+                        gray,
+                        processed,
+                        255,
+                        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv.THRESH_BINARY,
+                        11,
+                        params.adaptiveC
+                    );
+                } else {
+                    cv.threshold(gray, processed, params.threshold, 255, cv.THRESH_BINARY);
+                }
+
+                // Invert if needed
+                if (params.invert) {
+                    cv.bitwise_not(processed, processed);
+                }
+
+                cv.imshow('canvas', processed);
+                
+                processed.delete();
+                gray.delete();
+
+                // Update performance indicator
+                const processTime = performance.now() - startTime;
+                const performanceLevel = processTime < 50 ? 'Excellent' : 
+                                      processTime < 100 ? 'Good' : 
+                                      processTime < 200 ? 'Fair' : 'Poor';
+                const performanceColor = processTime < 50 ? '#4CAF50' : 
+                                      processTime < 100 ? '#2196F3' : 
+                                      processTime < 200 ? '#FFC107' : '#F44336';
+                
+                document.getElementById('performanceIndicator').innerHTML = 
+                    `Processing Time: ${Math.round(processTime)}ms<br>` +
+                    `Performance: <span style="color:${performanceColor}">${performanceLevel}</span>`;
+                
+            } catch (error) {
+                console.error(error);
+                showStatus("Processing error", "error");
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        // Event Listeners
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            const display = input.parentElement.querySelector('.value-display');
+            input.addEventListener('input', e => {
+                display.textContent = e.target.value;
+                scheduleProcessing();
+            });
+        });
+
+        document.getElementById('fineTuneMode').addEventListener('change', e => {
+            const isFineMode = e.target.checked;
+            const ranges = {
+                thresholdIntensity: isFineMode ? 1 : 5,
+                adaptiveC: isFineMode ? 0.5 : 1,
+                brightness: isFineMode ? 1 : 5,
+                contrast: isFineMode ? 1 : 5
+            };
+            
+            Object.entries(ranges).forEach(([id, step]) => {
+                const input = document.getElementById(id);
+                if (input) input.step = step;
+            });
+            
+            scheduleProcessing();
+        });
+
+        document.getElementById('performanceMode').addEventListener('change', e => {
+            processingDelay = e.target.checked ? 100 : 50;
+            scheduleProcessing();
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                input.value = input.defaultValue;
+                updateValueDisplay(input);
+            });
+            document.getElementById('invertColors').checked = false;
+            scheduleProcessing();
+        });
+
+        document.getElementById('invertColors').addEventListener('change', scheduleProcessing);
+        document.getElementById('thresholdMethod').addEventListener('change', scheduleProcessing);
+
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            if (!isOpenCvReady) {
+                showStatus("OpenCV.js not ready", "error");
+                return;
+            }
+
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    const maxDim = Math.max(img.width, img.height);
+                    const scale = maxDim > 1000 ? 1000 / maxDim : 1;
+                    
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    try {
+                        cleanupImages();
+                        srcImage = cv.imread(canvas);
+                        displayImage = srcImage.clone();
+                        grayImage = new cv.Mat();
+                        tempImage = new cv.Mat();
+                        scheduleProcessing();
+                    } catch (error) {
+                        showStatus("Error loading image", "error");
+                        console.error(error);
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') {
+                    document.getElementById('resetBtn').click();
+                    e.preventDefault();
+                } else if (e.key === 'f') {
+                    const fineTuneMode = document.getElementById('fineTuneMode');
+                    fineTuneMode.checked = !fineTuneMode.checked;
+                    fineTuneMode.dispatchEvent(new Event('change'));
+                    e.preventDefault();
+                } else if (e.key === 'p') {
+                    const performanceMode = document.getElementById('performanceMode');
+                    performanceMode.checked = !performanceMode.checked;
+                    performanceMode.dispatchEvent(new Event('change'));
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Performance check on startup
+        (function checkPerformance() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(100, 100);
+            
+            const startTime = performance.now();
+            for (let i = 0; i < 1000; i++) {
+                ctx.putImageData(imageData, 0, 0);
+            }
+            const endTime = performance.now();
+            
+            if (endTime - startTime > 100) {
+                document.getElementById('performanceMode').checked = true;
+                document.getElementById('fineTuneMode').checked = false;
+                processingDelay = 150;
+                showStatus("Performance mode enabled", "success");
+            }
+        })();
+
+        // Settings persistence
+        const settings = {
+            save: () => {
+                const currentSettings = {
+                    thresholdIntensity: document.getElementById('thresholdIntensity').value,
+                    adaptiveC: document.getElementById('adaptiveC').value,
+                    brightness: document.getElementById('brightness').value,
+                    contrast: document.getElementById('contrast').value,
+                    edgeEnhancement: document.getElementById('edgeEnhancement').value,
+                    invertColors: document.getElementById('invertColors').checked,
+                    fineTuneMode: document.getElementById('fineTuneMode').checked,
+                    performanceMode: document.getElementById('performanceMode').checked,
+                    thresholdMethod: document.getElementById('thresholdMethod').value
+                };
+                
+                localStorage.setItem('imageThresholdSettings', JSON.stringify(currentSettings));
+                showStatus("Settings saved", "success");
+            },
+            
+            load: () => {
+                try {
+                    const savedSettings = JSON.parse(localStorage.getItem('imageThresholdSettings'));
+                    if (savedSettings) {
+                        Object.entries(savedSettings).forEach(([id, value]) => {
+                            const element = document.getElementById(id);
+                            if (element) {
+                                if (element.type === 'checkbox') {
+                                    element.checked = value;
+                                } else {
+                                    element.value = value;
+                                    updateValueDisplay(element);
+                                }
+                                element.dispatchEvent(new Event('change'));
+                            }
+                        });
+                        scheduleProcessing();
+                        showStatus("Settings loaded", "success");
+                    }
+                } catch (error) {
+                    console.error("Error loading settings:", error);
+                    showStatus("Error loading settings", "error");
+                }
+            }
+        };
+
+        // Add settings buttons
+        const settingsGroup = document.createElement('div');
+        settingsGroup.className = 'control-group';
+        settingsGroup.innerHTML = `
+            <button onclick="settings.save()">Save Settings</button>
+            <button onclick="settings.load()">Load Settings</button>
+        `;
+        document.querySelector('.controls').appendChild(settingsGroup);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', cleanupImages);
+
+        // Expose settings to window for button onclick handlers
+        window.settings = settings;
+    </script>
+<div class="guidance-section">
+        <h2>Image Processing Guide</h2>
+        
+        <div class="scenario">
+            <h4>Document / Text Processing</h4>
+            <div class="workflow-steps">
+                1. Start with Adaptive Threshold method
+                2. Adjust brightness if the text is too light/dark (+20 to +40 for dark images)
+                3. Fine-tune Adaptive Sensitivity: 
+                   - Increase (2-6) for bold text
+                   - Decrease (-2 to -6) for thin text
+                4. Add slight Edge Enhancement (10-20) if text edges are fuzzy
+            </div>
+        </div>
+
+        <div class="scenario">
+            <h4>Technical Drawings / Blueprints</h4>
+            <div class="workflow-steps">
+                1. Use Regular Threshold method
+                2. Start with high contrast (+30 to +50)
+                3. Adjust Threshold Level to capture lines (around 127)
+                4. Apply Edge Enhancement (20-40) to sharpen lines
+                5. Invert if needed (usually for blueprints)
+            </div>
+        </div>
+
+        <div class="scenario">
+            <h4>Handwritten Notes</h4>
+            <div class="workflow-steps">
+                1. Use Adaptive Threshold method
+                2. Increase brightness slightly (+10 to +30)
+                3. Set Adaptive Sensitivity low (-4 to 0)
+                4. Add minimal Edge Enhancement (5-15)
+                5. Adjust contrast if needed (+20 to +40)
+            </div>
+        </div>
+
+        <div class="tool-explanation">
+            <h3>Understanding the Tools</h3>
+            <p><strong>Regular vs Adaptive Threshold:</strong> Regular works best with high-contrast images and consistent lighting. Adaptive excels with varying lighting conditions and subtle details.</p>
+            <p><strong>Brightness/Contrast:</strong> Use brightness first to make the important details visible, then contrast to increase separation between light and dark areas.</p>
+            <p><strong>Edge Enhancement:</strong> Helps clarify boundaries between objects. Use sparingly (10-30) for most cases, higher (40-70) for technical drawings.</p>
+            <p><strong>Adaptive Sensitivity:</strong> Higher values (+) make the threshold more aggressive, lower values (-) are more forgiving. Start at 2 and adjust based on results.</p>
+        </div>
+    </div>
+
+    <!-- Previous script section remains the same -->
+    <script>
+        // Previous JavaScript remains the same
+    
+    <div id="status"></div>
+    <div id="performanceIndicator" class="performance-indicator"></div>
+</body>
+</html>
+
+
+
