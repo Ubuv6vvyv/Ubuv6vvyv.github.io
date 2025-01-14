@@ -1,51 +1,296 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Editor</title>
     <style>
-        #code-textarea {
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .section-title {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.2em;
+        }
+        textarea {
             width: 100%;
-            height: 300px;
-            font-size: 12px;
+            height: 200px;
+            font-family: monospace;
+            font-size: 10px;
+            margin-bottom: 10px;
             padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
         }
         button {
-            margin: 10px;
-            padding: 10px;
+            padding: 6px 12px;
+            font-size: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #e9ecef;
+        }
+        .diff-content {
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .added { background-color: #e6ffe6; }
+        .removed { background-color: #ffe6e6; }
+        .highlight { background-color: #ffeb3b; }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .search-box input {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .search-count {
+            color: #666;
+            font-size: 0.5em;
+            margin-left: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Code Editor</h1>
-    <textarea id="code-textarea"></textarea>
-    <button id="open-in-new-tab-btn">Open Code in New Tab</button>
-    <button id="clear-all-btn">Clear All</button>
-    <button id="copy-all-btn">Copy All</button>
+    <div class="section">
+        <h2 class="section-title">Main Editor</h2>
+        <textarea id="code-textarea" placeholder="Enter or paste code here..."></textarea>
+        <div class="button-group">
+            <button onclick="handleFileOpen()">Open File</button>
+            <button onclick="saveFile()">Save File</button>
+            <button onclick="openInNewTab()">Open in New Tab</button>
+            <button onclick="minifyCode()">Minify</button>
+            <button onclick="beautifyCode()">Beautify</button>
+            <button onclick="copyToClipboard()">Copy</button>
+            <button onclick="clearEditor()">Clear</button>
+        </div>
+    </div>
 
+    <div class="section">
+        <h2 class="section-title">Text Tools</h2>
+        <div class="search-box">
+            <input type="text" id="find-input" placeholder="Find text">
+            <input type="text" id="replace-input" placeholder="Replace with">
+            <button onclick="findAndReplace()">Replace All</button>
+            <span class="search-count" id="match-count"></span>
+        </div>
+        <div class="button-group">
+            <button onclick="filterLines()">Filter Lines</button>
+            <button onclick="removeEmptyLines()">Remove Empty Lines</button>
+            <button onclick="removeDuplicateLines()">Remove Duplicate Lines</button>
+        </div>
+        <div class="search-box">
+            <input type="text" id="regex-input" placeholder="Enter regex pattern">
+            <button onclick="applyRegex()">Apply Regex</button>
+            <select id="regex-action">
+                <option value="highlight">Highlight Matches</option>
+                <option value="extract">Extract Matches</option>
+                <option value="remove">Remove Matches</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Diff Checker</h2>
+        <textarea id="original-code" placeholder="Original code"></textarea>
+        <textarea id="new-code" placeholder="Modified code"></textarea>
+        <div class="button-group">
+            <button onclick="checkDiff()">Compare</button>
+        </div>
+        <div id="diff-output" class="diff-content"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.1.0/diff.min.js"></script>
     <script>
-        const codeTextarea = document.getElementById('code-textarea');
-        const openInNewTabBtn = document.getElementById('open-in-new-tab-btn');
-        const clearAllBtn = document.getElementById('clear-all-btn');
-        const copyAllBtn = document.getElementById('copy-all-btn');
+        // File handling
+        function handleFileOpen() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.html,.js,.css,.txt';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = e => document.getElementById('code-textarea').value = e.target.result;
+                reader.readAsText(file);
+            };
+            input.click();
+        }
 
-        openInNewTabBtn.addEventListener('click', () => {
-            const code = codeTextarea.value;
-            const blob = new Blob([code], {type: 'text/html'});
+        function saveFile() {
+            const code = document.getElementById('code-textarea').value;
+            const blob = new Blob([code], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'code.txt';
+            a.click();
+        }
+
+        function openInNewTab() {
+            const code = document.getElementById('code-textarea').value;
+            const blob = new Blob([code], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank');
-        });
+        }
 
-        clearAllBtn.addEventListener('click', () => {
-            codeTextarea.value = '';
-        });
+        // Code manipulation
+        function minifyCode() {
+            let code = document.getElementById('code-textarea').value;
+            
+            // Remove comments
+            code = code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+            
+            // Minify HTML
+            code = code.replace(/>\s+</g, '><');
+            
+            // Minify CSS
+            code = code.replace(/\s*{\s*/g, '{')
+                       .replace(/\s*}\s*/g, '}')
+                       .replace(/\s*:\s*/g, ':')
+                       .replace(/\s*;\s*/g, ';');
+            
+            // Minify JavaScript
+            code = code.replace(/\s+/g, ' ')
+                       .replace(/\s*([{:,;=+\-*/<>])\s*/g, '$1')
+                       .replace(/\s*}\s*/g, '}')
+                       .replace(/\s*{\s*/g, '{');
+            
+            document.getElementById('code-textarea').value = code;
+        }
 
-        copyAllBtn.addEventListener('click', () => {
-            codeTextarea.select();
+        function beautifyCode() {
+            let code = document.getElementById('code-textarea').value;
+            let indent = '    ';
+            let level = 0;
+            
+            code = code.replace(/[{};]/g, match => {
+                if (match === '}') level--;
+                const newline = '\n' + indent.repeat(Math.max(0, level));
+                if (match === '{') level++;
+                return match + newline;
+            });
+            
+            document.getElementById('code-textarea').value = code;
+        }
+
+        function copyToClipboard() {
+            const textarea = document.getElementById('code-textarea');
+            textarea.select();
             document.execCommand('copy');
-        });
+        }
+
+        function clearEditor() {
+            document.getElementById('code-textarea').value = '';
+        }
+
+        // Text manipulation tools
+        function findAndReplace() {
+            const textarea = document.getElementById('code-textarea');
+            const findText = document.getElementById('find-input').value;
+            const replaceText = document.getElementById('replace-input').value;
+            
+            if (!findText) return;
+            
+            const regex = new RegExp(findText, 'g');
+            const matches = textarea.value.match(regex);
+            document.getElementById('match-count').textContent = 
+                matches ? `${matches.length} matches found` : 'No matches found';
+            
+            textarea.value = textarea.value.replace(regex, replaceText);
+        }
+
+        function filterLines() {
+            const textarea = document.getElementById('code-textarea');
+            const filterText = document.getElementById('find-input').value;
+            
+            if (!filterText) return;
+            
+            const lines = textarea.value.split('\n');
+            const filteredLines = lines.filter(line => line.includes(filterText));
+            textarea.value = filteredLines.join('\n');
+        }
+
+        function removeEmptyLines() {
+            const textarea = document.getElementById('code-textarea');
+            const lines = textarea.value.split('\n');
+            const nonEmptyLines = lines.filter(line => line.trim());
+            textarea.value = nonEmptyLines.join('\n');
+        }
+
+        function removeDuplicateLines() {
+            const textarea = document.getElementById('code-textarea');
+            const lines = textarea.value.split('\n');
+            const uniqueLines = [...new Set(lines)];
+            textarea.value = uniqueLines.join('\n');
+        }
+
+        function applyRegex() {
+            const textarea = document.getElementById('code-textarea');
+            const pattern = document.getElementById('regex-input').value;
+            const action = document.getElementById('regex-action').value;
+            
+            if (!pattern) return;
+            
+            try {
+                const regex = new RegExp(pattern, 'g');
+                const text = textarea.value;
+                
+                switch (action) {
+                    case 'highlight':
+                        const matches = text.match(regex);
+                        document.getElementById('match-count').textContent = 
+                            matches ? `${matches.length} matches found` : 'No matches found';
+                        break;
+                    case 'extract':
+                        const extracted = text.match(regex);
+                        textarea.value = extracted ? extracted.join('\n') : '';
+                        break;
+                    case 'remove':
+                        textarea.value = text.replace(regex, '');
+                        break;
+                }
+            } catch (e) {
+                alert('Invalid regex pattern');
+            }
+        }
+
+        // Diff functionality
+        function checkDiff() {
+            const original = document.getElementById('original-code').value;
+            const modified = document.getElementById('new-code').value;
+            const diff = Diff.diffLines(original, modified);
+            const output = document.getElementById('diff-output');
+            
+            output.innerHTML = '';
+            diff.forEach(part => {
+                const span = document.createElement('span');
+                span.textContent = part.value;
+                span.className = part.added ? 'added' : part.removed ? 'removed' : '';
+                output.appendChild(span);
+            });
+        }
     </script>
-</body>
-</html>
+
+
+</body></html>
