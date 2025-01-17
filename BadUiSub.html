@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Worst UI Ever 3.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f0f0f0;
+            transform: rotate(1deg);
+        }
+        .form-group {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .wind-handle {
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+        .wind-handle.spinning {
+            animation: spin 0.5s linear;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        #pageContent {
+            opacity: 0.1;
+            transition: opacity 0.5s;
+        }
+        .password-color {
+            width: 100%;
+            height: 50px;
+            transition: all 0.3s;
+        }
+        #captchaCanvas {
+            border: 1px solid #ccc;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .rotate-input {
+            transform-origin: center;
+            transition: transform 0.3s;
+            padding: 5px;
+            width: 200px;
+            background-color: #ffebeb;
+        }
+        .rotate-input.aligned {
+            background-color: #ebffeb;
+        }
+        .power-meter {
+            height: 20px;
+            background: linear-gradient(to right, #ff0000, #00ff00);
+            width: 200px;
+            margin: 10px 0;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .power-level {
+            height: 100%;
+            width: 0%;
+            background: white;
+            position: absolute;
+            right: 0;
+            transition: width 0.3s;
+        }
+        .letter-preview {
+            font-size: 24px;
+            padding: 10px;
+            border: 1px dashed #ccc;
+            margin: 10px 0;
+            min-width: 40px;
+            display: inline-block;
+            text-align: center;
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-1deg); }
+            75% { transform: translateX(5px) rotate(1deg); }
+        }
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            animation: sparkle 0.8s linear forwards;
+        }
+        @keyframes sparkle {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+        .circle-guide {
+            position: absolute;
+            border: 1px dashed #ccc;
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+        }
+        .angle-guide {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .valid-angle {
+            color: green;
+            font-weight: bold;
+        }
+        #alignmentStatus {
+            margin-top: 10px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div id="windingMechanism">
+        <span>Wind up page to view content: </span>
+        <span class="wind-handle">⚙️</span>
+        <span id="windCount">0%</span>
+        <div class="power-meter">
+            <div class="power-level"></div>
+        </div>
+    </div>
+
+    <div id="pageContent">
+        <h1>Welcome to the Worst UI Ever 3.0</h1>
+        
+        <div class="form-group">
+            <label>Username (use slider to type):</label><br>
+            <input type="range" id="usernameSlider" min="65" max="90" value="65">
+            <div class="letter-preview" id="usernameDisplay">A</div>
+            <button onclick="addLetter()">Add Letter</button>
+            <div>Current username: <span id="currentUsername"></span></div>
+        </div>
+
+        <div class="form-group">
+            <label>Password (pick a color):</label><br>
+            <input type="color" class="password-color" id="passwordColor">
+            <div>Password strength: <span id="passwordStrength">Weak</span></div>
+        </div>
+
+        <div class="form-group">
+            <label>Email (rotate to type - only works at 0°, 90°, 180°, or 270°):</label><br>
+            <input type="text" id="emailInput" class="rotate-input" placeholder="Align to type..." disabled>
+            <input type="range" id="emailRotation" min="0" max="360" value="0">
+            <div id="rotationDegree">Current rotation: 0°</div>
+            <div id="alignmentStatus">❌ Misaligned - Cannot type</div>
+            <div class="angle-guide">
+                Valid angles: <span class="valid-angle">0°</span>, <span class="valid-angle">90°</span>, 
+                <span class="valid-angle">180°</span>, <span class="valid-angle">270°</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>CAPTCHA (draw a perfect circle):</label><br>
+            <div style="position: relative;">
+                <div class="circle-guide"></div>
+                <canvas id="captchaCanvas" width="300" height="150"></canvas>
+            </div>
+            <button onclick="checkCircle()">Verify Circle</button>
+            <div id="circleResult"></div>
+        </div>
+
+        <button id="submitBtn" style="display: none;">Submit Form</button>
+    </div>
+
+    <script>
+        let username = '';
+        let windLevel = 0;
+        let lastWindTime = Date.now();
+        
+        // Sparkle effect
+        function createSparkle(x, y) {
+            const sparkle = document.createElement('div');
+            sparkle.className = 'sparkle';
+            sparkle.style.left = x + 'px';
+            sparkle.style.top = y + 'px';
+            sparkle.style.width = '20px';
+            sparkle.style.height = '20px';
+            sparkle.innerHTML = '✨';
+            document.body.appendChild(sparkle);
+            setTimeout(() => sparkle.remove(), 800);
+        }
+
+        // Winding mechanism
+        $('.wind-handle').on('click', function(e) {
+            const handle = $(this);
+            handle.addClass('spinning');
+            
+            for (let i = 0; i < 5; i++) {
+                createSparkle(e.pageX, e.pageY);
+            }
+            
+            windLevel = Math.min(100, windLevel + 10);
+            $('#windCount').text(windLevel + '%');
+            $('.power-level').css('width', (100 - windLevel) + '%');
+            $('#pageContent').css('opacity', windLevel/100);
+            
+            setTimeout(() => handle.removeClass('spinning'), 500);
+            lastWindTime = Date.now();
+        });
+
+        // Gradual power loss
+        setInterval(() => {
+            if (Date.now() - lastWindTime > 3000 && windLevel > 0) {
+                windLevel = Math.max(0, windLevel - 5);
+                $('#windCount').text(windLevel + '%');
+                $('.power-level').css('width', (100 - windLevel) + '%');
+                $('#pageContent').css('opacity', windLevel/100);
+            }
+        }, 1000);
+
+        // Username slider
+        $('#usernameSlider').on('input', function() {
+            const letter = String.fromCharCode(this.value);
+            $('#usernameDisplay').text(letter)
+                                .addClass('shake');
+            setTimeout(() => $('#usernameDisplay').removeClass('shake'), 500);
+        });
+
+        function addLetter() {
+            const letter = $('#usernameDisplay').text();
+            username += letter;
+            $('#currentUsername').text(username)
+                               .addClass('shake');
+            setTimeout(() => $('#currentUsername').removeClass('shake'), 500);
+            
+            const btn = event.target;
+            const rect = btn.getBoundingClientRect();
+            createSparkle(rect.left + rect.width/2, rect.top + rect.height/2);
+        }
+
+        // Password color
+        $('#passwordColor').on('input', function() {
+            const color = $(this).val();
+            const r = parseInt(color.substr(1,2), 16);
+            const g = parseInt(color.substr(3,2), 16);
+            const b = parseInt(color.substr(5,2), 16);
+            
+            const strength = (r + g + b) / 765;
+            const strengthText = strength < 0.3 ? 'Strong' : 
+                               strength < 0.6 ? 'Medium' : 'Weak';
+            $('#passwordStrength').text(strengthText)
+                                .addClass('shake');
+            setTimeout(() => $('#passwordStrength').removeClass('shake'), 500);
+        });
+
+        // Email rotation with valid angles
+        $('#emailRotation').on('input', function() {
+            const rotation = parseInt($(this).val());
+            const emailInput = $('#emailInput');
+            const validAngles = [0, 90, 180, 270];
+            
+            emailInput.css('transform', `rotate(${rotation}deg)`);
+            $('#rotationDegree').text(`Current rotation: ${rotation}°`);
+            
+            // Check if current angle is valid (within 5 degrees of valid angles)
+            const isValidAngle = validAngles.some(angle => 
+                Math.abs(rotation % 360 - angle) <= 5
+            );
+            
+            if (isValidAngle) {
+                emailInput.prop('disabled', false)
+                         .addClass('aligned');
+                $('#alignmentStatus').html('✅ Aligned - Ready to type')
+                                   .addClass('shake');
+            } else {
+                emailInput.prop('disabled', true)
+                         .removeClass('aligned');
+                $('#alignmentStatus').html('❌ Misaligned - Cannot type')
+                                   .removeClass('shake');
+            }
+        });
+
+        // CAPTCHA with touch support
+        const canvas = document.getElementById('captchaCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let points = [];
+
+        // Guide circle setup
+        const guide = document.querySelector('.circle-guide');
+        guide.style.width = '100px';
+        guide.style.height = '100px';
+        guide.style.left = '100px';
+        guide.style.top = '25px';
+
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            points = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            const coords = getCanvasCoordinates(e);
+            ctx.moveTo(coords.x, coords.y);
+            points.push(coords);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const coords = getCanvasCoordinates(e);
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+            points.push(coords);
+        }
+
+        function stopDrawing(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            isDrawing = false;
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('touchcancel', stopDrawing);
+
+        // Guide visibility
+        canvas.addEventListener('mouseenter', () => guide.style.display = 'block');
+        canvas.addEventListener('mouseleave', () => guide.style.display = 'none');
+        canvas.addEventListener('touchstart', () => guide.style.display = 'block');
+        canvas.addEventListener('touchend', () => guide.style.display = 'none');
+
+        function checkCircle() {
+            if (points.length < 20) {
+                $('#circleResult').text('Please draw a complete circle')
+                                .addClass('shake');
+                setTimeout(() => $('#circleResult').removeClass('shake'), 500);
+                return;
+            }
+
+            // Calculate center point
+            const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+            const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+            // Calculate average radius
+            const radius = points.reduce((sum, p) => {
+                return sum + Math.sqrt(Math.pow(p.x - centerX, 2) + 
+                                    Math.pow(p.y - centerY, 2));
+            }, 0) / points.length;
+
+            // Check if all points are roughly equidistant from center
+            const isCircle = points.every(p => {
+                const distance = Math.sqrt(Math.pow(p.x - centerX, 2) + 
+                                        Math.pow(p.y - centerY, 2));
+                return Math.abs(distance - radius) < 15;
+            });
+
+            const result = isCircle ? 'Perfect circle! ✓' : 'Not circular enough, try again';
+            $('#circleResult').text(result)
+                            .addClass('shake
