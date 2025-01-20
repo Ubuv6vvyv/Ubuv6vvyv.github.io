@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image Analysis Tool</title>
+    
+    <script async src="https://cdn.jsdelivr.net/npm/opencv.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #1e40af;
+            --background: #f3f4f6;
+            --text: #111827;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .control-group {
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 0;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--secondary);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .image-container {
+            position: relative;
+            margin: 20px auto;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        #canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .slider-container {
+            display: grid;
+            gap: 5px;
+            margin: 10px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        #results, #metadata {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #e0f2fe;
+            color: #0369a1;
+            text-align: center;
+        }
+
+        .reset-button {
+            background: #dc2626;
+        }
+
+        .reset-button:hover {
+            background: #b91c1c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Analysis & Enhancement Tool</h1>
+        <div id="modelStatus" class="status">Loading models...</div>
+        
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>Analysis</h3>
+                <button id="detectObjects">Detect Objects</button>
+                <button id="detectPeople">Detect People</button>
+                <button id="showMetadata">Show Metadata</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Enhancement</h3>
+                <div class="slider-container">
+                    <label>Brightness</label>
+                    <input type="range" id="brightness" min="-100" max="100" value="0">
+                    <span id="brightnessValue">0</span>
+                </div>
+                <div class="slider-container">
+                    <label>Contrast</label>
+                    <input type="range" id="contrast" min="-100" max="100" value="0">
+                    <span id="contrastValue">0</span>
+                </div>
+                <div class="slider-container">
+                    <label>Sharpness</label>
+                    <input type="range" id="sharpness" min="0" max="5" step="0.1" value="0">
+                    <span id="sharpnessValue">0</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Thresholding</h3>
+                <button id="simpleThreshold">Simple Threshold</button>
+                <button id="adaptiveThreshold">Adaptive Threshold</button>
+                <button id="otsuThreshold">Otsu Threshold</button>
+                <div class="slider-container">
+                    <label>Threshold Value</label>
+                    <input type="range" id="thresholdValue" min="0" max="255" value="127">
+                    <span id="thresholdValueDisplay">127</span>
+                </div>
+                <div class="slider-container">
+                    <label>Block Size</label>
+                    <input type="range" id="blockSize" min="3" max="99" step="2" value="11">
+                    <span id="blockSizeDisplay">11</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Edge Detection</h3>
+                <button id="cannyEdge">Canny Edge</button>
+                <button id="sobelEdge">Sobel Edge</button>
+                <div class="slider-container">
+                    <label>Edge Threshold</label>
+                    <input type="range" id="edgeThreshold" min="0" max="255" value="100">
+                    <span id="edgeThresholdDisplay">100</span>
+                </div>
+            </div>
+        </div>
+
+        <button id="resetImage" class="reset-button">Reset Image</button>
+
+        <div class="image-container">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div id="results"></div>
+        <div id="metadata"></div>
+    </div>
+
+    <script>
+        const App = {
+            models: { object: null, pose: null },
+            elements: {},
+            originalImage: null,
+            scaleFactor: 1,
+            
+            async init() {
+                this.bindElements();
+                this.setupEventListeners();
+                await this.loadModels();
+                this.waitForOpenCV();
+            },
+
+            bindElements() {
+                // Bind all input elements
+                ['canvas', 'results', 'metadata', 'modelStatus', 'imageInput'].forEach(id => {
+                    this.elements[id] = document.getElementById(id);
+                });
+
+                // Bind all sliders and their displays
+                ['brightness', 'contrast', 'sharpness', 'thresholdValue', 'blockSize', 'edgeThreshold'].forEach(id => {
+                    this.elements[id] = document.getElementById(id);
+                    this.elements[`${id}Display`] = document.getElementById(`${id}Display`) || 
+                                                  document.getElementById(`${id}Value`);
+                });
+
+                // Bind all buttons
+                ['detectObjects', 'detectPeople', 'showMetadata', 'simpleThreshold', 
+                 'adaptiveThreshold', 'otsuThreshold', 'cannyEdge', 'sobelEdge', 'resetImage'].forEach(id => {
+                    this.elements[id] = document.getElementById(id);
+                });
+            },
+
+            async loadModels() {
+                try {
+                    [this.models.object, this.models.pose] = await Promise.all([
+                        cocoSsd.load(),
+                        poseDetection.createDetector(poseDetection.SupportedModels.MoveNet)
+                    ]);
+                    this.elements.modelStatus.textContent = 'Models loaded successfully';
+                    this.enableButtons();
+                } catch (error) {
+                    console.error('Model loading error:', error);
+                    this.elements.modelStatus.textContent = 'Error loading models';
+                }
+            },
+
+            enableButtons() {
+                Object.values(this.elements).forEach(element => {
+                    if (element instanceof HTMLButtonElement) {
+                        element.disabled = false;
+                    }
+                });
+            },
+
+            waitForOpenCV() {
+                if (typeof cv === 'undefined') {
+                    setTimeout(() => this.waitForOpenCV(), 100);
+                }
+            },
+
+            setupEventListeners() {
+                // File input handler
+                this.elements.imageInput.addEventListener('change', e => this.handleImageUpload(e));
+
+                // Enhancement sliders
+                ['brightness', 'contrast', 'sharpness'].forEach(id => {
+                    this.elements[id].addEventListener('input', e => {
+                        this.elements[`${id}Value`].textContent = e.target.value;
+                        this.applyEnhancements();
+                    });
+                });
+
+                // Threshold sliders
+                ['thresholdValue', 'blockSize', 'edgeThreshold'].forEach(id => {
+                    this.elements[id].addEventListener('input', e => {
+                        this.elements[`${id}Display`].textContent = e.target.value;
+                        if (this.lastOperation) this[this.lastOperation]();
+                    });
+                });
+
+                // Button handlers
+                this.elements.detectObjects.addEventListener('click', () => this.detectObjects());
+                this.elements.detectPeople.addEventListener('click', () => this.detectPeople());
+                this.elements.showMetadata.addEventListener('click', () => this.showMetadata());
+                this.elements.simpleThreshold.addEventListener('click', () => this.simpleThreshold());
+                this.elements.adaptiveThreshold.addEventListener('click', () => this.adaptiveThreshold());
+                this.elements.otsuThreshold.addEventListener('click', () => this.otsuThreshold());
+                this.elements.cannyEdge.addEventListener('click', () => this.cannyEdge());
+                this.elements.sobelEdge.addEventListener('click', () => this.sobelEdge());
+                this.elements.resetImage.addEventListener('click', () => this.resetImage());
+            },
+
+            handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = e => {
+                    this.originalImage = new Image();
+                    this.originalImage.onload = () => {
+                        this.setupCanvas();
+                        this.drawImage();
+                    };
+                    this.originalImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            setupCanvas() {
+                const canvas = this.elements.canvas;
+                const maxWidth = 1200; // Maximum width for better performance
+                
+                let width = this.originalImage.naturalWidth;
+                let height = this.originalImage.naturalHeight;
+
+                if (width > maxWidth) {
+                    this.scaleFactor = maxWidth / width;
+                    width = maxWidth;
+                    height = this.originalImage.naturalHeight * this.scaleFactor;
+                } else {
+                    this.scaleFactor = 1;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+            },
+
+            drawImage() {
+                const ctx = this.elements.canvas.getContext('2d');
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.drawImage(this.originalImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+            },
+
+            resetImage() {
+                if (this.originalImage) {
+                    this.drawImage();
+                    this.lastOperation = null;
+                    // Reset all sliders
+                    ['brightness', 'contrast', 'sharpness'].forEach(id => {
+                        this.elements[id].value = 0;
+                        this.elements[`${id}Value`].textContent = "0";
+                    });
+                }
+            },
+
+            async detectObjects() {
+                if (!this.models.object || !this.originalImage) return;
+                
+                try {
+                    const predictions = await this.models.object.detect(this.elements.canvas);
+                    this.drawImage();
+                    this.drawDetections(predictions);
+                    this.displayDetectionResults(predictions);
+                } catch (error) {
+                    console.error('Object detection error:', error);
+                }
+            },
+
+            async detectPeople() {
+                if (!this.models.object || !this.originalImage) return;
+                
+                try {
+                    const predictions = await this.models.object.detect(this.elements.canvas);
+                    const people = predictions.filter(p => p.class === 'person');
+                    this.drawImage();
+                    this.drawDetections(people);
+                    this.displayDetectionResults(people);
+                } catch (error) {
+                    console.error('People detection error:', error);
+                }
+            },
+
+            drawDetections(predictions) {
+                const ctx = this.elements.canvas.getContext('2d');
+                
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.bbox.map(v => v * this.scaleFactor);
+                    const color = prediction.class === 'person' ? '#ff0000' : '#00ff00';
+                    
+                    // Draw bounding box
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Draw label background
+                    ctx.fillStyle = color;
+                    ctx.font = '16px Arial';
+                    const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+                    const textWidth = ctx.measureText(text).width;
+                    const textHeight = 20;
+                    ctx.fillRect(x, y - textHeight, textWidth + 10, textHeight);
+                    
+                    // Draw label text
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(text, x + 5, y - 5);
+                });
+            },
+
+            displayDetectionResults(predictions) {
+                this.elements.results.innerHTML = `
+                    <h3>Detection Results:</h3>
+                    <div style="display: grid; gap: 10px;">
+                        ${predictions.map(p => `
+                            <div style="padding: 10px; background: #f1f5f9; border-radius: 4px;">
+                                <strong>${p.class}</strong>: ${(p.score * 100).toFixed(1)}% confidence
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            },
+
+            applyEnhancements() {
+                if (!this.originalImage) return;
+                
+                const src = cv.imread(this.elements.canvas);
+                let dst = new cv.Mat();
+                
+                // Apply brightness and contrast
+                const alpha = 1 + (parseInt(this.elements.contrast.value) / 100);
+                const beta = parseInt(this.elements.brightness.value);
+                src.convertTo(dst, -1, alpha, beta);
+                
+                // Apply sharpness if value > 0
+                const sharpnessValue = parseFloat(this.elements.sharpness.value);
+                if (sharpnessValue > 0) {
+                    const kernel = cv.Mat.ones(3, 3, cv.CV_32F);
+                    const center = kernel.ucharPtr(1, 1);
+                    center[0] = 1 + 8 * sharpnessValue;
+                    const anchor = new cv.Point(-1, -1);
+                    cv.filter2D(dst, dst, -1, kernel, anchor, 0, cv.BORDER_DEFAULT);
+                    kernel.delete();
+                }
+                
+                cv.imshow('canvas', dst);
+                src.delete();
+                dst.delete();
+            },
+
+            simpleThreshold() {
+                if (!this.originalImage) return;
+                this.lastOperation = 'simpleThreshold';
+                
+                const src = cv.imread(this.elements.canvas);
+                const dst = new cv.Mat();
+                
+                cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+                cv.threshold(src, dst, 
+                    parseInt(this.elements.thresholdValue.value),
+                    255,
+                    cv.THRESH_BINARY
+                );
+                
+                cv.imshow('canvas', dst);
+                src.delete();
+                dst.delete();
+            },
+
+            adaptiveThreshold() {
+                if (!this.originalImage) return;
+                this.lastOperation = 'adaptiveThreshold';
+                
+                const src = cv.imread(this.elements.canvas);
+                const dst = new cv.Mat();
+                
+                cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+                cv.adaptiveThreshold(src, dst,
+                    255,
+                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    cv.THRESH_BINARY,
+                    parseInt(this.elements.blockSize.value),
+                    2
+                );
+                
+                cv.imshow('canvas', dst);
+                src.delete();
+                dst.delete();
+            },
+
+            otsuThreshold() {
+                if (!this.originalImage) return;
+                this.lastOperation = 'otsuThreshold';
+                
+                const src = cv.imread(this.elements.canvas);
+                const dst = new cv.Mat();
+                
+                cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+                cv.threshold(src, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                
+                cv.imshow('canvas', dst);
+                src.delete();
+                dst.delete();
+            },
+
+            cannyEdge() {
+                if (!this.originalImage) return;
+                this.lastOperation = 'cannyEdge';
+                
+                const src = cv.imread(this.elements.canvas);
+                const dst = new cv.Mat();
+                const threshold = parseInt(this.elements.edgeThreshold.value);
+                
+                cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+                cv.Canny(src, dst, threshold, threshold * 2, 3, false);
+                
+                cv.imshow('canvas', dst);
+                src.delete();
+                dst.delete();
+            },
+
+            sobelEdge() {
+                if (!this.originalImage) return;
+                this.lastOperation = 'sobelEdge';
+                
+                const src = cv.imread(this.elements.canvas);
+                const dst = new cv.Mat();
+                const gradX = new cv.Mat();
+                const gradY = new cv.Mat();
+                
+                cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+                
+                // Compute gradients
+                cv.Sobel(src, gradX, cv.CV_16S, 1, 0, 3, 1, 0, cv.BORDER_DEFAULT);
+                cv.Sobel(src, gradY, cv.CV_16S, 0, 1, 3, 1, 0, cv.BORDER_DEFAULT);
+                
+                // Convert to absolute scale
+                cv.convertScaleAbs(gradX, gradX);
+                cv.convertScaleAbs(gradY, gradY);
+                
+                // Combine gradients
+                cv.addWeighted(gradX, 0.5, gradY, 0.5, 0, dst);
+                
+                cv.imshow('canvas', dst);
+                
+                src.delete();
+                dst.delete();
+                gradX.delete();
+                gradY.delete();
+            },
+
+            showMetadata() {
+                if (!this.originalImage) return;
+                
+                try {
+                    EXIF.getData(this.originalImage, () => {
+                        const tags = EXIF.getAllTags(this.originalImage);
+                        const fileInfo = {
+                            dimensions: `${this.originalImage.naturalWidth} × ${this.originalImage.naturalHeight}`,
+                            aspectRatio: (this.originalImage.naturalWidth / this.originalImage.naturalHeight).toFixed(2),
+                            fileName: this.elements.imageInput.files[0]?.name || 'Unknown'
+                        };
+                        
+                        this.elements.metadata.innerHTML = `
+                            <h3>Image Metadata</h3>
+                            <div style="display: grid; gap: 10px;">
+                                ${Object.entries({...fileInfo, ...tags})
+                                    .map(([key, value]) => `
+                                        <div style="padding: 5px; border-bottom: 1px solid #eee;">
+                                            <strong>${key}:</strong> 
+                                            <span>${typeof value === 'object' ? JSON.stringify(value) : value}</span>
+                                        </div>
+                                    `).join('')}
+                            </div>
+                        `;
+                    });
+                } catch (error) {
+                    console.error('Metadata extraction error:', error);
+                    this.elements.metadata.innerHTML = '<div class="status">Error extracting metadata</div>';
+                }
+            }
+        };
+
+        // Initialize when DOM is ready
+        window.addEventListener('DOMContentLoaded', () => {
+            App.init().catch(console.error);
+        });
+    </script>
+</body>
+</html>

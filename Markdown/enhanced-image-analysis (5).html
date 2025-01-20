@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <title>Enhanced Image Analysis Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+<style>
+    :root {
+        --primary: #1E3A8A;
+        --secondary: #1E40AF;
+        --background: #F3F4F6;
+        --text: #111827;
+        --button-bg: #2563EB;
+        --button-hover: #1D4ED8;
+        --border: #E5E7EB;
+    }
+
+    body {
+        font-family: system-ui, -apple-system, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--background);
+        color: var(--text);
+        font-size: 14px;
+    }
+
+    .container {
+        max-width: 700px;
+        margin: 20px auto;
+        padding: 16px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    h1, h2, h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 16px;
+        text-align: center;
+    }
+
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 8px;
+        margin: 16px 0;
+    }
+
+    button {
+        padding: 8px 12px;
+        background: var(--button-bg);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    button:hover:not(:disabled) {
+        background: var(--button-hover);
+        transform: translateY(-1px);
+    }
+
+    button:disabled {
+        background: #A5B4FC;
+        cursor: not-allowed;
+    }
+
+    .image-container {
+        position: relative;
+        margin: 16px auto;
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #EFF6FF;
+    }
+
+    img {
+        max-width: 100%;
+        display: block;
+    }
+
+    canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    #results {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 8px;
+        background: #F8FAFC;
+        font-size: 0.75rem;
+    }
+
+    #imageInput {
+        padding: 12px;
+        border: 2px dashed var(--border);
+        border-radius: 8px;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 0.75rem;
+    }
+
+    .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(17, 24, 39, 0.9);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        z-index: 1000;
+        display: none;
+    }
+
+    .status {
+        padding: 8px;
+        margin: 8px 0;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-align: center;
+    }
+
+    .status-loading { background: #E0F2FE; color: #0369A1; }
+    .status-ready { background: #DCFCE7; color: #15803D; }
+    .status-error { background: #FFE4E6; color: #991B1B; }
+
+    .controls-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+        margin: 8px 0;
+    }
+
+    .checkbox-group {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        margin: 8px 0;
+    }
+
+    .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .checkbox label {
+        font-size: 0.75rem;
+    }
+
+    .image-info {
+        font-size: 0.75rem;
+        text-align: center;
+        color: #6B7280;
+        margin: 8px 0;
+    }
+
+    .detection-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 8px 0;
+        font-size: 0.75rem;
+        background: #F1F5F9;
+        padding: 8px;
+        border-radius: 6px;
+    }
+
+    .download-btn {
+        background: #059669;
+        margin-top: 8px;
+    }
+
+    .download-btn:hover {
+        background: #047857;
+    }
+</style>
+
+<div class="container">
+    <h1>Enhanced Image Analysis</h1>
+    <div id="modelStatus" class="status status-loading">Loading models...</div>
+    
+    <input type="file" id="imageInput" accept="image/*">
+    <div class="image-info" id="imageInfo"></div>
+    
+    <div class="controls">
+        <button id="detectObjects" disabled>Detect Objects</button>
+        <button id="detectPeople" disabled>Detect People</button>
+        <button id="detectPeopleLarge" disabled>Detect Crowds</button>
+        <button id="clearCanvas" disabled>Clear</button>
+    </div>
+
+    <div class="checkbox-group">
+        <div class="checkbox">
+            <input type="checkbox" id="dynamicThresholdToggle" checked>
+            <label for="dynamicThresholdToggle">Dynamic Threshold</label>
+        </div>
+        <div class="checkbox">
+            <input type="checkbox" id="showConfidence" checked>
+            <label for="showConfidence">Show Confidence</label>
+        </div>
+        <div class="checkbox">
+            <input type="checkbox" id="darkMode">
+            <label for="darkMode">Dark Mode</label>
+        </div>
+    </div>
+
+    <div class="image-container">
+        <img id="uploadedImage" style="display: none;">
+        <canvas id="outputCanvas"></canvas>
+    </div>
+
+    <div class="detection-stats" id="detectionStats"></div>
+    <div id="results"></div>
+    <button id="downloadResult" class="download-btn" disabled>Download Analysis</button>
+</div>
+<div class="loading" id="loadingIndicator">Processing...</div>
+
+<script>
+    let cocoModel = null;
+    let poseModel = null;
+    let currentImage;
+    let lastDetectionType = '';
+    const modelStatus = document.getElementById('modelStatus');
+    const dynamicThresholdToggle = document.getElementById('dynamicThresholdToggle');
+    const showConfidence = document.getElementById('showConfidence');
+    const darkMode = document.getElementById('darkMode');
+
+    async function initModels() {
+        try {
+            modelStatus.textContent = 'Loading models...';
+            modelStatus.className = 'status status-loading';
+            
+            const [cocoResult, poseResult] = await Promise.allSettled([
+                cocoSsd.load(),
+                poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+                    modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING
+                })
+            ]);
+            
+            if (cocoResult.status === 'fulfilled') cocoModel = cocoResult.value;
+            if (poseResult.status === 'fulfilled') poseModel = poseResult.value;
+            
+            if (!cocoModel && !poseModel) throw new Error('No models loaded');
+            
+            modelStatus.textContent = cocoModel && poseModel ? 'Models ready!' : 'Partial models loaded';
+            modelStatus.className = 'status status-ready';
+            return true;
+        } catch (error) {
+            console.error('Model loading error:', error);
+            modelStatus.textContent = 'Error loading models';
+            modelStatus.className = 'status status-error';
+            return false;
+        }
+    }
+
+    function updateImageInfo() {
+        if (!currentImage) return;
+        const info = document.getElementById('imageInfo');
+        info.textContent = `${currentImage.naturalWidth}×${currentImage.naturalHeight}px`;
+    }
+
+    function getThreshold(crowdDensity) {
+        return dynamicThresholdToggle.checked ? 
+            Math.max(0.3, 1 / (crowdDensity + 1)) : 0.5;
+    }
+
+    async function detectObjects() {
+        if (!cocoModel || !currentImage) return;
+        lastDetectionType = 'objects';
+        showLoading();
+        clearCanvas();
+        try {
+            const predictions = await cocoModel.detect(currentImage);
+            drawPredictions(predictions);
+            displayResults(predictions);
+            updateStats(predictions);
+            enableDownload();
+        } catch (error) {
+            console.error(error);
+            alert('Detection error');
+        }
+        hideLoading();
+    }
+
+    async function detectPeople() {
+        if (!cocoModel || !currentImage) return;
+        lastDetectionType = 'people';
+        showLoading();
+        clearCanvas();
+        try {
+            const predictions = await cocoModel.detect(currentImage);
+            const peoplePredictions = predictions.filter(p => p.class === 'person');
+            const crowdDensity = peoplePredictions.length;
+            const threshold = getThreshold(crowdDensity);
+            const filteredPredictions = peoplePredictions.filter(p => p.score > threshold);
+
+            filteredPredictions.length > 10
+                ? drawHeatmap(filteredPredictions)
+                : drawPredictions(filteredPredictions);
+            
+            displayResults([{ class: 'people detected', score: filteredPredictions.length }]);
+            updateStats(filteredPredictions);
+            enableDownload();
+        } catch (error) {
+            console.error(error);
+            alert('Detection error');
+        }
+        hideLoading();
+    }
+
+    async function detectPeopleLarge() {
+        if (!poseModel || !currentImage) return;
+        lastDetectionType = 'poses';
+        showLoading();
+        clearCanvas();
+        try {
+            const poses = await poseModel.estimatePoses(currentImage, {
+                maxPoses: 20,
+                flipHorizontal: false
+            });
+
+            const threshold = getThreshold(poses.length);
+            const filteredPoses = poses.filter(pose =>
+                pose.keypoints.some(keypoint => keypoint.score > threshold)
+            );
+
+            drawPoses(filteredPoses);
+            displayResults([{ class: 'poses detected', score: filteredPoses.length }]);
+            updateStats(filteredPoses);
+            enableDownload();
+        } catch (error) {
+            console.error('Pose detection error:', error);
+            alert('Pose detection error');
+        }
+        hideLoading();
+    }
+
+    function drawPredictions(predictions) {
+        const canvas = document.getElementById('outputCanvas');
+        const ctx = canvas.getContext('2d');
+        const isDark = darkMode.checked;
+        
+        predictions.forEach(pred => {
+            const [x, y, w, h] = pred.bbox;
+            ctx.strokeStyle = isDark ? '#00ff00' : '#2563EB';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+            
+            if (showConfidence.checked) {
+                ctx.fillStyle = isDark ? '#00ff00' : '#2563EB';
+                ctx.font = '12px system-ui';
+                const label = `${pred.class} ${Math.round(pred.score * 100)}%`;
+                ctx.fillText(label, x, y > 10 ? y - 5 : 10);
+            }
+        });
+    }
+
+    function drawHeatmap(predictions) {
+        const canvas = document.getElementById('outputCanvas');
+        const ctx = canvas.getContext('2d');
+        const isDark = darkMode.checked;
+        
+        predictions.forEach(pred => {
+            const [x, y, w, h] = pred.bbox;
+            const gradient = ctx.createRadialGradient(x + w/2, y + h/2, 0, x + w/2, y + h/2, 50);
+            const color = isDark ? '255,0,0' : '37,99,235';
+            gradient.addColorStop(0, `rgba(${color},0.2)`);
+            gradient.addColorStop(1, `rgba(${color},0)`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x - 50, y - 50, w + 100, h + 100);
+        });
+    }
+
+    function drawPoses(poses) {
+        const canvas = document.getElementById('outputCanvas');
+        const ctx = canvas.getContext('2d');
+        const isDark = darkMode.checked;
+        
+        poses.forEach(pose => {
+            pose.keypoints.forEach(point => {
+                if (point.score > 0.2) {
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = isDark ? '#00ff00' : '#2563EB';
+                    ctx.fill();
+                }
+            });
+        });
+    }
+
+    function updateStats(predictions) {
+        const stats = document.getElementById('detectionStats');
+        const count = predictions.length;
+        const avgConfidence = predictions.reduce((acc, p) => acc + (p.score || 0), 0) / count;
+        
+        stats.innerHTML = `
+            <div>Count: ${count}</div>
+            ${avgConfidence ? `<div>Avg. Confidence: ${(avgConfidence * 100).toFixed(1)}%</div>` : ''}
+            <div>Type: ${lastDetectionType}</div>
+        `;
+    }
+
+    function displayResults(predictions) {
+        document.getElementById('results').innerHTML = `
+            <h3>Results:</h3>
+            ${predictions.map(p => `
+                <p>${p.class}: ${p.class.includes('detected') ? 
+                    p.score : Math.round(p.score * 100) + '%'}
+                </p>
+            `).join('')}
+        `;
+    }
+
+    function enableDownload() {
+        const downloadBtn = document.getElementById('downloadResult');

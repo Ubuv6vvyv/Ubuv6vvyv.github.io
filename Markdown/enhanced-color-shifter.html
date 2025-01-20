@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Image Eyedropper & Color Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        #app {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        canvas {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            display: block;
+            margin: 10px 0;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        input[type="range"] {
+            flex: 1;
+            margin-left: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #colorBox {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            margin-left: 10px;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        .color-info {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1 style="text-align: center;">Dynamic Image Eyedropper & Color Editor</h1>
+        <canvas id="canvas" width="600" height="400"></canvas>
+        <div class="controls">
+            <div class="control-group">
+                <label>Upload Image</label>
+                <input type="file" id="uploadImage" accept="image/*">
+            </div>
+            <div class="control-group">
+                <label>Threshold</label>
+                <input type="range" id="threshold" min="0" max="100" value="10">
+            </div>
+            <div class="control-group">
+                <label>Hue Shift</label>
+                <input type="range" id="hue" min="-180" max="180" value="0">
+            </div>
+            <div class="control-group">
+                <label>Saturation</label>
+                <input type="range" id="saturation" min="0" max="200" value="100">
+            </div>
+            <div class="control-group">
+                <label>Brightness</label>
+                <input type="range" id="brightness" min="0" max="200" value="100">
+            </div>
+            <div class="control-group">
+                <button id="reset">Reset</button>
+                <button id="download">Download</button>
+            </div>
+            <div class="color-info">
+                <label>Selected Color:</label>
+                <div id="colorBox"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (() => {
+            const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
+            let originalImage = null;
+            let selectedColor = null;
+
+            // Convert RGB to Hex
+            const rgbToHex = (r, g, b) => `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+
+            // Update the color box with the selected color
+            const updateColorBox = () => {
+                if (selectedColor) {
+                    const hexColor = rgbToHex(selectedColor.r, selectedColor.g, selectedColor.b);
+                    document.getElementById('colorBox').style.backgroundColor = hexColor;
+                }
+            };
+
+            // Calculate Euclidean distance between two colors
+            const colorDistance = (color1, color2) => {
+                const rDiff = color1.r - color2.r;
+                const gDiff = color1.g - color2.g;
+                const bDiff = color1.b - color2.b;
+                return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+            };
+
+            // Apply filters dynamically
+            const applyFilters = () => {
+                if (!originalImage || !selectedColor) return;
+
+                const threshold = parseInt(document.getElementById('threshold').value, 10);
+                const hue = parseInt(document.getElementById('hue').value, 10);
+                const saturation = parseInt(document.getElementById('saturation').value, 10) / 100;
+                const brightness = parseInt(document.getElementById('brightness').value, 10) / 100;
+
+                originalImage.filters = [
+                    new fabric.Image.filters.HueRotation({ rotation: hue * Math.PI / 180 }),
+                    new fabric.Image.filters.Saturation({ saturation }),
+                    new fabric.Image.filters.Brightness({ brightness: brightness - 1 }),
+                    new fabric.Image.filters.RemoveColor({
+                        color: rgbToHex(selectedColor.r, selectedColor.g, selectedColor.b),
+                        distance: threshold / 100,
+                    })
+                ];
+
+                originalImage.applyFilters();
+                canvas.renderAll();
+            };
+
+            // Load and add image to canvas
+            document.getElementById('uploadImage').addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        fabric.Image.fromURL(e.target.result, (img) => {
+                            originalImage = img;
+                            img.scaleToWidth(canvas.width);
+                            img.scaleToHeight(canvas.height);
+                            img.set({ selectable: false });
+                            canvas.clear();
+                            canvas.add(img);
+                            canvas.renderAll();
+
+                            // Enable color picking
+                            canvas.on('mouse:down', (options) => {
+                                if (!originalImage) return;
+                                const pointer = canvas.getPointer(options.e);
+                                const x = Math.round(pointer.x);
+                                const y = Math.round(pointer.y);
+
+                                const ctx = canvas.getContext();
+                                const pixel = ctx.getImageData(x, y, 1, 1).data;
+                                selectedColor = { r: pixel[0], g: pixel[1], b: pixel[2] };
+                                console.log('Selected Color:', rgbToHex(pixel[0], pixel[1], pixel[2]));
+                                updateColorBox();
+                                applyFilters();
+                            });
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Reset to original state
+            document.getElementById('reset').addEventListener('click', () => {
+                if (originalImage) {
+                    canvas.clear();
+                    originalImage.set({ selectable: false });
+                    canvas.add(originalImage);
+                    selectedColor = null;
+                    document.getElementById('hue').value = 0;
+                    document.getElementById('saturation').value = 100;
+                    document.getElementById('brightness').value = 100;
+                    document.getElementById('threshold').value = 10;
+                    originalImage.filters = [];
+                    originalImage.applyFilters();
+                    canvas.renderAll();
+                    updateColorBox();
+                }
+            });
+
+            // Download edited image
+            document.getElementById('download').addEventListener('click', () => {
+                const dataURL = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = 'edited-image.png';
+                link.click();
+            });
+
+            // Attach dynamic slider events
+            ['threshold', 'hue', 'saturation', 'brightness'].forEach((id) => {
+                document.getElementById(id).addEventListener('input', applyFilters);
+            });
+        })();
+    </script>
+</body>
+</html>

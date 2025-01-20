@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image & PDF Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exiftool-vendored/dist/ExifTool.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        .container { display: flex; flex-direction: column; gap: 20px; }
+        .image-container, .analysis-container { padding: 20px; border: 1px solid #ccc; border-radius: 5px; background: white; }
+        .button-group { margin: 20px 0; display: flex; flex-wrap: wrap; gap: 10px; }
+        button { padding: 10px 20px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; font-size: 14px; }
+        button:hover { background: #45a049; }
+        #imageDisplay { max-width: 100%; margin-top: 20px; border: 1px solid #ddd; }
+        #analysisResults { white-space: pre-wrap; font-family: monospace; overflow: auto; }
+        .progress { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; }
+        .progress-bar { width: 0; height: 100%; background: #4CAF50; transition: width .3s ease; }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Image & PDF Analysis Tool</h1>
+    <div class="button-group">
+        <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none">
+        <button onclick="document.getElementById('fileInput').click()">Upload File</button>
+        <button onclick="analyzeImage()">Analyze Image</button>
+        <button onclick="extractPDFText()">Extract PDF Text</button>
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+    <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="container">
+        <div class="image-container">
+            <h2>Preview</h2>
+            <img id="imageDisplay"/>
+            <canvas id="canvas" style="display:none"></canvas>
+        </div>
+        <div class="analysis-container">
+            <h2>Results</h2>
+            <div id="analysisResults">Upload an image or PDF to begin analysis.</div>
+        </div>
+    </div>
+    <script>
+        let currentFile = null, canvas = document.getElementById("canvas"), ctx = canvas.getContext("2d");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        document.getElementById("fileInput").addEventListener("change", async e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            currentFile = file;
+            updateProgress(0);
+            if (file.type === "application/pdf") {
+                await handlePDF(file);
+            } else {
+                await handleImage(file);
+            }
+            updateProgress(100);
+        });
+
+        async function handlePDF(file) {
+            const buffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(buffer).promise;
+            const page = await pdf.getPage(1);
+            const view = page.getViewport({ scale: 1.5 });
+            canvas.width = view.width;
+            canvas.height = view.height;
+            await page.render({ canvasContext: ctx, viewport: view }).promise;
+            document.getElementById("imageDisplay").src = canvas.toDataURL();
+        }
+
+        async function handleImage(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    document.getElementById("imageDisplay").src = e.target.result;
+                    extractMetadata(file);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateProgress(p) {
+            document.getElementById("progressBar").style.width = `${p}%`;
+        }
+
+        function clearAll() {
+            currentFile = null;
+            document.getElementById("fileInput").value = "";
+            document.getElementById("imageDisplay").src = "";
+            document.getElementById("analysisResults").textContent = "Upload an image or PDF to begin analysis.";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateProgress(0);
+        }
+
+        async function analyzeImage() {
+            if (!currentFile) return alert("Please upload a file first.");
+            updateProgress(10);
+            const results = [];
+            results.push(`File: ${currentFile.name}, Size: ${(currentFile.size / 1024).toFixed(2)} KB, Type: ${currentFile.type}`);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            results.push(`Dimensions: ${canvas.width}x${canvas.height}`);
+            results.push(`Detailed EXIF Metadata:`);
+            results.push(await extractExifToolData(currentFile));
+            updateProgress(100);
+            document.getElementById("analysisResults").textContent = results.join("\n");
+        }
+
+        async function extractExifToolData(file) {
+            try {
+                const exiftool = new ExifTool();
+                const arrayBuffer = await file.arrayBuffer();
+                const metadata = await exiftool.read(new Uint8Array(arrayBuffer));
+                return JSON.stringify(metadata, null, 2);
+            } catch (error) {
+                return `Error retrieving detailed metadata: ${error.message}`;
+            }
+        }
+
+        async function extractPDFText() {
+            if (!currentFile || currentFile.type !== "application/pdf") return alert("Upload a PDF file first!");
+            const buffer = await currentFile.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(buffer).promise;
+            const pages = pdf.numPages;
+            let text = "";
+            for (let i = 1; i <= pages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(t => t.str).join(" ") + "\n\n";
+            }
+            document.getElementById("analysisResults").textContent = text;
+        }
+    </script>
+</body>
+</html>

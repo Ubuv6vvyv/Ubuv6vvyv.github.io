@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced File Analyzer</title>
+
+    <!-- Required Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background-color: #20232a;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #282c34;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #61dafb;
+        }
+        .dropzone {
+            border: 2px dashed #61dafb;
+            border-radius: 6px;
+            padding: 30px;
+            text-align: center;
+            background: #2d313c;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dropzone.active {
+            background: rgba(97, 218, 251, 0.2);
+            border-color: #61dafb;
+        }
+        button, input[type="text"] {
+            margin: 10px 5px 0;
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            transition: all 0.2s;
+        }
+        button {
+            background: #61dafb;
+            color: #000;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #21a1f1;
+        }
+        input[type="text"] {
+            width: calc(100% - 24px);
+            background: #333;
+            color: #fff;
+            border: 1px solid #444;
+        }
+        pre {
+            background: #2d313c;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .tooltip {
+            position: relative;
+            cursor: pointer;
+            color: #61dafb;
+        }
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 0;
+            top: -25px;
+            background: #444;
+            color: #fff;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced File Analyzer</h1>
+        <div id="dropzone" class="dropzone">Drag and drop a file here or click to upload</div>
+        <input type="file" id="fileInput" style="display: none;">
+        <input type="text" id="customPattern" placeholder="Add custom regex pattern (e.g., [0-9]{3}-[0-9]{3}-[0-9]{4})">
+        <button id="addPattern">Add Pattern</button>
+        <button id="clearResults">Clear Results</button>
+        <pre id="output">Results will appear here...</pre>
+    </div>
+
+    <script>
+        class FileAnalyzer {
+            constructor() {
+                this.patterns = {
+                    urls: /https?:\/\/[^\s<>"]+/g,
+                    emails: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+                    ipv4: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+                    jwt: /\beyJ[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+?\b/g,
+                    awsKeys: /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g,
+                    base64: /\b[A-Za-z0-9+/]{40,}={0,2}\b/g,
+                    hex: /\b(?:[0-9A-Fa-f]{2}){10,}\b/g
+                };
+                this.results = {};
+            }
+
+            async analyze(file) {
+                try {
+                    const fileType = file.type;
+
+                    this.results = {
+                        metadata: this.extractMetadata(file),
+                        patterns: {},
+                        decoded: {},
+                        exif: null,
+                        structure: null
+                    };
+
+                    // Extract EXIF for images
+                    if (fileType.startsWith("image/")) {
+                        this.results.exif = await this.extractExif(file);
+                    } 
+                    // Extract text-based content
+                    else if (fileType.startsWith("text/") || fileType === "") {
+                        const content = await this.readAsText(file);
+                        this.analyzeTextContent(content);
+                    } 
+                    // Analyze ZIP or structured files
+                    else {
+                        this.results.structure = await this.analyzeZip(file);
+                    }
+
+                    return this.results;
+                } catch (error) {
+                    console.error("Error during analysis:", error);
+                }
+            }
+
+            extractMetadata(file) {
+                return {
+                    name: file.name,
+                    size: `${(file.size / 1024).toFixed(2)} KB`,
+                    type: file.type || "Unknown",
+                    lastModified: new Date(file.lastModified).toLocaleString()
+                };
+            }
+
+            readAsText(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsText(file);
+                });
+            }
+
+            analyzeTextContent(text) {
+                for (const [key, regex] of Object.entries(this.patterns)) {
+                    const matches = [...new Set(text.match(regex) || [])];
+                    if (matches.length) this.results.patterns[key] = matches;
+                }
+                this.results.decoded.base64 = this.decodeBase64(text);
+                this.results.decoded.hex = this.decodeHex(text);
+            }
+
+            async extractExif(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const tags = EXIF.readFromBinaryFile(reader.result);
+                        resolve(tags);
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            async analyzeZip(file) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    return Object.keys(zip.files);
+                } catch {
+                    return "Not a valid ZIP file.";
+                }
+            }
+
+            decodeBase64(text) {
+                try {
+                    return atob(text.match(this.patterns.base64)?.[0] || "");
+                } catch {
+                    return null;
+                }
+            }
+
+            decodeHex(text) {
+                try {
+                    const hex = text.match(this.patterns.hex)?.[0] || "";
+                    return decodeURIComponent(hex.replace(/(..)/g, "%$1"));
+                } catch {
+                    return null;
+                }
+            }
+        }
+
+        const analyzer = new FileAnalyzer();
+        const dropzone = document.getElementById("dropzone");
+        const fileInput = document.getElementById("fileInput");
+        const output = document.getElementById("output");
+
+        dropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropzone.classList.add("active");
+        });
+
+        dropzone.addEventListener("dragleave", () => {
+            dropzone.classList.remove("active");
+        });
+
+        dropzone.addEventListener("drop", async (e) => {
+            e.preventDefault();
+            dropzone.classList.remove("active");
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const results = await analyzer.analyze(file);
+                output.textContent = JSON.stringify(results, null, 2);
+            }
+        });
+
+        dropzone.addEventListener("click", () => fileInput.click());
+
+        fileInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const results = await analyzer.analyze(file);
+                output.textContent = JSON.stringify(results, null, 2);
+            }
+        });
+
+        document.getElementById("addPattern").addEventListener("click", () => {
+            const customPattern = document.getElementById("customPattern").value;
+            try {
+                const regex = new RegExp(customPattern, "g");
+                analyzer.patterns[`custom_${Date.now()}`] = regex;
+                alert("Pattern added successfully!");
+            } catch {
+                alert("Invalid regex pattern.");
+            }
+        });
+
+        document.getElementById("clearResults").addEventListener("click", () => {
+            output.textContent = "Results will appear here...";
+            analyzer.results = {};
+        });
+    </script>
+</body>
+</html>

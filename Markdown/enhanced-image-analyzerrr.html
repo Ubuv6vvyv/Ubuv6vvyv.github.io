@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Analysis Tool with MoveNet MultiPose</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+    <style>
+        :root {--primary: #0066cc; --hover: #0052a3; --bg: #f5f5f5;}
+        body {font-family: system-ui; max-width: 1200px; margin: 0 auto; padding: 20px; background: var(--bg);}
+        .container {background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+        .controls {margin: 20px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;}
+        button {padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s;}
+        button:hover:not(:disabled) {background: var(--hover); transform: translateY(-1px);}
+        button:disabled {background: #ccc; cursor: not-allowed;}
+        .image-container {position: relative; display: inline-block; margin: 20px 0; max-width: 100%;}
+        canvas {position: absolute; top: 0; left: 0;}
+        #results {margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;}
+        .loading {position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; padding: 20px; border-radius: 8px; display: none; z-index: 1000;}
+        #modelStatus {padding: 12px; margin: 12px 0; border-radius: 6px;}
+        .status-loading {background: #fff3cd; color: #856404;}
+        .status-ready {background: #d4edda; color: #155724;}
+        .status-error {background: #f8d7da; color: #721c24;}
+        #imageInput {padding: 10px; border: 2px dashed #ccc; border-radius: 6px; width: 100%; box-sizing: border-box; margin: 10px 0;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Analysis Tool with MoveNet MultiPose</h1>
+        <div id="modelStatus" class="status-loading">Loading models...</div>
+        <input type="file" id="imageInput" accept="image/*">
+        <div class="controls">
+            <button id="detectObjects" disabled>Detect Objects</button>
+            <button id="detectPeople" disabled>Detect People</button>
+            <button id="detectPeopleLarge" disabled>Detect Large Crowds</button>
+            <button id="clearCanvas" disabled>Clear Analysis</button>
+        </div>
+        <div class="image-container">
+            <img id="uploadedImage" style="max-width: 100%; display: none;">
+            <canvas id="outputCanvas"></canvas>
+        </div>
+        <div id="results"></div>
+    </div>
+    <div class="loading" id="loadingIndicator">Processing...</div>
+    <script>
+        let cocoModel = null;
+        let poseModel = null;
+        let currentImage;
+        const modelStatus = document.getElementById('modelStatus');
+
+        async function initModels() {
+            try {
+                modelStatus.textContent = 'Loading models...';
+                modelStatus.className = 'status-loading';
+                
+                const [cocoResult, poseResult] = await Promise.allSettled([
+                    cocoSsd.load(),
+                    poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+                        modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING
+                    })
+                ]);
+                
+                if (cocoResult.status === 'fulfilled') cocoModel = cocoResult.value;
+                if (poseResult.status === 'fulfilled') poseModel = poseResult.value;
+                
+                if (!cocoModel && !poseModel) throw new Error('No models loaded');
+                
+                modelStatus.textContent = cocoModel && poseModel ? 'All models ready!' : 'Partial models loaded';
+                modelStatus.className = 'status-ready';
+                return true;
+            } catch (error) {
+                console.error('Model loading error:', error);
+                modelStatus.textContent = 'Error loading models';
+                modelStatus.className = 'status-error';
+                return false;
+            }
+        }
+
+        async function safeDetect(detectFunction) {
+            const requiredModel = detectFunction.name === 'detectPeopleLarge' ? poseModel : cocoModel;
+            if (!requiredModel) {
+                alert('Required model not available');
+                return;
+            }
+            await detectFunction();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.getElementById('uploadedImage');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    currentImage = img;
+                    img.onload = () => {
+                        setupCanvas();
+                        enableButtons();
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function setupCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+        }
+
+        function enableButtons() {
+            document.getElementById('detectObjects').disabled = !cocoModel;
+            document.getElementById('detectPeople').disabled = !cocoModel;
+            document.getElementById('detectPeopleLarge').disabled = !poseModel;
+            document.getElementById('clearCanvas').disabled = false;
+        }
+
+        async function detectObjects() {
+            if (!cocoModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                drawPredictions(predictions);
+                displayResults(predictions);
+            } catch (error) {
+                console.error(error);
+                alert('Detection error');
+            }
+            hideLoading();
+        }
+
+        async function detectPeople() {
+            if (!cocoModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                const peoplePredictions = predictions.filter(p => p.class === 'person');
+                peoplePredictions.length > 10 ? drawHeatmap(peoplePredictions) : drawPredictions(peoplePredictions);
+                displayResults([{class: 'people detected', score: peoplePredictions.length}]);
+            } catch (error) {
+                console.error(error);
+                alert('Detection error');
+            }
+            hideLoading();
+        }
+
+        async function detectPeopleLarge() {
+            if (!poseModel || !currentImage) return;
+            showLoading();
+            clearCanvas();
+            try {
+                const poses = await poseModel.estimatePoses(currentImage, {
+                    maxPoses: 20, // Adjust maxPoses for crowded scenes
+                    flipHorizontal: false
+                });
+
+                // Draw each detected pose
+                drawPoses(poses);
+
+                // Display results summary
+                displayResults([{ class: 'poses detected', score: poses.length }]);
+            } catch (error) {
+                console.error('Pose detection error:', error);
+                alert('Pose detection error');
+            }
+            hideLoading();
+        }
+
+        function drawPredictions(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            predictions.forEach(pred => {
+                const [x, y, w, h] = pred.bbox;
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillText(`${pred.class} ${Math.round(pred.score * 100)}%`, x, y > 10 ? y - 5 : 10);
+            });
+        }
+
+        function drawHeatmap(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            predictions.forEach(pred => {
+                const [x, y, w, h] = pred.bbox;
+                const gradient = ctx.createRadialGradient(x + w/2, y + h/2, 0, x + w/2, y + h/2, 50);
+                gradient.addColorStop(0, 'rgba(255,0,0,0.2)');
+                gradient.addColorStop(1, 'rgba(255,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x-50, y-50, w+100, h+100);
+            });
+        }
+
+        function drawPoses(poses) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            poses.forEach(pose => {
+                pose.keypoints.forEach(point => {
+                    if (point.score > 0.2) { // Adjust confidence threshold
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'red';
+                        ctx.fill();
+                    }
+                });
+            });
+        }
+
+        function displayResults(predictions) {
+            document.getElementById('results').innerHTML = `<h3>Results:</h3>${
+                predictions.map(p => `<p>${p.class}: ${
+                    p.class.includes('detected') ? p.score : Math.round(p.score * 100) + '%'
+                }</p>`).join('')
+            }`;
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        function setupEventListeners() {
+            document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+            document.getElementById('detectObjects').addEventListener('click', () => safeDetect(detectObjects));
+            document.getElementById('detectPeople').addEventListener('click', () => safeDetect(detectPeople));
+            document.getElementById('detectPeopleLarge').addEventListener('click', () => safeDetect(detectPeopleLarge));
+            document.getElementById('clearCanvas').addEventListener('click', clearCanvas);
+        }
+
+        window.addEventListener('load', async () => {
+            await initModels();
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>

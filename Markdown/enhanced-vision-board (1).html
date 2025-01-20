@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision Board Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Indie+Flower&family=Patrick+Hand&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #f9f3e6;
+      color: #4a4a4a;
+      font-family: 'Patrick Hand', cursive;
+      padding: 20px;
+    }
+
+    .controls {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: white;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .control-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .vision-board {
+      display: grid;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .vision-board.portrait { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .vision-board.landscape { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+    .vision-board.masonry { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .vision-board.single-column { grid-template-columns: 1fr; max-width: 600px; }
+
+    .category {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .category-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0.15;
+    }
+
+    .category-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .category h2 {
+      font-family: 'Caveat', cursive;
+      font-size: 2rem;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    .image-container {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .image-box {
+      aspect-ratio: 1;
+      position: relative;
+      background: #f8f8f8;
+      border: 2px dashed #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .image-box input[type="file"] { display: none; }
+
+    .image-box label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .image-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .upload-icon {
+      width: 40px;
+      height: 40px;
+      border: 2px dashed #ccc;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+    }
+
+    .upload-icon::before {
+      content: '📷';
+      font-size: 20px;
+    }
+
+    .background-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 6px;
+    }
+
+    .list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .list li {
+      margin: 8px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .list li::before {
+      content: '✧';
+      position: absolute;
+      left: 0;
+      color: #7f8c8d;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #2c3e50;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover { background: #34495e; }
+
+    .edit-mode .controls-hide { display: block; }
+    .view-mode .controls-hide { display: none; }
+
+    @media print {
+      .controls, .controls-hide { display: none; }
+      .category { break-inside: avoid; }
+    }
+
+    @media (max-width: 768px) {
+      .vision-board { grid-template-columns: 1fr !important; }
+      .controls { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div class="control-group">
+      <label for="layout">Layout:</label>
+      <select id="layout" onchange="changeLayout(this.value)">
+        <option value="portrait">Portrait</option>
+        <option value="landscape">Landscape</option>
+        <option value="masonry">Masonry</option>
+        <option value="single-column">Single Column</option>
+      </select>
+      <button class="btn" onclick="toggleEditMode()">Toggle Edit Mode</button>
+      <button class="btn" onclick="saveVisionBoard()">Save Board</button>
+      <button class="btn" onclick="exportAsPDF()">Export PDF</button>
+      <button class="btn" onclick="addNewCategory()">Add Category</button>
+    </div>
+  </div>
+
+  <div id="vision-board" class="vision-board portrait view-mode"></div>
+
+  <script>
+    const categories = [
+      {
+        title: 'Career',
+        quote: 'Your empire awaits',
+        goals: ['Launch software tools', 'Passive income', 'Financial freedom'],
+        images: []
+      },
+      // Add other categories here
+    ];
+
+    function initializeBoard() {
+      const board = document.getElementById('vision-board');
+      categories.forEach(category => {
+        board.appendChild(createCategoryElement(category));
+      });
+      initializeFileUploads();
+      animateCategories();
+    }
+
+    function createCategoryElement(data) {
+      const div = document.createElement('div');
+      div.className = 'category';
+      div.innerHTML = `
+        <div class="category-background"></div>
+        <div class="category-content">
+          <h2>${data.title}</h2>
+          <p>${data.quote}</p>
+          
+          <div class="background-controls controls-hide">
+            <input type="file" id="${data.title}-bg" accept="image/*" class="bg-upload">
+            <label for="${data.title}-bg" class="btn">Set Background</label>
+            <input type="range" min="0" max="100" value="15" class="opacity-control">
+            <input type="range" min="100" max="200" value="100" class="scale-control">
+          </div>
+
+          <div class="image-container">
+            <div class="image-box">
+              <input type="file" id="${data.title}-img" accept="image/*">
+              <label for="${data.title}-img"><div class="upload-icon"></div></label>
+            </div>
+          </div>
+          
+          <div class="image-controls controls-hide">
+            <button class="btn" onclick="addImageBox(this)">Add Image</button>
+            <button class="btn" onclick="removeImageBox(this)">Remove Image</button>
+          </div>
+
+          <ul class="list">
+            ${data.goals.map(goal => `<li>${goal}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+      return div;
+    }
+
+    function handleImageUpload(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        const label = input.nextElementSibling;
+        
+        reader.onload = e => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          label.innerHTML = '';
+          label.appendChild(img);
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function handleBackgroundUpload(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        const category = input.closest('.category');
+        const background = category.querySelector('.category-background');
+        
+        reader.onload = e => {
+          background.style.backgroundImage = `url(${e.target.result})`;
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function addImageBox(button) {
+      const container = button.closest('.category-content').querySelector('.image-container');
+      const newBox = document.createElement('div');
+      newBox.className = 'image-box';
+      const id = 'img-' + Math.random().toString(36).substr(2, 9);
+      
+      newBox.innerHTML = `
+        <input type="file" id="${id}" accept="image/*">
+        <label for="${id}"><div class="upload-icon"></div></label>
+      `;
+      
+      container.appendChild(newBox);
+      initializeFileUploads();
+    }
+
+    function removeImageBox(button) {
+      const container = button.closest('.category-content').querySelector('.image-container');
+      if (container.children.length > 1) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    function initializeFileUploads() {
+      document.querySelectorAll('input[type="file"]').forEach(input => {
+        input.addEventListener('change', function() {
+          if (this.classList.contains('bg-upload')) {
+            handleBackgroundUpload(this);
+          } else {
+            handleImageUpload(this);
+          }
+        });
+      });
+
+      document.querySelectorAll('.opacity-control').forEach(input => {
+        input.addEventListener('input', function() {
+          const background = this.closest('.category').querySelector('.category-background');
+          background.style.opacity = this.value / 100;
+        });
+      });
+
+      document.querySelectorAll('.scale-control').forEach(input => {
+        input.addEventListener('input', function() {
+          const background = this.closest('.category').querySelector('.category-background');
+          background.style.transform = `scale(${this.value / 100})`;
+        });
+      });
+    }
+
+    function changeLayout(value) {
+      const board = document.getElementById('vision-board');
+      board.className = `vision-board ${value}`;
+    }
+
+    function toggleEditMode() {
+      const board = document.getElementById('vision-board');
+      board.classList.toggle('edit-mode');
+      board.classList.toggle('view-mode');
+    }
+
+    async function saveVisionBoard() {
+      const board = document.getElementById('vision-board');
+      const originalClass = board.className;
+      board.classList.add('view-mode');
+      
+      const canvas = await html2canvas(board);
+      const link = document.createElement('a');
+      link.download = 'vision-board.png';
+      link.href = canvas.toDataURL();
+      link.click();
+      
+      board.className = originalClass;
+    }
+
+    function exportAsPDF() {
+      window.print();
+    }
+
+    function addNewCategory() {
+      const title = prompt('Enter category title:');
+      if (title) {
+        const category = {
+          title,
+          quote: 'Your custom quote here',
+          goals: ['New goal 1', 'New goal 2'],
+          images: []
+        };
+        const element = createCategoryElement(category);
+        document.getElementById('vision-board').appendChild(element);
+        initializeFileUploads();
+        gsap.from(element, {
+          duration: 0.5,
+          y: 50,
+          opacity: 0,
+          ease: "power2.out"
+        });
+      }
+    }
+
+    function animateCategories() {
+      gsap.from(".category", {
+        duration: 0.8,
+        y: 50,
+        opacity: 0,
+        stagger: 0.1,
+        ease: "power2.out"
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeBoard);
+  </script>
+</body>
+</html>

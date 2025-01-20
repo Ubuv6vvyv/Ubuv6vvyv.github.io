@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Tone Disorientation Generator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #16213e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #0f3460;
+            background-color: #e94560;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            background-color: #0f3460;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .slider-container label {
+            flex: 1;
+            margin-right: 15px;
+            color: #e94560;
+        }
+        .slider-container input[type="range"] {
+            flex: 2;
+            accent-color: #e94560;
+        }
+        .slider-container span {
+            flex: 0.5;
+            color: #e0e0e0;
+            margin-left: 10px;
+        }
+        button {
+            background-color: #e94560;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background-color: #ff6b81;
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        #visualizer {
+            width: 100%;
+            height: 150px;
+            background-color: #0f3460;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Tone Disorientation Generator</h1>
+
+        <div class="control-group">
+            <h2>Sine Wave Controls</h2>
+            <div class="slider-container">
+                <label for="frequencySlider">Frequency (Hz)</label>
+                <input type="range" id="frequencySlider" min="1000" max="25000" step="1" value="15000">
+                <span id="frequencyValue">15000</span> Hz
+            </div>
+            <div class="slider-container">
+                <label for="detuneSlider">Detune (Cents)</label>
+                <input type="range" id="detuneSlider" min="-2000" max="2000" step="1" value="0">
+                <span id="detuneValue">0</span> cents
+            </div>
+            <div class="slider-container">
+                <label for="modulationFreqSlider">Modulation Frequency (Hz)</label>
+                <input type="range" id="modulationFreqSlider" min="0" max="100" step="0.1" value="20">
+                <span id="modulationFreqValue">20</span> Hz
+            </div>
+            <div class="slider-container">
+                <label for="modulationDepthSlider">Modulation Depth</label>
+                <input type="range" id="modulationDepthSlider" min="0" max="2" step="0.01" value="0.75">
+                <span id="modulationDepthValue">0.75</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h2>Annoyance Intensity</h2>
+            <div class="slider-container">
+                <label for="volumeSlider">Volume</label>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.75">
+                <span id="volumeValue">0.75</span>
+            </div>
+            <div class="slider-container">
+                <label for="gainSlider">Gain Intensity</label>
+                <input type="range" id="gainSlider" min="0" max="2" step="0.01" value="1">
+                <span id="gainValue">1</span>
+            </div>
+        </div>
+
+        <div class="control-group button-group">
+            <button id="playButton">Start Tone</button>
+            <button id="stopButton">Stop Tone</button>
+            <button id="autoToggleButton">Auto Morph</button>
+        </div>
+
+        <div class="control-group">
+            <h2>Preset Annoying Tones</h2>
+            <div class="button-group">
+                <button id="annoyingTone1">Disorienting Low</button>
+                <button id="annoyingTone2">Piercing High</button>
+                <button id="annoyingTone3">Aggressive Mid</button>
+                <button id="annoyingTone4">Ultrasonic Edge</button>
+                <button id="highPitchTone1">Extreme High 1</button>
+                <button id="highPitchTone2">Extreme High 2</button>
+                <button id="dogTone">Canine Distress</button>
+                <button id="detuneRandomButton">Random Detune</button>
+                <button id="startButton">Evasive Sound Mode</button>
+            </div>
+        </div>
+
+        <canvas id="visualizer"></canvas>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Select all DOM elements inside the event listener
+            const frequencySlider = document.getElementById('frequencySlider');
+            const detuneSlider = document.getElementById('detuneSlider');
+            const modulationFreqSlider = document.getElementById('modulationFreqSlider');
+            const modulationDepthSlider = document.getElementById('modulationDepthSlider');
+            const volumeSlider = document.getElementById('volumeSlider');
+            const gainSlider = document.getElementById('gainSlider');
+
+            const frequencyValueSpan = document.getElementById('frequencyValue');
+            const detuneValueSpan = document.getElementById('detuneValue');
+            const modulationFreqValueSpan = document.getElementById('modulationFreqValue');
+            const modulationDepthValueSpan = document.getElementById('modulationDepthValue');
+            const volumeValueSpan = document.getElementById('volumeValue');
+            const gainValueSpan = document.getElementById('gainValue');
+
+            const playButton = document.getElementById('playButton');
+            const stopButton = document.getElementById('stopButton');
+            const autoToggleButton = document.getElementById('autoToggleButton');
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+
+            // Additional button selections
+            const annoyingTone1Button = document.getElementById('annoyingTone1');
+            const annoyingTone2Button = document.getElementById('annoyingTone2');
+            const annoyingTone3Button = document.getElementById('annoyingTone3');
+            const annoyingTone4Button = document.getElementById('annoyingTone4');
+            const highPitchTone1Button = document.getElementById('highPitchTone1');
+            const highPitchTone2Button = document.getElementById('highPitchTone2');
+            const dogToneButton = document.getElementById('dogTone');
+            const detuneRandomButton = document.getElementById('detuneRandomButton');
+            const startButton = document.getElementById('startButton');
+
+            let isAutoToggle = false;
+            let autoToggleInterval;
+            let oscillator;
+            let gainNode;
+            let modulationOscillator;
+            let modulationGainNode;
+
+            // Set up Web Audio API
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            function setupOscillator() {
+                oscillator = audioContext.createOscillator();
+                gainNode = audioContext.createGain();
+                modulationOscillator = audioContext.createOscillator();
+                modulationGainNode = audioContext.createGain();
+
+                oscillator.type = "sine";
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                modulationOscillator.connect(modulationGainNode);
+                modulationGainNode.connect(gainNode.gain);
+
+                oscillator.start();
+                modulationOscillator.start();
+            }
+
+            function updateSound() {
+                const frequency = parseFloat(frequencySlider.value);
+                const detune = parseFloat(detuneSlider.value);
+                const modulationFreq = parseFloat(modulationFreqSlider.value);
+                const modulationDepth = parseFloat(modulationDepthSlider.value);
+                const volume = parseFloat(volumeSlider.value);
+                const gain = parseFloat(gainSlider.value);
+
+                // Update oscillator frequency and detune
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+                oscillator.detune.setValueAtTime(detune, audioContext.currentTime);
+
+                // Update modulation oscillator
+                modulationOscillator.frequency.setValueAtTime(modulationFreq, audioContext.currentTime);
+                modulationGainNode.gain.setValueAtTime(modulationDepth, audioContext.currentTime);
+
+                // Update volume and gain
+                gainNode.gain.setValueAtTime(volume * gain, audioContext.currentTime);
+
+                // Update UI values
+                frequencyValueSpan.textContent = frequency;
+                detuneValueSpan.textContent = detune;
+                modulationFreqValueSpan.textContent = modulationFreq;
+                modulationDepthValueSpan.textContent = modulationDepth;
+                volumeValueSpan.textContent = volume;
+                gainValueSpan.textContent = gain;
+            }
+
+            // Event listeners for controls
+            frequencySlider.addEventListener('input', updateSound);
+            detuneSlider.addEventListener('input', updateSound);
+            modulationFreqSlider.addEventListener('input', updateSound);
+            modulationDepthSlider.addEventListener('input', updateSound);
+            volumeSlider.addEventListener('input', updateSound);
+            gainSlider.addEventListener('input', updateSound);
+
+            // Start sine wave generation
+            playButton.addEventListener('click', function () {
+                if (audioContext.state !== 'running') {
+                    audioContext.resume();
+                }
+                setupOscillator();
+                updateSound();
+            });
+
+            // Stop sine wave generation
+            stopButton.addEventListener('click', function () {
+                if (oscillator) {
+                    oscillator.stop();
+                    modulationOscillator.stop();
+                }
+                oscillator = null;
+                modulationOscillator = null;
+            });
+
+            // Auto Toggle Button Logic
+            autoToggleButton.addEventListener('click', function () {
+                isAutoToggle = !isAutoToggle;
+                if (isAutoToggle) {
+                    autoToggleButton.textContent = "Stop Auto Toggle";
+                    startAutoToggle();
+                } else {
+                    autoToggleButton.textContent = "Start Auto Toggle";
+                    clearInterval(autoToggleInterval);
+                }
+            });
+
+            function startAutoToggle() {
+                autoToggleInterval = setInterval(() => {
+                    // Gradually adjust sliders towards a new tone
+                    frequencySlider.value = Math.random() * (25000 - 1000) + 1000;
+                    detuneSlider.value = Math.random() * 4000 - 2000;
+                    modulationFreqSlider.value = Math.random() * 100;
+                    modulationDepthSlider.value = Math.random() * 2;
+                    volumeSlider.value = Math.random();
+                    gainSlider.value = Math.random() * 2;
+
+                    updateSound();
+                }, 2000); // Change values every 2 seconds
+            }
+
+            // Annoying tone effects
+            function generateAnnoyingTone(frequency, detune, volume, modulationFreq, modulationDepth) {
+                frequencySlider.value = frequency;
+                detuneSlider.value = detune;
+                volumeSlider.value = volume;
+                modulationFreqSlider.value = modulationFreq || 20;
+                modulationDepthSlider.value = modulationDepth || 0.75;
+                updateSound();
+                
+                // Optional: Add visual feedback
+                canvas.style.backgroundColor = `hsl(${frequency/200}, 70%, 50%)`;
+            }
+
+            // Preset Tone Buttons
+            annoyingTone1Button.addEventListener('click', function () {
+                generateAnnoyingTone(9500, 350, 1, 15, 1);
+            });
+
+            annoyingTone2Button.addEventListener('click', function () {
+                generateAnnoyingTone(18000, 500, 1, 40, 1.5);
+            });
+
+            annoyingTone3Button.addEventListener('click', function () {
+                generateAnnoyingTone(12000, 250, 1, 25, 0.85);
+            });
+
+            annoyingTone4Button.addEventListener('click', function () {
+                generateAnnoyingTone(15500, 400, 1, 30, 1.25);
+            });
+
+            dogToneButton.addEventListener('click', function () {
+                generateAnnoyingTone(19000, 200, 1, 50, 1.75);
+            });
+
+            highPitchTone1Button.addEventListener('click', function () {
+                generateAnnoyingTone(22000, 600, 1, 60, 2);
+            });
+
+            highPitchTone2Button.addEventListener('click', function () {
+                generateAnnoyingTone(20500, 450, 1, 55, 1.6);
+            });
+
+            detuneRandomButton.addEventListener('click', function () {
+                detuneSlider.value = Math.random() * 4000 - 2000;
+                updateSound();
+            });
+
+            // Optional: Visualization Enhancement
+            function visualizeSound() {
+                const analyser = audioContext.createAnalyser();
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                requestAnimationFrame(visualizeSound);
+                analyser.getByteFrequencyData(dataArray);
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const barWidth = (canvas.width / dataArray.length) * 2.5;
+                let x = 0;
+
+                for(let i = 0; i < dataArray.length; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    ctx.fillStyle = `hsl(${i

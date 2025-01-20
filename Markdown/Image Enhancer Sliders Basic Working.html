@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCV.js Image Processing with Intensity Control</title>
+    <script async src="https://cdn.jsdelivr.net/npm/opencv.js" onload="onOpenCvReady()"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 20px;
+            background-color: #f4f4f9;
+            margin: 0;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        #canvas {
+            border: 1px solid #ccc;
+            margin: 20px 0;
+            max-width: 90%;
+            max-height: 50vh;
+            background: #fff;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button, input[type="file"] {
+            background: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button:hover, input[type="file"]:hover {
+            background: #0056b3;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        label {
+            font-size: 12px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>OpenCV.js Image Processing</h1>
+    <input type="file" id="imageInput" accept="image/*">
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Edge Detection</label>
+            <input type="range" id="edgeIntensity" min="50" max="300" value="100" step="10" 
+                oninput="applyEdgeDetection(this.value)">
+        </div>
+        <div class="control-group">
+            <label>Gaussian Blur</label>
+            <input type="range" id="blurIntensity" min="1" max="30" value="15" step="2" 
+                oninput="applyGaussianBlur(this.value)">
+        </div>
+        <div class="control-group">
+            <label>Thresholding</label>
+            <input type="range" id="thresholdIntensity" min="50" max="255" value="100" step="5" 
+                oninput="applyThresholding(this.value)">
+        </div>
+    </div>
+
+    <script>
+        let baseImage = null; // Store the base image for resets
+
+        function onOpenCvReady() {
+            console.log("OpenCV.js is ready.");
+        }
+
+        document.getElementById('imageInput').addEventListener('change', loadImage);
+
+        function loadImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Resize to fit within 90% width and height
+                    const maxWidth = window.innerWidth * 0.9;
+                    const maxHeight = window.innerHeight * 0.5;
+                    const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    baseImage = cv.imread(canvas); // Save base image
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetCanvas() {
+            if (baseImage) {
+                const canvas = document.getElementById('canvas');
+                cv.imshow(canvas, baseImage);
+            }
+        }
+
+        function applyEdgeDetection(threshold) {
+            if (!baseImage) return;
+            resetCanvas();
+
+            const canvas = document.getElementById('canvas');
+            const src = cv.imread(canvas);
+            const edges = new cv.Mat();
+
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.Canny(src, edges, parseInt(threshold), parseInt(threshold) * 2);
+
+            cv.imshow(canvas, edges);
+            src.delete();
+            edges.delete();
+        }
+
+        function applyGaussianBlur(blurLevel) {
+            if (!baseImage) return;
+            resetCanvas();
+
+            const canvas = document.getElementById('canvas');
+            const src = cv.imread(canvas);
+            const dst = new cv.Mat();
+
+            const kernelSize = Math.max(1, Math.min(parseInt(blurLevel), 30));
+            const adjustedKernel = kernelSize % 2 === 1 ? kernelSize : kernelSize + 1; // Ensure odd size
+            cv.GaussianBlur(src, dst, new cv.Size(adjustedKernel, adjustedKernel), 0);
+
+            cv.imshow(canvas, dst);
+            src.delete();
+            dst.delete();
+        }
+
+        function applyThresholding(threshold) {
+            if (!baseImage) return;
+            resetCanvas();
+
+            const canvas = document.getElementById('canvas');
+            const src = cv.imread(canvas);
+            const dst = new cv.Mat();
+
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.threshold(src, dst, parseInt(threshold), 255, cv.THRESH_BINARY);
+
+            cv.imshow(canvas, dst);
+            src.delete();
+            dst.delete();
+        }
+    </script>
+</body>
+</html>

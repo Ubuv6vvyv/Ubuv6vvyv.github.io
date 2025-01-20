@@ -1,0 +1,197 @@
+processedMat.convertTo(processedMat, -1, 1 + contrast/100, brightness);
+        }
+
+        // Apply noise reduction
+        const noiseLevel = parseInt(document.getElementById('noiseReduction').value);
+        if (noiseLevel > 0) {
+            const ksize = 2 * noiseLevel + 1;
+            cv.GaussianBlur(processedMat, processedMat, new cv.Size(ksize, ksize), 0, 0);
+        }
+
+        // Apply sharpening
+        const sharpness = parseInt(document.getElementById('sharpness').value);
+        if (sharpness > 0) {
+            const kernel = cv.Mat.ones(3, 3, cv.CV_32F);
+            kernel.data32F[4] = -sharpness;
+            cv.filter2D(processedMat, processedMat, -1, kernel);
+            kernel.delete();
+        }
+
+        // Handle edge detection
+        const activeTab = document.querySelector('.tab.active').dataset.tab;
+        if (activeTab === 'edges') {
+            const method = document.getElementById('edgeMethod').value;
+            cv.cvtColor(processedMat, tempMat, cv.COLOR_RGBA2GRAY);
+            
+            switch(method) {
+                case 'canny':
+                    const t1 = parseInt(document.getElementById('edgeThreshold1').value);
+                    const t2 = parseInt(document.getElementById('edgeThreshold2').value);
+                    cv.Canny(tempMat, processedMat, t1, t2);
+                    break;
+                case 'sobel':
+                    cv.Sobel(tempMat, processedMat, cv.CV_8U, 1, 1);
+                    break;
+                case 'laplacian':
+                    cv.Laplacian(tempMat, processedMat, cv.CV_8U);
+                    break;
+            }
+
+            // Apply edge thickness
+            const thickness = parseInt(document.getElementById('edgeThickness').value);
+            if (thickness > 1) {
+                const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(thickness, thickness));
+                cv.dilate(processedMat, processedMat, kernel);
+                kernel.delete();
+            }
+        }
+
+        // Handle color thresholding
+        if (activeTab === 'color') {
+            const channel = document.getElementById('colorChannel').value;
+            const min = parseInt(document.getElementById('colorThresholdMin').value);
+            const max = parseInt(document.getElementById('colorThresholdMax').value);
+            const sensitivity = parseInt(document.getElementById('colorSensitivity').value);
+            
+            if (channel !== 'all') {
+                let channelIdx = {'red': 0, 'green': 1, 'blue': 2}[channel];
+                let channels = cv.split(processedMat);
+                cv.threshold(channels[channelIdx], processedMat, min, max, cv.THRESH_BINARY);
+                channels.forEach(ch => ch.delete());
+            } else {
+                cv.inRange(processedMat, 
+                    new cv.Mat(1, 1, cv.CV_8UC3, [min - sensitivity, min - sensitivity, min - sensitivity]), 
+                    new cv.Mat(1, 1, cv.CV_8UC3, [max + sensitivity, max + sensitivity, max + sensitivity]), 
+                    processedMat);
+            }
+        }
+
+        // Handle basic thresholding
+        if (activeTab === 'basic') {
+            cv.cvtColor(processedMat, tempMat, cv.COLOR_RGBA2GRAY);
+            const adaptiveSize = parseInt(document.getElementById('adaptiveThresholdSize').value);
+            
+            if (adaptiveSize > 3) {
+                cv.adaptiveThreshold(tempMat, processedMat, 255,
+                    cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY,
+                    adaptiveSize, 2);
+            } else {
+                const threshold = parseInt(document.getElementById('thresholdIntensity').value);
+                cv.threshold(tempMat, processedMat, threshold, 255, cv.THRESH_BINARY);
+            }
+        }
+
+        // Apply morphological operations
+        const dilation = parseInt(document.getElementById('dilation').value);
+        const erosion = parseInt(document.getElementById('erosion').value);
+        
+        if (dilation > 0) {
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(dilation, dilation));
+            cv.dilate(processedMat, processedMat, kernel);
+            kernel.delete();
+        }
+        
+        if (erosion > 0) {
+            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(erosion, erosion));
+            cv.erode(processedMat, processedMat, kernel);
+            kernel.delete();
+        }
+
+        cv.imshow('canvas', processedMat);
+
+        // Update performance metrics
+        lastProcessingTime = performance.now() - startTime;
+        updatePerformanceIndicator();
+
+    } catch (err) {
+        console.error('Processing error:', err);
+        showStatus("Processing error", "error");
+    } finally {
+        processing = false;
+    }
+}
+
+function updatePerformanceIndicator() {
+    const indicator = document.getElementById('performanceIndicator');
+    const performanceStatus = lastProcessingTime < 50 ? 'Excellent' :
+                            lastProcessingTime < 100 ? 'Good' :
+                            lastProcessingTime < 200 ? 'Fair' : 'Poor';
+    const color = lastProcessingTime < 50 ? '#4CAF50' :
+                 lastProcessingTime < 100 ? '#2196F3' :
+                 lastProcessingTime < 200 ? '#FFC107' : '#F44336';
+    
+    indicator.innerHTML = `
+        Processing Time: ${Math.round(lastProcessingTime)}ms<br>
+        Performance: <span style="color:${color}">${performanceStatus}</span>
+    `;
+}
+
+function resetControls() {
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+        input.value = input.defaultValue;
+        updateValueDisplay(input);
+    });
+    document.querySelectorAll('select').forEach(select => {
+        select.selectedIndex = 0;
+    });
+    processImage();
+}
+
+function cleanup() {
+    [baseImage, processedMat, tempMat].forEach(mat => {
+        if (mat) mat.delete();
+    });
+    initializeMats();
+}
+
+// Auto-enable performance mode on slow devices
+function checkDevicePerformance() {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(100, 100);
+    
+    const startTime = performance.now();
+    for(let i = 0; i < 1000; i++) {
+        ctx.putImageData(imageData, 0, 0);
+    }
+    const duration = performance.now() - startTime;
+    
+    if(duration > 100) {
+        document.getElementById('performanceMode').checked = true;
+        document.getElementById('fineTuneMode').checked = false;
+        updateSliderConfigs(false);
+        processingDelay = 150;
+        showStatus("Performance mode enabled for better responsiveness", "success");
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if(e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+            case 'z':
+                document.getElementById('resetBtn').click();
+                e.preventDefault();
+                break;
+            case 'f':
+                const fineTuneCheckbox = document.getElementById('fineTuneMode');
+                fineTuneCheckbox.checked = !fineTuneCheckbox.checked;
+                fineTuneCheckbox.dispatchEvent(new Event('change'));
+                e.preventDefault();
+                break;
+            case 'p':
+                const perfModeCheckbox = document.getElementById('performanceMode');
+                perfModeCheckbox.checked = !perfModeCheckbox.checked;
+                perfModeCheckbox.dispatchEvent(new Event('change'));
+                e.preventDefault();
+                break;
+        }
+    }
+});
+
+// Initialize
+window.addEventListener('load', checkDevicePerformance);
+window.addEventListener('beforeunload', cleanup);
+    </script>
+</body>
+</html>

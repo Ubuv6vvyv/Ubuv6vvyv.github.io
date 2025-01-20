@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio BPM Analyzer & Video Editor</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0052a3;
+        }
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #videoPreview, #videoOutput {
+            max-width: 100%;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: #0066cc;
+            transition: width 0.3s ease;
+        }
+        .results {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        #waveform {
+            width: 100%;
+            height: 100px;
+            background: #f0f0f0;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio BPM Analyzer & Video Editor</h1>
+        
+        <div class="section">
+            <h2>Audio Analysis</h2>
+            <input type="file" id="audioInput" accept="audio/*">
+            <button class="btn" id="analyzeBtn">Analyze BPM</button>
+            <canvas id="waveform"></canvas>
+            <div class="results" id="bpmResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>Video Editor</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            <div>
+                <label for="startTime">Start Time (seconds):</label>
+                <input type="number" id="startTime" value="0" min="0" step="0.1">
+                
+                <label for="clipDuration">Clip Duration (seconds):</label>
+                <input type="number" id="clipDuration" value="1" min="0.1" step="0.1">
+                
+                <label for="numClips">Number of Clips:</label>
+                <input type="number" id="numClips" value="1" min="1">
+            </div>
+            
+            <button class="btn" id="processBtn">Process Video</button>
+            
+            <div>
+                <video id="videoPreview" controls></video>
+                <div class="progress-bar">
+                    <div class="progress" id="processProgress"></div>
+                </div>
+            </div>
+            
+            <div id="outputContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        let audioContext;
+        let videoElement;
+        
+        // Initialize audio context with user interaction
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            await analyzeBPM();
+        });
+
+        async function analyzeBPM() {
+            const audioFile = document.getElementById('audioInput').files[0];
+            if (!audioFile) {
+                alert('Please select an audio file first');
+                return;
+            }
+
+            try {
+                const arrayBuffer = await audioFile.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Draw waveform
+                drawWaveform(audioBuffer);
+                
+                // Perform BPM detection
+                const bpm = await detectBPM(audioBuffer);
+                
+                // Display results
+                displayResults(bpm);
+            } catch (error) {
+                console.error('Error analyzing audio:', error);
+                alert('Error analyzing audio file. Please try again.');
+            }
+        }
+
+        function drawWaveform(audioBuffer) {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            const data = audioBuffer.getChannelData(0);
+            const step = Math.ceil(data.length / canvas.width);
+            const amp = canvas.height / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(0, amp);
+
+            for (let i = 0; i < canvas.width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                ctx.lineTo(i, (1 + min) * amp);
+                ctx.lineTo(i, (1 + max) * amp);
+            }
+
+            ctx.strokeStyle = '#0066cc';
+            ctx.stroke();
+        }
+
+        async function detectBPM(audioBuffer) {
+            const data = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            
+            // Simple energy-based beat detection
+            const bufferSize = 1024;
+            const energyThreshold = 0.1;
+            let beats = 0;
+            let prevEnergy = 0;
+            
+            for (let i = 0; i < data.length; i += bufferSize) {
+                let energy = 0;
+                
+                // Calculate energy for current buffer
+                for (let j = 0; j < bufferSize && (i + j) < data.length; j++) {
+                    energy += Math.abs(data[i + j]);
+                }
+                energy = energy / bufferSize;
+                
+                // Beat detection using energy difference
+                if (energy > energyThreshold && energy > prevEnergy * 1.5) {
+                    beats++;
+                }
+                
+                prevEnergy = energy;
+            }
+            
+            // Calculate BPM
+            const durationSeconds = audioBuffer.duration;
+            const bpm = Math.round((beats / durationSeconds) * 60);
+            
+            return Math.min(Math.max(bpm, 60), 200); // Clamp between 60-200 BPM
+        }
+
+        function displayResults(bpm) {
+            const results = document.getElementById('bpmResults');
+            results.innerHTML = `
+                <h3>Analysis Results:</h3>
+                <p>Detected BPM: ${bpm}</p>
+                <p>Recommended clip durations:</p>
+                <ul>
+                    <li>One beat: ${(60/bpm).toFixed(2)} seconds</li>
+                    <li>Two beats: ${(120/bpm).toFixed(2)} seconds</li>
+                    <li>Four beats: ${(240/bpm).toFixed(2)} seconds</li>
+                </ul>
+            `;
+        }
+
+        // Video Processing
+        document.getElementById('videoInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const video = document.getElementById('videoPreview');
+            video.src = URL.createObjectURL(file);
+            video.load();
+        });
+
+        document.getElementById('processBtn').addEventListener('click', async () => {
+            const video = document.getElementById('videoPreview');
+            const startTime = parseFloat(document.getElementById('startTime').value);
+            const clipDuration = parseFloat(document.getElementById('clipDuration').value);
+            const numClips = parseInt(document.getElementById('numClips').value);
+            
+            if (!video.src) {
+                alert('Please select a video first');
+                return;
+            }
+
+            const outputContainer = document.getElementById('outputContainer');
+            outputContainer.innerHTML = '';
+            
+            for (let i = 0; i < numClips; i++) {
+                // Create canvas for video processing
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set video to specific time
+                video.currentTime = startTime + (i * clipDuration);
+                
+                // Wait for video to seek
+                await new Promise(resolve => {
+                    video.onseeked = resolve;
+                });
+                
+                // Set canvas dimensions
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Draw current frame
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Create output video element
+                const outputVideo = document.createElement('video');
+                outputVideo.controls = true;
+                outputVideo.style.maxWidth = '300px';
+                outputVideo.style.margin = '10px';
+                
+                // Convert canvas to video blob
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    outputVideo.src = url;
+                }, 'image/jpeg');
+                
+                outputContainer.appendChild(outputVideo);
+                
+                // Update progress
+                document.getElementById('processProgress').style.width = 
+                    `${((i + 1) / numClips) * 100}%`;
+            }
+        });
+    </script>
+</body>
+</html>

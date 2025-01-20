@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image Analysis Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0"></script>
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --hover-color: #0052a3;
+            --bg-color: #f5f5f5;
+            --card-bg: white;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-color);
+            line-height: 1.6;
+        }
+        .container {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+        .controls {
+            margin: 20px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        button {
+            padding: 12px 24px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        button:hover:not(:disabled) {
+            background: var(--hover-color);
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .image-container {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+            max-width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+        }
+        #modelStatus {
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        .status-loading { background: #fff3cd; color: #856404; }
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        
+        #imageInput {
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enhanced Image Analysis Tool</h1>
+        
+        <div id="modelStatus" class="status-loading">Loading models...</div>
+        
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <div class="controls">
+            <button id="detectObjects" disabled>Detect Objects</button>
+            <button id="detectPeople" disabled>Detect People</button>
+            <button id="detectPeopleLarge" disabled>Detect Large Crowds</button>
+            <button id="clearCanvas" disabled>Clear Analysis</button>
+        </div>
+
+        <div class="image-container">
+            <img id="uploadedImage" style="max-width: 100%; display: none;">
+            <canvas id="outputCanvas"></canvas>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <div class="loading" id="loadingIndicator">Processing...</div>
+
+    <script>
+        let cocoModel = null;
+        let mediaPipeModel = null;
+        let currentImage;
+        const modelStatus = document.getElementById('modelStatus');
+        
+        async function initModels() {
+            try {
+                modelStatus.textContent = 'Loading models...';
+                modelStatus.className = 'status-loading';
+                
+                // Load COCO-SSD model
+                if (typeof cocoSsd === 'undefined') {
+                    throw new Error('COCO-SSD model failed to load');
+                }
+                cocoModel = await cocoSsd.load();
+                
+                // Load MediaPipe model
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                );
+                mediaPipeModel = await PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-assets/pose_landmarker_lite.task"
+                    },
+                    numPoses: 50,
+                    minPoseDetectionConfidence: 0.5
+                });
+                
+                modelStatus.textContent = 'Models ready!';
+                modelStatus.className = 'status-ready';
+                return true;
+            } catch (error) {
+                console.error('Error loading models:', error);
+                modelStatus.textContent = 'Error loading models. Please refresh the page.';
+                modelStatus.className = 'status-error';
+                return false;
+            }
+        }
+        
+        async function init() {
+            await initModels();
+            setupEventListeners();
+        }
+
+        function setupEventListeners() {
+            const imageInput = document.getElementById('imageInput');
+            const detectObjectsBtn = document.getElementById('detectObjects');
+            const detectPeopleBtn = document.getElementById('detectPeople');
+            const detectPeopleLargeBtn = document.getElementById('detectPeopleLarge');
+            const clearCanvasBtn = document.getElementById('clearCanvas');
+
+            imageInput.addEventListener('change', handleImageUpload);
+            detectObjectsBtn.addEventListener('click', () => safeDetect(detectObjects));
+            detectPeopleBtn.addEventListener('click', () => safeDetect(detectPeople));
+            detectPeopleLargeBtn.addEventListener('click', () => safeDetect(detectPeopleLarge));
+            clearCanvasBtn.addEventListener('click', clearCanvas);
+        }
+
+        async function safeDetect(detectFunction) {
+            if (!cocoModel || (detectFunction === detectPeopleLarge && !mediaPipeModel)) {
+                alert('Required model is not ready yet. Please wait.');
+                return;
+            }
+            await detectFunction();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('uploadedImage');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    currentImage = img;
+                    
+                    img.onload = function() {
+                        setupCanvas();
+                        enableButtons();
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function setupCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+        }
+
+        function enableButtons() {
+            const allModelsReady = cocoModel && mediaPipeModel;
+            document.getElementById('detectObjects').disabled = !cocoModel;
+            document.getElementById('detectPeople').disabled = !cocoModel;
+            document.getElementById('detectPeopleLarge').disabled = !allModelsReady;
+            document.getElementById('clearCanvas').disabled = false;
+        }
+
+        async function detectObjects() {
+            if (!cocoModel || !currentImage) return;
+            
+            showLoading();
+            clearCanvas();
+            
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                drawPredictions(predictions);
+                displayResults(predictions);
+            } catch (error) {
+                console.error('Detection error:', error);
+                alert('Error during detection. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function detectPeople() {
+            if (!cocoModel || !currentImage) return;
+            
+            showLoading();
+            clearCanvas();
+            
+            try {
+                const predictions = await cocoModel.detect(currentImage);
+                const peoplePredictions = predictions.filter(pred => pred.class === 'person');
+                
+                if (peoplePredictions.length > 10) {
+                    drawHeatmap(peoplePredictions);
+                } else {
+                    drawPredictions(peoplePredictions);
+                }
+                
+                displayResults([{
+                    class: 'people detected',
+                    score: peoplePredictions.length
+                }]);
+            } catch (error) {
+                console.error('People detection error:', error);
+                alert('Error during people detection. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function detectPeopleLarge() {
+            if (!mediaPipeModel || !currentImage) return;
+            
+            showLoading();
+            clearCanvas();
+            
+            try {
+                const results = await mediaPipeModel.detect(currentImage);
+                const poses = results.poses;
+                
+                drawPoseDetections(poses);
+                displayResults([{
+                    class: 'people detected (MediaPipe)',
+                    score: poses.length
+                }]);
+            } catch (error) {
+                console.error('MediaPipe detection error:', error);
+                alert('Error during crowd detection. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function drawPoseDetections(poses) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            poses.forEach(pose => {
+                // Draw pose landmarks
+                pose.landmarks.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.x * canvas.width, point.y * canvas.height, 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'red';
+                    ctx.fill();
+                });
+                
+                // Connect landmarks to form skeleton
+                const connections = [
+                    [11, 12], // shoulders
+                    [11, 13], [13, 15], // left arm
+                    [12, 14], [14, 16], // right arm
+                    [11, 23], [12, 24], // trunk
+                    [23, 24], // hips
+                    [23, 25], [25, 27], // left leg
+                    [24, 26], [26, 28]  // right leg
+                ];
+                
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                
+                connections.forEach(([i, j]) => {
+                    if (pose.landmarks[i] && pose.landmarks[j]) {
+                        ctx.beginPath();
+                        ctx.moveTo(pose.landmarks[i].x * canvas.width, pose.landmarks[i].y * canvas.height);
+                        ctx.lineTo(pose.landmarks[j].x * canvas.width, pose.landmarks[j].y * canvas.height);
+                        ctx.stroke();
+                    }
+                });
+            });
+        }
+
+        function drawPredictions(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.font = '16px sans-serif';
+                ctx.fillText(
+                    `${prediction.class} ${Math.round(prediction.score * 100)}%`,
+                    x, y > 10 ? y - 5 : 10
+                );
+            });
+        }
+
+        function drawHeatmap(predictions) {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                const centerX = x + width/2;
+                const centerY = y + height/2;
+                
+                const gradient = ctx.createRadialGradient(
+                    centerX, centerY, 0,
+                    centerX, centerY, 50
+                );
+                
+                gradient.addColorStop(0, 'rgba(255,0,0,0.2)');
+                gradient.addColorStop(1, 'rgba(255,0,0,0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x-50, y-50, width+100, height+100);
+            });
+        }
+
+        function displayResults(predictions) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h3>Detection Results:</h3>' + 
+                predictions.map(pred => 
+                    `<p>${pred.class}: ${
+                        pred.class.includes('detected') ? 
+                        pred.score : 
+                        Math.round(pred.score * 100) + '%'
+                    }</p>`
+                ).join('');
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('outputCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

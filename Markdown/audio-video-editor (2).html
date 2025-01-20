@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio-Video Beat Sync Editor</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0052a3;
+        }
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #videoPreview {
+            max-width: 100%;
+            margin: 10px 0;
+        }
+        .timeline {
+            width: 100%;
+            height: 150px;
+            background: #f0f0f0;
+            margin: 20px 0;
+            position: relative;
+            overflow-x: auto;
+        }
+        .beat-marker {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: rgba(0, 102, 204, 0.5);
+        }
+        .clip-marker {
+            position: absolute;
+            height: 50px;
+            background: rgba(0, 204, 102, 0.3);
+            border: 1px solid rgba(0, 204, 102, 0.5);
+            cursor: move;
+        }
+        .waveform {
+            width: 100%;
+            height: 60px;
+            background: #e0e0e0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .control-group {
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .preview-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        .beat-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio-Video Beat Sync Editor</h1>
+        
+        <div class="section">
+            <h2>Audio Analysis</h2>
+            <input type="file" id="audioInput" accept="audio/*">
+            <button class="btn" id="analyzeBtn">Analyze BPM</button>
+            <div class="waveform" id="waveform"></div>
+            <div class="results" id="bpmResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>Video Editor</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="beatSnap">Snap to Beat:</label>
+                    <select id="beatSnap">
+                        <option value="1">1 Beat</option>
+                        <option value="2">2 Beats</option>
+                        <option value="4">4 Beats</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="clipLength">Clip Length (beats):</label>
+                    <input type="number" id="clipLength" value="4" min="1">
+                </div>
+                <div class="control-group">
+                    <button class="btn" id="addClipBtn">Add Clip</button>
+                    <button class="btn" id="previewBtn">Preview Sync</button>
+                </div>
+            </div>
+
+            <div class="preview-container">
+                <video id="videoPreview" controls></video>
+                <div class="beat-indicator" id="beatIndicator">Beat: 1</div>
+            </div>
+
+            <div class="timeline" id="timeline">
+                <!-- Beat markers and clips will be added here dynamically -->
+            </div>
+
+            <button class="btn" id="exportBtn">Export Final Video</button>
+        </div>
+    </div>
+
+    <script>
+        let audioContext;
+        let audioBuffer;
+        let videoElement;
+        let beatMarkers = [];
+        let clips = [];
+        let bpm = 0;
+        let beatDuration = 0;
+
+        // Initialize audio context
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            await analyzeBPM();
+        });
+
+        async function analyzeBPM() {
+            const audioFile = document.getElementById('audioInput').files[0];
+            if (!audioFile) {
+                alert('Please select an audio file first');
+                return;
+            }
+
+            try {
+                const arrayBuffer = await audioFile.arrayBuffer();
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                bpm = await detectBPM(audioBuffer);
+                beatDuration = 60 / bpm;
+                
+                drawWaveform();
+                createBeatMarkers();
+                displayResults();
+                enableVideoControls();
+            } catch (error) {
+                console.error('Error analyzing audio:', error);
+                alert('Error analyzing audio file. Please try again.');
+            }
+        }
+
+        function drawWaveform() {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            const data = audioBuffer.getChannelData(0);
+            const step = Math.ceil(data.length / canvas.width);
+            const amp = canvas.height / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(0, amp);
+
+            for (let i = 0; i < canvas.width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                ctx.lineTo(i, (1 + min) * amp);
+                ctx.lineTo(i, (1 + max) * amp);
+            }
+
+            ctx.strokeStyle = '#0066cc';
+            ctx.stroke();
+        }
+
+        function createBeatMarkers() {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '';
+            const duration = audioBuffer.duration;
+            const totalBeats = Math.floor(duration * (bpm / 60));
+            
+            for (let i = 0; i < totalBeats; i++) {
+                const marker = document.createElement('div');
+                marker.className = 'beat-marker';
+                marker.style.left = `${(i * beatDuration / duration) * 100}%`;
+                timeline.appendChild(marker);
+                beatMarkers.push({
+                    element: marker,
+                    time: i * beatDuration
+                });
+            }
+        }
+
+        async function detectBPM(audioBuffer) {
+            const data = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            
+            const bufferSize = 1024;
+            const energyThreshold = 0.1;
+            let beats = 0;
+            let prevEnergy = 0;
+            
+            for (let i = 0; i < data.length; i += bufferSize) {
+                let energy = 0;
+                for (let j = 0; j < bufferSize && (i + j) < data.length; j++) {
+                    energy += Math.abs(data[i + j]);
+                }
+                energy = energy / bufferSize;
+                
+                if (energy > energyThreshold && energy > prevEnergy * 1.5) {
+                    beats++;
+                }
+                prevEnergy = energy;
+            }
+            
+            const bpm = Math.round((beats / audioBuffer.duration) * 60);
+            return Math.min(Math.max(bpm, 60), 200);
+        }
+
+        function displayResults() {
+            const results = document.getElementById('bpmResults');
+            results.innerHTML = `
+                <h3>Analysis Results:</h3>
+                <p>Detected BPM: ${bpm}</p>
+                <p>Beat Duration: ${beatDuration.toFixed(3)} seconds</p>
+            `;
+        }
+
+        function enableVideoControls() {
+            document.getElementById('addClipBtn').disabled = false;
+            document.getElementById('previewBtn').disabled = false;
+        }
+
+        // Video handling
+        document.getElementById('videoInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            videoElement = document.getElementById('videoPreview');
+            videoElement.src = URL.createObjectURL(file);
+            videoElement.load();
+        });
+
+        document.getElementById('addClipBtn').addEventListener('click', () => {
+            if (!videoElement || !videoElement.src) {
+                alert('Please select a video first');
+                return;
+            }
+
+            const clipLength = parseInt(document.getElementById('clipLength').value);
+            const timeline = document.getElementById('timeline');
+            const clip = document.createElement('div');
+            clip.className = 'clip-marker';
+            clip.style.width = `${(clipLength * beatDuration / audioBuffer.duration) * 100}%`;
+            clip.draggable = true;
+            
+            // Add drag functionality
+            clip.addEventListener('dragstart', handleDragStart);
+            clip.addEventListener('dragend', handleDragEnd);
+            
+            timeline.appendChild(clip);
+            clips.push({
+                element: clip,
+                startBeat: clips.length * clipLength,
+                length: clipLength
+            });
+        });
+
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', '');
+            e.target.style.opacity = '0.5';
+        }
+
+        function handleDragEnd(e) {
+            e.target.style.opacity = '1';
+            // Snap to nearest beat
+            const timeline = document.getElementById('timeline');
+            const rect = timeline.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const nearestBeat = Math.round((offsetX / rect.width) * (audioBuffer.duration / beatDuration));
+            
+            e.target.style.left = `${(nearestBeat * beatDuration / audioBuffer.duration) * 100}%`;
+            
+            // Update clip data
+            const clipIndex = clips.findIndex(clip => clip.element === e.target);
+            if (clipIndex !== -1) {
+                clips[clipIndex].startBeat = nearestBeat;
+            }
+        }
+
+        document.getElementById('previewBtn').addEventListener('click', () => {
+            if (!videoElement || clips.length === 0) return;
+            
+            // Sort clips by start time
+            clips.sort((a, b) => a.startBeat - b.startBeat);
+            
+            // Reset video
+            videoElement.currentTime = 0;
+            videoElement.play();
+            
+            // Update beat indicator
+            const beatIndicator = document.getElementById('beatIndicator');
+            let currentBeat = 0;
+            
+            const updateBeat = () => {
+                currentBeat = Math.floor(videoElement.currentTime / beatDuration);
+                beatIndicator.textContent = `Beat: ${currentBeat + 1}`;
+                
+                // Check if we're at a clip boundary
+                const currentClip = clips.find(clip => 
+                    currentBeat >= clip.startBeat && 
+                    currentBeat < clip.startBeat + clip.length
+                );
+                
+                if (currentClip) {
+                    videoElement.style.opacity = '1';
+                } else {
+                    videoElement.style.opacity = '0.5';
+                }
+                
+                if (videoElement.paused) return;
+                requestAnimationFrame(updateBeat);
+            };
+            
+            requestAnimationFrame(updateBeat);
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            alert('Export functionality would go here - would combine video clips according to timeline and mix with audio');
+        });
+    </script>
+</body>
+</html>

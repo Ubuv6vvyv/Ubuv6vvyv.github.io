@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <title>COCO-SSD Object Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <style>
+        :root {
+            --primary: #1E3A8A;
+            --background: #F3F4F6;
+            --text: #111827;
+            --button-bg: #2563EB;
+            --button-hover: #1D4ED8;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        button {
+            background: var(--button-bg);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+        }
+
+        button:disabled {
+            background: #A5B4FC;
+            color: #E0E7FF;
+            cursor: not-allowed;
+        }
+
+        .image-container {
+            position: relative;
+            text-align: center;
+        }
+
+        img, canvas {
+            max-width: 100%;
+            display: block;
+            margin: 0 auto;
+        }
+
+        #results {
+            margin-top: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            font-size: 14px;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>COCO-SSD Object Detection</h1>
+        <input type="file" id="imageInput" accept="image/*">
+        <div class="controls">
+            <button id="detectButton" disabled>Detect Objects</button>
+            <button id="clearButton" disabled>Clear</button>
+        </div>
+        <div class="image-container">
+            <img id="uploadedImage" alt="Uploaded Image" style="display:none;">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let cocoModel = null;
+        let currentImage = null;
+        const imageInput = document.getElementById('imageInput');
+        const detectButton = document.getElementById('detectButton');
+        const clearButton = document.getElementById('clearButton');
+        const canvas = document.getElementById('canvas');
+        const resultsContainer = document.getElementById('results');
+
+        // Load the COCO-SSD model
+        async function loadCOCOSSDModel() {
+            try {
+                detectButton.disabled = true;
+                clearButton.disabled = true;
+                resultsContainer.innerHTML = '<p class="loading">Loading COCO-SSD model...</p>';
+
+                cocoModel = await cocoSsd.load();
+                console.log('COCO-SSD model loaded');
+                resultsContainer.innerHTML = '';
+                detectButton.disabled = false;
+            } catch (error) {
+                console.error('Error loading COCO-SSD model:', error);
+                resultsContainer.innerHTML = '<p class="loading">Failed to load COCO-SSD model</p>';
+            }
+        }
+
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = document.getElementById('uploadedImage');
+                img.src = e.target.result;
+                img.style.display = 'block';
+
+                img.onload = function () {
+                    setupCanvas(img);
+                    currentImage = img;
+                    clearButton.disabled = false;
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Set up canvas dimensions
+        function setupCanvas(image) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Detect objects
+        async function detectObjects() {
+            if (!currentImage || !cocoModel) return;
+
+            const ctx = canvas.getContext('2d');
+            const predictions = await cocoModel.detect(currentImage);
+            console.log('Predictions:', predictions);
+
+            predictions.forEach(pred => {
+                const [x, y, width, height] = pred.bbox;
+                const label = pred.class;
+                const score = (pred.score * 100).toFixed(2);
+
+                // Draw bounding box
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+
+                // Draw label and score
+                ctx.fillStyle = '#00ff00';
+                ctx.fillText(`${label} (${score}%)`, x, y > 10 ? y - 5 : 10);
+            });
+
+            displayResults(predictions);
+        }
+
+        // Display results
+        function displayResults(predictions) {
+            resultsContainer.innerHTML = `<h3>Results:</h3>${
+                predictions.map(pred => 
+                    `<p>${pred.class}: ${(pred.score * 100).toFixed(2)}%</p>`
+                ).join('')
+            }`;
+        }
+
+        // Clear canvas and results
+        function clearCanvas() {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            resultsContainer.innerHTML = '';
+            currentImage = null;
+            document.getElementById('uploadedImage').style.display = 'none';
+            clearButton.disabled = true;
+        }
+
+        // Event listeners
+        window.onload = loadCOCOSSDModel;
+        imageInput.addEventListener('change', handleImageUpload);
+        detectButton.addEventListener('click', detectObjects);
+        clearButton.addEventListener('click', clearCanvas);
+    </script>
+</body>
+</html>

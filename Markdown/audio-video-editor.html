@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio-Video Beat Sync Editor</title>
+    <script src="https://cdn.jsdelivr.net/npm/aubiojs@0.2.1/build/aubio.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/konva@8.4.2/konva.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ffmpeg.js/ffmpeg.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            margin: 0;
+            padding: 10px 0;
+        }
+        input, button, select {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        canvas {
+            display: block;
+            margin: 10px 0;
+        }
+        #timeline {
+            position: relative;
+            width: 100%;
+            height: 150px;
+            background: #e8e8e8;
+            border: 1px solid #ccc;
+            overflow-x: auto;
+        }
+        .marker {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: rgba(0, 0, 255, 0.5);
+        }
+        .clip {
+            position: absolute;
+            height: 50px;
+            background: rgba(0, 255, 0, 0.3);
+            border: 1px solid rgba(0, 255, 0, 0.5);
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .toolbar button {
+            padding: 10px;
+        }
+        .preview {
+            display: flex;
+            gap: 20px;
+        }
+        .preview video {
+            width: 45%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio-Video Beat Sync Editor</h1>
+        <div class="section">
+            <h2>Upload Audio</h2>
+            <input type="file" id="audioInput" accept="audio/*">
+            <button id="analyzeAudio">Analyze Beats</button>
+            <div id="bpmResult">Detected BPM: --</div>
+        </div>
+
+        <div class="section">
+            <h2>Upload Video</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            <button id="syncPreview">Preview Sync</button>
+        </div>
+
+        <div class="section">
+            <h2>Timeline</h2>
+            <div id="timeline"></div>
+            <button id="addClip">Add Clip</button>
+        </div>
+
+        <div class="section preview">
+            <video id="originalVideo" controls></video>
+            <video id="syncedVideo" controls></video>
+        </div>
+
+        <div class="section toolbar">
+            <button id="exportVideo">Export Video</button>
+            <button id="saveProject">Save Project</button>
+            <button id="loadProject">Load Project</button>
+        </div>
+    </div>
+
+    <script>
+        let audioContext, audioBuffer, videoElement, bpm, beatDuration, clips = [];
+
+        async function analyzeBeats() {
+            const audioInput = document.getElementById('audioInput').files[0];
+            if (!audioInput) {
+                alert("No audio file selected!");
+                return;
+            }
+
+            audioContext = new AudioContext();
+            const arrayBuffer = await audioInput.arrayBuffer();
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            bpm = await detectBPM(audioBuffer);
+            beatDuration = 60 / bpm;
+
+            document.getElementById('bpmResult').innerText = `Detected BPM: ${bpm}`;
+        }
+
+        function detectBPM(buffer) {
+            const data = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            let peakIntervals = [];
+
+            for (let i = 0; i < data.length; i += sampleRate) {
+                let energy = 0;
+                for (let j = i; j < i + sampleRate && j < data.length; j++) {
+                    energy += Math.abs(data[j]);
+                }
+                if (energy > 0.8) peakIntervals.push(i / sampleRate);
+            }
+
+            const intervals = [];
+            for (let i = 1; i < peakIntervals.length; i++) {
+                intervals.push(peakIntervals[i] - peakIntervals[i - 1]);
+            }
+
+            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            return Math.round(60 / avgInterval);
+        }
+
+        function addClip() {
+            const timeline = document.getElementById('timeline');
+            const clip = document.createElement('div');
+            clip.className = 'clip';
+            clip.style.width = '100px';
+            clip.style.left = `${clips.length * 110}px`;
+            timeline.appendChild(clip);
+
+            clips.push({ element: clip, start: clips.length * beatDuration });
+        }
+
+        async function syncPreview() {
+            const originalVideo = document.getElementById('originalVideo');
+            const syncedVideo = document.getElementById('syncedVideo');
+
+            const videoInput = document.getElementById('videoInput').files[0];
+            if (!videoInput) {
+                alert("No video file selected!");
+                return;
+            }
+
+            const videoURL = URL.createObjectURL(videoInput);
+            originalVideo.src = videoURL;
+            syncedVideo.src = videoURL;
+
+            syncedVideo.playbackRate = beatDuration / (1 / bpm);
+        }
+
+        function saveProject() {
+            const projectData = {
+                bpm,
+                clips,
+            };
+            const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'project.json';
+            a.click();
+        }
+
+        function loadProject() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.addEventListener('change', async () => {
+                const file = input.files[0];
+                const data = await file.text();
+                const project = JSON.parse(data);
+
+                bpm = project.bpm;
+                clips = project.clips;
+
+                alert("Project loaded successfully!");
+            });
+            input.click();
+        }
+
+        document.getElementById('analyzeAudio').addEventListener('click', analyzeBeats);
+        document.getElementById('addClip').addEventListener('click', addClip);
+        document.getElementById('syncPreview').addEventListener('click', syncPreview);
+        document.getElementById('saveProject').addEventListener('click', saveProject);
+        document.getElementById('loadProject').addEventListener('click', loadProject);
+    </script>
+</body>
+</html>

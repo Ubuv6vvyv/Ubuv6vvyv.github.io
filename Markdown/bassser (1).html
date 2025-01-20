@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hard Dance Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+      /* Previous styles remain the same */
+      body {
+        background: #1a1a1a;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        overscroll-behavior: none;
+        touch-action: manipulation;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .panel {
+        background: #2a2a2a;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(16, 1fr);
+        gap: 2px;
+        margin: 10px 0;
+      }
+
+      .step {
+        aspect-ratio: 1;
+        background: #333;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .step.active {
+        background: #4CAF50;
+      }
+
+      .step.current {
+        border: 2px solid #fff;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+      }
+
+      .control-group {
+        border-top: 1px solid #444;
+        padding-top: 10px;
+        margin-top: 10px;
+      }
+
+      .slider {
+        width: 100%;
+        margin: 5px 0;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 8px;
+        background: #444;
+        border-radius: 4px;
+        outline: none;
+      }
+
+      .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: #4CAF50;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+
+      .slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        background: #4CAF50;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+      }
+
+      button {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      button.active {
+        background: #f44336;
+      }
+
+      select {
+        padding: 8px;
+        background: #333;
+        color: white;
+        border: 1px solid #444;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 0.9em;
+        color: #aaa;
+      }
+
+      #startOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      #startButton {
+        font-size: 1.5em;
+        padding: 20px 40px;
+        background: #4CAF50;
+        border: none;
+        border-radius: 10px;
+        color: white;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      #startButton:active {
+        transform: scale(0.95);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      #statusMessage {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        padding: 10px 20px;
+        border-radius: 5px;
+        z-index: 1001;
+        text-align: center;
+        transition: opacity 0.3s;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="startOverlay">
+      <button id="startButton">Tap to Start</button>
+    </div>
+    <div id="statusMessage" class="hidden"></div>
+    <div class="container">
+      <h1>Hard Dance Generator</h1>
+      <div class="panel">
+        <button id="playButton">Play</button>
+        <input type="range" id="tempo" min="140" max="200" value="150" class="slider">
+        <span id="tempoValue">150 BPM</span>
+        <select id="presetSelect">
+          <option value="hardstyle">Classic Hardstyle</option>
+          <option value="rawStyle">Raw Hardstyle</option>
+          <option value="euphoric">Euphoric Hardstyle</option>
+          <option value="hardcore">Hardcore</option>
+          <option value="trance">Trance</option>
+          <option value="techno">Techno</option>
+          <option value="drumAndBass">Drum & Bass</option>
+          <option value="house">House</option>
+          <option value="dubstep">Dubstep</option>
+        </select>
+      </div>
+      <div class="panel">
+        <h3>Kick</h3>
+        <div id="kickGrid" class="grid"></div>
+        <div class="controls">
+          <div>
+            <label>Punch</label>
+            <input type="range" class="slider" id="kickPunch" min="0" max="100" value="70">
+          </div>
+          <div>
+            <label>Tail Length</label>
+            <input type="range" class="slider" id="kickTail" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Pitch Decay</label>
+            <input type="range" class="slider" id="kickPitchDecay" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Octaves</label>
+            <input type="range" class="slider" id="kickOctaves" min="1" max="12" value="8">
+          </div>
+          <div>
+            <label>Attack</label>
+            <input type="range" class="slider" id="kickAttack" min="0" max="100" value="10">
+          </div>
+          <div>
+            <label>Decay</label>
+            <input type="range" class="slider" id="kickDecay" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Sustain</label>
+            <input type="range" class="slider" id="kickSustain" min="0" max="100" value="20">
+          </div>
+          <div>
+            <label>Release</label>
+            <input type="range" class="slider" id="kickRelease" min="0" max="100" value="60">
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Bass</h3>
+        <div id="bassGrid" class="grid"></div>
+        <div class="controls">
+          <div>
+            <label>Frequency</label>
+            <input type="range" class="slider" id="bassFreq" min="30" max="100" value="50">
+          </div>
+          <div>
+            <label>Reverse</label>
+            <input type="range" class="slider" id="bassReverse" min="0" max="100" value="70">
+          </div>
+          <div>
+            <label>Filter Cutoff</label>
+            <input type="range" class="slider" id="bassFilterCutoff" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Filter Resonance</label>
+            <input type="range" class="slider" id="bassFilterRes" min="0" max="100" value="60">
+          </div>
+          <div>
+            <label>Filter Envelope</label>
+            <input type="range" class="slider" id="bassFilterEnvAmount" min="0" max="100" value="70">
+          </div>
+          <div>
+            <label>Oscillator Mix</label>
+            <input type="range" class="slider" id="bassOscMix" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Sub Oscillator</label>
+            <input type="range" class="slider" id="bassSubOsc" min="0" max="100" value="60">
+          </div>
+          <div>
+            <label>Attack</label>
+            <input type="range" class="slider" id="bassAttack" min="0" max="100" value="20">
+          </div>
+          <div>
+            <label>Decay</label>
+            <input type="range" class="slider" id="bassDecay" min="0" max="100" value="40">
+          </div>
+          <div>
+            <label>Sustain</label>
+            <input type="range" class="slider" id="bassSustain" min="0" max="100" value="30">
+          </div>
+          <div>
+            <label>Release</label>
+            <input type="range" class="slider" id="bassRelease" min="0" max="100" value="50">
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Effects</h3>
+        <div class="controls">
+          <div>
+            <label>Distortion</label>
+            <input type="range" class="slider" id="distortion" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label>Compression</label>
+            <input type="range" class="slider" id="compression" min="0" max="100" value="60">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    const App = {
+        currentStep: 0,
+        isPlaying: false,
+        kickSynth: null,
+        bassSynth: null,
+        distortionEffect: null,
+        compressorEffect: null,
+        isInitialized: false,
+        patterns: {
+            hardstyle: {
+                kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+                bass: [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1]
+            },
+            rawStyle: {
+                kick: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1],
+                bass: [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+            },
+            euphoric: {
+                kick: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+                bass: [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]
+            },
+            hardcore: {
+                kick: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                bass: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+            },
+            trance: {
+                kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+                bass: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+            },
+            techno: {
+                kick: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+                bass: [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0]
+            },
+            drumAndBass: {
+                kick: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+                bass: [0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0]
+            },
+            house: {
+                kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+                bass: [0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]
+            },
+            dubstep: {
+                kick: [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1],
+                bass: [0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1]
+            }
+        },
+
+        showStatus(message, duration = 2000) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.classList.remove('hidden');
+            setTimeout(() => statusEl.classList.add('hidden'), duration);
+        },
+
+        async initializeAudio() {
+            try {
+                await Tone.start();
+                
+                // Initialize effects chain
+                this.compressorEffect = new Tone.Compressor({
+                    threshold: -30,
+                    ratio: 12,
+                    attack: 0.003,
+                    release: 0.25
+                }).toDestination();
+
+                this.distortionEffect = new Tone.Distortion(0.5).connect(this.compressorEffect);
+
+                // Initialize synthesizers
+                this.kickSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 8,
+            oscillator: { 
+                type: 'square4',
+                phase: 0
+            },
+            envelope: {
+                attack: 0.001,
+                decay: 0.2,
+                sustain: 0.1,
+                release: 0.8
+            }
+        }).connect(this.distortionEffect);
+
+                this.bassSynth = new Tone.MonoSynth({
+                    oscillator: { type: 'square8' },
+                    envelope: {
+                        attack: 0.02,
+                        decay: 0.2,
+                        sustain: 0.2,
+                        release: 0.5
+                    },
+                    filter: {
+                        Q: 6,
+                        type: 'lowpass',
+                        rolloff: -24
+                    },
+                    filterEnvelope: {
+                        attack: 0.02,
+                        decay: 0.2,
+                        sustain: 0.2,
+                        release: 0.5,
+                        baseFrequency: 200,
+                        octaves: 7,
+                        exponent: 2
+                    }
+                }).connect(this.distortionEffect);
+
+                // Set up transport
+                Tone.Transport.scheduleRepeat((time) => {
+                    this.playStep(time);
+                }, "16n");
+
+                Tone.Transport.bpm.value = 150;
+                this.isInitialized = true;
+
+                return true;
+            } catch (error) {
+                console.error('Audio initialization error:', error);
+                this.showStatus('Error initializing audio system', 3000);
+                return false;
+            }
+        },
+
+        async initialize() {
+            if (await this.initializeAudio()) {
+                document.getElementById('startOverlay').classList.add('hidden');
+                this.setupEventListeners();
+                this.loadPattern(document.getElementById('presetSelect').value);
+                this.showStatus('Ready to play!');
+            }
+        },
+
+        setupEventListeners() {
+            // Prevent double-tap zoom on mobile
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // Main controls
+            document.getElementById('playButton').addEventListener('click', () => this.togglePlay());
+            document.getElementById('presetSelect').addEventListener('change', (e) => this.loadPattern(e.target.value));
+            document.getElementById('tempo').addEventListener('input', (e) => this.updateTempo(e.target.value));
+
+            // Kick controls
+            const kickControls = ['kickPunch', 'kickTail', 'kickPitchDecay', 'kickOctaves', 
+                                'kickAttack', 'kickDecay', 'kickSustain', 'kickRelease'];
+            kickControls.forEach(id => {
+                const el = document.getElementById(id);
+                const updateKick = () => this.updateKickSynth();
+                el.addEventListener('input', updateKick);
+                el.addEventListener('touchmove', updateKick);
+            });
+
+            // Bass controls
+            const bassControls = ['bassFreq', 'bassReverse', 'bassFilterCutoff', 'bassFilterRes',
+                                'bassFilterEnvAmount', 'bassOscMix', 'bassSubOsc', 'bassAttack',
+                                'bassDecay', 'bassSustain', 'bassRelease'];
+            bassControls.forEach(id => {
+                const el = document.getElementById(id);
+                const updateBass = () => this.updateBassSynth();
+                el.addEventListener('input', updateBass);
+                el.addEventListener('touchmove', updateBass);
+            });
+
+            // Effects
+            document.getElementById('distortion').addEventListener('input', (e) => {
+                this.distortionEffect.distortion = e.target.value / 100;
+            });
+
+            document.getElementById('compression').addEventListener('input', (e) => {
+                const value = e.target.value;
+                this.compressorEffect.threshold.value = -30 - (value / 2);
+                this.compressorEffect.ratio.value = 12 + (value / 5);
+            });
+
+            // Step sequencer grids
+            ['kickGrid', 'bassGrid'].forEach(gridId => {
+                document.getElementById(gridId).addEventListener('click', (e) => {
+                    if (e.target.classList.contains('step')) {
+                        e.target.classList.toggle('active');
+                    }
+                });
+            });
+        },
+
+        loadPattern(name) {
+            const pattern = this.patterns[name];
+            if (!pattern) return;
+
+            const createGrid = (type, pattern) => {
+                const grid = document.getElementById(`${type}Grid`);
+                grid.innerHTML = pattern.map(active => 
+                    `<div class="step ${active ? 'active' : ''}"></div>`
+                ).join('');
+            };
+
+            createGrid('kick', pattern.kick);
+            createGrid('bass', pattern.bass);
+
+            this.updateKickSynth();
+            this.updateBassSynth();
+        },
+
+        async togglePlay() {
+            if (!this.isInitialized) {
+                this.showStatus('Please wait for initialization...', 2000);
+                return;
+            }
+
+            try {
+                if (!this.isPlaying) {
+                    await Tone.start();
+                    Tone.Transport.start();
+                    document.getElementById('playButton').textContent = 'Stop';
+                    document.getElementById('playButton').classList.add('active');
+                } else {
+                    Tone.Transport.stop();
+                    this.currentStep = 0;
+                    document.getElementById('playButton').textContent = 'Play';
+                    document.getElementById('playButton').classList.remove('active');
+                    // Reset all current step indicators
+                    document.querySelectorAll('.step').forEach(step => {
+                        step.classList.remove('current');
+                    });
+                }
+                this.isPlaying = !this.isPlaying;
+            } catch (error) {
+                console.error('Playback error:', error);
+                this.showStatus('Error with playback', 2000);
+            }
+        },
+
+        updateTempo(value) {
+            document.getElementById('tempoValue').textContent = `${value} BPM`;
+            Tone.Transport.bpm.value = value;
+        },
+
+        getActiveSteps(type) {
+            const steps = [];
+            document.querySelectorAll(`#${type}Grid .step`).forEach(step => {
+                steps.push(step.classList.contains('active') ? 1 : 0);
+            });
+            return steps;
+        },
+
+        playStep(time) {
+            const kickSteps = this.getActiveSteps('kick');
+            const bassSteps = this.getActiveSteps('bass');
+
+            // Update visual step indicator
+            document.querySelectorAll('.step').forEach((step, i) => {
+                step.classList.toggle('current', i % 16 === this.currentStep);
+            });
+
+            // Play kick
+            if (kickSteps[this.currentStep]) {
+                const kickPunch = document.getElementById('kickPunch').value / 100;
+                const kickTail = document.getElementById('kickTail').value / 100;
+                
+                this.kickSynth.triggerAttackRelease(
+                    `C${1 + Math.round(kickPunch * 2)}`,
+                    0.1 + (kickTail * 0.4),
+                    time,
+                    0.8 + (kickPunch * 0.4)
+                );
+            }
+
+            // Play bass
+            if (bassSteps[this.currentStep]) {
+                const bassFreq = document.getElementById('bassFreq').value;
+                const bassReverse = document.getElementById('bassReverse').value / 100;
+                
+                const baseFreq = bassFreq * (1 + (Math.sin(this.currentStep * Math.PI / 8) * bassReverse));
+                this.bassSynth.triggerAttackRelease(
+                    `C${Math.max(1, Math.min(4, Math.floor(baseFreq / 25)))}`,
+                    "16n",
+                    time,
+                    0.6 + (bassReverse * 0.4)
+                );
+            }
+
+            this.currentStep = (this.currentStep + 1) % 16;
+        },
+
+        updateKickSynth() {
+            if (!this.kickSynth) return;
+            
+            this.kickSynth.set({
+                pitchDecay: document.getElementById('kickPitchDecay').value / 100,
+                octaves: document.getElementById('kickOctaves').value,
+                envelope: {
+                    attack: document.getElementById('kickAttack').value / 1000,
+                    decay: document.getElementById('kickDecay').value / 100,
+                    sustain: document.getElementById('kickSustain').value / 100,
+                    release: document.getElementById('kickRelease').value / 100
+                }
+            });
+        },
+
+        updateBassSynth() {
+            if (!this.bassSynth) return;
+
+            const filterCutoff = Math.pow(2, document.getElementById('bassFilterCutoff').value / 10);
+            const filterRes = document.getElementById('bassFilterRes').value / 10;
+            const envAmount = document.getElementById('bassFilterEnvAmount').value / 50;
+            const oscMix = document.getElementById('bassOscMix').value / 100;
+            
+            this.bassSynth.set({
+                oscillator: { type: `square${Math.floor(oscMix * 16)}` },
+                filter: { 
+                    frequency: filterCutoff,
+                    Q: filterRes
+                },
+                filterEnvelope: {
+                    attack: document.getElementById('bassAttack').value / 1000,
+                    decay: document.getElementById('bassDecay').value / 100,
+                    sustain: document.getElementById('bassSustain').value / 100,
+                    release: document.getElementById('bassRelease').value / 100,
+                    octaves: envAmount * 7
+                }
+            });
+        }
+    };
+
+    // Initialize the app when the DOM is loaded
+    window.addEventListener('DOMContentLoaded', () => {
+        // Set up start button handlers
+        const startButton = document.getElementById('startButton');
+        const startHandler = async (e) => {
+            e.preventDefault();
+            await App.initialize();
+        };
+        
+        startButton.addEventListener('click', startHandler);
+        startButton.addEventListener('touchstart', startHandler);
+    });
+</script>
+</body>
+</html>
+
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    // First, add these new parameters to the synth initialization in initializeAudio()
+
+
+// Then, update the loadPattern function with enhanced genre settings
+loadPattern(name) {
+    const pattern = this.patterns[name];
+    if (!pattern) return;
+
+    // Previous grid creation code remains the same
+    const createGrid = (type, pattern) => {
+        const grid = document.getElementById(`${type}Grid`);
+        grid.innerHTML = pattern.map(active => 
+            `<div class="step ${active ? 'active' : ''}"></div>`
+        ).join('');
+    };
+
+    createGrid('kick', pattern.kick);
+    createGrid('bass', pattern.bass);
+
+    // Enhanced genre-specific parameters
+    const genreSettings = {
+        hardstyle: {
+            kick: {
+                punch: 80,
+                tail: 60,
+                pitchDecay: 70,
+                octaves: 10,
+                attack: 5,
+                decay: 60,
+                sustain: 20,
+                release: 50,
+                oscillatorType: 'square8',
+                oscillatorPhase: 45
+            },
+            bass: {
+                freq: 45,
+                reverse: 80,
+                filterCutoff: 70,
+                filterRes: 80,
+                filterEnvAmount: 90,
+                oscMix: 70,
+                subOsc: 80,
+                attack: 10,
+                decay: 40,
+                sustain: 30,
+                release: 40,
+                oscillatorType: 'square8'
+            },
+            effects: {
+                distortion: 70,
+                compression: 80,
+                reverbDecay: 1.5,
+                reverbMix: 0.15,
+                delayTime: "16n",
+                delayFeedback: 0.2,
+                delayMix: 0.15,
+                filterFreq: 2000,
+                filterQ: 2,
+                lfoRate: "8n",
+                lfoDepth: 400
+            }
+        },
+        rawStyle: {
+            kick: {
+                punch: 90,
+                tail: 40,
+                pitchDecay: 80,
+                octaves: 12,
+                attack: 2,
+                decay: 70,
+                sustain: 10,
+                release: 40,
+                oscillatorType: 'square16',
+                oscillatorPhase: 90
+            },
+            bass: {
+                freq: 40,
+                reverse: 90,
+                filterCutoff: 90,
+                filterRes: 90,
+                filterEnvAmount: 100,
+                oscMix: 90,
+                subOsc: 90,
+                attack: 5,
+                decay: 30,
+                sustain: 20,
+                release: 30,
+                oscillatorType: 'square16'
+            },
+            effects: {
+                distortion: 90,
+                compression: 90,
+                reverbDecay: 1.0,
+                reverbMix: 0.1,
+                delayTime: "32n",
+                delayFeedback: 0.15,
+                delayMix: 0.1,
+                filterFreq: 3000,
+                filterQ: 4,
+                lfoRate: "16n",
+                lfoDepth: 800
+            }
+        },
+        euphoric: {
+            kick: {
+                punch: 70,
+                tail: 70,
+                pitchDecay: 60,
+                octaves: 8,
+                attack: 10,
+                decay: 50,
+                sustain: 30,
+                release: 60,
+                oscillatorType: 'square4',
+                oscillatorPhase: 0
+            },
+            bass: {
+                freq: 50,
+                reverse: 60,
+                filterCutoff: 60,
+                filterRes: 50,
+                filterEnvAmount: 60,
+                oscMix: 50,
+                subOsc: 70,
+                attack: 20,
+                decay: 50,
+                sustain: 40,
+                release: 60,
+                oscillatorType: 'sine4'
+            },
+            effects: {
+                distortion: 50,
+                compression: 70,
+                reverbDecay: 3.0,
+                reverbMix: 0.3,
+                delayTime: "8n",
+                delayFeedback: 0.3,
+                delayMix: 0.25,
+                filterFreq: 1500,
+                filterQ: 1,
+                lfoRate: "4n",
+                lfoDepth: 200
+            }
+        },
+        // Add similar detailed settings for other genres...
+    };
+
+    // Apply enhanced settings
+    const settings = genreSettings[name];
+    if (settings) {
+        // Update kick synth
+        this.kickSynth.set({
+            pitchDecay: settings.kick.pitchDecay / 100,
+            octaves: settings.kick.octaves,
+            oscillator: {
+                type: settings.kick.oscillatorType,
+                phase: settings.kick.oscillatorPhase
+            },
+            envelope: {
+                attack: settings.kick.attack / 1000,
+                decay: settings.kick.decay / 100,
+                sustain: settings.kick.sustain / 100,
+                release: settings.kick.release / 100
+            }
+        });
+
+        // Update bass synth
+        this.bassSynth.set({
+            oscillator: {
+                type: settings.bass.oscillatorType
+            },
+            envelope: {
+                attack: settings.bass.attack / 1000,
+                decay: settings.bass.decay / 100,
+                sustain: settings.bass.sustain / 100,
+                release: settings.bass.release / 100
+            },
+            filterEnvelope: {
+                baseFrequency: settings.bass.filterCutoff * 20,
+                octaves: settings.bass.filterEnvAmount / 10,
+                attack: settings.bass.attack / 1000,
+                decay: settings.bass.decay / 100,
+                sustain: settings.bass.sustain / 100,
+                release: settings.bass.release / 100
+            }
+        });
+
+        // Update effects
+        this.distortionEffect.distortion = settings.effects.distortion / 100;
+        this.compressorEffect.threshold.value = -30 - (settings.effects.compression / 2);
+        this.compressorEffect.ratio.value = 12 + (settings.effects.compression / 5);
+        
+        // Update new effects
+        this.reverbEffect.set({
+            decay: settings.effects.reverbDecay,
+            wet: settings.effects.reverbMix
+        });
+
+        this.delayEffect.set({
+            delayTime: settings.effects.delayTime,
+            feedback: settings.effects.delayFeedback,
+            wet: settings.effects.delayMix
+        });
+
+        this.filterEffect.set({
+            frequency: settings.effects.filterFreq,
+            Q: settings.effects.filterQ
+        });
+
+        this.filterLFO.set({
+            frequency: settings.effects.lfoRate,
+            min: settings.effects.filterFreq - settings.effects.lfoDepth,
+            max: settings.effects.filterFreq + settings.effects.lfoDepth
+        });
+    }
+}
+
+
+
+
+
+
+async initializeAudio() {
+    try {
+        await Tone.start();
+        
+        // Initialize effects chain with new effects
+        this.reverbEffect = new Tone.Reverb({
+            decay: 2.5,
+            preDelay: 0.1
+        }).connect(this.compressorEffect);
+
+        this.delayEffect = new Tone.PingPongDelay({
+            delayTime: "8n",
+            feedback: 0.2,
+            wet: 0.1
+        }).connect(this.reverbEffect);
+
+        this.filterEffect = new Tone.Filter({
+            type: "lowpass",
+            frequency: 2000,
+            Q: 1
+        }).connect(this.delayEffect);
+
+        this.distortionEffect = new Tone.Distortion(0.5).connect(this.filterEffect);
+
+        // Enhanced kick synth
+        this.kickSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 8,
+            oscillator: { 
+                type: 'square4',
+                phase: 0
+            },
+            envelope: {
+                attack: 0.001,
+                decay: 0.2,
+                sustain: 0.1,
+                release: 0.8
+            }
+        }).connect(this.distortionEffect);
+
+        // Enhanced bass synth with dual oscillators
+        this.bassSynth = new Tone.MonoSynth({
+            oscillator: { 
+                type: 'square8'
+            },
+            envelope: {
+                attack: 0.02,
+                decay: 0.2,
+                sustain: 0.2,
+                release: 0.5
+            },
+            filter: {
+                Q: 6,
+                type: 'lowpass',
+                rolloff: -24
+            },
+            filterEnvelope: {
+                attack: 0.02,
+                decay: 0.2,
+                sustain: 0.2,
+                release: 0.5,
+                baseFrequency: 200,
+                octaves: 7,
+                exponent: 2
+            }
+        }).connect(this.distortionEffect);
+
+        // Add LFO for filter modulation
+        this.filterLFO = new Tone.LFO({
+            frequency: "8n",
+            min: 200,
+            max: 2000
+        }).connect(this.filterEffect.frequency);
+
+        // Initialize transport and complete setup
+        Tone.Transport.scheduleRepeat((time) => {
+            this.playStep(time);
+        }, "16n");
+
+        Tone.Transport.bpm.value = 150;
+        this.isInitialized = true;
+
+        return true;
+    } catch (error) {
+        console.error('Audio initialization error:', error);
+        this.showStatus('Error initializing audio system', 3000);
+        return false;
+    }
+}

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image Analysis Tool</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/opencv.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #1e40af;
+            --background: #f3f4f6;
+            --text: #111827;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .control-group {
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .image-container {
+            position: relative;
+            margin: 20px auto;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        img, canvas {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .threshold-controls {
+            display: grid;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .slider-container {
+            display: grid;
+            gap: 5px;
+        }
+
+        #results, #metadata {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Analysis & Enhancement Tool</h1>
+        <div id="modelStatus" class="status"></div>
+        
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>Analysis</h3>
+                <button id="detectObjects">Detect Objects</button>
+                <button id="detectPeople">Detect People</button>
+                <button id="showMetadata">Full Metadata</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Enhancement</h3>
+                <button id="simpleThreshold">Simple Threshold</button>
+                <button id="adaptiveThreshold">Adaptive Threshold</button>
+                <button id="cartoonify">Cartoonify</button>
+                
+                <div class="threshold-controls">
+                    <div class="slider-container">
+                        <label>Threshold</label>
+                        <input type="range" id="thresholdValue" min="0" max="255" value="127">
+                    </div>
+                    <div class="slider-container">
+                        <label>Block Size</label>
+                        <input type="range" id="blockSize" min="3" max="99" step="2" value="11">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="image-container">
+            <img id="image" style="display: none">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div id="results"></div>
+        <div id="metadata"></div>
+    </div>
+
+    <script>
+        // Core functionality module
+        const Core = {
+            models: { object: null, pose: null },
+            elements: {},
+            
+            async init() {
+                this.bindElements();
+                await this.loadModels();
+                this.setupEventListeners();
+                this.initOpenCV();
+            },
+
+            bindElements() {
+                ['image', 'canvas', 'results', 'metadata', 'modelStatus', 'imageInput',
+                 'thresholdValue', 'blockSize'].forEach(id => 
+                    this.elements[id] = document.getElementById(id));
+                
+                this.bindButtons();
+            },
+
+            bindButtons() {
+                const buttons = [
+                    'detectObjects', 'detectPeople', 'showMetadata',
+                    'simpleThreshold', 'adaptiveThreshold', 'cartoonify'
+                ];
+                this.buttons = Object.fromEntries(
+                    buttons.map(id => [id, document.getElementById(id)])
+                );
+            },
+
+            initOpenCV() {
+                if (typeof cv !== 'undefined') {
+                    ImageProcessor.init();
+                } else {
+                    setTimeout(() => this.initOpenCV(), 100);
+                }
+            },
+
+            async loadModels() {
+                try {
+                    [this.models.object, this.models.pose] = await Promise.all([
+                        cocoSsd.load(),
+                        poseDetection.createDetector(poseDetection.SupportedModels.MoveNet)
+                    ]);
+                } catch (error) {
+                    console.error('Model loading error:', error);
+                }
+            },
+
+            setupEventListeners() {
+                this.elements.imageInput.addEventListener('change', e => this.handleImageUpload(e));
+                
+                Object.entries(this.buttons).forEach(([key, button]) => {
+                    button.addEventListener('click', () => {
+                        switch(key) {
+                            case 'detectObjects': ObjectDetector.detect(); break;
+                            case 'detectPeople': PeopleDetector.detect(); break;
+                            case 'showMetadata': MetadataExtractor.extract(); break;
+                            case 'simpleThreshold': 
+                                ImageProcessor.applyThreshold('simple'); break;
+                            case 'adaptiveThreshold': 
+                                ImageProcessor.applyThreshold('adaptive'); break;
+                            case 'cartoonify': 
+                                ImageProcessor.cartoonify(); break;
+                        }
+                    });
+                });
+
+                ['thresholdValue', 'blockSize'].forEach(id => {
+                    this.elements[id].addEventListener('input', () => 
+                        ImageProcessor.updateThreshold());
+                });
+            },
+
+            handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = e => {
+                    this.elements.image.src = e.target.result;
+                    this.elements.image.style.display = 'block';
+                    this.elements.image.onload = () => this.setupCanvas();
+                };
+                reader.readAsDataURL(file);
+            },
+
+            setupCanvas() {
+                const canvas = this.elements.canvas;
+                const img = this.elements.image;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                canvas.style.width = img.clientWidth + 'px';
+                canvas.style.height = img.clientHeight + 'px';
+            }
+        };
+
+        // Image Processing Module
+        const ImageProcessor = {
+            init() {
+                this.mat = new cv.Mat();
+                this.dst = new cv.Mat();
+            },
+
+            applyThreshold(type) {
+                const img = Core.elements.image;
+                const canvas = Core.elements.canvas;
+                const ctx = canvas.getContext('2d');
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                cv.imshow('canvas', this.processThreshold(imgData, type));
+            },
+
+            processThreshold(imgData, type) {
+                const src = cv.matFromImageData(imgData);
+                cv.cvtColor(src, this.mat, cv.COLOR_RGBA2GRAY);
+
+                if (type === 'simple') {
+                    cv.threshold(
+                        this.mat,
+                        this.dst,
+                        Core.elements.thresholdValue.value,
+                        255,
+                        cv.THRESH_BINARY
+                    );
+                } else {
+                    const blockSize = parseInt(Core.elements.blockSize.value);
+                    cv.adaptiveThreshold(
+                        this.mat,
+                        this.dst,
+                        255,
+                        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv.THRESH_BINARY,
+                        blockSize,
+                        2
+                    );
+                }
+
+                src.delete();
+                return this.dst;
+            },
+
+            cartoonify() {
+                const img = Core.elements.image;
+                const canvas = Core.elements.canvas;
+                const ctx = canvas.getContext('2d');
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                const src = cv.matFromImageData(imgData);
+                const gray = new cv.Mat();
+                const edges = new cv.Mat();
+                const dst = new cv.Mat();
+
+                // Convert to grayscale and blur
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                cv.medianBlur(gray, gray, 5);
+                
+                // Detect edges
+                cv.adaptiveThreshold(
+                    gray,
+                    edges,
+                    255,
+                    cv.ADAPTIVE_THRESH_MEAN_C,
+                    cv.THRESH_BINARY,
+                    9,
+                    2
+                );
+
+                // Color quantization
+                cv.pyrMeanShiftFiltering(src, dst, 20, 45);
+
+                // Combine edges with color
+                cv.bitwise_and(dst, dst, dst, edges);
+
+                cv.imshow('canvas', dst);
+
+                // Cleanup
+                [src, gray, edges, dst].forEach(mat => mat.delete());
+            },
+
+            updateThreshold() {
+                if (this.lastOperation) {
+                    this.applyThreshold(this.lastOperation);
+                }
+            }
+        };
+
+        // Enhanced Metadata Extraction
+        const MetadataExtractor = {
+            async extract() {
+                try {
+                    const img = Core.elements.image;
+                    EXIF.getData(img, () => {
+                        const tags = EXIF.getAllTags(img);
+                        const fileInfo = this.getFileInfo(img);
+                        this.displayMetadata({ ...tags, ...fileInfo });
+                    });
+                } catch (error) {
+                    console.error('Metadata extraction error:', error);
+                }
+            },
+
+            getFileInfo(img) {
+                return {
+                    dimensions: `${img.naturalWidth} × ${img.naturalHeight}`,
+                    aspectRatio: (img.naturalWidth / img.naturalHeight).toFixed(2),
+                    src: img.src.substring(0, 50) + '...'
+                };
+            },
+
+            displayMetadata(metadata) {
+                const formatValue = (value) => {
+                    if (value instanceof Object) return JSON.stringify(value);
+                    return value;
+                };
+
+                Core.elements.metadata.innerHTML = `
+                    <h3>Complete Metadata</h3>
+                    <div style="display: grid; gap: 10px;">
+                        ${Object.entries(metadata)
+                            .map(([key, value]) => `
+                                <div style="padding: 5px; border-bottom: 1px solid #eee;">
+                                    <strong>${key}:</strong> 
+                                    <span>${formatValue(value)}</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                `;
+            }
+        };
+
+        // Initialize when DOM is ready
+        window.addEventListener('DOMContentLoaded', () => Core.init());
+    </script>
+</body>
+</html>

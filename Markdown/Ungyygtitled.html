@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Execution Tool</title>
+    <!-- CodeMirror CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --background-color: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--background-color);
+            font-size: 16px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .main {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .CodeMirror {
+            height: 300px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: var(--secondary-color);
+        }
+
+        .output {
+            white-space: pre-wrap;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            min-height: 100px;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: #e2e8f0;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .error {
+            color: #dc2626;
+            padding: 10px;
+            background: #fee2e2;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .code-display {
+            background: #f8fafc;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+
+        .generated-button-container {
+            margin-top: 20px;
+        }
+
+        .generated-button-container button {
+            background: green;
+        }
+
+        .generated-button-container pre {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Code Execution Tool</h1>
+        </div>
+        
+        <div class="main">
+            <div class="panel">
+                <div class="tabs">
+                    <button class="tab active" data-mode="javascript">JavaScript</button>
+                    <button class="tab" data-mode="html">HTML</button>
+                    <button class="tab" data-mode="css">CSS</button>
+                    <button class="tab" data-mode="mixed">Mixed</button>
+                </div>
+                <textarea id="code-input"></textarea>
+                <div class="button-group">
+                    <button id="execute">Execute</button>
+                    <button id="format">Format</button>
+                    <button id="minify">Minify</button>
+                    <button id="copy">Copy Code</button>
+                    <button id="generate-button">Generate Button</button>
+                    <input type="file" id="file-input" accept=".js,.html,.css,.txt,.json">
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>Output</h3>
+                <div class="button-group">
+                    <button id="copy-output">Copy Output</button>
+                    <button id="new-window">Open in New Window</button>
+                    <button id="save">Save</button>
+                </div>
+                <div id="error" class="error" style="display: none;"></div>
+                <div id="output" class="output"></div>
+
+                <div class="generated-button-container">
+                    <h4>Generated Button:</h4>
+                    <div id="generated-button"></div>
+                    <div id="generated-button-code"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+
+    <script>
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-input'), {
+            lineNumbers: true,
+            theme: 'monokai',
+            mode: 'javascript',
+            indentUnit: 4,
+            lineWrapping: true,
+            autoCloseBrackets: true,
+            matchBrackets: true
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                editor.setOption('mode', tab.dataset.mode);
+            });
+        });
+
+        // Execute code
+        document.getElementById('execute').addEventListener('click', () => {
+            const code = editor.getValue();
+            const mode = document.querySelector('.tab.active').dataset.mode;
+            const output = document.getElementById('output');
+            const error = document.getElementById('error');
+            
+            error.style.display = 'none';
+            
+            try {
+                if (mode === 'javascript') {
+                    // Execute JavaScript
+                    const result = new Function(code)();
+                    output.textContent = result !== undefined ? result : 'Code executed successfully';
+                } else if (mode === 'html' || mode === 'mixed') {
+                    // Render HTML
+                    output.innerHTML = code;
+                } else if (mode === 'css') {
+                    // Apply CSS
+                    const style = document.createElement('style');
+                    style.textContent = code;
+                    document.head.appendChild(style);
+                    output.textContent = 'CSS applied successfully';
+                }
+            } catch (e) {
+                error.style.display = 'block';
+                error.textContent = e.toString();
+            }
+        });
+
+        // Format code
+        document.getElementById('format').addEventListener('click', () => {
+            const code = editor.getValue();
+            const mode = document.querySelector('.tab.active').dataset.mode;
+            
+            let formatted;
+            if (mode === 'javascript') {
+                formatted = js_beautify(code);
+            } else if (mode === 'html' || mode === 'mixed') {
+                formatted = html_beautify(code);
+            } else if (mode === 'css') {
+                formatted = css_beautify(code);
+            }
+            
+            editor.setValue(formatted);
+        });
+
+        // Minify code
+        document.getElementById('minify').addEventListener('click', () => {
+            const code = editor.getValue();
+            const minified = code.replace(/\s+/g, ' ').trim();
+            editor.setValue(minified);
+        });
+
+        // Copy code to clipboard
+        document.getElementById('copy').addEventListener('click', () => {
+            const code = editor.getValue();
+            navigator.clipboard.writeText(code)
+                .then(() => {
+                    alert('Code copied to clipboard');
+                })
+                .catch(err => {
+                    alert('Failed to copy code: ' + err);
+                });
+        });
+
+        // Generate button
+        document.getElementById('generate-button').addEventListener('click', () => {
+            const code = editor.getValue();
+            const buttonCode = `<button onclick="(function(){${code}})()">Execute Code</button>`;
+            const buttonContainer = document.getElementById('generated-button');
+            const codeContainer = document.getElementById('generated-button-code');
+
+            // Display the button code
+            codeContainer.textContent = buttonCode;
+
+            // Create and display the rendered button
+            const newButton = document.createElement('button');
+            newButton.textContent = 'Generated Button';
+            newButton.onclick = new Function(code);
+            buttonContainer.innerHTML = ''; // Clear previous content
+            buttonContainer.appendChild(newButton);
+        });
+
+        // Copy output content to clipboard
+        document.getElementById('copy-output').addEventListener('click', () => {
+            const output = document.getElementById('output').textContent;
+            navigator.clipboard.writeText(output)
+                .then(() => {
+                    alert('Output copied to clipboard');
+                })
+                .catch(err => {
+                    alert('Failed to copy output: ' + err);
+                });
+        });
+
+        // Open output in a new window
+        document.getElementById('new-window').addEventListener('click', () => {
+            const output = document.getElementById('output').textContent;
+            const newWindow = window.open();
+            newWindow.document.write(`<pre>${output}</pre>`);
+        });
+
+        // Save output to file
+        document.getElementById('save').addEventListener('click', () => {
+            const output = document.getElementById('output').textContent;
+            const blob = new Blob([output], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'output.txt';
+            link.click();
+        });
+    </script>
+</body>
+</html>

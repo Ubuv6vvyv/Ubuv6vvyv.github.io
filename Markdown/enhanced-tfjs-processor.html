@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Enhanced TensorFlow.js Image Processor</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection"></script>
+    <style>
+        :root {
+            --primary: #2196f3;
+            --primary-dark: #1976d2;
+            --error: #f44336;
+            --success: #4caf50;
+            --bg: #f5f5f5;
+            --card: #fff;
+            --text: #333;
+            --text-2: #666;
+            --radius: 8px;
+            --trans: .3s;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --card: #2d2d2d;
+                --text: #fff;
+                --text-2: #bbb;
+                --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--bg);
+            color: var(--text);
+            transition: background var(--trans);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius);
+            background: var(--primary);
+            color: #fff;
+            cursor: pointer;
+            transition: all var(--trans);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            box-shadow: var(--shadow);
+        }
+        
+        .btn:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            background: var(--card);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            transition: transform var(--trans);
+        }
+        
+        .canvas-wrapper:hover {
+            transform: translateY(-5px);
+        }
+        
+        .canvas-label {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 5px 15px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        canvas {
+            width: 100%;
+            height: auto;
+            border-radius: calc(var(--radius) - 4px);
+            display: block;
+        }
+        
+        #drop-zone {
+            border: 3px dashed #ccc;
+            border-radius: var(--radius);
+            padding: 40px 20px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all var(--trans);
+            background: var(--card);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #drop-zone.over {
+            border-color: var(--primary);
+            background: rgba(33, 150, 243, 0.1);
+            transform: scale(1.02);
+        }
+        
+        #drop-zone::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(33, 150, 243, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+        
+        #drop-zone:hover::before {
+            transform: translateX(100%);
+        }
+        
+        .status {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: background var(--trans);
+        }
+        
+        .dot.on {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+        
+        .msg {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: var(--radius);
+            animation: slideIn .3s;
+            box-shadow: var(--shadow);
+        }
+        
+        .error {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--error);
+            border-left: 4px solid var(--error);
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+            border-left: 4px solid var(--success);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .canvas-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .status {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TensorFlow.js Image Processor</h1>
+            <div class="status" id="model-status"></div>
+        </div>
+
+        <div id="drop-zone">
+            <p>Drop image or click to upload</p>
+            <input type="file" id="file-input" accept="image/*" hidden>
+        </div>
+
+        <div class="controls" id="controls"></div>
+
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <div class="canvas-label">Input</div>
+                <canvas id="input"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <div class="canvas-label">Output</div>
+                <canvas id="output"></canvas>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Global state
+        const state = {
+            models: {},
+            image: null,
+            busy: false,
+            results: [],
+            maxImageSize: 800 // Maximum dimension for processing
+        };
+
+        // Image processing utilities
+        const imageUtils = {
+            calculateAspectRatioFit(srcWidth, srcHeight, maxWidth, maxHeight) {
+                const ratio = Math.min(maxWidth / srcWidth, maxHeight / srcHeight);
+                return {
+                    width: srcWidth * ratio,
+                    height: srcHeight * ratio
+                };
+            },
+
+            resizeImage(img, maxDimension) {
+                const dims = this.calculateAspectRatioFit(
+                    img.naturalWidth,
+                    img.naturalHeight,
+                    maxDimension,
+                    maxDimension
+                );
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = dims.width;
+                canvas.height = dims.height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, dims.width, dims.height);
+                
+                return canvas;
+            }
+        };
+
+        // Drawing functions
+        const drawUtils = {
+            clearCanvas(canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            },
+
+            setupCanvas(canvas, width, height) {
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, width, height);
+                return ctx;
+            },
+
+            drawDetections(faces) {
+                const outputCanvas = document.getElementById('output');
+                const ctx = this.setupCanvas(outputCanvas, state.image.width, state.image.height);
+                ctx.drawImage(state.image, 0, 0);
+                
+                faces.forEach((face, idx) => {
+                    const { box } = face;
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(box.xMin, box.yMin, box.width, box.height);
+                    
+                    ctx.fillStyle = '#00ff00';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(
+                        `Face ${idx + 1} (${(face.score * 100).toFixed(1)}%)`,
+                        box.xMin,
+                        box.yMin - 5
+                    );
+                });
+            },
+
+            drawObjects(objects) {
+                const outputCanvas = document.getElementById('output');
+                const ctx = this.setupCanvas(outputCanvas, state.image.width, state.image.height);
+                ctx.drawImage(state.image, 0, 0);
+                
+                objects.forEach(obj => {
+                    const [x, y, width, height] = obj.bbox;
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Draw background for text
+                    const label = `${obj.class} (${Math.round(obj.score * 100)}%)`;
+                    const textMetrics = ctx.measureText(label);
+                    const padding = 4;
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(
+                        x,
+                        y > 20 ? y - 24 : y + height,
+                        textMetrics.width + padding * 2,
+                        20
+                    );
+                    
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '14px Arial';
+                    ctx.fillText(
+                        label,
+                        x + padding,
+                        y > 20 ? y - 8 : y + height + 16
+                    );
+                });
+            },
+
+            drawClasses(classes) {
+                const outputCanvas = document.getElementById('output');
+                const ctx = this.setupCanvas(outputCanvas, state.image.width, state.image.height);
+                ctx.drawImage(state.image, 0, 0);
+                
+                // Draw classification results with improved visibility
+                const height = 35 * classes.length + 20;
+                const padding = 10;
+                
+                // Semi-transparent background
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, ctx.canvas.height - height, ctx.canvas.width, height);
+                
+                classes.forEach((cls, idx) => {
+                    const y = ctx.canvas.height - height + 30 + (idx * 35);
+                    
+                    // Draw progress bar
+                    const barWidth = (cls.probability * (ctx.canvas.width - padding * 2));
+                    ctx.fillStyle = 'rgba(33, 150, 243, 0.5)';
+                    ctx.fillRect(padding, y - 15, barWidth, 20);
+                    
+                    // Draw text
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(
+                        `${cls.className}`,
+                        padding,
+                        y
+                    );
+                    
+                    ctx.fillStyle = '#aaaaaa';
+                    ctx.font = '12px Arial';
+                    ctx.fillText(
+                        `${(cls.probability * 100).toFixed(1)}%`,
+                        padding + barWidth + 5,
+                        y
+                    );
+                });
+            }
+        };
+
+        // Processing functions
+        const processors = {
+            async segment() {
+                const seg = await state.models.bodyPix.segmentPerson(state.image);
+                const mask = bodyPix.toMask(seg);
+                const outputCanvas = document.getElementById('output');
+                const ctx = drawUtils.setupCanvas(outputCanvas, state.image.width, state.image.height);
+                ctx.putImageData(mask, 0, 0);
+                return 'Segmentation complete';
+            },
+
+            async detect() {
+                const faces = await state.models.faceDetector.estimateFaces(state.image);
+                drawUtils.drawDetections(faces);
+                return `Detected ${faces.length} faces`;
+            },
+
+            async objects() {
+                const objects = await state.models.cocoSsd.detect(state.image);
+                drawUtils.drawObjects(objects);
+                return objects.map(o => `${o.class} (${(o.score * 100).toFixed()}%)`).join(', ');
+            },
+
+            async classify() {
+                const classes = await state.models.mobilenet.classify(state.image);
+                drawUtils.drawClasses(classes);
+                return classes.map(c => `${c.className} (${(c.probability * 100).toFixed()}%)`).join(', ');
+            }
+        };
+
+        // UI feedback utilities
+        const uiUtils = {
+            notify(msg, type = 'success') {
+                const div = document.createElement('div');
+                div.className = `msg ${type}`;
+                div.textContent = msg;
+                const results = document.getElementById('results');
+                results.prepend(div);
+                
+                // Limit number of messages
+                while (results.children.length > 5) {
+                    results.removeChild(results.lastChild);
+                }
+                
+                setTimeout(() => {
+                    div.style.opacity = '0';
+                    setTimeout(() => div.remove(), 300);
+                }, 5000);
+            },
+
+            updateStatus(name, ok) {
+                const statusItem = document.querySelector(`[data-model="${name}"]`);
+                if (statusItem) {
+                    const dot = statusItem.querySelector('.dot');
+                    dot.classList.toggle('on', ok);
+                    statusItem.title = ok ? 'Model loaded' : 'Model failed to load';
+                }
+            },
+
+            updateButtons(enabled = true) {
+                document.querySelectorAll('.btn').forEach(btn => {
+                    btn.disabled = !enabled || (enabled && !state.image && !btn.classList.contains('clear-btn'));
+                });
+            }
+        };
+
+        // Initialize models
+        const initModels = async () => {
+            const modelConfigs = {
+                bodyPix: bodyPix.load(),
+                cocoSsd: cocoSsd.load(),
+                mobilenet: mobilenet.load(),
+                faceDetector: faceDetection.createDetector(
+                    faceDetection.SupportedModels.MediaPipeFaceDetector,
+                    { runtime: 'tfjs', modelType: 'short' }
+                )
+            };
+
+            for (const [name, promise] of Object.entries(modelConfigs)) {
+                try {
+                    state.models[name] = await promise;
+                    uiUtils.updateStatus(name, true);
+                    uiUtils.notify(`${name} loaded successfully`);
+                } catch (e) {
+                    console.error(`Failed to load ${name}:`, e);
+                    uiUtils.updateStatus(name, false);
+                    uiUtils.notify(`Failed to load ${name}`, 'error');
+                }
+            }
+        };
+
+        // File handling
+        const handleFile = async file => {
+            if (!file?.type.startsWith('image/')) {
+                uiUtils.notify('Please select a valid image file', 'error');
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                // Create a resized version for processing
+                const resized = imageUtils.resizeImage(img, state.maxImageSize);
+                state.image = resized;
+                
+                // Update both canvases
+                ['input', 'output'].forEach(id => {
+                    const canvas = document.getElementById(id);
+                    const ctx = drawUtils.setupCanvas(canvas, resized.width, resized.height);
+                    ctx.drawImage(resized, 0, 0);
+                });
+                
+                uiUtils.updateButtons(true);
+                uiUtils.notify('Image loaded successfully');
+            };
+            img.onerror = () => {
+                uiUtils.notify('Failed to load image', 'error');
+            };
+            img.src = URL.createObjectURL(file);
+        };
+
+        // Process images
+        const process = async (type) => {
+            if (state.busy) return;
+            
+            state.busy = true;
+            uiUtils.updateButtons(false);
+            
+            try {
+                if (type === 'all') {
+                    for (const [name, fn] of Object.entries(processors)) {
+                        const result = await fn();
+                        uiUtils.notify(`${name}: ${result}`);
+                    }
+                } else if (processors[type]) {
+                    const result = await processors[type]();
+                    uiUtils.notify(result);
+                }
+            } catch (e) {
+                console.error(e);
+                uiUtils.notify(e.message, 'error');
+            } finally {
+                state.busy = false;
+                uiUtils.updateButtons(true);
+            }
+        };
+
+        // Clear everything
+        const clearAll = () => {
+            state.image = null;
+            state.results = [];
+            
+            ['input', 'output'].forEach(id => {
+                const canvas = document.getElementById(id);
+                drawUtils.clearCanvas(canvas);
+            });
+            
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('file-input').value = '';
+            
+            uiUtils.updateButtons(false);
+            tf.dispose();
+            uiUtils.notify('All cleared');
+        };
+
+        // Initialize UI
+        const initUI = () => {
+            // Setup model status indicators
+            const statusHTML = Object.keys(processors).map(name => 
+                `<div class="status-item" data-model="${name}">
+                    <div class="dot"></div>
+                    <span>${name}</span>
+                </div>`
+            ).join('');
+            document.getElementById('model-status').innerHTML = statusHTML;
+
+            // Setup control buttons
+            const controlsHTML = Object.keys(processors).map(name => 
+                `<button class="btn" onclick="process('${name}')" disabled>
+                    ${name.charAt(0).toUpperCase() + name.slice(1)}
+                </button>`
+            ).join('') +
+            '<button class="btn" onclick="process(\'all\')" disabled>Process All</button>' +
+            '<button class="btn clear-btn" onclick="clearAll()">Clear</button>';
+            document.getElementById('controls').innerHTML = controlsHTML;
+
+            // Setup drag & drop
+            const zone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+
+            zone.ondragover = e => {
+                e.preventDefault();
+                zone.classList.add('over');
+            };
+            
+            zone.ondragleave = () => zone.classList.remove('over');
+            
+            zone.ondrop = e => {
+                e.preventDefault();
+                zone.classList.remove('over');
+                handleFile(e.dataTransfer.files[0]);
+            };
+            
+            zone.onclick = () => fileInput.click();
+            fileInput.onchange = e => handleFile(e.target.files[0]);
+        };
+
+        // Start application
+        window.onload = () => {
+            initUI();
+            initModels();
+        };
+    </script>
+</body>
+</html>

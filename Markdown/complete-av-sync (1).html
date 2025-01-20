@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enhanced Audio-Video Beat Sync Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            margin: 0;
+            padding: 10px 0;
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        video {
+            width: 100%;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio-Video Beat Sync Editor</h1>
+        <div>
+            <h2>Upload Audio</h2>
+            <input type="file" id="audioInput" accept="audio/*">
+            <button id="analyzeAudio">Analyze Beats</button>
+            <div id="bpmResult">Detected BPM: --</div>
+        </div>
+
+        <div>
+            <h2>Upload Video</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            <button id="segmentVideo" disabled>Segment Video by Beats</button>
+        </div>
+
+        <div>
+            <h2>Preview and Export</h2>
+            <video id="preview" controls></video>
+            <button id="exportVideo" disabled>Export Video</button>
+        </div>
+    </div>
+
+    <script>
+        let audioContext, audioBuffer, bpm, beatDuration, videoElement, segments = [];
+        const MAX_SEGMENTS = 50; // Limit to avoid freezing the browser
+
+        document.getElementById('analyzeAudio').addEventListener('click', analyzeBeats);
+        document.getElementById('segmentVideo').addEventListener('click', segmentVideoByBeats);
+        document.getElementById('exportVideo').addEventListener('click', exportVideo);
+
+        // Analyze Beats
+        async function analyzeBeats() {
+            const audioInput = document.getElementById('audioInput').files[0];
+            if (!audioInput) {
+                alert("No audio file selected!");
+                return;
+            }
+
+            audioContext = new AudioContext();
+            const arrayBuffer = await audioInput.arrayBuffer();
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            // Improved BPM detection with realistic constraints
+            bpm = detectBPM(audioBuffer);
+            bpm = Math.min(Math.max(bpm, 60), 300); // Clamp BPM to 60–300
+            beatDuration = 60 / bpm;
+
+            document.getElementById('bpmResult').innerText = `Detected BPM: ${bpm}`;
+            document.getElementById('segmentVideo').disabled = false;
+        }
+
+        function detectBPM(buffer) {
+            const channelData = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            let energy = 0;
+            let peaks = [];
+            let threshold = 0.8;
+
+            for (let i = 0; i < channelData.length; i += sampleRate / 10) {
+                energy = channelData.slice(i, i + sampleRate / 10).reduce((acc, val) => acc + Math.abs(val), 0);
+                if (energy > threshold) {
+                    peaks.push(i / sampleRate);
+                    threshold *= 1.05; // Dynamically adjust threshold
+                } else {
+                    threshold *= 0.95; // Reset threshold slightly
+                }
+            }
+
+            if (peaks.length < 2) return 60; // Default BPM if insufficient peaks detected
+
+            const intervals = [];
+            for (let i = 1; i < peaks.length; i++) {
+                intervals.push(peaks[i] - peaks[i - 1]);
+            }
+
+            const bpmCounts = intervals.reduce((acc, interval) => {
+                const bpm = Math.round(60 / interval);
+                acc[bpm] = (acc[bpm] || 0) + 1;
+                return acc;
+            }, {});
+
+            const mostFrequentBPM = Object.keys(bpmCounts).reduce((a, b) => bpmCounts[a] > bpmCounts[b] ? a : b);
+            return parseInt(mostFrequentBPM, 10);
+        }
+
+        // Segment Video by Beats
+        async function segmentVideoByBeats() {
+            const videoInput = document.getElementById('videoInput').files[0];
+            if (!videoInput) {
+                alert("No video file selected!");
+                return;
+            }
+
+            const videoURL = URL.createObjectURL(videoInput);
+            videoElement = document.createElement('video');
+            videoElement.src = videoURL;
+
+            await new Promise(resolve => {
+                videoElement.addEventListener('loadedmetadata', resolve);
+            });
+
+            const duration = videoElement.duration;
+            let totalBeats = Math.floor(duration / beatDuration);
+
+            if (totalBeats > MAX_SEGMENTS) {
+                alert(`Too many segments detected (${totalBeats}). Reducing to ${MAX_SEGMENTS}.`);
+                beatDuration = duration / MAX_SEGMENTS;
+                totalBeats = MAX_SEGMENTS;
+            }
+
+            segments = [];
+            for (let i = 0; i < totalBeats; i++) {
+                segments.push({ start: i * beatDuration, duration: beatDuration });
+            }
+
+            alert(`Video segmented into ${segments.length} clips.`);
+            document.getElementById('exportVideo').disabled = false;
+        }
+
+        // Export Video
+        async function exportVideo() {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            const ctx = canvas.getContext('2d');
+            const stream = canvas.captureStream();
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+            const chunks = [];
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const preview = document.getElementById('preview');
+                preview.src = url;
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'segmented_video.webm';
+                a.click();
+            };
+
+            recorder.start();
+
+            for (const segment of segments) {
+                await playSegment(segment, ctx, canvas);
+            }
+
+            recorder.stop();
+        }
+
+        // Play a Video Segment
+        async function playSegment(segment, ctx, canvas) {
+            return new Promise(resolve => {
+                const segmentStart = Math.min(segment.start, videoElement.duration - 0.1);
+                const segmentDuration = Math.min(segment.duration, videoElement.duration - segmentStart);
+
+                videoElement.currentTime = segmentStart;
+                videoElement.play();
+
+                const renderInterval = setInterval(() => {
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                }, 1000 / 30); // 30 FPS
+
+                videoElement.ontimeupdate = () => {
+                    if (videoElement.currentTime >= segmentStart + segmentDuration) {
+                        videoElement.pause();
+                        clearInterval(renderInterval);
+                        videoElement.ontimeupdate = null;
+                        resolve();
+                    }
+                };
+            });
+        }
+    </script>
+</body>
+</html>

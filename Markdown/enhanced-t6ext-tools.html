@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ultimate Text Toolbox</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0 auto; padding: 10px; max-width: 1200px; }
+        .tools { float: left; width: 25%; max-height: 90vh; overflow-y: auto; padding-right: 10px; }
+        .content { float: left; width: 70%; padding-left: 20px; }
+        button { display: block; margin: 5px 0; width: 100%; }
+        textarea, .box { width: 100%; margin: 5px 0; border: 1px solid #ccc; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="tools">
+        <div><b>Essential</b>
+            <button onclick="fnd()">Find & Replace</button>
+            <button onclick="reg()">Regex Replace</button>
+            <button onclick="cc('u')">Uppercase</button>
+            <button onclick="cc('l')">Lowercase</button>
+            <button onclick="trm()">Trim</button>
+            <button onclick="cpy()">Copy to Clipboard</button>
+            <button onclick="clr()">Clear All</button>
+        </div>
+        <div><b>Formatting</b>
+            <button onclick="wrap()">Text Wrap</button>
+            <button onclick="ind(1)">Indent</button>
+            <button onclick="ind(0)">Unindent</button>
+            <button onclick="brk(1)">Add Line Breaks</button>
+            <button onclick="brk(0)">Remove Line Breaks</button>
+            <button onclick="tab(1)">Tabs to Spaces</button>
+            <button onclick="tab(0)">Spaces to Tabs</button>
+        </div>
+        <div><b>Extraction</b>
+            <button onclick="ext('email')">Emails</button>
+            <button onclick="ext('phone')">Phone Numbers</button>
+            <button onclick="ext('url')">URLs</button>
+            <button onclick="ext('date')">Dates</button>
+            <button onclick="ext('html')">HTML Tags</button>
+        </div>
+        <div><b>Transformation</b>
+            <button onclick="json()">To JSON</button>
+            <button onclick="csv()">To CSV</button>
+            <button onclick="xml()">To XML</button>
+            <button onclick="b64(1)">Base64 Encode</button>
+            <button onclick="b64(0)">Base64 Decode</button>
+        </div>
+        <div><b>Analysis</b>
+            <button onclick="stat()">Statistics</button>
+            <button onclick="read()">Readability</button>
+        </div>
+        <div><b>Miscellaneous</b>
+            <button onclick="rnd()">Randomize</button>
+            <button onclick="sort(1)">Sort A-Z</button>
+            <button onclick="sort(0)">Sort Z-A</button>
+            <button onclick="rev()">Reverse</button>
+            <button onclick="cipher(1)">Caesar Encrypt</button>
+            <button onclick="cipher(0)">Caesar Decrypt</button>
+        </div>
+        <div><b>NLP</b>
+            <button onclick="sent()">Sentiment</button>
+            <button onclick="ner()">Named Entities</button>
+            <button onclick="pos()">POS Tags</button>
+            <button onclick="sum()">Summarize</button>
+            <button onclick="lang()">Language</button>
+        </div>
+        <div><b>Comparison</b>
+            <button onclick="initComp()">Line Diff</button>
+            <button onclick="initWordComp()">Word Diff</button>
+        </div>
+    </div>
+    <div class="content">
+        <textarea id="input" placeholder="Enter or paste text here..."></textarea>
+        <div id="comparison" style="display: none;">
+            <textarea id="comp1" placeholder="First text..."></textarea>
+            <textarea id="comp2" placeholder="Second text..."></textarea>
+            <button style="width: 100%;" onclick="compare()">Compare</button>
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const g = (id) => document.getElementById(id),
+              i = () => g('input').value,
+              o = (r, t) => g('output').innerHTML = `<div class="box"><b>${t}</b><pre>${r}</pre></div>` + g('output').innerHTML;
+
+        // Essential
+        const fnd = () => o(i().replaceAll(prompt('Find:'), prompt('Replace:')), 'Find & Replace'),
+              reg = () => o(i().replace(new RegExp(prompt('Regex:'), 'g'), prompt('Replace:')), 'Regex Replace'),
+              cc = (t) => o(t === 'u' ? i().toUpperCase() : i().toLowerCase(), t === 'u' ? 'Uppercase' : 'Lowercase'),
+              trm = () => o(i().trim(), 'Trimmed'),
+              cpy = () => navigator.clipboard.writeText(i());
+
+        // Formatting
+        const wrap = () => o(i().replace(/(.{1,80})(\s+|$)/g, '$1\n'), 'Wrapped Text'),
+              ind = (t) => o(i().split('\n').map(l => t ? '    ' + l : l.replace(/^ {4}/, '')).join('\n'), t ? 'Indented' : 'Unindented'),
+              brk = (t) => o(t ? i().replace(/([.!?])\s+/g, '$1\n\n') : i().replace(/\n+/g, ' '), t ? 'Added Breaks' : 'Removed Breaks'),
+              tab = (t) => o(i().replace(t ? /\t/g : / {4}/g, t ? '    ' : '\t'), t ? 'Tabs to Spaces' : 'Spaces to Tabs');
+
+        // Extraction
+        const pat = { email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, phone: /\d{10,}/g, url: /https?:\/\/[^\s]+/g, date: /\b\d{4}-\d{2}-\d{2}\b/g, html: /<[^>]*>/g },
+              ext = (t) => o((i().match(pat[t]) || []).join('\n'), `Extracted ${t}`);
+
+        // Transformation
+        const json = () => o(JSON.stringify(i().split('\n')), 'JSON'),
+              csv = () => o(i().split('\n').join(','), 'CSV'),
+              xml = () => o(`<root>\n${i().split('\n').map(l => `  <line>${l}</line>`).join('\n')}\n</root>`, 'XML'),
+              b64 = (e) => o(e ? btoa(i()) : atob(i()), e ? 'Base64 Encoded' : 'Base64 Decoded');
+
+        // Analysis
+        const stat = () => o(`Words: ${i().split(/\s+/).length}\nChars: ${i().length}`, 'Statistics'),
+              read = () => {
+                  const w = i().split(/\s+/).length, s = i().split(/[.!?]+/).length - 1, syll = i().replace(/[^aeiouy]/gi, '').length;
+                  o(`Readability: ${(206.835 - 1.015 * (w/s) - 84.6 * (syll/w)).toFixed(1)}`, 'Readability');
+              };
+
+        // Miscellaneous
+        const rnd = () => o(_.shuffle(i().split('\n')).join('\n'), 'Randomized Text'),
+              sort = (a) => o(i().split('\n').sort((a ? 1 : -1)).join('\n'), a ? 'Sorted A-Z' : 'Sorted Z-A'),
+              rev = () => o(i().split('').reverse().join(''), 'Reversed Text'),
+              cipher = (e) => o(i().replace(/[a-z]/gi, c => String.fromCharCode(c.charCodeAt(0) + (e ? 3 : -3))), e ? 'Encrypted' : 'Decrypted');
+
+        // NLP
+        const sent = () => o(i().includes('good') ? 'Positive' : 'Neutral', 'Sentiment Analysis'),
+              ner = () => o((i().match(/\b[A-Z][a-z]+\b/g) || []).join(', '), 'Named Entities'),
+              pos = () => o(i().split(/\s+/).map(w => `${w}: ${w.endsWith('ing') ? 'Verb' : 'Noun'}`).join('\n'), 'POS Tags'),
+              sum = () => o(i().split('.').slice(0, 2).join('.') + '.', 'Summary'),
+              lang = () => o(/^[a-z\s]+$/i.test(i()) ? 'English' : 'Unknown', 'Language');
+
+        // Comparison
+        const initComp = () => g('comparison').style.display = 'block';
+        const compare = () => {
+            const t1 = g('comp1').value.split('\n'), t2 = g('comp2').value.split('\n'), r = [];
+            const m = Math.max(t1.length, t2.length);
+            for (let i = 0; i < m; i++) {
+                const l1 = t1[i] || '', l2 = t2[i] || '';
+                if (l1 === l2) r.push(`   ${l1}`);
+                else {
+                    if (l1) r.push(`-  ${l1}`);
+                    if (l2) r.push(`+  ${l2}`);
+                }
+            }
+            o(r.join('\n'), 'Line Diff');
+        };
+    </script>
+</body>
+</html>

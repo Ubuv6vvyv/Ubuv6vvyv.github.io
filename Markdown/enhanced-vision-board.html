@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision Board Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Indie+Flower&family=Patrick+Hand&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #f9f3e6;
+      color: #4a4a4a;
+      font-family: 'Patrick Hand', cursive;
+      padding: 20px;
+    }
+
+    .controls {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: white;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .vision-board {
+      display: grid;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .vision-board.portrait { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .vision-board.landscape { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+    .vision-board.masonry { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .vision-board.single-column { grid-template-columns: 1fr; max-width: 600px; }
+
+    .category {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+
+    .category:hover { transform: translateY(-5px); }
+
+    .category-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .category h2 {
+      font-family: 'Caveat', cursive;
+      font-size: 2rem;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    .image-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
+
+    .image-box {
+      aspect-ratio: 1;
+      position: relative;
+      background: #f8f8f8;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .image-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .image-box:hover img { transform: scale(1.1); }
+
+    .goals-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .goals-list li {
+      padding: 8px;
+      margin: 5px 0;
+      background: rgba(255,255,255,0.8);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #2c3e50;
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover { background: #34495e; }
+
+    .edit-mode .controls-overlay { display: block; }
+    .view-mode .controls-overlay { display: none; }
+
+    @media print {
+      .controls, .controls-overlay { display: none; }
+      .category { break-inside: avoid; }
+    }
+
+    @media (max-width: 768px) {
+      .vision-board { grid-template-columns: 1fr; }
+      .controls { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div class="control-group">
+      <label for="layout">Layout:</label>
+      <select id="layout" onchange="changeLayout(this.value)">
+        <option value="portrait">Portrait</option>
+        <option value="landscape">Landscape</option>
+        <option value="masonry">Masonry</option>
+        <option value="single-column">Single Column</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <button class="btn" onclick="toggleEditMode()">Toggle Edit Mode</button>
+      <button class="btn" onclick="saveVisionBoard()">Save Board</button>
+      <button class="btn" onclick="exportAsPDF()">Export PDF</button>
+      <button class="btn" onclick="addNewCategory()">Add Category</button>
+    </div>
+  </div>
+
+  <div id="vision-board" class="vision-board portrait view-mode"></div>
+
+  <script>
+    const categories = [
+      { title: 'Career', quote: 'Your empire awaits', goals: ['Launch software tools', 'Passive income', 'Financial freedom'] },
+      { title: 'Health', quote: 'Your health is your wealth', goals: ['Better sleep', 'More water', 'Regular exercise'] },
+      { title: 'Travel', quote: 'The world awaits', goals: ['Europe tour', 'Asian adventure', 'Local exploration'] }
+    ];
+
+    function initializeBoard() {
+      const board = document.getElementById('vision-board');
+      categories.forEach(category => {
+        board.appendChild(createCategoryElement(category));
+      });
+      animateCategories();
+    }
+
+    function createCategoryElement(data) {
+      const div = document.createElement('div');
+      div.className = 'category';
+      div.innerHTML = `
+        <div class="category-content">
+          <h2>${data.title}</h2>
+          <p class="quote">${data.quote}</p>
+          <div class="image-grid"></div>
+          <ul class="goals-list">
+            ${data.goals.map(goal => `<li>${goal}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+      return div;
+    }
+
+    function changeLayout(value) {
+      const board = document.getElementById('vision-board');
+      board.className = `vision-board ${value}`;
+    }
+
+    function toggleEditMode() {
+      const board = document.getElementById('vision-board');
+      board.classList.toggle('edit-mode');
+      board.classList.toggle('view-mode');
+    }
+
+    async function saveVisionBoard() {
+      const board = document.getElementById('vision-board');
+      board.classList.add('view-mode');
+      const canvas = await html2canvas(board);
+      const link = document.createElement('a');
+      link.download = 'vision-board.png';
+      link.href = canvas.toDataURL();
+      link.click();
+      board.classList.remove('view-mode');
+    }
+
+    function animateCategories() {
+      gsap.from(".category", {
+        duration: 0.8,
+        y: 50,
+        opacity: 0,
+        stagger: 0.1,
+        ease: "power2.out"
+      });
+    }
+
+    function addNewCategory() {
+      const title = prompt('Enter category title:');
+      if (title) {
+        const category = {
+          title,
+          quote: 'Your custom quote here',
+          goals: ['New goal 1', 'New goal 2']
+        };
+        const element = createCategoryElement(category);
+        document.getElementById('vision-board').appendChild(element);
+        gsap.from(element, {
+          duration: 0.5,
+          y: 50,
+          opacity: 0,
+          ease: "power2.out"
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeBoard);
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" name="viewport" content="width=device-width,initial-scale=1">
+<title>Audio Processor Lite</title>
+<style>
+*{margin:0;box-sizing:border-box}body{font:14px system-ui;max-width:600px;margin:auto;padding:15px;background:#f0f0f0}.c{background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 4px #0002}#w{height:128px;background:#f5f5f5;border-radius:4px;margin:10px 0;cursor:pointer}.g{margin:12px 0}label{display:block;margin-bottom:4px;font-weight:600}input[type=range]{width:100%;margin:8px 0}button{background:#07b;color:#fff;border:0;padding:8px 16px;border-radius:4px;margin:4px;cursor:pointer}button:disabled{background:#ccc}.v{font-size:12px;color:#666}
+</style>
+</head>
+<body>
+<div class="c">
+    <input type="file" id="f" accept="audio/*">
+    <canvas id="w"></canvas>
+    <div class="g">
+        <button id="p">Play</button>
+        <button id="r">Reset</button>
+        <button id="d" disabled>Download</button>
+    </div>
+    <div class="g">
+        <label>Pitch <span id="pv" class="v">1.0x</span></label>
+        <input type="range" id="pt" min="0.5" max="2" step="0.01" value="1">
+    </div>
+    <div class="g">
+        <label>Speed <span id="sv" class="v">1.0x</span></label>
+        <input type="range" id="sp" min="0.25" max="4" step="0.05" value="1">
+    </div>
+    <div class="g">
+        <label>Bass <span id="bv" class="v">0dB</span></label>
+        <input type="range" id="bs" min="0" max="30" step="0.5" value="0">
+    </div>
+    <div class="g">
+        <label>Voice <span id="vv" class="v">0dB</span></label>
+        <input type="range" id="vc" min="0" max="30" step="0.5" value="0">
+    </div>
+</div>
+<script>
+let A,B,S,P=0,T=0,D,a={},N,W,C,X;const c=document.getElementById("w"),x=c.getContext("2d"),
+I=()=>{A=new(window.AudioContext||window.webkitAudioContext);N=A.createAnalyser();W=A.createGain();
+C=A.createBiquadFilter();C.type="lowshelf";C.frequency.value=100;X=A.createBiquadFilter();
+X.type="peaking";X.frequency.value=2500;X.Q.value=1;C.connect(X);X.connect(W);W.connect(A.destination)},
+U=e=>{const v=e.target.value,i=e.target.id;a[i]=v;document.getElementById(i+"v").textContent=
+v+(i=="pt"||i=="sp"?"x":"dB");P&&(E(),L())},L=()=>{if(!B)return;E();S=A.createBufferSource();
+S.buffer=B;S.playbackRate.value=a.sp;S.detune.value=(a.pt-1)*1200;C.gain.value=a.bs;
+X.gain.value=a.vc;S.connect(C);S.connect(N);S.start(0,T);P=1;T=A.currentTime;
+document.getElementById("p").textContent="Stop"},E=()=>{S&&(S.stop(),S.disconnect());P=0;
+document.getElementById("p").textContent="Play"},R=()=>{const b=new Uint8Array(N.frequencyBinCount);
+N.getByteTimeDomainData(b);x.fillStyle="#f5f5f5";x.fillRect(0,0,c.width,c.height);
+x.lineWidth=2;x.strokeStyle="#07b";x.beginPath();const s=c.width/b.length;
+for(let i=0;i<b.length;i++){const v=b[i]/128,y=v*c.height/2;i===0?x.moveTo(i*s,y):
+x.lineTo(i*s,y)}x.lineTo(c.width,c.height/2);x.stroke();P&&requestAnimationFrame(R)};
+document.getElementById("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+const r=await f.arrayBuffer();B=await A.decodeAudioData(r);document.getElementById("d").disabled=0;
+D=new Uint8Array(B.length);for(let i=0;i<B.numberOfChannels;i++){
+const d=B.getChannelData(i);for(let j=0;j<d.length;j++)D[j]+=d[j]}R()};
+document.getElementById("p").onclick=()=>P?E():L();
+document.getElementById("r").onclick=()=>{document.querySelectorAll("input[type=range]").forEach(
+e=>{e.value=e.getAttribute("value");U({target:e})});T=0;P&&(E(),L())};
+c.onclick=e=>{const r=e.offsetX/c.width;T=r*B.duration;P&&(E(),L())};
+document.querySelectorAll("input[type=range]").forEach(e=>{a[e.id]=e.value;
+e.oninput=U});document.addEventListener("click",I,{once:!0});
+c.width=600;c.height=128;
+</script>
+</body>
+</html>

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Lab</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/lib/js-beautify/1.14.11/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/lib/js-beautify/1.14.11/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/terser/5.24.0/bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252526;
+            --border: #333;
+            --text: #d4d4d4;
+            --accent: #0066cc;
+            --error: #ff4444;
+            --success: #44ff44;
+        }
+        body { 
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            background: var(--bg-primary);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .container { 
+            padding: 10px;
+            max-width: 100%;
+        }
+        .section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin: 8px 0;
+            padding: 8px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid var(--border);
+        }
+        #editor { 
+            height: 250px;
+            border-radius: 4px;
+        }
+        .output-container {
+            position: relative;
+        }
+        #output, #console { 
+            min-height: 80px;
+            max-height: 200px;
+            overflow: auto;
+            background: var(--bg-primary);
+            padding: 8px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .preview {
+            background: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            min-height: 80px;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 4px;
+        }
+        button {
+            padding: 6px;
+            background: var(--bg-primary);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        button.active {
+            background: var(--accent);
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 4px;
+            color: var(--text);
+            font-size: 12px;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .tab {
+            padding: 4px 8px;
+            border-radius: 4px 4px 0 0;
+        }
+        pre {
+            margin: 0;
+            font-size: 12px;
+        }
+        .error { color: var(--error); }
+        .success { color: var(--success); }
+        #snippets {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .snippet {
+            padding: 6px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 4px 0;
+        }
+        #settings {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 280px;
+            height: 100%;
+            background: var(--bg-secondary);
+            padding: 10px;
+            transition: right 0.3s;
+            z-index: 1000;
+        }
+        #settings.open { right: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <div class="header">
+                <h3>Code Lab</h3>
+                <button onclick="toggleSettings()">⚙️</button>
+            </div>
+            <input type="file" id="fileInput" accept=".html,.js,.txt,.json,.css">
+        </div>
+
+        <div class="section">
+            <div class="controls">
+                <div class="btn-group">
+                    <button onclick="clearEditor()">Clear</button>
+                    <button onclick="resetTool()">Reset All</button>
+                </div>
+                <select id="langSelect" onchange="changeLanguage()">
+                    <option value="javascript">JavaScript</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            <div id="editor"></div>
+        </div>
+
+        <div class="section">
+            <div class="btn-group">
+                <button onclick="executeCode()">Run</button>
+                <button onclick="executeInNewTab()">New Tab</button>
+                <button onclick="minifyCode()">Minify</button>
+                <button onclick="formatCode()">Format</button>
+                <button onclick="createBookmarklet()">Button</button>
+                <button onclick="validateCode()">Validate</button>
+                <button onclick="shareCode()">Share</button>
+            </div>
+        </div>
+
+        <div class="output-container section">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('output')">Output</button>
+                <button class="tab" onclick="showTab('console')">Console</button>
+            </div>
+            <div id="output"></div>
+            <div id="console" style="display: none"></div>
+        </div>
+
+        <div class="section preview" id="preview"></div>
+
+        <div id="snippets"></div>
+    </div>
+
+    <div id="settings">
+        <h4>Settings</h4>
+        <div>
+            <label>Theme: 
+                <select onchange="setTheme(this.value)">
+                    <option value="monokai">Monokai</option>
+                    <option value="github_dark">GitHub Dark</option>
+                    <option value="dracula">Dracula</option>
+                </select>
+            </label>
+        </div>
+        <div>
+            <label>Font Size: 
+                <input type="number" min="8" max="24" value="13" onchange="setFontSize(this.value)">
+            </label>
+        </div>
+        <div>
+            <label>Auto-run: 
+                <input type="checkbox" onchange="toggleAutoRun(this.checked)">
+            </label>
+        </div>
+        <button onclick="toggleSettings()">Close</button>
+    </div>
+
+    <script>
+        let editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/javascript");
+        editor.setFontSize(13);
+        
+        let settings = {
+            autoRun: false,
+            theme: 'monokai',
+            fontSize: 13
+        };
+
+        const consoleLog = console.log;
+        const consoleError = console.error;
+        let consoleOutput = [];
+
+        console.log = (...args) => {
+            consoleOutput.push(['log', args.join(' ')]);
+            document.getElementById('console').innerHTML = consoleOutput
+                .map(([type, msg]) => `<div class="${type}">${msg}</div>`)
+                .join('\n');
+            consoleLog.apply(console, args);
+        };
+
+        console.error = (...args) => {
+            consoleOutput.push(['error', args.join(' ')]);
+            document.getElementById('console').innerHTML = consoleOutput
+                .map(([type, msg]) => `<div class="${type}">${msg}</div>`)
+                .join('\n');
+            consoleError.apply(console, args);
+        };
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                editor.setValue(e.target.result);
+                const mode = file.name.split('.').pop();
+                setEditorMode(mode);
+            };
+            reader.readAsText(file);
+        });
+
+        function setEditorMode(ext) {
+            const modes = {
+                'js': 'javascript',
+                'html': 'html',
+                'css': 'css',
+                'json': 'json'
+            };
+            editor.session.setMode(`ace/mode/${modes[ext] || 'javascript'}`);
+            document.getElementById('langSelect').value = modes[ext] || 'javascript';
+        }
+
+        function changeLanguage() {
+            const mode = document.getElementById('langSelect').value;
+            editor.session.setMode(`ace/mode/${mode}`);
+        }
+
+        async function validateCode() {
+            const code = editor.getValue();
+            const mode = document.getElementById('langSelect').value;
+            
+            try {
+                if (mode === 'javascript') {
+                    eval(`(function(){${code}})()`);
+                } else if (mode === 'json') {
+                    JSON.parse(code);
+                }
+                document.getElementById('output').innerHTML = '<div class="success">Code validation passed</div>';
+            } catch (err) {
+                document.getElementById('output').innerHTML = `<div class="error">Validation Error: ${err.message}</div>`;
+            }
+        }
+
+        function showTab(tabId) {
+            ['output', 'console'].forEach(id => {
+                document.getElementById(id).style.display = id === tabId ? 'block' : 'none';
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.textContent.toLowerCase() === tabId);
+            });
+        }
+
+        function toggleSettings() {
+            document.getElementById('settings').classList.toggle('open');
+        }
+
+        function setTheme(theme) {
+            editor.setTheme(`ace/theme/${theme}`);
+            settings.theme = theme;
+        }
+
+        function setFontSize(size) {
+            editor.setFontSize(parseInt(size));
+            settings.fontSize = size;
+        }
+
+        function toggleAutoRun(enabled) {
+            settings.autoRun = enabled;
+        }
+
+        function shareCode() {
+            const code = editor.getValue();
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            navigator.clipboard.writeText(url);
+            document.getElementById('output').innerHTML = 'Code URL copied to clipboard!';
+        }
+
+        async function minifyCode() {
+            const code = editor.getValue();
+            try {
+                const result = await Terser.minify(code);
+                document.getElementById('output').innerHTML = 
+                    `<pre>${result.code}</pre>
+                     <button onclick="saveToFile('${result.code}', 'minified.js')">Save</button>`;
+            } catch (err) {
+                document.getElementById('output').innerHTML = `<div class="error">Minification Error: ${err.message}</div>`;
+            }
+        }
+
+        function clearEditor() {
+            editor.setValue('');
+        }
+
+        function resetTool() {
+            clearEditor();
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('console').innerHTML = '';
+            document.getElementById('preview').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            consoleOutput = [];
+        }
+
+        function executeCode() {
+            const code = editor.getValue();
+            const preview = document.getElementById('preview');
+            const output = document.getElementById('output');
+            preview.innerHTML = '';
+            consoleOutput = [];
+            
+            try {
+                if (code.includes('<script') || code.includes('<html')) {
+                    preview.innerHTML = code;
+                } else {
+                    const result = eval(code);
+                    output.innerHTML = result !== undefined ? result : 'Executed successfully';
+                }
+            } catch (err) {
+                output.innerHTML = `<div class="error">Runtime Error: ${err.message}</div>`;
+            }
+        }
+
+        function executeInNewTab() {
+            const code = editor.getValue();
+            const newTab = window.open();
+            newTab.document.write(code.includes('<html') ? code : 
+                `<!DOCTYPE html><html><body><script>${code}<\/script></body></html>`);
+        }
+
+        function formatCode() {
+            const code = editor.getValue();
+            const mode = document.getElementById('langSelect').value;
+            try {
+                const formatted = mode === 'html' ? html_beautify(code) : js_beautify(code);
+                document.getElementById('output').innerHTML = 
+                    `<pre>${formatted}</pre>
+                     <button onclick="saveToFile('${formatted}', 'formatted.${mode}')">Save</button>`;
+            } catch (err) {
+                document.getElementById('output').innerHTML = `<div class="error">Formatting Error: ${err.message}</div>`;
+            }
+        }
+
+        function createBookmarklet() {
+            const code = editor.getValue();
+            const bookmarklet = `javascript:(function(){${encodeURIComponent(code)}})()`;
+            const buttonCode = `<button onclick="${bookmarklet}">Execute Code</button>`;
+            document.getElementById('output').innerHTML = 
+                `${buttonCode}<pre>Button HTML:\n${buttonCode}</pre>`;
+        }
+
+        function saveToFile(content, filename) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize with some common code snippets
+        const snippets = {
+            'Hello World': 'console.log("Hello World!");',
+            'Fetch Data': 'fetch("https://api.example.com/data")\n  .then(res => res.json())\n  .then(data => console.log(data));',
+            'DOM Manipulation': 'document.querySelector("#demo").innerHTML = "Changed!";'
+        };
+
+        Object.entries(snippets).forEach(([name, code]) => {
+            const div = document.createElement('div');
+            div.className = 'snippet';
+            div.textContent = name;
+            div.onclick = () => editor.setValue(code);
+            document.getElementById('snippets').appendChild(div);
+        });
+    </script>
+</body>
+</html>

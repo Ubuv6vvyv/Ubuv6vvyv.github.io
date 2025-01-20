@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Code Playground</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        #code-input {
+            width: 100%;
+            height: 300px;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            font-size: 1rem;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn.secondary {
+            background: #6c757d;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .output-container {
+            background: #f8f9fa;
+            padding: 1rem;
+            border: 1px solid #ced4da;
+            border-radius: 0.25rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin-bottom: 1rem;
+        }
+
+        #output {
+            color: #212529;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Enhanced Code Playground</h1>
+        </div>
+
+        <!-- File Upload -->
+        <input type="file" id="file-upload" accept=".html,.css,.js" class="btn secondary" />
+
+        <textarea id="code-input" placeholder="Write or paste HTML, CSS, or JavaScript code here..."></textarea>
+
+        <div class="toolbar">
+            <button class="btn" id="run-current-page">▶ Run on Current Page</button>
+            <button class="btn" id="run-new-window">🗔 Run in New Window</button>
+            <button class="btn secondary" id="attach-button">📌 Attach to Button</button>
+            <button class="btn secondary" id="download-code">💾 Download Code</button>
+            <button class="btn secondary" id="clear-code">🗑️ Clear Code</button>
+        </div>
+
+        <div class="output-container">
+            <h3>Output:</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const codeInput = document.getElementById("code-input");
+        const outputContainer = document.getElementById("output");
+
+        // File upload functionality
+        document.getElementById("file-upload").addEventListener("change", (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                codeInput.value = reader.result;
+            };
+            reader.readAsText(file);
+        });
+
+        // Run code on the current page
+        document.getElementById("run-current-page").addEventListener("click", () => {
+            const code = codeInput.value.trim();
+            if (!code) {
+                appendOutput("No code to execute.");
+                return;
+            }
+
+            const iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+            document.body.appendChild(iframe);
+
+            const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDocument.open();
+            iframeDocument.write(code);
+            iframeDocument.close();
+
+            document.body.removeChild(iframe);
+            appendOutput("Code executed on the current page.");
+        });
+
+        // Run code in a new window
+        document.getElementById("run-new-window").addEventListener("click", () => {
+            const code = codeInput.value.trim();
+            if (!code) {
+                appendOutput("No code to execute.");
+                return;
+            }
+
+            const newWindow = window.open();
+            newWindow.document.open();
+            newWindow.document.write(code);
+            newWindow.document.close();
+            appendOutput("Code executed in a new window.");
+        });
+
+        // Attach code to a button
+        document.getElementById("attach-button").addEventListener("click", () => {
+            const code = codeInput.value.trim();
+            if (!code) {
+                appendOutput("No code to attach.");
+                return;
+            }
+
+            const button = document.createElement("button");
+            button.textContent = "Run Code";
+            button.className = "btn";
+            button.addEventListener("click", () => {
+                const newWindow = window.open();
+                newWindow.document.open();
+                newWindow.document.write(code);
+                newWindow.document.close();
+            });
+            outputContainer.appendChild(button);
+            appendOutput("Code attached to a new button.");
+        });
+
+        // Download code as a file
+        document.getElementById("download-code").addEventListener("click", () => {
+            const code = codeInput.value.trim();
+            if (!code) {
+                appendOutput("No code to download.");
+                return;
+            }
+
+            const blob = new Blob([code], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "code.html";
+            link.click();
+            appendOutput("Code downloaded successfully.");
+        });
+
+        // Clear code
+        document.getElementById("clear-code").addEventListener("click", () => {
+            codeInput.value = "";
+            appendOutput("Code cleared.");
+        });
+
+        // Append output to the output container
+        function appendOutput(text) {
+            const line = document.createElement("div");
+            line.textContent = text;
+            outputContainer.appendChild(line);
+        }
+    </script>
+</body>
+</html>

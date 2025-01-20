@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Image Processing Tool</title>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
+    <style>
+        body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px;background:#f4f4f9;margin:0}
+        .canvas-container{position:relative;margin:20px 0}
+        .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;max-width:90vw;width:100%;padding:10px}
+        .control-group{display:flex;flex-direction:column;align-items:center;padding:15px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+        .control-group.fine-tune{border-color:#4CAF50;background:#f9fff9}
+        .tabs{display:flex;gap:10px;margin-bottom:20px}
+        .tab{padding:10px;cursor:pointer;border:1px solid #ddd;border-radius:4px}
+        .tab.active{background:#007BFF;color:white}
+        .tab-content{display:none}
+        .tab-content.active{display:block}
+        .value-display{font-size:12px;color:#666;margin-top:5px;width:60px;text-align:center}
+        .mode-toggle{background:#f0f0f0;padding:10px;border-radius:5px;margin:10px 0;display:flex;align-items:center;gap:10px}
+        .performance-indicator{position:fixed;bottom:20px;right:20px;padding:10px;background:rgba(0,0,0,0.7);color:white;border-radius:5px;font-size:12px}
+        button,.file-input{background:#007BFF;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer}
+        .reset-btn{background:#dc3545}
+        input[type="range"]{width:180px;margin:10px 0}
+        .histogram-canvas{margin-top:10px;width:180px;height:60px;background:#f8f8f8}
+        #status{position:fixed;top:20px;right:20px;padding:10px;border-radius:5px;display:none;z-index:1000}
+    </style>
+</head>
+<body>
+    <h1>Advanced Image Processing</h1>
+    
+    <div class="mode-toggle">
+        <label title="Enable fine-tuning mode for precise control">
+            <input type="checkbox" id="fineTuneMode"> Fine-Tune Mode
+        </label>
+        <label title="Enable performance mode for smoother processing">
+            <input type="checkbox" id="performanceMode" checked> Performance Mode
+        </label>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="basic">Basic</div>
+        <div class="tab" data-tab="edges">Edges</div>
+        <div class="tab" data-tab="color">Color</div>
+        <div class="tab" data-tab="advanced">Advanced</div>
+    </div>
+
+    <input type="file" class="file-input" id="imageInput" accept="image/*">
+    <button id="resetBtn" class="reset-btn">Reset All</button>
+    
+    <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+        <div id="loading" style="display:none">Processing...</div>
+    </div>
+
+    <div id="status"></div>
+    <div id="performanceIndicator" class="performance-indicator"></div>
+
+    <div class="controls">
+        <div class="tab-content active" data-tab="basic">
+            <div class="control-group">
+                <label>Binary Threshold</label>
+                <input type="range" id="thresholdIntensity" min="0" max="255" value="127">
+                <span class="value-display">127</span>
+                <canvas class="histogram-canvas" id="thresholdHistogram"></canvas>
+            </div>
+            <div class="control-group">
+                <label>Adaptive Block Size</label>
+                <input type="range" id="adaptiveThresholdSize" min="3" max="99" value="11" step="2">
+                <span class="value-display">11</span>
+            </div>
+            <div class="control-group">
+                <label>Brightness</label>
+                <input type="range" id="brightness" min="-100" max="100" value="0">
+                <span class="value-display">0</span>
+            </div>
+            <div class="control-group">
+                <label>Contrast</label>
+                <input type="range" id="contrast" min="-100" max="100" value="0">
+                <span class="value-display">0</span>
+            </div>
+        </div>
+
+        <div class="tab-content" data-tab="edges">
+            <div class="control-group">
+                <label>Edge Detection Method</label>
+                <select id="edgeMethod">
+                    <option value="canny">Canny</option>
+                    <option value="sobel">Sobel</option>
+                    <option value="laplacian">Laplacian</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Edge Threshold 1</label>
+                <input type="range" id="edgeThreshold1" min="0" max="255" value="100">
+                <span class="value-display">100</span>
+            </div>
+            <div class="control-group">
+                <label>Edge Threshold 2</label>
+                <input type="range" id="edgeThreshold2" min="0" max="255" value="200">
+                <span class="value-display">200</span>
+            </div>
+            <div class="control-group">
+                <label>Edge Thickness</label>
+                <input type="range" id="edgeThickness" min="1" max="7" value="1" step="2">
+                <span class="value-display">1</span>
+            </div>
+        </div>
+
+        <div class="tab-content" data-tab="color">
+            <div class="control-group">
+                <label>Color Channel</label>
+                <select id="colorChannel">
+                    <option value="all">All Channels</option>
+                    <option value="red">Red</option>
+                    <option value="green">Green</option>
+                    <option value="blue">Blue</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Color Threshold Min</label>
+                <input type="range" id="colorThresholdMin" min="0" max="255" value="127">
+                <span class="value-display">127</span>
+            </div>
+            <div class="control-group">
+                <label>Color Threshold Max</label>
+                <input type="range" id="colorThresholdMax" min="0" max="255" value="255">
+                <span class="value-display">255</span>
+            </div>
+            <div class="control-group">
+                <label>Color Sensitivity</label>
+                <input type="range" id="colorSensitivity" min="1" max="50" value="10">
+                <span class="value-display">10</span>
+            </div>
+        </div>
+
+        <div class="tab-content" data-tab="advanced">
+            <div class="control-group">
+                <label>Noise Reduction</label>
+                <input type="range" id="noiseReduction" min="0" max="9" value="0">
+                <span class="value-display">0</span>
+            </div>
+            <div class="control-group">
+                <label>Sharpness</label>
+                <input type="range" id="sharpness" min="0" max="100" value="0">
+                <span class="value-display">0</span>
+            </div>
+            <div class="control-group">
+                <label>Dilation</label>
+                <input type="range" id="dilation" min="0" max="20" value="0">
+                <span class="value-display">0</span>
+            </div>
+            <div class="control-group">
+                <label>Erosion</label>
+                <input type="range" id="erosion" min="0" max="20" value="0">
+                <span class="value-display">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+let openCvReady = false;
+let baseImage = null;
+let processedMat = null;
+let tempMat = null;
+let processing = false;
+let processingQueue = null;
+let lastProcessingTime = 0;
+let processingDelay = 100;
+
+const sliderConfigs = {
+    normal: {
+        thresholdIntensity: { min: 0, max: 255, step: 5 },
+        adaptiveThresholdSize: { min: 3, max: 51, step: 4 },
+        brightness: { min: -50, max: 50, step: 5 },
+        contrast: { min: -50, max: 50, step: 5 }
+    },
+    fineTune: {
+        thresholdIntensity: { min: 0, max: 255, step: 1 },
+        adaptiveThresholdSize: { min: 3, max: 99, step: 2 },
+        brightness: { min: -100, max: 100, step: 1 },
+        contrast: { min: -100, max: 100, step: 1 }
+    }
+};
+
+function onOpenCvReady() {
+    openCvReady = true;
+    showStatus("Ready", "success");
+    initializeMats();
+}
+
+function showStatus(message, type) {
+    const status = document.getElementById('status');
+    status.style.display = 'block';
+    status.style.backgroundColor = type === 'success' ? '#4CAF50' : '#f44336';
+    status.textContent = message;
+    setTimeout(() => status.style.display = 'none', 2000);
+}
+
+function initializeMats() {
+    processedMat = new cv.Mat();
+    tempMat = new cv.Mat();
+}
+
+// Tab handling
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`.tab-content[data-tab="${tab.dataset.tab}"]`).classList.add('active');
+        requestProcessing();
+    });
+});
+
+// Fine-tune mode handling
+document.getElementById('fineTuneMode').addEventListener('change', (e) => {
+    updateSliderConfigs(e.target.checked);
+    document.querySelectorAll('.control-group').forEach(group => {
+        group.classList.toggle('fine-tune', e.target.checked);
+    });
+    requestProcessing();
+});
+
+document.getElementById('performanceMode').addEventListener('change', (e) => {
+    processingDelay = e.target.checked ? 100 : 50;
+    requestProcessing();
+});
+
+function updateSliderConfigs(isFineTune) {
+    const config = isFineTune ? sliderConfigs.fineTune : sliderConfigs.normal;
+    Object.entries(config).forEach(([id, settings]) => {
+        const slider = document.getElementById(id);
+        if (slider) {
+            const currentValue = Number(slider.value);
+            slider.min = settings.min;
+            slider.max = settings.max;
+            slider.step = settings.step;
+            slider.value = Math.min(Math.max(currentValue, settings.min), settings.max);
+            updateValueDisplay(slider);
+        }
+    });
+}
+
+// Input handling
+document.querySelectorAll('input[type="range"], select').forEach(input => {
+    input.addEventListener('input', () => {
+        updateValueDisplay(input);
+        requestProcessing();
+    });
+});
+
+function updateValueDisplay(input) {
+    const display = input.parentElement.querySelector('.value-display');
+    if (display) display.textContent = input.value;
+}
+
+function requestProcessing() {
+    if (processingQueue) clearTimeout(processingQueue);
+    processingQueue = setTimeout(processImage, processingDelay);
+}
+
+// Image loading
+document.getElementById('imageInput').addEventListener('change', loadImage);
+document.getElementById('resetBtn').addEventListener('click', resetControls);
+
+function loadImage(event) {
+    if (!openCvReady || !event.target.files[0]) return;
+    
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const scale = Math.min(800 / img.width, 600 / img.height);
+            
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                cleanup();
+                baseImage = cv.imread(canvas);
+                updateHistogram();
+                processImage();
+            } catch (err) {
+                console.error('Error loading image:', err);
+                showStatus("Error loading image", "error");
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(event.target.files[0]);
+}
+
+function updateHistogram() {
+    if (!baseImage) return;
+
+    const histCanvas = document.getElementById('thresholdHistogram');
+    const ctx = histCanvas.getContext('2d');
+    ctx.clearRect(0, 0, histCanvas.width, histCanvas.height);
+
+    const hist = new cv.Mat();
+    const mask = new cv.Mat();
+    const channels = [0];
+    const histSize = [256];
+    const ranges = [0, 256];
+
+    cv.cvtColor(baseImage, tempMat, cv.COLOR_RGBA2GRAY);
+    cv.calcHist([tempMat], channels, mask, hist, histSize, ranges);
+
+    const maxVal = cv.minMaxLoc(hist).maxVal;
+    const scale = histCanvas.height / maxVal;
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#4CAF50';
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < 256; i++) {
+        const x = (i / 256) * histCanvas.width;
+        const y = histCanvas.height - (hist.data32F[i] * scale);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+
+    ctx.stroke();
+    hist.delete();
+    mask.delete();
+}
+
+function processImage() {
+    if (!baseImage || processing) return;
+    processing = true;
+    const startTime = performance.now();
+
+    try {
+        baseImage.copyTo(processedMat);
+        
+        // Apply basic adjustments
+        const brightness = parseInt(document.getElementById('brightness').value);
+        const contrast = parseInt(document.getElementById('contrast').value);
+        if (brightness !== 0 || contrast !== 0) {

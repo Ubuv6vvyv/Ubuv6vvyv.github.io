@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Code Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/terser/5.17.1/terser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify-css.min.js"></script>
+    <style>
+        body { font-family: monospace; background: #f4f4f4; color: #333; margin: 0; padding: 10px; font-size: 10px; }
+        .c { max-width: 900px; margin: auto; }
+        .t { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        button, select, input { padding: 10px; font-size: 10px; cursor: pointer; }
+        #e { width: 100%; height: 400px; border: 1px solid #ccc; margin-bottom: 10px; }
+        #o, #p { padding: 10px; background: #f9f9f9; border: 1px solid #ccc; white-space: pre-wrap; }
+        #p { background: #fff; }
+        .h { display: none; }
+    </style>
+</head>
+<body>
+    <div class="c">
+        <div class="t">
+            <input type="file" id="f">
+            <button onclick="run()">Run</button>
+            <button onclick="runTab()">New Tab</button>
+            <button onclick="min()">Minify</button>
+            <button onclick="fmt()">Format</button>
+            <button onclick="bmk()">Bookmarklet</button>
+            <button onclick="val()">Validate</button>
+            <button onclick="reset()">Reset</button>
+            <select id="l" onchange="setLang()">
+                <option value="javascript">JS</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="json">JSON</option>
+                <option value="python">Python</option>
+            </select>
+        </div>
+        <div id="e"></div>
+        <div id="o"></div>
+        <div id="p"></div>
+    </div>
+
+    <script>
+        const ed = ace.edit("e");
+        ed.setTheme("ace/theme/chrome");
+        ed.session.setMode("ace/mode/javascript");
+        const o = document.getElementById("o"), p = document.getElementById("p");
+
+        function reset() { ed.setValue(""); o.textContent = ""; p.innerHTML = ""; }
+        function setLang() { ed.session.setMode("ace/mode/" + document.getElementById("l").value); }
+
+        document.getElementById("f").addEventListener("change", (e) => {
+            const r = new FileReader();
+            r.onload = () => ed.setValue(r.result);
+            r.readAsText(e.target.files[0]);
+        });
+
+        function run() {
+            const c = ed.getValue();
+            o.textContent = ""; p.innerHTML = "";
+            try {
+                if (c.includes("<html>")) p.innerHTML = c;
+                else o.textContent = eval(c) ?? "Executed.";
+            } catch (err) { o.textContent = `Error: ${err.message}`; }
+        }
+
+        function runTab() {
+            const c = ed.getValue(), n = window.open();
+            n.document.write(c.includes("<html>") ? c : `<script>${c}<\/script>`);
+        }
+
+        async function min() {
+            try {
+                const c = ed.getValue();
+                ed.setValue((await Terser.minify(c)).code);
+                o.textContent = "Minified.";
+            } catch (e) { o.textContent = "Minify Error: " + e.message; }
+        }
+
+        function fmt() {
+            const c = ed.getValue();
+            try {
+                ed.setValue(detLang(c) === "html" ? html_beautify(c) :
+                            detLang(c) === "css" ? css_beautify(c) :
+                            detLang(c) === "json" ? JSON.stringify(JSON.parse(c), null, 2) :
+                            js_beautify(c));
+                o.textContent = "Formatted.";
+            } catch (e) { o.textContent = "Format Error: " + e.message; }
+        }
+
+        function bmk() {
+            const c = ed.getValue();
+            const bm = `javascript:(function(){${encodeURIComponent(c)}})()`;
+            o.innerHTML = `<button onclick="${bm}">Run</button> <pre>${bm}</pre>`;
+        }
+
+        function val() {
+            try { eval(ed.getValue()); alert("Valid."); } catch (e) { alert("Error: " + e.message); }
+        }
+
+        function detLang(c) {
+            if (c.trim().startsWith("<!DOCTYPE html>") || c.trim().startsWith("<html")) return "html";
+            if (c.trim().startsWith("{") || c.trim().startsWith("[")) return "json";
+            if (c.includes("{") && c.includes(":")) return "css";
+            return "javascript";
+        }
+    </script>
+</body>
+</html>

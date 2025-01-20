@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dynamic Bill of Lading</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @media print {
+            .print-hidden { display: none; }
+            body { margin: 0; }
+        }
+        @page { 
+            size: A4; 
+            margin: 10mm; 
+        }
+        .a4-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="a4-container p-6">
+        <div class="print-hidden mb-4">
+            <input 
+                type="file" 
+                id="headerImageUpload" 
+                accept="image/*" 
+                class="hidden"
+            >
+            <button 
+                onclick="document.getElementById('headerImageUpload').click()"
+                class="bg-blue-500 text-white px-4 py-2 rounded flex items-center"
+            >
+                Upload Header Image
+            </button>
+            
+            <div id="imageControls" class="mt-2 hidden">
+                <label>Scale: 
+                    <input 
+                        type="range" 
+                        id="imageScaleSlider" 
+                        min="0.1" 
+                        max="2" 
+                        step="0.1" 
+                        value="1"
+                    >
+                </label>
+            </div>
+        </div>
+
+        <div id="headerImageContainer" class="mb-4 text-center">
+            <img id="headerImage" class="mx-auto max-h-36 object-contain" style="display:none;">
+        </div>
+
+        <div id="billOfLadingContent">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="border p-2">
+                    <h3 class="font-bold text-center bg-gray-100">SHIPPER / EXPORTER</h3>
+                    <input 
+                        placeholder="Name" 
+                        class="w-full border p-1 mb-2 shipper-input"
+                        data-field="name"
+                    >
+                    <input 
+                        placeholder="Address" 
+                        class="w-full border p-1 mb-2 shipper-input"
+                        data-field="address"
+                    >
+                </div>
+                <div class="border p-2">
+                    <h3 class="font-bold text-center bg-gray-100">BILL OF LADING</h3>
+                    <input 
+                        placeholder="B/L Number" 
+                        class="w-full border p-1 mb-2"
+                        id="blNumber"
+                    >
+                    <input 
+                        type="date" 
+                        class="w-full border p-1"
+                        id="blDate"
+                    >
+                </div>
+            </div>
+
+            <div class="border p-2">
+                <h3 class="font-bold text-center bg-gray-100">CARGO DETAILS</h3>
+                <table id="cargoTable" class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border p-1">Marks & Numbers</th>
+                            <th class="border p-1">Packages</th>
+                            <th class="border p-1">Description</th>
+                            <th class="border p-1">Gross Weight</th>
+                            <th class="border p-1">Measurement</th>
+                            <th class="border p-1 print-hidden">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cargoTableBody">
+                        <tr class="cargo-row">
+                            <td class="border p-1">
+                                <input class="w-full cargo-input" data-field="marksAndNumbers">
+                            </td>
+                            <td class="border p-1">
+                                <input type="number" class="w-full cargo-input" data-field="packages">
+                            </td>
+                            <td class="border p-1">
+                                <input class="w-full cargo-input" data-field="description">
+                            </td>
+                            <td class="border p-1">
+                                <input type="number" class="w-full cargo-input" data-field="grossWeight">
+                            </td>
+                            <td class="border p-1">
+                                <input type="number" class="w-full cargo-input" data-field="measurement">
+                            </td>
+                            <td class="border p-1 print-hidden">
+                                <button onclick="addCargoRow()" class="text-green-500">+</button>
+                                <button onclick="removeCargoRow(this)" class="text-red-500">-</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr id="totalsRow" class="font-bold bg-gray-100">
+                            <td class="border p-1">TOTALS</td>
+                            <td id="totalPackages" class="border p-1">0</td>
+                            <td class="border p-1"></td>
+                            <td id="totalWeight" class="border p-1">0</td>
+                            <td id="totalMeasurement" class="border p-1">0</td>
+                            <td class="border p-1 print-hidden"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="mt-4 print-hidden">
+                <button 
+                    onclick="printDocument()" 
+                    class="bg-blue-500 text-white px-4 py-2 rounded"
+                >
+                    Print / Save Document
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Image Upload and Scaling
+        document.getElementById('headerImageUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const img = document.getElementById('headerImage');
+            const imageControls = document.getElementById('imageControls');
+            const slider = document.getElementById('imageScaleSlider');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    imageControls.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+
+            slider.addEventListener('input', function() {
+                img.style.transform = `scale(${this.value})`;
+            });
+        });
+
+        // Cargo Row Management
+        function addCargoRow() {
+            const tableBody = document.getElementById('cargoTableBody');
+            const newRow = tableBody.rows[0].cloneNode(true);
+            
+            // Clear input values
+            newRow.querySelectorAll('input').forEach(input => input.value = '');
+            
+            tableBody.appendChild(newRow);
+            updateTotals();
+        }
+
+        function removeCargoRow(button) {
+            const tableBody = document.getElementById('cargoTableBody');
+            if (tableBody.rows.length > 1) {
+                button.closest('tr').remove();
+                updateTotals();
+            }
+        }
+
+        // Dynamic Calculations
+        function updateTotals() {
+            let totalPackages = 0;
+            let totalWeight = 0;
+            let totalMeasurement = 0;
+
+            document.querySelectorAll('.cargo-row').forEach(row => {
+                const packages = parseFloat(row.querySelector('[data-field="packages"]').value) || 0;
+                const weight = parseFloat(row.querySelector('[data-field="grossWeight"]').value) || 0;
+                const measurement = parseFloat(row.querySelector('[data-field="measurement"]').value) || 0;
+
+                totalPackages += packages;
+                totalWeight += weight;
+                totalMeasurement += measurement;
+            });
+
+            document.getElementById('totalPackages').textContent = totalPackages.toFixed(2);
+            document.getElementById('totalWeight').textContent = totalWeight.toFixed(2);
+            document.getElementById('totalMeasurement').textContent = totalMeasurement.toFixed(2);
+        }
+
+        // Add event listeners for dynamic updates
+        document.getElementById('cargoTableBody').addEventListener('input', function(event) {
+            if (event.target.classList.contains('cargo-input')) {
+                updateTotals();
+            }
+        });
+
+        // Print Function
+        function printDocument() {
+            const element = document.querySelector('.a4-container');
+            html2pdf().from(element).save('bill-of-lading.pdf');
+        }
+    </script>
+</body>
+</html>

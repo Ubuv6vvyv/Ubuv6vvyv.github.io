@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image Processing Tool</title>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f4f4f9;
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: calc(100vh - 250px);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8f8f8;
+            border-radius: 8px;
+        }
+
+        #canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Rest of the CSS remains the same */
+    </style>
+</head>
+<body>
+    <!-- HTML structure remains the same -->
+
+<script>
+let openCvReady = false;
+let baseImage = null;
+let processedMat = null;
+let tempMat = null;
+let processing = false;
+let processingQueue = null;
+let lastProcessingTime = 0;
+let processingDelay = 100;
+let originalImageSize = { width: 0, height: 0 };
+
+function onOpenCvReady() {
+    openCvReady = true;
+    showStatus("OpenCV Ready", "success");
+    initializeMats();
+}
+
+function initializeMats() {
+    if (processedMat) processedMat.delete();
+    if (tempMat) tempMat.delete();
+    processedMat = new cv.Mat();
+    tempMat = new cv.Mat();
+}
+
+function loadImage(event) {
+    if (!openCvReady || !event.target.files[0]) return;
+    
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            originalImageSize.width = img.width;
+            originalImageSize.height = img.height;
+            
+            const canvas = document.getElementById('canvas');
+            const container = canvas.parentElement;
+            
+            // Calculate the best fit size while maintaining aspect ratio
+            const containerRatio = container.clientWidth / container.clientHeight;
+            const imageRatio = img.width / img.height;
+            
+            let newWidth, newHeight;
+            if (imageRatio > containerRatio) {
+                newWidth = container.clientWidth;
+                newHeight = newWidth / imageRatio;
+            } else {
+                newHeight = container.clientHeight;
+                newWidth = newHeight * imageRatio;
+            }
+            
+            // Set canvas size to the calculated dimensions
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                if (baseImage) baseImage.delete();
+                baseImage = cv.imread(canvas);
+                updateHistogram();
+                processImage();
+            } catch (err) {
+                console.error('Error loading image:', err);
+                showStatus("Error loading image", "error");
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(event.target.files[0]);
+}
+
+function processImage() {
+    if (!baseImage || processing) return;
+    processing = true;
+    const startTime = performance.now();
+
+    try {
+        // Create a copy of the base image
+        if (processedMat) processedMat.delete();
+        processedMat = baseImage.clone();
+        
+        // Get all current settings
+        const settings = {
+            brightness: parseInt(document.getElementById('brightness').value),
+            contrast: parseInt(document.getElementById('contrast').value),
+            noiseLevel: parseInt(document.getElementById('noiseReduction').value),
+            threshold: parseInt(document.getElementById('thresholdIntensity').value),
+            edgeMethod: document.getElementById('edgeMethod').value,
+            edgeThreshold: parseInt(document.getElementById('edgeThreshold1').value),
+            dilation: parseInt(document.getElementById('dilation').value),
+            erosion: parseInt(document.getElementById('erosion').value)
+        };
+
+        // Apply processing steps in order
+        applyBrightnessContrast(settings);
+        applyNoiseReduction(settings);
+        applyEdgeDetection(settings);
+        applyThreshold(settings);
+        applyMorphologicalOperations(settings);
+
+        // Display the result
+        cv.imshow('canvas', processedMat);
+
+        lastProcessingTime = performance.now() - startTime;
+        updatePerformanceIndicator();
+    } catch (err) {
+        console.error('Processing error:', err);
+        showStatus("Processing error", "error");
+    } finally {
+        processing = false;
+    }
+}
+
+// Separated processing functions
+function applyBrightnessContrast(settings) {
+    if (settings.brightness !== 0 || settings.contrast !== 0) {
+        const alpha = 1 + settings.contrast / 100;
+        const beta = settings.brightness;
+        processedMat.convertTo(processedMat, -1, alpha, beta);
+    }
+}
+
+function applyNoiseReduction(settings) {
+    if (settings.noiseLevel > 0) {
+        const ksize = 2 * settings.noiseLevel + 1;
+        cv.GaussianBlur(processedMat, processedMat, new cv.Size(ksize, ksize), 0, 0);
+    }
+}
+
+function applyEdgeDetection(settings) {
+    if (settings.edgeMethod !== 'none') {
+        if (tempMat) tempMat.delete();
+        tempMat = new cv.Mat();
+        cv.cvtColor(processedMat, tempMat, cv.COLOR_RGBA2GRAY);
+        
+        switch(settings.edgeMethod) {
+            case 'canny':
+                cv.Canny(tempMat, processedMat, settings.edgeThreshold, settings.edgeThreshold * 2);
+                break;
+            case 'sobel':
+                cv.Sobel(tempMat, processedMat, cv.CV_8U, 1, 1);
+                break;
+            case 'laplacian':
+                cv.Laplacian(tempMat, processedMat, cv.CV_8U);
+                break;
+        }
+    }
+}
+
+function applyThreshold(settings) {
+    if (settings.threshold > 0) {
+        if (tempMat) tempMat.delete();
+        tempMat = new cv.Mat();
+        cv.cvtColor(processedMat, tempMat, cv.COLOR_RGBA2GRAY);
+        cv.threshold(tempMat, processedMat, settings.threshold, 255, cv.THRESH_BINARY);
+    }
+}
+
+function applyMorphologicalOperations(settings) {
+    if (settings.dilation > 0) {
+        const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(settings.dilation, settings.dilation));
+        cv.dilate(processedMat, processedMat, kernel);
+        kernel.delete();
+    }
+    
+    if (settings.erosion > 0) {
+        const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(settings.erosion, settings.erosion));
+        cv.erode(processedMat, processedMat, kernel);
+        kernel.delete();
+    }
+}
+
+// Rest of the utility functions (showStatus, updateHistogram, etc.) remain the same
+</script>
+</body>
+</html>

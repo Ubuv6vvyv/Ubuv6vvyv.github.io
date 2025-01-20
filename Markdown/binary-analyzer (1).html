@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binary File Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .dropzone {
+            border: 2px dashed #666;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            background: #2d2d2d;
+            cursor: pointer;
+        }
+        .dropzone.active {
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        pre {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #0f0;
+            color: black;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        input[type="text"] {
+            padding: 8px;
+            width: 100%;
+            margin-top: 10px;
+            background: #3d3d3d;
+            color: #fff;
+            border: 1px solid #555;
+        }
+        #output {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dropzone" id="dropzone">Drag and drop a file here or click to select</div>
+        <input type="file" id="fileInput" style="display: none;">
+        <input type="text" id="customPattern" placeholder="Add custom regex pattern">
+        <button id="addPattern">Add Pattern</button>
+        <button id="exportResults">Export Results as JSON</button>
+        <pre id="output">Analysis results will appear here...</pre>
+    </div>
+
+    <script>
+        class BinaryFileAnalyzer {
+            constructor() {
+                this.patterns = {
+                    urls: /https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/g,
+                    emails: /[\w.-]+@[\w.-]+\.\w+/g,
+                    ipv4: /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g,
+                    base64: /[A-Za-z0-9+/]{40,}={0,2}/g,
+                    hex: /0x[A-Fa-f0-9]{8,}/g,
+                    awsKeys: /(?:AKIA|ASIA)[A-Z0-9]{16}/g,
+                    jwtTokens: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+                    domainNames: /(?:[A-Za-z0-9-]+\.){1,}[A-Za-z]{2,}/g
+                };
+                this.results = {};
+            }
+
+            addPattern(pattern) {
+                try {
+                    const regex = new RegExp(pattern, 'g');
+                    const key = `custom_${Date.now()}`;
+                    this.patterns[key] = regex;
+                    return true;
+                } catch (e) {
+                    console.error("Invalid regex:", e);
+                    return false;
+                }
+            }
+
+            async analyze(file) {
+                this.results = {
+                    fileInfo: this.getFileInfo(file),
+                    patterns: {},
+                    exifData: null,
+                    hexDump: null
+                };
+
+                // Analyze text
+                const textContent = await this.readAsText(file);
+                for (const [name, regex] of Object.entries(this.patterns)) {
+                    const matches = [...new Set(textContent.match(regex) || [])];
+                    if (matches.length) {
+                        this.results.patterns[name] = matches;
+                    }
+                }
+
+                // Extract EXIF metadata if possible
+                try {
+                    EXIF.getData(file, () => {
+                        this.results.exifData = EXIF.getAllTags(file);
+                    });
+                } catch (e) {
+                    console.error("EXIF extraction error:", e);
+                }
+
+                // Create hex dump
+                this.results.hexDump = await this.createHexDump(file);
+
+                return this.results;
+            }
+
+            getFileInfo(file) {
+                return {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    lastModified: new Date(file.lastModified).toISOString()
+                };
+            }
+
+            async readAsText(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsText(file);
+                });
+            }
+
+            async createHexDump(file) {
+                const buffer = await file.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                let result = '';
+                for (let i = 0; i < bytes.length; i += 16) {
+                    const hex = bytes.slice(i, i + 16).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    const ascii = bytes.slice(i, i + 16).map(b => (b >= 32 && b <= 126 ? String.fromCharCode(b) : '.')).join('');
+                    result += `${i.toString(16).padStart(8, '0')}  ${hex.padEnd(48, ' ')}  ${ascii}\n`;
+                }
+                return result;
+            }
+        }
+
+        const analyzer = new BinaryFileAnalyzer();
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const output = document.getElementById('output');
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('active');
+        });
+
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('active'));
+
+        dropzone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('active');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const results = await analyzer.analyze(file);
+                output.textContent = JSON.stringify(results, null, 2);
+            }
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const results = await analyzer.analyze(file);
+                output.textContent = JSON.stringify(results, null, 2);
+            }
+        });
+
+        document.getElementById('addPattern').addEventListener('click', () => {
+            const pattern = document.getElementById('customPattern').value;
+            if (analyzer.addPattern(pattern)) {
+                alert('Pattern added successfully!');
+            } else {
+                alert('Invalid pattern. Please try again.');
+            }
+        });
+
+        document.getElementById('exportResults').addEventListener('click', () => {
+            const blob = new Blob([JSON.stringify(analyzer.results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'analysis_results.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

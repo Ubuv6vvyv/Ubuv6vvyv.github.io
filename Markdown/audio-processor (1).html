@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" name="viewport" content="width=device-width,initial-scale=1">
+    <title>Audio Processor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/7.7.3/wavesurfer.min.js"></script>
+    <style>
+        body{font-family:system-ui;max-width:600px;margin:0 auto;padding:15px;background:#f0f0f0}
+        .container{background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+        .control-group{margin:12px 0}
+        .waveform{height:128px;background:#f5f5f5;border-radius:4px;margin:10px 0}
+        label{display:block;margin-bottom:4px;font-weight:600;font-size:14px}
+        .slider{width:100%;margin:8px 0}
+        .fine-slider{width:100%;margin:4px 0}
+        button{background:#007bff;color:#fff;border:none;padding:8px 16px;border-radius:4px;margin:4px;cursor:pointer}
+        button:disabled{background:#ccc}
+        #fileInput{margin:15px 0}
+        .value-display{font-size:12px;color:#666}
+        .trim-container{display:flex;gap:10px;align-items:center;margin:10px 0}
+        .trim-input{width:80px}
+        .advanced-controls{display:none}
+        .advanced-controls.show{display:block}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="file" id="fileInput" accept="audio/*">
+        <div id="waveform" class="waveform"></div>
+        
+        <div class="trim-container">
+            <input type="number" id="trimStart" class="trim-input" placeholder="Start" min="0" step="0.1">
+            <input type="number" id="trimEnd" class="trim-input" placeholder="End" min="0" step="0.1">
+            <button id="trim">Trim</button>
+        </div>
+
+        <div class="control-group">
+            <button id="playPause">Play</button>
+            <button id="reset">Reset</button>
+            <button id="download" disabled>Download</button>
+            <button id="toggleAdvanced">Advanced Mode</button>
+        </div>
+
+        <div class="control-group">
+            <label>Pitch <span id="pitchValue" class="value-display">1.0x</span></label>
+            <input type="range" id="pitch" class="slider" min="0.5" max="2" step="0.01" value="1">
+            <input type="range" id="pitchFine" class="fine-slider advanced-controls" min="0.95" max="1.05" step="0.001" value="1">
+        </div>
+
+        <div class="control-group">
+            <label>Speed <span id="speedValue" class="value-display">1.0x</span></label>
+            <input type="range" id="speed" class="slider" min="0.25" max="4" step="0.05" value="1">
+            <input type="range" id="speedFine" class="fine-slider advanced-controls" min="0.95" max="1.05" step="0.001" value="1">
+        </div>
+
+        <div class="control-group">
+            <label>Bass Boost <span id="bassValue" class="value-display">0dB</span></label>
+            <input type="range" id="bass" class="slider" min="0" max="30" step="0.5" value="0">
+            <input type="range" id="bassFine" class="fine-slider advanced-controls" min="-5" max="5" step="0.1" value="0">
+        </div>
+
+        <div class="control-group">
+            <label>Voice Boost <span id="voiceValue" class="value-display">0dB</span></label>
+            <input type="range" id="voice" class="slider" min="0" max="30" step="0.5" value="0">
+            <input type="range" id="voiceFine" class="fine-slider advanced-controls" min="-5" max="5" step="0.1" value="0">
+        </div>
+
+        <div class="control-group">
+            <label>Fade <span id="fadeValue" class="value-display">0s</span></label>
+            <input type="range" id="fade" class="slider" min="0" max="5" step="0.1" value="0">
+        </div>
+
+        <div class="control-group">
+            <button id="reverse">Reverse</button>
+        </div>
+    </div>
+
+<script>
+let wavesurfer,audioCtx,source,audioBuffer,isPlaying=!1,isReversed=!1,gainNode,biquadFilter,voiceFilter;const initAudio=()=>{audioCtx=new(window.AudioContext||window.webkitAudioContext),gainNode=audioCtx.createGain(),biquadFilter=audioCtx.createBiquadFilter(),biquadFilter.type="lowshelf",biquadFilter.frequency.value=100,voiceFilter=audioCtx.createBiquadFilter(),voiceFilter.type="peaking",voiceFilter.frequency.value=2500,voiceFilter.Q.value=1,biquadFilter.connect(voiceFilter),voiceFilter.connect(gainNode),gainNode.connect(audioCtx.destination)};document.addEventListener("click",initAudio,{once:!0}),wavesurfer=WaveSurfer.create({container:"#waveform",waveColor:"#4a9eff",progressColor:"#1e6bb8",cursorColor:"#1e6bb8",barWidth:2,barRadius:3,responsive:!0,height:128,normalize:!0}),wavesurfer.on("ready",()=>{document.getElementById("download").disabled=!1,document.getElementById("trimEnd").value=wavesurfer.getDuration().toFixed(2)}),document.getElementById("fileInput").addEventListener("change",async e=>{const t=e.target.files[0];if(!t)return;const n=await t.arrayBuffer();audioBuffer=await audioCtx.decodeAudioData(n),wavesurfer.loadBlob(t)});const updateAudio=()=>{if(!isPlaying)return;stopAudio(),playAudio()},playAudio=()=>{if(!audioBuffer)return;stopAudio(),source=audioCtx.createBufferSource(),source.buffer=audioBuffer;const e=parseFloat(document.getElementById("speed").value)*parseFloat(document.getElementById("speedFine").value),t=(parseFloat(document.getElementById("pitch").value)*parseFloat(document.getElementById("pitchFine").value)-1)*1200;source.playbackRate.value=e,source.detune.value=t;const n=parseFloat(document.getElementById("bass").value)+parseFloat(document.getElementById("bassFine").value),a=parseFloat(document.getElementById("voice").value)+parseFloat(document.getElementById("voiceFine").value);biquadFilter.gain.value=n,voiceFilter.gain.value=a,source.connect(biquadFilter);const o=parseFloat(document.getElementById("fade").value);o>0&&(gainNode.gain.setValueAtTime(0,audioCtx.currentTime),gainNode.gain.linearRampToValueAtTime(1,audioCtx.currentTime+o),gainNode.gain.linearRampToValueAtTime(0,audioCtx.currentTime+source.buffer.duration-o)),source.start(0,wavesurfer.getCurrentTime()),isPlaying=!0,document.getElementById("playPause").textContent="Stop",wavesurfer.play()},stopAudio=()=>{source&&(source.stop(),source.disconnect()),isPlaying=!1,document.getElementById("playPause").textContent="Play",wavesurfer.pause()};document.getElementById("playPause").addEventListener("click",()=>{isPlaying?stopAudio():playAudio()}),document.getElementById("reset").addEventListener("click",()=>{document.querySelectorAll(".slider, .fine-slider").forEach(e=>{e.value=e.getAttribute("value"),updateValueDisplay(e.id)}),isReversed=!1,stopAudio(),wavesurfer.seekTo(0)});const updateValueDisplay=e=>{const t=document.getElementById(e),n=parseFloat(t.value);let a=n;switch(e){case"pitch":case"pitchFine":case"speed":case"speedFine":a=n+"x";break;case"bass":case"bassFine":case"voice":case"voiceFine":a=n+"dB";break;case"fade":a=n+"s"}document.getElementById(e.replace("Fine","")+"Value").textContent=a};document.querySelectorAll(".slider, .fine-slider").forEach(e=>{e.addEventListener("input",()=>{updateValueDisplay(e.id),updateAudio()}),updateValueDisplay(e.id)}),document.getElementById("toggleAdvanced").addEventListener("click",()=>{document.querySelectorAll(".advanced-controls").forEach(e=>e.classList.toggle("show"))}),document.getElementById("reverse").addEventListener("click",()=>{if(!audioBuffer)return;const e=audioBuffer.getChannelData(0).slice();e.reverse(),audioBuffer.getChannelData(0).set(e),audioBuffer.numberOfChannels>1&&(e=audioBuffer.getChannelData(1).slice(),e.reverse(),audioBuffer.getChannelData(1).set(e)),isReversed=!isReversed,isPlaying&&(stopAudio(),playAudio())}),document.getElementById("trim").addEventListener("click",()=>{if(!audioBuffer)return;const e=parseFloat(document.getElementById("trimStart").value)||0,t=parseFloat(document.getElementById("trimEnd").value)||audioBuffer.duration,n=audioCtx.createBuffer(audioBuffer.numberOfChannels,Math.floor((t-e)*audioBuffer.sampleRate),audioBuffer.sampleRate);for(let a=0;a<audioBuffer.numberOfChannels;a++){const o=audioBuffer.getChannelData(a),r=n.getChannelData(a),i=Math.floor(e*audioBuffer.sampleRate),d=Math.floor(t*audioBuffer.sampleRate);for(let l=0;l<d-i;l++)r[l]=o[l+i]}audioBuffer=n,wavesurfer.loadDecodedBuffer(audioBuffer)}),wavesurfer.on("seek",e=>{isPlaying&&(stopAudio(),playAudio())}),document.getElementById("download").addEventListener("click",async()=>{if(!audioBuffer)return;const e=new OfflineAudioContext({numberOfChannels:audioBuffer.numberOfChannels,length:audioBuffer.length,sampleRate:audioBuffer.sampleRate}),t=e.createBufferSource();t.buffer=audioBuffer;const n=parseFloat(document.getElementById("speed").value)*parseFloat(document.getElementById("speedFine").value),a=(parseFloat(document.getElementById("pitch").value)*parseFloat(document.getElementById("pitchFine").value)-1)*1200;t.playbackRate.value=n,t.detune.value=a;const o=e.createBiquadFilter();o.type="lowshelf",o.frequency.value=100;const r=parseFloat(document.getElementById("bass").value)+parseFloat(document.getElementById("bassFine").value);o.gain.value=r;const i=e.createBiquadFilter();i.type="peaking",i.frequency.value=2500,i.Q.value=1;const d=parseFloat(document.getElementById("voice").value)+parseFloat(document.getElementById("voiceFine").value);i.gain.value=d,t.connect(o),o.connect(i),i.connect(e.destination),t.start();const l=await e.startRendering(),s=((e,t=16)=>{const n=e.numberOfChannels,a=e.sampleRate,o=1,r=new Float32Array(e.length*n);for(let v=0;v<n;v++){const b=e.getChannelData(v);for(let f=0;f<b.length;f++)r[f*n+v]=b[f]}const i=r.length*(t/8),d=new ArrayBuffer(44+i),l=new DataView(d);return((e,t,n)=>{for(let a=0;a<n.length;a++)e.setUint8(t+a,n.charCodeAt(a))})(l,0,"RIFF"),l.setUint32(4,36+i,!0),((e,t,n)=>{for(let a=0;a<n.length;a++)e.setUint8(t+a,n.charCodeAt(a))})(l,8,"WAVE"),((e,t,n)=>{for(let a=0;a<n.length;a++)e.setUint8(t+a,n.charCodeAt(a))})(l,12,"fmt "),l.setUint32(16,16,!0),l.setUint16(20,o,!0),l.setUint16(22,n,!0),l.setUint32(24,a,!0),l.setUint32(28,a*n*(t/8),!0),l.setUint16(32,n*(t/8),!0),l.setUint16(34,t,!0),((e,t,n)=>{for(let a=0;a<n.length;a++)e.setUint8(t+a,n.charCodeAt(a))})(l,36,"data"),l.setUint32(40,i,!0);let s=44;for(let v=0;v<r.length;v++){const b=Math.max(-1,Math.min(1,r[v]));l.setInt16(s,b<0?32768*b:32767*b,!0),s+=2}return new Blob([d],{type:"audio/wav"})})(l),u=URL.createObjectURL(s),c=document.createElement("a");c.href=u,c.download="processed_audio.wav",c.click(),URL.revokeObjectURL(u)});
+</script>
+</body>
+</html>

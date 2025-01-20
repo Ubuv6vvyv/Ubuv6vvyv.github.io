@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Vision Board</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.10.17/interact.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #95a5a6;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --background: #f7f9fc;
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--background);
+            margin: 0;
+            padding: 0;
+        }
+
+        #toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            background-color: white;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        #toolbar .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            flex: 1;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        #board {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 60px);
+            background-color: white;
+            overflow: hidden;
+            display: grid;
+        }
+
+        .image-container {
+            position: relative;
+            border: 2px solid transparent;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .image-container.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            z-index: 10;
+        }
+
+        .resize-handle.nw {
+            top: -5px;
+            left: -5px;
+            cursor: nw-resize;
+        }
+
+        .resize-handle.ne {
+            top: -5px;
+            right: -5px;
+            cursor: ne-resize;
+        }
+
+        .resize-handle.sw {
+            bottom: -5px;
+            left: -5px;
+            cursor: sw-resize;
+        }
+
+        .resize-handle.se {
+            bottom: -5px;
+            right: -5px;
+            cursor: se-resize;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toolbar">
+        <button id="addImageBtn" class="btn btn-primary">Add Images</button>
+        <button id="downloadBoardBtn" class="btn btn-success">Download</button>
+        <button id="clearBoardBtn" class="btn btn-danger">Clear</button>
+        <input type="file" id="imageInput" accept="image/*,.zip" multiple style="display: none;">
+    </div>
+    <div id="board"></div>
+
+    <script>
+        // Core Elements
+        const board = document.getElementById("board");
+        const imageInput = document.getElementById("imageInput");
+
+        // State Variables
+        let images = [];
+        let selectedImage = null;
+
+        // Event Listeners
+        document.getElementById("addImageBtn").addEventListener("click", () => imageInput.click());
+        imageInput.addEventListener("change", handleFileUpload);
+        document.getElementById("downloadBoardBtn").addEventListener("click", downloadBoard);
+        document.getElementById("clearBoardBtn").addEventListener("click", clearBoard);
+        window.addEventListener("resize", () => generateGrid(images.length));
+
+        // Intelligent Grid Generation Logic
+        function calculateGrid(imageCount) {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (imageCount <= 1) return { rows: 1, columns: 1 };
+            if (isPortrait) {
+                const rows = Math.ceil(Math.sqrt(imageCount));
+                const columns = Math.ceil(imageCount / rows);
+                return { rows, columns };
+            } else {
+                const columns = Math.ceil(Math.sqrt(imageCount));
+                const rows = Math.ceil(imageCount / columns);
+                return { rows, columns };
+            }
+        }
+
+        function generateGrid(imageCount) {
+            const { rows, columns } = calculateGrid(imageCount);
+            board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+            board.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+        }
+
+        // Handle File Upload
+        async function handleFileUpload(event) {
+            const files = Array.from(event.target.files);
+            for (const file of files) {
+                if (file.type.startsWith("image/")) {
+                    const imageURL = URL.createObjectURL(file);
+                    addImage(imageURL);
+                } else if (file.name.endsWith(".zip")) {
+                    await handleZipFile(file);
+                }
+            }
+            generateGrid(images.length);
+        }
+
+        // Handle ZIP File
+        async function handleZipFile(file) {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+            for (const filename in contents.files) {
+                const file = contents.files[filename];
+                if (!file.dir && /\.(jpe?g|png|gif)$/i.test(filename)) {
+                    const blob = await file.async("blob");
+                    const imageURL = URL.createObjectURL(blob);
+                    addImage(imageURL);
+                }
+            }
+        }
+
+        // Add Image to Board
+        function addImage(src) {
+            const container = document.createElement("div");
+            container.classList.add("image-container");
+
+            const img = document.createElement("img");
+            img.src = src;
+
+            container.appendChild(img);
+            board.appendChild(container);
+            images.push(container);
+
+            setupInteractivity(container);
+        }
+
+        // Setup Interactivity
+        function setupInteractivity(element) {
+            element.addEventListener("click", () => selectImage(element));
+
+            interact(element).draggable({
+                listeners: {
+                    move(event) {
+                        const target = event.target;
+                        const x = (parseFloat(target.dataset.x) || 0) + event.dx;
+                        const y = (parseFloat(target.dataset.y) || 0) + event.dy;
+                        target.style.transform = `translate(${x}px, ${y}px)`;
+                        target.dataset.x = x;
+                        target.dataset.y = y;
+                    },
+                },
+            });
+
+            interact(element).resizable({
+                edges: { left: true, right: true, top: true, bottom: true },
+                listeners: {
+                    move(event) {
+                        const target = event.target;
+                        const { width, height } = event.rect;
+                        target.style.width = `${width}px`;
+                        target.style.height = `${height}px`;
+                    },
+                },
+            });
+        }
+
+        // Select Image
+        function selectImage(element) {
+            if (selectedImage) selectedImage.classList.remove("selected");
+            selectedImage = element;
+            selectedImage.classList.add("selected");
+        }
+
+        // Clear Board
+        function clearBoard() {
+            if (confirm("Are you sure you want to clear the board?")) {
+                board.innerHTML = "";
+                images = [];
+                selectedImage = null;
+            }
+        }
+
+        // Download Board
+        async function downloadBoard() {
+            const canvas = await html2canvas(board);
+            canvas.toBlob((blob) => saveAs(blob, "vision-board.png"));
+        }
+    </script>
+</body>
+
+</html>

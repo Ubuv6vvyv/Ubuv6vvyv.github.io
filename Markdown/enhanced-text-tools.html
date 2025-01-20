@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Tools</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prismjs/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.35/diff2html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prismjs/1.29.0/themes/prism.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.35/diff2html.min.css">
+    <style>
+        :root { --border: #ddd; --bg: #f5f5f5; }
+        body { font-family: system-ui; margin: 0; padding: 20px; background: var(--bg); }
+        .container { display: grid; grid-template-columns: 300px 1fr; gap: 20px; max-width: 1400px; margin: 0 auto; }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+        .tools { position: sticky; top: 20px; }
+        .tool-group { background: white; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; }
+        .tool-header { padding: 10px; cursor: pointer; background: var(--bg); }
+        .tool-content { padding: 10px; display: grid; gap: 5px; }
+        .hidden { display: none; }
+        button { padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; }
+        button:hover { background: var(--bg); }
+        textarea, .cm-editor { width: 100%; min-height: 200px; border: 1px solid var(--border); border-radius: 4px; }
+        .output { background: white; padding: 10px; border: 1px solid var(--border); border-radius: 4px; margin-top: 10px; }
+        .modal { display: none; position: fixed; inset: 0; background: #0006; }
+        .modal-content { background: white; padding: 20px; border-radius: 4px; max-width: 500px; margin: 50px auto; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tools">
+            <div class="toolbar">
+                <button id="undoBtn" onclick="undo()" disabled>↶</button>
+                <button id="redoBtn" onclick="redo()" disabled>↷</button>
+                <select id="encoding">
+                    <option value="UTF-8">UTF-8</option>
+                    <option value="UTF-16">UTF-16</option>
+                    <option value="ASCII">ASCII</option>
+                </select>
+            </div>
+            <div id="toolGroups"></div>
+        </div>
+        <div class="content">
+            <div class="toolbar">
+                <input type="file" id="fileInput" onchange="handleFile(this)" hidden>
+                <button onclick="fileInput.click()">Open</button>
+                <button onclick="saveFile()">Save</button>
+                <button onclick="showDiff()">Diff</button>
+            </div>
+            <textarea id="input" spellcheck="false"></textarea>
+            <div id="outputs"></div>
+        </div>
+    </div>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalTitle"></h3>
+            <div id="modalBody"></div>
+            <div style="text-align:right;margin-top:10px">
+                <button onclick="closeModal()">Cancel</button>
+                <button id="modalConfirm">OK</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// History management
+let history = { past: [], present: '', future: [] };
+const input = document.getElementById('input');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+function updateHistory(text) {
+    history.past.push(history.present);
+    history.present = text;
+    history.future = [];
+    undoBtn.disabled = !history.past.length;
+    redoBtn.disabled = !history.future.length;
+}
+
+function undo() {
+    if (!history.past.length) return;
+    history.future.unshift(history.present);
+    history.present = history.past.pop();
+    input.value = history.present;
+    undoBtn.disabled = !history.past.length;
+    redoBtn.disabled = false;
+}
+
+function redo() {
+    if (!history.future.length) return;
+    history.past.push(history.present);
+    history.present = history.future.shift();
+    input.value = history.present;
+    undoBtn.disabled = false;
+    redoBtn.disabled = !history.future.length;
+}
+
+// Tool groups
+const tools = {
+    'Text Operations': {
+        'Find & Replace': () => showModal('Find & Replace', `
+            <input id="findText" placeholder="Find">
+            <input id="replaceText" placeholder="Replace">
+        `, () => {
+            const text = input.value;
+            const find = document.getElementById('findText').value;
+            const replace = document.getElementById('replaceText').value;
+            input.value = text.replaceAll(find, replace);
+            updateHistory(input.value);
+        }),
+        'Regex Replace': () => showModal('Regex Replace', `
+            <input id="regex" placeholder="Regex pattern">
+            <input id="replaceText" placeholder="Replace">
+            <select id="regexExample" onchange="document.getElementById('regex').value=this.value">
+                <option value="">Common patterns...</option>
+                <option value="\\b\\w+@\\w+\\.\\w+\\b">Email addresses</option>
+                <option value="\\b\\d{3}[-.]?\\d{3}[-.]?\\d{4}\\b">Phone numbers</option>
+                <option value="https?://[\\w\\d./?=#]+">URLs</option>
+                <option value="\\b\\d+\\b">Numbers</option>
+            </select>
+        `, () => {
+            try {
+                const text = input.value;
+                const pattern = new RegExp(document.getElementById('regex').value, 'g');
+                const replace = document.getElementById('replaceText').value;
+                input.value = text.replace(pattern, replace);
+                updateHistory(input.value);
+            } catch (e) {
+                alert('Invalid regex pattern');
+            }
+        }),
+        'Case Convert': {
+            'UPPERCASE': () => processText(t => t.toUpperCase()),
+            'lowercase': () => processText(t => t.toLowerCase()),
+            'Title Case': () => processText(t => t.replace(/\b\w/g, c => c.toUpperCase())),
+            'Sentence case': () => processText(t => t.toLowerCase().replace(/(^\w|\.\s+\w)/g, c => c.toUpperCase()))
+        }
+    },
+    'Format & Clean': {
+        'Remove Spaces': () => processText(t => t.replace(/\s+/g, ' ').trim()),
+        'Remove Lines': () => processText(t => t.replace(/\n+/g, '\n').trim()),
+        'Remove HTML': () => processText(t => t.replace(/<[^>]*>/g, '')),
+        'JSON Format': () => {
+            try {
+                const obj = JSON.parse(input.value);
+                input.value = JSON.stringify(obj, null, 2);
+                updateHistory(input.value);
+            } catch (e) {
+                alert('Invalid JSON');
+            }
+        },
+        'Syntax Highlight': () => {
+            const code = input.value;
+            const html = Prism.highlight(code, Prism.languages.javascript, 'javascript');
+            addOutput('Syntax Highlighted', `<pre><code class="language-javascript">${html}</code></pre>`);
+        }
+    },
+    'Analysis': {
+        'Word Count': () => {
+            const text = input.value;
+            const stats = {
+                chars: text.length,
+                words: text.trim().split(/\s+/).length,
+                lines: text.split('\n').length,
+                spaces: text.split(' ').length - 1
+            };
+            addOutput('Text Statistics', `
+                Characters: ${stats.chars}<br>
+                Words: ${stats.words}<br>
+                Lines: ${stats.lines}<br>
+                Spaces: ${stats.spaces}
+            `);
+        },
+        'Extract Matches': () => showModal('Extract Patterns', `
+            <select id="extractPattern">
+                <option value="\\b\\w+@\\w+\\.\\w+\\b">Email addresses</option>
+                <option value="\\b\\d{3}[-.]?\\d{3}[-.]?\\d{4}\\b">Phone numbers</option>
+                <option value="https?://[\\w\\d./?=#]+">URLs</option>
+                <option value="\\b\\d+\\b">Numbers</option>
+            </select>
+        `, () => {
+            const pattern = new RegExp(document.getElementById('extractPattern').value, 'g');
+            const matches = input.value.match(pattern) || [];
+            addOutput('Extracted Matches', matches.join('\n'));
+        })
+    }
+};
+
+// UI Functions
+function buildTools() {
+    const container = document.getElementById('toolGroups');
+    for (const [group, items] of Object.entries(tools)) {
+        const div = document.createElement('div');
+        div.className = 'tool-group';
+        div.innerHTML = `
+            <div class="tool-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                ${group}
+            </div>
+            <div class="tool-content">
+                ${Object.entries(items).map(([name, action]) => 
+                    typeof action === 'function' 
+                        ? `<button onclick="tools['${group}']['${name}']())">${name}</button>`
+                        : Object.entries(action).map(([subname, subaction]) => 
+                            `<button onclick="tools['${group}']['${name}']['${subname}']()">${subname}</button>`
+                        ).join('')
+                ).join('')}
+            </div>
+        `;
+        container.appendChild(div);
+    }
+}
+
+function showModal(title, body, onConfirm) {
+    document.getElementById('modal').style.display = 'block';
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = body;
+    document.getElementById('modalConfirm').onclick = () => {
+        onConfirm();
+        closeModal();
+    };
+}
+
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+}
+
+function addOutput(title, content) {
+    const div = document.createElement('div');
+    div.className = 'output';
+    div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <b>${title}</b>
+            <button onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+        <div>${content}</div>
+    `;
+    document.getElementById('outputs').prepend(div);
+}
+
+function processText(fn) {
+    input.value = fn(input.value);
+    updateHistory(input.value);
+}
+
+function handleFile(input) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('input').value = e.target.result;
+        updateHistory(e.target.result);
+    };
+    reader.readAsText(file, document.getElementById('encoding').value);
+}
+
+function saveFile() {
+    const blob = new Blob([input.value], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'text-tools-output.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function showDiff() {
+    if (!history.past.length) return;
+    const diff = Diff2Html.create(
+        Diff2Html.createPatch('text', history.past[history.past.length-1], input.value),
+        {outputFormat: 'side-by-side'}
+    );
+    addOutput('Changes', diff);
+}
+
+// Initialize
+input.oninput = e => updateHistory(e.target.value);
+buildTools();
+</script>
+</body>
+</html>

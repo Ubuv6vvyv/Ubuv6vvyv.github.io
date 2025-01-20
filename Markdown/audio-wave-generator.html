@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Wave Manipulation Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #1a1a2e; color: #e0e0e0; margin: 0; padding: 20px; }
+        .control-section { margin-bottom: 20px; }
+        .slider-container { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; }
+        button { margin: 5px 0; padding: 10px; background-color: #333; color: #fff; border: none; cursor: pointer; }
+        button:hover { background-color: #444; }
+    </style>
+</head>
+<body>
+    <h1>Audio Wave Manipulation Tool</h1>
+    <div class="control-section">
+        <h2>Basic Controls</h2>
+        <div class="slider-container">
+            <label for="frequency">Frequency (Hz): <span id="frequencyValue">440</span></label>
+            <input type="range" id="frequency" min="20" max="15000" value="440">
+        </div>
+        <div class="slider-container">
+            <label for="gain">Gain: <span id="gainValue">0.5</span></label>
+            <input type="range" id="gain" min="0" max="1" step="0.01" value="0.5">
+        </div>
+    </div>
+    <div class="control-section">
+        <h2>Advanced Controls</h2>
+        <div class="slider-container">
+            <label for="modulation">Modulation (Hz): <span id="modulationValue">0</span></label>
+            <input type="range" id="modulation" min="0" max="1000" step="0.1" value="0">
+        </div>
+        <div class="slider-container">
+            <label for="cents">Cents Shift: <span id="centsValue">0</span></label>
+            <input type="range" id="cents" min="-2000" max="2000" value="0">
+        </div>
+    </div>
+    <div class="control-section">
+        <button id="startBtn">Start</button>
+        <button id="stopBtn">Stop</button>
+        <button id="sweepUpBtn">Sweep Up</button>
+        <button id="sweepDownBtn">Sweep Down</button>
+        <button id="randomBtn">Random Mode</button>
+        <button id="evasiveBtn">Evasive Mode</button>
+    </div>
+    <script>
+        class AudioWaveGenerator {
+            constructor() {
+                this.audioContext = null;
+                this.oscillator = null;
+                this.gainNode = null;
+                this.isPlaying = false;
+                this.evasiveInterval = null;
+                this.modulationValue = 0;
+                this.centsShiftValue = 0;
+            }
+
+            initializeContext() {
+                if (!this.audioContext) this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            startOscillator(frequency = 440) {
+                this.initializeContext();
+                if (this.isPlaying) this.stopOscillator();
+                this.oscillator = this.audioContext.createOscillator();
+                this.gainNode = this.audioContext.createGain();
+                this.oscillator.frequency.value = frequency;
+                this.gainNode.gain.value = parseFloat(document.getElementById('gain').value);
+                this.oscillator.connect(this.gainNode);
+                this.gainNode.connect(this.audioContext.destination);
+                this.oscillator.start();
+                this.isPlaying = true;
+            }
+
+            stopOscillator() {
+                if (this.oscillator) {
+                    this.oscillator.stop();
+                    this.oscillator.disconnect();
+                    this.gainNode.disconnect();
+                }
+                this.isPlaying = false;
+                clearTimeout(this.evasiveInterval);
+            }
+
+            updateFrequency() {
+                if (this.oscillator) {
+                    let frequency = parseFloat(document.getElementById('frequency').value);
+                    this.oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+                    document.getElementById('frequencyValue').textContent = frequency;
+                }
+            }
+
+            updateGain() {
+                if (this.gainNode) {
+                    let gain = parseFloat(document.getElementById('gain').value);
+                    this.gainNode.gain.setValueAtTime(gain, this.audioContext.currentTime);
+                    document.getElementById('gainValue').textContent = gain;
+                }
+            }
+
+            updateModulation() {
+                this.modulationValue = parseFloat(document.getElementById('modulation').value);
+                if (this.oscillator) {
+                    let modulationFrequency = this.modulationValue;
+                    // Apply modulation to the oscillator frequency
+                    this.oscillator.frequency.setValueAtTime(
+                        this.oscillator.frequency.value + modulationFrequency, this.audioContext.currentTime
+                    );
+                    document.getElementById('modulationValue').textContent = this.modulationValue;
+                }
+            }
+
+            updateCentsShift() {
+                this.centsShiftValue = parseFloat(document.getElementById('cents').value);
+                if (this.oscillator) {
+                    let centsShift = this.centsShiftValue;
+                    // Apply cents shift as a small pitch offset
+                    this.oscillator.frequency.setValueAtTime(
+                        this.oscillator.frequency.value * Math.pow(2, centsShift / 1200), this.audioContext.currentTime
+                    );
+                    document.getElementById('centsValue').textContent = this.centsShiftValue;
+                }
+            }
+
+            sweep(direction) {
+                const step = direction === 'up' ? 10 : -10;
+                let frequency = parseFloat(document.getElementById('frequency').value);
+                const interval = setInterval(() => {
+                    frequency += step;
+                    if (frequency > 15000 || frequency < 20) clearInterval(interval);
+                    else {
+                        this.oscillator.frequency.value = frequency;
+                        document.getElementById('frequencyValue').textContent = Math.round(frequency);
+                    }
+                }, 50);
+            }
+
+            randomMode() {
+                if (!this.isPlaying) this.startOscillator();
+                const randomFrequency = Math.random() * (15000 - 20) + 20;
+                this.oscillator.frequency.value = randomFrequency;
+                document.getElementById('frequencyValue').textContent = Math.round(randomFrequency);
+            }
+
+            evasiveMode() {
+                this.stopOscillator();
+                this.initializeContext();
+                this.oscillator = this.audioContext.createOscillator();
+                this.gainNode = this.audioContext.createGain();
+                this.oscillator.connect(this.gainNode);
+                this.gainNode.connect(this.audioContext.destination);
+                this.oscillator.start();
+                const fade = (gainNode, target, duration) => {
+                    const now = this.audioContext.currentTime;
+                    gainNode.gain.cancelScheduledValues(now);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+                    gainNode.gain.linearRampToValueAtTime(target, now + duration);
+                };
+                const playBurst = () => {
+                    const randomFrequency = Math.random() * 5000 + 8000;
+                    this.oscillator.frequency.setValueAtTime(randomFrequency, this.audioContext.currentTime);
+                    fade(this.gainNode, 0.5, 2);
+                    setTimeout(() => fade(this.gainNode, 0, 2), 3000);
+                    const randomDelay = Math.random() * (15 - 5) + 5;
+                    this.evasiveInterval = setTimeout(playBurst, (7 + randomDelay) * 1000);
+                };
+                playBurst();
+            }
+        }
+
+        const audioWaveGenerator = new AudioWaveGenerator();
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            const frequency = parseFloat(document.getElementById('frequency').value);
+            audioWaveGenerator.startOscillator(frequency);
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => audioWaveGenerator.stopOscillator());
+        document.getElementById('sweepUpBtn').addEventListener('click', () => audioWaveGenerator.sweep('up'));
+        document.getElementById('sweepDownBtn').addEventListener('click', () => audioWaveGenerator.sweep('down'));
+        document.getElementById('randomBtn').addEventListener('click', () => audioWaveGenerator.randomMode());
+        document.getElementById('evasiveBtn').addEventListener('click', () => audioWaveGenerator.evasiveMode());
+
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', e => {
+                const id = e.target.id;
+                const value = e.target.value;
+                document.getElementById(`${id}Value`).textContent = value;
+
+                if (id === 'frequency') audioWaveGenerator.updateFrequency();
+                if (id === 'gain') audioWaveGenerator.updateGain();
+                if (id === 'modulation') audioWaveGenerator.updateModulation();
+                if (id === 'cents') audioWaveGenerator.updateCentsShift();
+            });
+        });
+    </script>
+</body>
+</html>

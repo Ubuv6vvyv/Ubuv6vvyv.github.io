@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Code Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify-html.min.js"></script>
+    <style>
+        body { font-family: system-ui; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        #editor { height: 300px; border: 1px solid #ccc; margin: 10px 0; }
+        #output { height: 200px; border: 1px solid #ccc; margin: 10px 0; padding: 10px; overflow: auto; }
+        .preview { border: 1px solid #ccc; padding: 10px; margin: 10px 0; min-height: 100px; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        .btn-group { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="btn-group">
+            <input type="file" id="fileInput" accept=".html,.js,.txt">
+            <button onclick="executeCode()">Execute</button>
+            <button onclick="executeInNewTab()">Execute in New Tab</button>
+            <button onclick="minifyCode()">Minify</button>
+            <button onclick="formatCode()">Format</button>
+            <button onclick="createBookmarklet()">Create Button</button>
+        </div>
+
+        <div id="editor"></div>
+        <div id="output"></div>
+        <div class="preview" id="preview"></div>
+    </div>
+
+    <script>
+        // Initialize Ace editor
+        const editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/javascript");
+        
+        // File input handling
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => editor.setValue(e.target.result);
+            reader.readAsText(file);
+        });
+
+        // Execute code in container
+        function executeCode() {
+            const code = editor.getValue();
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            
+            try {
+                if (code.includes('<script') || code.includes('<html')) {
+                    preview.innerHTML = code;
+                } else {
+                    const result = eval(code);
+                    document.getElementById('output').innerText = result;
+                }
+            } catch (err) {
+                document.getElementById('output').innerText = `Error: ${err.message}`;
+            }
+        }
+
+        // Execute in new tab
+        function executeInNewTab() {
+            const code = editor.getValue();
+            const newTab = window.open();
+            newTab.document.write(code.includes('<html') ? code : `
+                <!DOCTYPE html>
+                <html>
+                    <body>
+                        <script>${code}<\/script>
+                    </body>
+                </html>
+            `);
+        }
+
+        // Minify code
+        function minifyCode() {
+            const code = editor.getValue();
+            const minified = code.replace(/\s+/g, ' ')
+                               .replace(/{\s+/g, '{')
+                               .replace(/}\s+/g, '}')
+                               .replace(/;\s+/g, ';')
+                               .trim();
+            document.getElementById('output').innerHTML = `
+                <div>${minified}</div>
+                <button onclick="saveToFile('${minified}', 'minified.js')">Save</button>
+            `;
+        }
+
+        // Format code
+        function formatCode() {
+            const code = editor.getValue();
+            const formatted = code.includes('<html') 
+                ? html_beautify(code)
+                : js_beautify(code);
+            document.getElementById('output').innerHTML = `
+                <pre>${formatted}</pre>
+                <button onclick="saveToFile('${formatted}', 'formatted.js')">Save</button>
+            `;
+        }
+
+        // Create bookmarklet
+        function createBookmarklet() {
+            const code = editor.getValue();
+            const bookmarklet = `javascript:(function(){${encodeURIComponent(code)}})()`;
+            const buttonCode = `<button onclick="${bookmarklet}">Execute Code</button>`;
+            document.getElementById('output').innerHTML = `
+                ${buttonCode}
+                <pre>
+Button HTML:
+${buttonCode}</pre>
+            `;
+        }
+
+        // Save file helper
+        function saveToFile(content, filename) {
+            const blob = new Blob([content], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

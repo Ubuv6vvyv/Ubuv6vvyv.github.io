@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive PDF and Image Editor</title>
+
+  <!-- Konva CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/konva@8.3.5/konva.min.js"></script>
+
+  <!-- PDF.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+
+  <!-- OpenCV.js CDN -->
+  <script async src="https://cdn.jsdelivr.net/npm/opencv.js"></script>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      padding: 5px;
+      margin: 15px;
+    }
+    #canvas-container {
+      position: relative;
+      width: 550px;
+      height: 1012px;
+      margin: 20px auto;
+      border: 2px solid black;
+      background-color: #f0f0f0;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    .control-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 250px;
+      padding: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+      max-height: 90%;
+    }
+    .control-panel h3 {
+      margin: 0 0 10px;
+      font-size: 10px;
+      text-align: center;
+    }
+    .control-panel label {
+      display: block;
+      font-size: 10px;
+      margin: 5px 0;
+    }
+    .control-panel input[type="range"] {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .control-panel button {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-top: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .control-panel button:hover {
+      background-color: #0056b3;
+    }
+    #toolbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+      background-color: #007bff;
+    }
+    #toolbar button {
+      padding: 4px 5px;
+      color: white;
+      background-color: #0056b3;
+      border: none;
+      border-radius: 5px;
+      margin: 0 5px;
+      cursor: pointer;
+    }
+    #toolbar button:hover {
+      background-color: #003f7f;
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="uploadPDFButton">Upload PDF</button>
+  <button id="uploadImageButton">Upload Image</button>
+  <button id="downloadBtn">Download as PNG</button>
+</div>
+
+<div id="canvas-container"></div>
+
+<div class="control-panel">
+  <h3>Image Manipulation</h3>
+
+  <label>Opacity:</label>
+  <input type="range" id="opacitySlider" min="0" max="1" step="0.01" value="1">
+
+  <label>Brightness:</label>
+  <input type="range" id="brightnessSlider" min="0" max="2" step="0.1" value="1">
+
+  <label>Contrast:</label>
+  <input type="range" id="contrastSlider" min="0" max="2" step="0.1" value="1">
+
+  <label>Hue Shift:</label>
+  <input type="range" id="hueShiftSlider" min="0" max="360" step="1" value="0">
+
+  <label>Saturation:</label>
+  <input type="range" id="saturationSlider" min="0" max="2" step="0.1" value="1">
+
+  <label>Sharpness:</label>
+  <input type="range" id="sharpnessSlider" min="0" max="10" step="0.1" value="0">
+
+  <label>Threshold Type:</label>
+  <select id="thresholdType">
+    <option value="simple">Simple Threshold</option>
+    <option value="adaptive">Adaptive Threshold</option>
+  </select>
+
+  <label>Threshold Value:</label>
+  <input type="range" id="thresholdSlider" min="0" max="255" step="1" value="127">
+
+  <label>Edge Detection:</label>
+  <input type="range" id="edgeSlider" min="0" max="255" step="1" value="100">
+
+  <label>Edge Enhance:</label>
+  <input type="range" id="edgeEnhanceSlider" min="0" max="3" step="0.1" value="1">
+
+  <label>Chroma Key (Green):</label>
+  <input type="range" id="chromaKeySlider" min="0" max="1" step="0.01" value="0">
+  
+  <button id="prevButton">Previous</button>
+  <button id="nextButton">Next</button>
+</div>
+
+<input type="file" id="uploadPDF" accept="application/pdf" style="display:none;">
+<input type="file" id="uploadImage" accept="image/*" style="display:none;">
+
+<script>
+  const stage = new Konva.Stage({
+    container: 'canvas-container',
+    width: 550,
+    height: 1012
+  });
+
+  const layer = new Konva.Layer();
+  stage.add(layer);
+
+  const transformer = new Konva.Transformer({
+    boundBoxFunc: (oldBox, newBox) => {
+      if (newBox.width < 20 || newBox.height < 20) return oldBox;
+      return newBox;
+    }
+  });
+  layer.add(transformer);
+
+  let elements = [];
+  let currentElementIndex = -1;
+
+  function updateTransformer() {
+    transformer.nodes(currentElementIndex >= 0 ? [elements[currentElementIndex]] : []);
+    layer.batchDraw();
+  }
+
+  function selectElement(index) {
+    currentElementIndex = index;
+    updateTransformer();
+  }
+
+  function addImageToCanvas(image) {
+    const imgNode = new Konva.Image({
+      image,
+      x: 50,
+      y: 50,
+      draggable: true,
+      width: Math.min(300, image.width / 2),
+      height: Math.min(500, image.height / 2),
+    });
+    layer.add(imgNode);
+    elements.push(imgNode);
+    selectElement(elements.length - 1);
+  }
+
+  function applyThresholding(imgMat) {
+    const thresholdValue = parseInt(document.getElementById('thresholdSlider').value);
+    const thresholdType = document.getElementById('thresholdType').value;
+
+    if (thresholdType === 'simple') {
+      cv.threshold(imgMat, imgMat, thresholdValue, 255, cv.THRESH_BINARY);
+    } else if (thresholdType === 'adaptive') {
+      cv.adaptiveThreshold(imgMat, imgMat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
+    }
+  }
+
+  function applyEdgeDetection(imgMat) {
+    const edgeValue = parseInt(document.getElementById('edgeSlider').value);
+    cv.Canny(imgMat, imgMat, edgeValue, edgeValue * 2);
+  }
+
+  function applyEdgeEnhance(imgMat) {
+    const edgeEnhanceValue = parseFloat(document.getElementById('edgeEnhanceSlider').value);
+    const kernel = new cv.Mat(3, 3, cv.CV_32F, edgeEnhanceValue);
+    cv.filter2D(imgMat, imgMat, -1, kernel);
+  }
+
+  function applyFilters() {
+    const el = elements[currentElementIndex];
+    if (!el) return;
+
+    // Get the canvas element
+    const canvas = el.image();
+    
+    // Read the image into OpenCV Mat
+    const src = cv.imread(canvas);
+    
+    // Apply the thresholding
+    applyThresholding(src);
+
+    // Apply edge detection
+    applyEdgeDetection(src);
+
+    // Apply edge enhancement
+    applyEdgeEnhance(src);
+
+    // Update the image on the canvas
+    cv.imshow(canvas, src);
+    src.delete();
+  }
+
+  document.getElementById('uploadImageButton').addEventListener('click', () => {
+    document.getElementById('uploadImage').click();
+  });
+
+  document.getElementById('uploadImage').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = function () {
+      const img = new Image();
+      img.src = reader.result;
+      img.onload = function () {
+        addImageToCanvas(img);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('downloadBtn').addEventListener('click', function() {
+    const el = elements[currentElementIndex];
+    if (!el) return;
+    
+    const canvas = el.image();
+    const dataUrl = canvas.toDataURL("image/png");
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = "image.png";
+    link.click();
+  });
+
+  document.getElementById('opacitySlider').addEventListener('input', function () {
+    const opacity = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      el.opacity(opacity);
+      layer.batchDraw();
+    }
+  });
+
+  document.getElementById('brightnessSlider').addEventListener('input', function() {
+    const brightness = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      el.cache();
+      el.brightness(brightness);
+      layer.batchDraw();
+    }
+  });
+
+  document.getElementById('contrastSlider').addEventListener('input', function() {
+    const contrast = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      el.cache();
+      el.contrast(contrast);
+      layer.batchDraw();
+    }
+  });
+
+  document.getElementById('saturationSlider').addEventListener('input', function() {
+    const saturation = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      el.cache();
+      el.saturation(saturation);
+      layer.batchDraw();
+    }
+  });
+
+  document.getElementById('hueShiftSlider').addEventListener('input', function() {
+    const hueShift = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      el.cache();
+      el.hueShift(hueShift);
+      layer.batchDraw();
+    }
+  });
+
+  document.getElementById('sharpnessSlider').addEventListener('input', function() {
+    const sharpness = parseFloat(this.value);
+    const el = elements[currentElementIndex];
+    if (el) {
+      // Apply sharpening filter (custom logic)
+      el.cache();
+      el.sharpness(sharpness);
+      layer.batchDraw();
+    }
+  });
+
+  // Apply filters when the sliders change
+  document.getElementById('thresholdSlider').addEventListener('input', applyFilters);
+  document.getElementById('edgeSlider').addEventListener('input', applyFilters);
+  document.getElementById('edgeEnhanceSlider').addEventListener('input', applyFilters);
+</script>
+
+</body>
+</html>

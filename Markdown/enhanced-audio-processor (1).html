@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" name="viewport" content="width=device-width,initial-scale=1">
+<title>Audio Processor Pro</title>
+<style>
+* { margin: 0; box-sizing: border-box; }
+body {
+    font: 14px system-ui;
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+    background: #f0f0f0;
+    color: #333;
+}
+.container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.waveform {
+    height: 160px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 15px 0;
+    cursor: pointer;
+    position: relative;
+}
+.waveform-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(0,123,255,0.1);
+    pointer-events: none;
+}
+.control-group {
+    margin: 16px 0;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+.control-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+.control {
+    flex: 1;
+}
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #444;
+}
+input[type="range"] {
+    width: 100%;
+    margin: 8px 0;
+    accent-color: #007bff;
+}
+.value {
+    font-size: 12px;
+    color: #666;
+    float: right;
+}
+.button-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+button {
+    background: #007bff;
+    color: #fff;
+    border: 0;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: 500;
+}
+button:hover {
+    background: #0056b3;
+}
+button:disabled {
+    background: #ccc;
+}
+button.secondary {
+    background: #6c757d;
+}
+button.secondary:hover {
+    background: #545b62;
+}
+.file-input {
+    margin-bottom: 15px;
+}
+.effects-toggle {
+    margin: 10px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <input type="file" id="fileInput" accept="audio/*" class="file-input">
+    <div class="waveform">
+        <canvas id="waveformCanvas"></canvas>
+        <div id="progress" class="waveform-progress"></div>
+    </div>
+    <div class="button-group">
+        <button id="playButton">Play</button>
+        <button id="resetButton">Reset</button>
+        <button id="reverseButton">Reverse</button>
+        <button id="downloadButton" disabled>Download</button>
+        <button id="saveButton" disabled>Save Preset</button>
+    </div>
+    
+    <div class="control-group">
+        <div class="control-row">
+            <div class="control">
+                <label>Pitch <span id="pitchValue" class="value">1.0x</span></label>
+                <input type="range" id="pitch" min="0.5" max="2" step="0.01" value="1">
+            </div>
+            <div class="control">
+                <label>Speed <span id="speedValue" class="value">1.0x</span></label>
+                <input type="range" id="speed" min="0.25" max="4" step="0.05" value="1">
+            </div>
+        </div>
+        
+        <div class="control-row">
+            <div class="control">
+                <label>Bass <span id="bassValue" class="value">0dB</span></label>
+                <input type="range" id="bass" min="0" max="30" step="0.5" value="0">
+            </div>
+            <div class="control">
+                <label>Voice <span id="voiceValue" class="value">0dB</span></label>
+                <input type="range" id="voice" min="0" max="30" step="0.5" value="0">
+            </div>
+        </div>
+
+        <div class="control-row">
+            <div class="control">
+                <label>Echo Delay <span id="echoDelayValue" class="value">0s</span></label>
+                <input type="range" id="echoDelay" min="0" max="1" step="0.01" value="0">
+            </div>
+            <div class="control">
+                <label>Echo Feedback <span id="echoFeedbackValue" class="value">0%</span></label>
+                <input type="range" id="echoFeedback" min="0" max="90" step="1" value="0">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let audioContext, audioBuffer, sourceNode, analyser, gainNode, 
+    bassFilter, voiceFilter, delayNode, feedbackGain,
+    isPlaying = false, startTime = 0, currentTime = 0, isReversed = false;
+
+const canvas = document.getElementById('waveformCanvas');
+const ctx = canvas.getContext('2d');
+const progress = document.getElementById('progress');
+
+// Initialize audio context and nodes
+const initAudio = () => {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    gainNode = audioContext.createGain();
+    
+    bassFilter = audioContext.createBiquadFilter();
+    bassFilter.type = "lowshelf";
+    bassFilter.frequency.value = 100;
+    
+    voiceFilter = audioContext.createBiquadFilter();
+    voiceFilter.type = "peaking";
+    voiceFilter.frequency.value = 2500;
+    voiceFilter.Q.value = 1;
+    
+    delayNode = audioContext.createDelay(1.0);
+    feedbackGain = audioContext.createGain();
+    feedbackGain.gain.value = 0;
+    
+    // Connect effect chain
+    delayNode.connect(feedbackGain);
+    feedbackGain.connect(delayNode);
+    feedbackGain.connect(gainNode);
+    
+    // Connect analyzer to final output
+    gainNode.connect(analyser);
+    analyser.connect(audioContext.destination);
+    
+    // Set up analyser
+    analyser.fftSize = 2048;
+};
+
+// Handle parameter updates
+const updateParams = (e) => {
+    const value = parseFloat(e.target.value);
+    const id = e.target.id;
+    
+    document.getElementById(id + 'Value').textContent = 
+        value + (id === 'pitch' || id === 'speed' ? 'x' : 
+                id.includes('echo') ? (id === 'echoDelay' ? 's' : '%') : 'dB');
+    
+    if (sourceNode && isPlaying) {
+        switch(id) {
+            case 'pitch':
+                sourceNode.detune.value = (value - 1) * 1200;
+                break;
+            case 'speed':
+                sourceNode.playbackRate.value = value;
+                break;
+            case 'bass':
+                bassFilter.gain.value = value;
+                break;
+            case 'voice':
+                voiceFilter.gain.value = value;
+                break;
+            case 'echoDelay':
+                delayNode.delayTime.value = value;
+                break;
+            case 'echoFeedback':
+                feedbackGain.gain.value = value / 100;
+                break;
+        }
+    }
+};
+
+// Play/pause audio
+const togglePlay = () => {
+    if (isPlaying) {
+        stopAudio();
+    } else {
+        playAudio();
+    }
+};
+
+// Play audio from current position
+const playAudio = () => {
+    if (!audioBuffer) return;
+    
+    stopAudio();
+    
+    sourceNode = audioContext.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    
+    // Apply current parameters
+    sourceNode.playbackRate.value = parseFloat(document.getElementById('speed').value);
+    sourceNode.detune.value = (parseFloat(document.getElementById('pitch').value) - 1) * 1200;
+    bassFilter.gain.value = parseFloat(document.getElementById('bass').value);
+    voiceFilter.gain.value = parseFloat(document.getElementById('voice').value);
+    delayNode.delayTime.value = parseFloat(document.getElementById('echoDelay').value);
+    feedbackGain.gain.value = parseFloat(document.getElementById('echoFeedback').value) / 100;
+    
+    // Connect audio processing chain
+    sourceNode.connect(bassFilter);
+    bassFilter.connect(voiceFilter);
+    voiceFilter.connect(delayNode);
+    voiceFilter.connect(gainNode);
+    delayNode.connect(gainNode);
+    
+    sourceNode.start(0, currentTime);
+    startTime = audioContext.currentTime - currentTime;
+    isPlaying = true;
+    document.getElementById('playButton').textContent = 'Pause';
+    
+    drawWaveform();
+};
+
+// Stop audio playback
+const stopAudio = () => {
+    if (sourceNode) {
+        sourceNode.stop();
+        sourceNode.disconnect();
+    }
+    isPlaying = false;
+    document.getElementById('playButton').textContent = 'Play';
+    currentTime = audioContext.currentTime - startTime;
+};
+
+// Reset all parameters
+const resetParams = () => {
+    document.querySelectorAll('input[type=range]').forEach(input => {
+        input.value = input.getAttribute('value');
+        updateParams({target: input});
+    });
+    currentTime = 0;
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+};
+
+// Reverse audio
+const reverseAudio = () => {
+    if (!audioBuffer) return;
+    
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const reversedBuffer = audioContext.createBuffer(
+        numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+    );
+    
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+        const channelData = audioBuffer.getChannelData(channel);
+        const reversedData = reversedBuffer.getChannelData(channel);
+        for (let i = 0; i < channelData.length; i++) {
+            reversedData[i] = channelData[channelData.length - 1 - i];
+        }
+    }
+    
+    audioBuffer = reversedBuffer;
+    isReversed = !isReversed;
+    document.getElementById('reverseButton').textContent = isReversed ? 'Unreverse' : 'Reverse';
+    
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+    drawWaveform();
+};
+
+// Draw waveform
+const drawWaveform = () => {
+    if (!audioBuffer) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(dataArray);
+    
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#007bff';
+    ctx.beginPath();
+    
+    const sliceWidth = canvas.width / bufferLength;
+    let x = 0;
+    
+    for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * canvas.height / 2;
+        
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+        
+        x += sliceWidth;
+    }
+    
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+    
+    // Update progress bar
+    if (isPlaying && audioBuffer) {
+        const progress = (audioContext.currentTime - startTime) / audioBuffer.duration;
+        document.getElementById('progress').style.width = `${progress * 100}%`;
+    }
+    
+    if (isPlaying) {
+        requestAnimationFrame(drawWaveform);
+    }
+};
+
+// Handle file input
+document.getElementById('fileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const arrayBuffer = e.target.result;
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        document.getElementById('downloadButton').disabled = false;
+        document.getElementById('saveButton').disabled = false;
+        drawWaveform();
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+// Handle canvas click for seeking
+canvas.onclick = (e) => {
+    if (!audioBuffer) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    currentTime = (x / canvas.width) * audioBuffer.duration;
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+};
+
+// Initialize canvas size
+const resizeCanvas = () => {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+};
+
+// Event listeners
+document.getElementById('playButton').onclick = togglePlay;
+document.getElementById('resetButton').onclick = resetParams;
+document.getElementById('reverseButton').onclick = reverseAudio;
+document.querySelectorAll('input[type=range]').forEach(input => {
+    input.oninput = updateParams;
+});
+
+// Initialize audio context on first user interaction
+document.addEventListener('click', initAudio, {once: true});
+
+// Handle window resize
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Draw initial empty waveform
+ctx.fillStyle = '#f8f9fa';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+</script>
+</body>
+</html>
