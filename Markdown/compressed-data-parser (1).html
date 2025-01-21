@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Data Parser</title>
+    <style>
+        :root{--b:#ffffff;--s:#f4f4f4;--tp:#333;--ts:#666;--bc:#ddd;--th:#f0f0f0;--pb:#4a90e2;--ph:#357abd;--cb:#e74c3c;--ch:#c0392b;--db:#2ecc71;--dh:#27ae60;--nb:#9b59b6;--nh:#8e44ad}
+        :root.d{--b:#2c3e50;--s:#34495e;--tp:#ecf0f1;--ts:#bdc3c7;--bc:#45525e;--th:#3a4f5f;--pb:#3498db;--ph:#2980b9;--cb:#e74c3c;--ch:#c0392b;--db:#2ecc71;--dh:#27ae60;--nb:#8e44ad;--nh:#9b59b6}
+        :root.dr{--b:#282a36;--s:#44475a;--tp:#f8f8f2;--ts:#6272a4;--bc:#6272a4;--th:#44475a;--pb:#50fa7b;--ph:#5af78e;--cb:#ff5555;--ch:#ff6b6b;--db:#bd93f9;--dh:#c6a6f7;--nb:#ff79c6;--nh:#ff89c6}
+        body{font-family:Arial,sans-serif;background-color:var(--s);color:var(--tp);margin:0;padding:20px;line-height:1.6}
+        .container{max-width:1000px;margin:0 auto;background-color:var(--b);padding:20px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
+        #file-input,textarea{width:100%;margin-bottom:15px;padding:10px;border:1px solid var(--bc);border-radius:4px;background-color:var(--b);color:var(--tp)}
+        textarea{min-height:200px;resize:vertical}
+        .button-group{display:flex;gap:10px;margin-bottom:15px}
+        button{flex-grow:1;padding:10px;border:none;border-radius:4px;cursor:pointer;color:#fff;font-weight:bold}
+        .parse-btn{background-color:var(--pb)}
+        .parse-btn:hover{background-color:var(--ph)}
+        .clear-btn{background-color:var(--cb)}
+        .clear-btn:hover{background-color:var(--ch)}
+        .download-btn{background-color:var(--db)}
+        .download-btn:hover{background-color:var(--dh)}
+        .new-tab-btn{background-color:var(--nb)}
+        .new-tab-btn:hover{background-color:var(--nh)}
+        .error-container{background-color:#f8d7da;color:#721c24;padding:10px;border-radius:4px;margin-bottom:15px;display:none}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid var(--bc);padding:8px;text-align:left;max-width:300px;white-space:normal}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align:center;color:var(--tp)">Advanced Data Parser</h1>
+        <select id="theme-selector">
+            <option value="l">Light Theme</option>
+            <option value="d">Dark Theme</option>
+            <option value="dr">Dracula Theme</option>
+        </select>
+        <input type="file" id="file-input" accept=".csv,.txt,.json,.html,.xls,.xlsx">
+        <textarea id="data-input" placeholder="Paste your JSON, CSV, HTML, or unstructured text here..."></textarea>
+        <div id="error-container" class="error-container"></div>
+        <div class="button-group">
+            <button id="parse-btn" class="parse-btn">Parse Data</button>
+            <button id="clear-btn" class="clear-btn">Clear Data</button>
+        </div>
+        <div id="table-container" class="table-container"></div>
+        <div class="button-group">
+            <button id="download-btn" class="download-btn">Download as HTML</button>
+            <button id="new-tab-btn" class="new-tab-btn">Open in New Tab</button>
+        </div>
+    </div>
+    <script>
+    class DataParser {
+    constructor() {
+        this.initializeElements();
+        this.addEventListeners();
+        this.initializeTheme();
+    }
+
+    initializeElements() {
+        this.dataInput = document.getElementById('data-input');
+        this.fileInput = document.getElementById('file-input');
+        this.errorContainer = document.getElementById('error-container');
+        this.tableContainer = document.getElementById('table-container');
+        this.parseBtn = document.getElementById('parse-btn');
+        this.clearBtn = document.getElementById('clear-btn');
+        this.downloadBtn = document.getElementById('download-btn');
+        this.newTabBtn = document.getElementById('new-tab-btn');
+        this.themeSelector = document.getElementById('theme-selector');
+    }
+
+    addEventListeners() {
+        this.parseBtn.addEventListener('click', () => this.parseData());
+        this.clearBtn.addEventListener('click', () => this.clearData());
+        this.downloadBtn.addEventListener('click', () => this.downloadTable());
+        this.newTabBtn.addEventListener('click', () => this.openInNewTab());
+        this.themeSelector.addEventListener('change', e => this.changeTheme(e.target.value));
+        this.fileInput.addEventListener('change', e => this.handleFileUpload(e));
+    }
+
+    initializeTheme() {
+        document.documentElement.className = 'l';
+        this.themeSelector.value = 'l';
+    }
+
+    changeTheme(theme) {
+        document.documentElement.className = theme;
+    }
+
+    handleFileUpload(e) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.dataInput.value = e.target.result;
+            this.parseData();
+        };
+        reader.readAsText(e.target.files[0]);
+    }
+
+    parseInputData(input) {
+        input = input.trim();
+        const parsers = [
+            this.tryJSONParse.bind(this),
+            this.tryDelimitedParse.bind(this),
+            this.tryHTMLTableParse.bind(this),
+            this.tryTextParse.bind(this)
+        ];
+
+        for (const parser of parsers) {
+            try {
+                const result = parser(input);
+                if (result && result.length) return result;
+            } catch (error) {
+                console.log(`Parser failed: ${parser.name}`, error);
+            }
+        }
+
+        throw new Error('Unable to parse input data');
+    }
+
+    tryJSONParse(input) {
+        try {
+            const parsed = JSON.parse(input);
+            return Array.isArray(parsed) ? parsed : [parsed];
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    tryDelimitedParse(input) {
+        const delimiters = [',', ';', '\t'];
+        for (const delimiter of delimiters) {
+            const lines = input.split('\n');
+            const headers = lines[0].split(delimiter);
+            
+            if (headers.length > 1) {
+                return lines.slice(1)
+                    .filter(line => line.trim() !== '')
+                    .map(line => {
+                        const values = line.split(delimiter);
+                        return headers.reduce((obj, header, index) => {
+                            obj[header.trim()] = values[index] ? values[index].trim() : '';
+                            return obj;
+                        }, {});
+                    });
+            }
+        }
+        return [];
+    }
+
+    tryHTMLTableParse(input) {
+        if (!input.toLowerCase().includes('<table')) return [];
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = input;
+        const table = tempDiv.querySelector('table');
+        
+        if (!table) return [];
+
+        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+        const rows = Array.from(table.querySelectorAll('tr')).slice(1);
+        
+        return rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+            return headers.reduce((obj, header, index) => {
+                obj[header] = cells[index] || '';
+                return obj;
+            }, {});
+        });
+    }
+
+    tryTextParse(input) {
+        const lines = input.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) return [];
+
+        return lines.map(line => {
+            const parts = line.split(/\s+/);
+            return parts.reduce((obj, part, index) => {
+                obj[`column${index + 1}`] = part;
+                return obj;
+            }, {});
+        });
+    }
+
+    parseData() {
+        const input = this.dataInput.value;
+        try {
+            this.errorContainer.style.display = 'none';
+            this.tableContainer.innerHTML = '';
+
+            const parsedData = this.parseInputData(input);
+            this.renderTable(parsedData);
+        } catch (error) {
+            this.showError(`Parsing Error: ${error.message}`);
+        }
+    }
+
+    renderTable(data) {
+        if (!data || data.length === 0) {
+            this.showError('No data to display');
+            return;
+        }
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+
+        // Get all unique keys across all objects
+        const allKeys = [...new Set(data.flatMap(Object.keys))].sort((a, b) => a.localeCompare(b));
+
+        // Create header row
+        const headerRow = document.createElement('tr');
+        allKeys.forEach(key => {
+            const th = document.createElement('th');
+            th.textContent = key;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create data rows
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            allKeys.forEach(key => {
+                const td = document.createElement('td');
+                const value = item[key] ?? '';
+                td.textContent = String(value).length > 1000 
+                    ? value.substring(0, 1000) + '...' 
+                    : value;
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        this.tableContainer.appendChild(table);
+    }
+
+    showError(message) {
+        this.errorContainer.textContent = message;
+        this.errorContainer.style.display = 'block';
+    }
+
+    clearData() {
+        this.dataInput.value = '';
+        this.tableContainer.innerHTML = '';
+        this.errorContainer.style.display = 'none';
+    }
+
+    downloadTable() {
+        const table = this.tableContainer.querySelector('table');
+        if (!table) return;
+
+        const htmlContent = `
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; }
+                        table { border-collapse: collapse; width: 100%; }
+                        th, td { 
+                            border: 1px solid #ddd; 
+                            padding: 8px; 
+                            text-align: left; 
+                            word-break: break-word; 
+                        }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>${table.outerHTML}</body>
+            </html>
+        `;
+
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'data_table.html';
+        link.click();
+    }
+
+    openInNewTab() {
+        const table = this.tableContainer.querySelector('table');
+        const newTab = window.open('', '_blank');
+
+        if (!table) {
+            newTab.document.write('<p>No table to display</p>');
+            return;
+        }
+
+        const htmlContent = `
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; }
+                        table { border-collapse: collapse; width: 100%; }
+                        th, td { 
+                            border: 1px solid #ddd; 
+                            padding: 8px; 
+                            text-align: left; 
+                            word-break: break-word; 
+                        }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>${table.outerHTML}</body>
+            </html>
+        `;
+
+        newTab.document.write(htmlContent);
+        newTab.document.close();
+    }
+}
+
+new DataParser();
+    </script>
+</body>
+</html>

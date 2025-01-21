@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data to HTML Table Converter</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <style>
+        .bordered-design {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 2px solid #e2e8f0
+        }
+        .bordered-design th {
+            background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+            border-bottom: 2px solid #cbd5e1
+        }
+        .bordered-design td {
+            border: 1px solid #e2e8f0
+        }
+        .striped-design {
+            background: linear-gradient(45deg, #f9fafb, #f3f4f6);
+            border-radius: 8px;
+            overflow: hidden
+        }
+        .striped-design th {
+            background: linear-gradient(to right, #2c3e50, #3498db);
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px
+        }
+        .striped-design tbody tr:nth-child(even) {
+            background-color: rgba(45,66,85,0.05)
+        }
+        .striped-design tbody tr:hover {
+            background-color: rgba(45,66,85,0.1)
+        }
+        .dark-design {
+            background-color: #0a192f;
+            color: #8892b0;
+            border-radius: 10px;
+            border: 2px solid #112240;
+            box-shadow: 0 10px 30px -15px rgba(2,12,27,0.7)
+        }
+        .dark-design th {
+            background-color: #112240;
+            color: #64ffda;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 2px solid #64ffda
+        }
+        .dark-design td {
+            border-bottom: 1px solid #112240
+        }
+        .dark-design tbody tr:hover {
+            background-color: #112240;
+            color: #64ffda
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="container mx-auto max-w-4xl bg-white shadow-lg rounded-lg p-6">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Data to HTML Table Converter</h1>
+        <div class="mb-6">
+            <label class="block text-gray-700 font-bold mb-2">Input Data</label>
+            <textarea id="inputData" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" rows="8" placeholder="Paste CSV, JSON, or raw text here..."></textarea>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <input type="file" id="fileInput" accept=".csv, .json, .xls, .xlsx" class="hidden" />
+                <button onclick="document.getElementById('fileInput').click();" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                    Upload File
+                </button>
+            </div>
+        </div>
+        <div class="mb-6">
+            <label class="block text-gray-700 font-bold mb-2">Table Design</label>
+            <div class="flex flex-wrap gap-2">
+                <select id="tableDesign" class="border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="basic">Basic</option>
+                    <option value="bordered">Bordered</option>
+                    <option value="striped">Striped</option>
+                    <option value="dark">Dark/Hacker</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-6">
+            <button onclick="convertData()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                Convert
+            </button>
+            <button onclick="clearInput()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">
+                Clear
+            </button>
+        </div>
+        <div id="errorDisplay" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative hidden" role="alert">
+            <span id="errorMessage" class="block sm:inline"></span>
+        </div>
+        <div class="mt-6">
+            <label class="block text-gray-700 font-bold mb-2">Output</label>
+            <div id="outputContainer" class="overflow-x-auto max-h-96">
+                <table id="outputTable" class="w-full"></table>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button onclick="copyTable()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                    Copy Table
+                </button>
+                <button onclick="downloadHTML()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                    Download HTML
+                </button>
+                <button onclick="downloadTXT()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">
+                    Download TXT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function trimText(str) {
+            return str.replace(/\s+/g, ' ').trim();
+        }
+
+        function displayError(msg) {
+            const errorEl = document.getElementById('errorDisplay');
+            const errorMsg = document.getElementById('errorMessage');
+            errorEl.classList.remove('hidden');
+            errorMsg.textContent = msg;
+        }
+
+        function clearError() {
+            document.getElementById('errorDisplay').classList.add('hidden');
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n').filter(line => line.trim() !== '');
+            const headers = lines[0].split(',').map(trimText);
+            const data = lines.slice(1).map(line => 
+                line.split(',').map(trimText)
+            );
+            return { headers, data };
+        }
+
+        function parseJSON(jsonText) {
+            try {
+                let parsedData = JSON.parse(jsonText);
+
+                function flattenData(obj) {
+                    if (Array.isArray(obj)) return obj.map(flattenData);
+                    if (typeof obj === 'object' && obj !== null) 
+                        return Object.values(obj).map(flattenData);
+                    return obj;
+                }
+
+                if (!Array.isArray(parsedData)) parsedData = [parsedData];
+
+                const flattened = flattenData(parsedData);
+                const headers = Object.keys(flattened[0] || {});
+                const processedData = flattened.map(item => 
+                    headers.map(header => item[header])
+                );
+
+                return { headers, data: processedData };
+            } catch (error) {
+                throw new Error('Invalid JSON format');
+            }
+        }
+
+        function parseExcel(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    const headers = data[0];
+                    const processedData = data.slice(1);
+                    resolve({ headers, data: processedData });
+                };
+                reader.readAsBinaryString(file);
+            });
+        }
+
+        function renderTable(headers, data) {
+            const tableDesign = document.getElementById('tableDesign').value;
+            const outputTable = document.getElementById('outputTable');
+            outputTable.innerHTML = '';
+
+            const designClasses = {
+                basic: '',
+                bordered: 'bordered-design',
+                striped: 'striped-design',
+                dark: 'dark-design'
+            };
+
+            const headerClasses = {
+                basic: 'bg-white',
+                bordered: '',
+                striped: '',
+                dark: ''
+            };
+
+            const rowClasses = {
+                basic: '',
+                bordered: '',
+                striped: '',
+                dark: ''
+            };
+
+            outputTable.className = `w-full ${designClasses[tableDesign]}`;
+
+            const tableHead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.className = headerClasses[tableDesign];
+
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                th.className = 'p-3 text-left font-bold';
+                headerRow.appendChild(th);
+            });
+
+            tableHead.appendChild(headerRow);
+            outputTable.appendChild(tableHead);
+
+            const tableBody = document.createElement('tbody');
+            data.forEach(rowData => {
+                const tableRow = document.createElement('tr');
+                tableRow.className = rowClasses[tableDesign];
+
+                rowData.forEach(cellData => {
+                    const tableCell = document.createElement('td');
+                    tableCell.textContent = cellData;
+                    tableCell.className = 'p-3';
+                    tableRow.appendChild(tableCell);
+                });
+
+                tableBody.appendChild(tableRow);
+            });
+
+            outputTable.appendChild(tableBody);
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            clearError();
+
+            if (file) {
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                try {
+                    let result;
+                    switch (fileExtension) {
+                        case 'csv':
+                            const csvText = await file.text();
+                            result = parseCSV(csvText);
+                            break;
+                        case 'json':
+                            const jsonText = await file.text();
+                            result = parseJSON(jsonText);
+                            break;
+                        case 'xls':
+                        case 'xlsx':
+                            result = await parseExcel(file);
+                            break;
+                        default:
+                            throw new Error('Unsupported file type');
+                    }
+                    renderTable(result.headers, result.data);
+                    event.target.value = '';
+                } catch (error) {
+                    displayError(error.message);
+                }
+            }
+        });
+
+        function convertData() {
+            const inputData = document.getElementById('inputData').value.trim();
+            clearError();
+
+            try {
+                let result;
+                if (inputData.includes(',')) {
+                    result = parseCSV(inputData);
+                } else {
+                    result = parseJSON(inputData);
+                }
+                renderTable(result.headers, result.data);
+            } catch (error) {
+                displayError('Invalid input format. Please provide valid CSV or JSON data.');
+            }
+        }
+
+        function clearInput() {
+            document.getElementById('inputData').value = '';
+            document.getElementById('outputTable').innerHTML = '';
+            clearError();
+        }
+
+        function copyTable() {
+            const outputTable = document.getElementById('outputTable');
+            const range = document.createRange();
+            range.selectNode(outputTable);
+            window.getSelection().addRange(range);
+
+            try {
+                document.execCommand('copy');
+                alert('Table copied to clipboard!');
+            } catch (err) {
+                console.error('Unable to copy table', err);
+            }
+
+            window.getSelection().removeAllRanges();
+        }
+
+        function downloadHTML() {
+            const outputTable = document.getElementById('outputTable');
+            const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Converted Table</title>
+    <style>
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    ${outputTable.outerHTML}
+</body>
+</html>
+            `;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'converted_table.html';
+            link.click();
+        }
+
+        function downloadTXT() {
+            const outputTable = document.getElementById('outputTable');
+            let txtContent = '';
+
+            const headers = Array.from(outputTable.querySelectorAll('thead th')).map(th => th.textContent);
+            txtContent += headers.join('\t') + '\n';
+
+            const rows = outputTable.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent);
+                txtContent += cells.join('\t') + '\n';
+            });
+
+            const blob = new Blob([txtContent], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'converted_table.txt';
+            link.click();
+        }
+    </script>
+</body>
+</html>

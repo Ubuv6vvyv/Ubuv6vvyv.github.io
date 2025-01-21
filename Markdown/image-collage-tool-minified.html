@@ -1,0 +1,74 @@
+document.addEventListener('DOMContentLoaded', () => {
+  const collageContainer = document.getElementById('collage-container');
+  const uploadImage = document.getElementById('upload-image');
+  const addTextButton = document.getElementById('add-text');
+  const exportButton = document.getElementById('export-collage');
+  const toggleGridButton = document.getElementById('toggle-grid');
+
+  let isGridVisible = false;
+
+  // Handle image upload
+  uploadImage.addEventListener('change', handleImageUpload);
+
+  function handleImageUpload(event) {
+    const files = event.target.files;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.draggable = true;
+        img.style.zIndex = 1;
+        img.addEventListener('dragstart', handleDragStart);
+        img.addEventListener('dragend', handleDragEnd);
+        collageContainer.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Drag and Drop
+  function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.style.cssText);
+    e.target.style.opacity = '0.5';
+  }
+
+  function handleDragEnd(e) {
+    e.target.style.opacity = '';
+    const x = e.pageX - collageContainer.offsetLeft;
+    const y = e.pageY - collageContainer.offsetTop;
+    e.target.style.left = `${x}px`;
+    e.target.style.top = `${y}px`;
+  }
+
+  // Add Text
+  addTextButton.addEventListener('click', () => {
+    const textBox = document.createElement('div');
+    textBox.contentEditable = true;
+    textBox.className = 'text-box';
+    textBox.textContent = 'Edit me!';
+    textBox.draggable = true;
+    textBox.style.zIndex = 1;
+    textBox.style.left = '10px';
+    textBox.style.top = '10px';
+    textBox.addEventListener('dragstart', handleDragStart);
+    textBox.addEventListener('dragend', handleDragEnd);
+    collageContainer.appendChild(textBox);
+  });
+
+  // Toggle Grid
+  toggleGridButton.addEventListener('click', () => {
+    isGridVisible = !isGridVisible;
+    collageContainer.style.backgroundSize = isGridVisible ? '20px 20px' : '';
+    collageContainer.style.backgroundImage = isGridVisible ? 'linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px)' : '';
+  });
+
+  // Export Collage
+  exportButton.addEventListener('click', () => {
+    html2canvas(collageContainer).then(canvas => {
+      canvas.toBlob(blob => {
+        saveAs(blob, 'collage.png');
+      });
+    });
+  });
+});

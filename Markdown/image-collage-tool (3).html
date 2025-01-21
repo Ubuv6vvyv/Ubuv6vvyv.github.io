@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Collage Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .control-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+        .slider-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background: white;
+        }
+        button {
+            padding: 6px 12px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        select, input[type="range"] {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .thumbnail-container {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+        }
+        .thumbnail {
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .thumbnail img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .thumbnail button {
+            width: 100%;
+            font-size: 12px;
+            padding: 4px;
+        }
+        .remove-button {
+            background: #ff4444;
+        }
+        .remove-button:hover {
+            background: #cc0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <input type="file" id="imageUpload" multiple accept="image/*">
+                <button onclick="downloadCanvas()">Download</button>
+                <button onclick="clearCanvas()" class="remove-button">Clear</button>
+                <select id="layoutType" onchange="updateLayout()">
+                    <option value="grid">Grid</option>
+                    <option value="horizontal">Row</option>
+                    <option value="vertical">Column</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <div class="slider-group">
+                    <span class="slider-label">Opacity</span>
+                    <input type="range" id="opacitySlider" min="0" max="100" value="100" onchange="updateSelectedObject()">
+                </div>
+                <div class="slider-group">
+                    <span class="slider-label">Border Width</span>
+                    <input type="range" id="borderSlider" min="0" max="20" value="0" onchange="updateSelectedObject()">
+                </div>
+                <div class="slider-group">
+                    <span class="slider-label">Padding</span>
+                    <input type="range" id="paddingSlider" min="10" max="50" value="20" onchange="updateLayout()">
+                </div>
+            </div>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div id="thumbnailContainer" class="thumbnail-container"></div>
+    </div>
+
+    <script>
+        let canvas;
+        let images = [];
+        
+        function initCanvas() {
+            const wrapper = document.querySelector('.canvas-wrapper');
+            const containerWidth = wrapper.offsetWidth;
+            const containerHeight = Math.min(window.innerHeight * 0.6, containerWidth * 0.75);
+
+            canvas = new fabric.Canvas('canvas', {
+                width: containerWidth,
+                height: containerHeight,
+                backgroundColor: 'white',
+                preserveObjectStacking: true
+            });
+
+            // Enhanced controls and containment
+            fabric.Object.prototype.transparentCorners = false;
+            fabric.Object.prototype.cornerColor = '#00a0f5';
+            fabric.Object.prototype.cornerStyle = 'circle';
+            fabric.Object.prototype.borderColor = '#00a0f5';
+            fabric.Object.prototype.cornerSize = 8;
+
+            canvas.on('object:moving', function(e) {
+                const obj = e.target;
+                const bounds = obj.getBoundingRect();
+                const containerBounds = obj._containerBounds;
+
+                if (containerBounds) {
+                    if (bounds.left < containerBounds.left) obj.left = containerBounds.left;
+                    if (bounds.top < containerBounds.top) obj.top = containerBounds.top;
+                    if (bounds.left + bounds.width > containerBounds.right) 
+                        obj.left = containerBounds.right - bounds.width;
+                    if (bounds.top + bounds.height > containerBounds.bottom)
+                        obj.top = containerBounds.bottom - bounds.height;
+                }
+            });
+
+            canvas.on('object:scaling', function(e) {
+                const obj = e.target;
+                const bounds = obj.getBoundingRect();
+                const containerBounds = obj._containerBounds;
+
+                if (containerBounds) {
+                    const scaleX = obj.scaleX;
+                    const scaleY = obj.scaleY;
+
+                    if (bounds.width > containerBounds.width || 
+                        bounds.height > containerBounds.height) {
+                        const scale = Math.min(
+                            containerBounds.width / (bounds.width / scaleX),
+                            containerBounds.height / (bounds.height / scaleY)
+                        );
+                        obj.scale(scale);
+                    }
+                }
+            });
+
+            canvas.on('selection:created', updateSliders);
+            canvas.on('selection:updated', updateSliders);
+            canvas.on('selection:cleared', resetSliders);
+        }
+
+        function updateSliders(e) {
+            const obj = canvas.getActiveObject();
+            if (obj) {
+                document.getElementById('opacitySlider').value = obj.opacity * 100;
+                document.getElementById('borderSlider').value = obj.strokeWidth || 0;
+            }
+        }
+
+        function resetSliders() {
+            document.getElementById('opacitySlider').value = 100;
+            document.getElementById('borderSlider').value = 0;
+        }
+
+        function updateSelectedObject() {
+            const obj = canvas.getActiveObject();
+            if (obj) {
+                obj.set({
+                    opacity: document.getElementById('opacitySlider').value / 100,
+                    strokeWidth: parseInt(document.getElementById('borderSlider').value),
+                    stroke: document.getElementById('borderSlider').value > 0 ? '#000' : null
+                });
+                canvas.renderAll();
+            }
+        }
+
+        function addImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fabric.Image.fromURL(e.target.result, function(img) {
+                    const maxSize = 800;
+                    if (img.width > maxSize || img.height > maxSize) {
+                        const scale = maxSize / Math.max(img.width, img.height);
+                        img.scale(scale);
+                    }
+                    images.push(img);
+                    updateLayout();
+                    updateThumbnails();
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateLayout() {
+            const layoutType = document.getElementById('layoutType').value;
+            const padding = parseInt(document.getElementById('paddingSlider').value);
+            
+            canvas.clear();
+            if (images.length === 0) return;
+
+            let containerBounds;
+            
+            switch(layoutType) {
+                case 'grid':
+                    containerBounds = arrangeGrid(padding);
+                    break;
+                case 'horizontal':
+                    containerBounds = arrangeHorizontal(padding);
+                    break;
+                case 'vertical':
+                    containerBounds = arrangeVertical(padding);
+                    break;
+            }
+
+            // Set container bounds for each image
+            images.forEach(img => {
+                img._containerBounds = containerBounds;
+            });
+
+            canvas.renderAll();
+        }
+
+        function arrangeGrid(padding) {
+            const cols = Math.ceil(Math.sqrt(images.length));
+            const rows = Math.ceil(images.length / cols);
+
+            const cellWidth = (canvas.width - (padding * (cols + 1))) / cols;
+            const cellHeight = (canvas.height - (padding * (rows + 1))) / rows;
+
+            images.forEach((img, index) => {
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+
+                const scale = Math.min(
+                    cellWidth / img.width,
+                    cellHeight / img.height
+                ) * 0.9;
+
+                img.set({
+                    scaleX: scale,
+                    scaleY: scale,
+                    left: padding + col * (cellWidth + padding),
+                    top: padding + row * (cellHeight + padding)
+                });
+
+                canvas.add(img);
+            });
+
+            return {
+                left: padding,
+                top: padding,
+                right: canvas.width - padding,
+                bottom: canvas.height - padding,
+                width: canvas.width - (padding * 2),
+                height: canvas.height - (padding * 2)
+            };
+        }
+
+        // [Previous arrangeHorizontal, arrangeVertical, updateThumbnails, removeImage, 
+        // clearCanvas, and downloadCanvas functions remain the same]
+
+        window.onload = function() {
+            initCanvas();
+
+            document.getElementById('imageUpload').addEventListener('change', function(e) {
+                Array.from(e.target.files).forEach(file => addImage(file));
+            });
+        };
+
+        window.addEventListener('resize', function() {
+            const wrapper = document.querySelector('.canvas-wrapper');
+            const containerWidth = wrapper.offsetWidth;
+            const containerHeight = Math.min(window.innerHeight * 0.6, containerWidth * 0.75);
+            
+            canvas.setDimensions({
+                width: containerWidth,
+                height: containerHeight
+            });
+
+            updateLayout();
+        });
+    </script>
+</body>
+</html>

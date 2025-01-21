@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Logistics Container Crusher</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-10">
+    <div class="max-w-2xl mx-auto bg-gray-900 p-8 rounded-lg shadow-xl">
+        <div class="text-center mb-4">
+            <h2 class="text-2xl font-bold text-white">Crush Your Competition Meter</h2>
+            <p class="text-gray-300">Slide to obliterate the competition!</p>
+            <p id="crushedCounter" class="text-gray-300">Crushed: 0 rivals</p>
+        </div>
+        
+        <div class="relative h-24 bg-gray-800 rounded-lg overflow-hidden">
+            <div 
+                id="shippingContainer" 
+                class="absolute left-0 top-1/2 -translate-y-1/2 w-16 h-12 bg-red-600 border-4 border-red-800"
+            ></div>
+            <div id="slider" class="slider absolute bottom-0 left-0 right-0"></div>
+        </div>
+    </div>
+
+    <script>
+        let crushedCount = 0;
+        const shippingContainer = document.getElementById('shippingContainer');
+        const crushedCounter = document.getElementById('crushedCounter');
+        const sliderContainer = document.getElementById('slider');
+
+        // Initialize noUiSlider
+        noUiSlider.create(sliderContainer, {
+            start: [0],
+            range: { min: 0, max: 100 },
+            connect: [true, false]
+        });
+
+        // Add event listener to slider
+        sliderContainer.noUiSlider.on('change', function(values) {
+            if (values[0] > 99) {
+                crushCompetition();
+            }
+        });
+
+        function crushCompetition() {
+            // Animate container sliding out
+            anime({
+                targets: shippingContainer,
+                translateX: window.innerWidth + 500,
+                rotate: '180deg',
+                duration: 1500,
+                easing: 'easeInQuad',
+                complete: function() {
+                    // Trigger confetti explosion
+                    confetti({
+                        particleCount: 250,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#FF6B6B', '#4ECDC4', '#45B7D1']
+                    });
+
+                    // Update crushed counter
+                    crushedCount++;
+                    crushedCounter.textContent = `Crushed: ${crushedCount} rivals`;
+
+                    // Reset slider
+                    sliderContainer.noUiSlider.set(0);
+
+                    // Reset container position
+                    shippingContainer.style.transform = 'translateX(0px) rotate(0deg)';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

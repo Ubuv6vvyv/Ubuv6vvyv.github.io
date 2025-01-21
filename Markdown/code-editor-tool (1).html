@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Editor Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.8.4/standalone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.8.4/parser-html.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            font-family: monospace;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .style-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #styleLink {
+            flex: 1;
+            padding: 8px;
+        }
+        #output {
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #f9f9f9;
+            min-height: 100px;
+        }
+        #preview {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Code Editor Tool</h2>
+        
+        <div>
+            <input type="file" id="fileInput" accept=".html,.js,.css">
+        </div>
+
+        <textarea id="codeInput" placeholder="Paste your code here..."></textarea>
+
+        <div class="button-group">
+            <button onclick="executeNewWindow()">Execute in New Window</button>
+            <button onclick="executeCurrentPage()">Execute on Current Page</button>
+            <button onclick="minifyCode()">Minify</button>
+            <button onclick="beautifyCode()">Beautify</button>
+            <button onclick="attachToButton()">Attach to Button</button>
+            <button onclick="clearAll()">Clear All</button>
+            <button onclick="downloadAll()">Download All</button>
+        </div>
+
+        <div class="style-input">
+            <input type="text" id="styleLink" placeholder="Paste stylesheet URL here...">
+            <button onclick="addStylesheet()">Add Stylesheet</button>
+        </div>
+
+        <textarea id="output" readonly placeholder="Output will appear here..."></textarea>
+        <div id="preview"></div>
+    </div>
+
+    <script>
+        // File input handling
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('codeInput').value = e.target.result;
+            };
+            reader.readAsText(file);
+        });
+
+        // Execute in new window
+        function executeNewWindow() {
+            const code = document.getElementById('codeInput').value;
+            const newWindow = window.open('', '_blank');
+            newWindow.document.write(code);
+            newWindow.document.close();
+        }
+
+        // Execute on current page
+        function executeCurrentPage() {
+            const code = document.getElementById('codeInput').value;
+            document.getElementById('preview').innerHTML = code;
+        }
+
+        // Minify code
+        function minifyCode() {
+            const code = document.getElementById('codeInput').value;
+            const minified = code.replace(/\s+/g, ' ')
+                               .replace(/>\s+</g, '><')
+                               .trim();
+            document.getElementById('output').value = minified;
+        }
+
+        // Beautify code
+        function beautifyCode() {
+            const code = document.getElementById('codeInput').value;
+            try {
+                const beautified = prettier.format(code, {
+                    parser: "html",
+                    plugins: prettierPlugins,
+                    printWidth: 80,
+                });
+                document.getElementById('output').value = beautified;
+            } catch (error) {
+                document.getElementById('output').value = "Error beautifying code: " + error.message;
+            }
+        }
+
+        // Attach to button
+        function attachToButton() {
+            const code = document.getElementById('codeInput').value;
+            const button = document.createElement('button');
+            button.textContent = 'Execute Code';
+            button.onclick = function() {
+                eval(code);
+            };
+            document.getElementById('preview').innerHTML = '';
+            document.getElementById('preview').appendChild(button);
+        }
+
+        // Clear all
+        function clearAll() {
+            document.getElementById('codeInput').value = '';
+            document.getElementById('output').value = '';
+            document.getElementById('preview').innerHTML = '';
+            document.getElementById('styleLink').value = '';
+        }
+
+        // Download all
+        function downloadAll() {
+            const code = document.getElementById('codeInput').value;
+            const output = document.getElementById('output').value;
+            const content = `Original Code:\n${code}\n\nOutput:\n${output}`;
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'code-export.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Add stylesheet
+        function addStylesheet() {
+            const styleLink = document.getElementById('styleLink').value;
+            if (styleLink) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = styleLink;
+                document.head.appendChild(link);
+                document.getElementById('output').value = `Stylesheet ${styleLink} added successfully`;
+            }
+        }
+    </script>
+</body>
+</html>

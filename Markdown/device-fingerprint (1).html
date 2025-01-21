@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Deep Device Fingerprint Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/2.1.0/fingerprint2.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f4f8;
+            line-height: 1.6;
+        }
+        .fingerprint-section {
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .fingerprint-section:hover {
+            transform: scale(1.02);
+        }
+        h1, h2 { color: #2c3e50; }
+        pre { 
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .warning {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕵️ Comprehensive Device Fingerprint Analyzer</h1>
+    
+    <div id="warningContainer" class="warning"></div>
+    <div id="errorContainer" style="color: darkred;"></div>
+    
+    <div id="fingerprintResults">
+        <div class="fingerprint-section">
+            <h2>🌐 Advanced Network Profiling</h2>
+            <pre id="networkInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>📱 Hyper-Detailed Device Signature</h2>
+            <pre id="deviceInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>🔋 Power & Performance Metrics</h2>
+            <pre id="batteryInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>📡 Sensor & Hardware Capabilities</h2>
+            <pre id="sensorInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>🌈 Browser Ecosystem Fingerprint</h2>
+            <pre id="browserEcosystem"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced Error and Warning Management
+        function logWarning(message) {
+            console.warn(message);
+            document.getElementById('warningContainer').innerHTML += `<p>${message}</p>`;
+        }
+
+        function handleError(message) {
+            console.error(message);
+            document.getElementById('errorContainer').innerHTML += `<p>${message}</p>`;
+        }
+
+        // Advanced Network Profiling
+        function getEnhancedNetworkInfo() {
+            const networkInfo = document.getElementById('networkInfo');
+            try {
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                const metrics = {
+                    connectionType: connection?.type || 'Unknown',
+                    effectivebandwidth: connection?.downlink ? `${connection.downlink} Mbps` : 'N/A',
+                    roundTripTime: connection?.rtt ? `${connection.rtt} ms` : 'N/A',
+                    saveMode: connection?.saveData ? 'Enabled' : 'Disabled',
+                    ipAddress: 'Browser API Restricted',
+                    webRTCIPs: 'Potential Additional Detection'
+                };
+                networkInfo.textContent = JSON.stringify(metrics, null, 2);
+            } catch (error) {
+                handleError('Network Profiling Error: ' + error.message);
+            }
+        }
+
+        // Hyper-Detailed Device Signature
+        function getComprehensiveDeviceInfo() {
+            const deviceInfo = document.getElementById('deviceInfo');
+            const parser = new UAParser();
+            const result = parser.getResult();
+            
+            const deviceSignature = {
+                browser: {
+                    name: result.browser.name,
+                    version: result.browser.version,
+                    major: result.browser.major
+                },
+                device: {
+                    model: result.device.model || 'Unknown',
+                    type: result.device.type || 'Unknown',
+                    vendor: result.device.vendor || 'Unknown'
+                },
+                os: {
+                    name: result.os.name,
+                    version: result.os.version
+                },
+                system: {
+                    architecture: result.cpu.architecture || 'Unknown',
+                    screenResolution: `${window.screen.width}x${window.screen.height}`,
+                    colorDepth: window.screen.colorDepth,
+                    pixelRatio: window.devicePixelRatio,
+                    memoryEstimate: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'N/A'
+                }
+            };
+            
+            deviceInfo.textContent = JSON.stringify(deviceSignature, null, 2);
+        }
+
+        // Sensor and Hardware Capabilities
+        function discoverSensorCapabilities() {
+            const sensorInfo = document.getElementById('sensorInfo');
+            const capabilities = {
+                sensors: {
+                    accelerometer: 'accelerometer' in window,
+                    gyroscope: 'gyroscope' in window,
+                    magnetometer: 'magnetometer' in window,
+                    ambientLight: 'AmbientLightSensor' in window
+                },
+                hardware: {
+                    hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown',
+                    maxTouchPoints: navigator.maxTouchPoints,
+                    virtualKeyboard: 'virtualKeyboard' in navigator
+                },
+                permissions: {
+                    sensors: navigator.permissions && 'sensors' in navigator.permissions
+                }
+            };
+            
+            sensorInfo.textContent = JSON.stringify(capabilities, null, 2);
+        }
+
+        // Browser Ecosystem Fingerprint
+        function generateBrowserEcosystemFingerprint() {
+            const browserEcosystem = document.getElementById('browserEcosystem');
+            
+            Fingerprint2.get(components => {
+                const fingerprint = Fingerprint2.x64hash128(
+                    components.map(pair => pair.value).join(), 
+                    31
+                );
+                
+                const ecosystem = {
+                    fingerprintHash: fingerprint,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    languages: navigator.languages,
+                    pluginsInstalled: Array.from(navigator.plugins).map(p => p.name),
+                    cookiesEnabled: navigator.cookieEnabled,
+                    doNotTrack: navigator.doNotTrack,
+                    timezoneDifference: new Date().getTimezoneOffset()
+                };
+                
+                browserEcosystem.textContent = JSON.stringify(ecosystem, null, 2);
+            });
+        }
+
+        // Battery Metrics with Advanced Information
+        async function getBatteryExtendedInfo() {
+            const batteryInfo = document.getElementById('batteryInfo');
+            try {
+                const battery = await navigator.getBattery();
+                const metrics = {
+                    charging: battery.charging,
+                    batteryLevel: `${(battery.level * 100).toFixed(2)}%`,
+                    chargingTime: battery.chargingTime === Infinity 
+                        ? 'Fully Charged' 
+                        : `${battery.chargingTime} seconds`,
+                    dischargingTime: battery.dischargingTime === Infinity 
+                        ? 'Plugged In' 
+                        : `${battery.dischargingTime} seconds`,
+                    lowPowerMode: window.navigator.connection?.saveData || false
+                };
+                
+                batteryInfo.textContent = JSON.stringify(metrics, null, 2);
+            } catch (error) {
+                handleError('Battery Metrics Error: ' + error.message);
+            }
+        }
+
+        // Initialize Enhanced Fingerprinting
+        async function initEnhancedFingerprinting() {
+            try {
+                getEnhancedNetworkInfo();
+                getComprehensiveDeviceInfo();
+                discoverSensorCapabilities();
+                generateBrowserEcosystemFingerprint();
+                getBatteryExtendedInfo();
+
+                // Add warning about data collection
+                logWarning('⚠️ This page collects detailed device information for demonstration purposes.');
+            } catch (error) {
+                handleError('Initialization Error: ' + error.message);
+            }
+        }
+
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', initEnhancedFingerprinting);
+    </script>
+</body>
+</html>

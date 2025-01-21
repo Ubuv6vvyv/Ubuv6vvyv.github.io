@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Comprehensive Device Fingerprint Explorer</title>
+    <!-- Core Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/2.1.0/fingerprint2.min.js"></script>
+
+    <!-- Optional: Add IP Geolocation Service -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Conditional Google Maps API Load -->
+    <script id="google-maps-script"></script>
+
+    <style>
+        /* Previous CSS remains the same */
+    </style>
+</head>
+<body>
+    <!-- Previous HTML structure remains the same -->
+
+    <script>
+    class DeviceFingerprinter {
+        constructor() {
+            this.apiKeys = {
+                googleMaps: 'YOUR_GOOGLE_MAPS_API_KEY', // Replace with your key
+                ipGeolocation: null // Optional IP geolocation service
+            };
+            this.errors = [];
+            this.warnings = [];
+            this.map = null;
+        }
+
+        // Enhanced error and warning management
+        logError(message, context = {}) {
+            console.error('🚨 Error:', message, context);
+            this.errors.push({ message, timestamp: new Date(), context });
+            this.updateErrorDisplay();
+        }
+
+        logWarning(message, context = {}) {
+            console.warn('⚠️ Warning:', message, context);
+            this.warnings.push({ message, timestamp: new Date(), context });
+            this.updateWarningDisplay();
+        }
+
+        updateErrorDisplay() {
+            const errorContainer = document.getElementById('errorContainer');
+            if (errorContainer) {
+                errorContainer.innerHTML = this.errors
+                    .map(error => `<p>${error.message}</p>`)
+                    .join('');
+            }
+        }
+
+        updateWarningDisplay() {
+            const warningContainer = document.getElementById('warningContainer');
+            if (warningContainer) {
+                warningContainer.innerHTML = this.warnings
+                    .map(warning => `<p>${warning.message}</p>`)
+                    .join('');
+            }
+        }
+
+        // Advanced IP and Geolocation Detection
+        async detectIPAndLocation() {
+            try {
+                const ipResponse = await axios.get('https://api.ipify.org?format=json');
+                const geoResponse = await axios.get(`https://ipapi.co/${ipResponse.data.ip}/json/`);
+                
+                return {
+                    ip: geoResponse.data.ip,
+                    city: geoResponse.data.city,
+                    region: geoResponse.data.region,
+                    country: geoResponse.data.country_name,
+                    latitude: geoResponse.data.latitude,
+                    longitude: geoResponse.data.longitude,
+                    timezone: geoResponse.data.timezone,
+                    org: geoResponse.data.org
+                };
+            } catch (error) {
+                this.logError('IP/Geolocation Detection Failed', error);
+                return null;
+            }
+        }
+
+        // Advanced Characteristics 
+        getAdvancedCharacteristics() {
+            return {
+                // Performance and System Insights
+                performanceProfile: {
+                    processorCount: navigator.hardwareConcurrency,
+                    maxTouchPoints: navigator.maxTouchPoints,
+                    deviceMemory: navigator.deviceMemory,
+                    webglVendor: this.getWebGLVendor()
+                },
+                
+                // Browser Capabilities
+                browserCapabilities: {
+                    cookieEnabled: navigator.cookieEnabled,
+                    doNotTrack: navigator.doNotTrack,
+                    plugins: Array.from(navigator.plugins).map(p => p.name),
+                    mimeTypes: Array.from(navigator.mimeTypes).map(m => m.type)
+                },
+                
+                // Media and Multimedia
+                mediaCapabilities: {
+                    videoCodecs: this.getSupportedVideoCodecs(),
+                    audioFormats: this.getSupportedAudioFormats()
+                }
+            };
+        }
+
+        getWebGLVendor() {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            
+            if (gl) {
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                return debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown';
+            }
+            return 'WebGL Not Supported';
+        }
+
+        getSupportedVideoCodecs() {
+            const videoElement = document.createElement('video');
+            const codecs = ['webm', 'mp4', 'ogg'];
+            return codecs.filter(codec => videoElement.canPlayType(`video/${codec}`) !== '');
+        }
+
+        getSupportedAudioFormats() {
+            const audioElement = document.createElement('audio');
+            const formats = ['mp3', 'wav', 'ogg', 'webm'];
+            return formats.filter(format => audioElement.canPlayType(`audio/${format}`) !== '');
+        }
+
+        // Conditional Google Maps Script Loading
+        async loadGoogleMapsScript() {
+            if (!this.apiKeys.googleMaps || this.apiKeys.googleMaps === 'YOUR_GOOGLE_MAPS_API_KEY') {
+                this.logWarning('Google Maps API key not configured');
+                return false;
+            }
+
+            return new Promise((resolve, reject) => {
+                const script = document.getElementById('google-maps-script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKeys.googleMaps}&libraries=places`;
+                script.async = true;
+                script.defer = true;
+
+                script.onload = () => resolve(true);
+                script.onerror = () => {
+                    this.logError('Failed to load Google Maps Script');
+                    resolve(false);
+                };
+            });
+        }
+
+        // Comprehensive Fingerprint Collection
+        async collectFingerprint() {
+            try {
+                // Optional: IP and Location Detection
+                const ipLocation = await this.detectIPAndLocation();
+
+                // Conditionally Load Google Maps
+                const mapsLoaded = await this.loadGoogleMapsScript();
+
+                const fingerprint = {
+                    timestamp: new Date().toISOString(),
+                    ipLocation,
+                    network: await this.getNetworkInfo(),
+                    device: this.getDeviceSignature(),
+                    geolocation: await this.getGeolocation(),
+                    battery: await this.getBatteryInfo(),
+                    sensors: this.getSensorCapabilities(),
+                    browser: await this.generateBrowserEcosystemFingerprint(),
+                    advanced: this.getAdvancedCharacteristics(),
+                    geospatial: mapsLoaded ? await this.getGeospatialContext() : null
+                };
+
+                this.updateDOMWithFingerprint(fingerprint);
+                return fingerprint;
+            } catch (error) {
+                this.logError('Comprehensive Fingerprint Collection Failed', error);
+            }
+        }
+
+        // [Rest of the previous methods remain unchanged]
+    }
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', async () => {
+        const fingerprinter = new DeviceFingerprinter();
+        await fingerprinter.collectFingerprint();
+    });
+    </script>
+</body>
+</html>

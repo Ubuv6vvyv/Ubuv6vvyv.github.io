@@ -388,28 +388,37 @@
         }).connect(this.distortionEffect);
 
                 this.bassSynth = new Tone.MonoSynth({
-                    oscillator: { type: 'square8' },
-                    envelope: {
-                        attack: 0.02,
-                        decay: 0.2,
-                        sustain: 0.2,
-                        release: 0.5
-                    },
-                    filter: {
-                        Q: 6,
-                        type: 'lowpass',
-                        rolloff: -24
-                    },
-                    filterEnvelope: {
-                        attack: 0.02,
-                        decay: 0.2,
-                        sustain: 0.2,
-                        release: 0.5,
-                        baseFrequency: 200,
-                        octaves: 7,
-                        exponent: 2
-                    }
-                }).connect(this.distortionEffect);
+            oscillator: { 
+                type: 'square8'
+            },
+            envelope: {
+                attack: 0.02,
+                decay: 0.2,
+                sustain: 0.2,
+                release: 0.5
+            },
+            filter: {
+                Q: 6,
+                type: 'lowpass',
+                rolloff: -24
+            },
+            filterEnvelope: {
+                attack: 0.02,
+                decay: 0.2,
+                sustain: 0.2,
+                release: 0.5,
+                baseFrequency: 200,
+                octaves: 7,
+                exponent: 2
+            }
+        }).connect(this.distortionEffect);
+
+        // Add LFO for filter modulation
+        this.filterLFO = new Tone.LFO({
+            frequency: "8n",
+            min: 200,
+            max: 2000
+        }).connect(this.filterEffect.frequency);
 
                 // Set up transport
                 Tone.Transport.scheduleRepeat((time) => {
@@ -916,25 +925,22 @@ async initializeAudio() {
         }).connect(this.distortionEffect);
 
         // Enhanced bass synth with dual oscillators
-        this.bassSynth = new Tone.MonoSynth({
-            oscillator: { 
-                type: 'square8'
-            },
-            envelope: {
-                attack: 0.02,
-                decay: 0.2,
-                sustain: 0.2,
-                release: 0.5
-            },
-            filter: {
-                Q: 6,
-                type: 'lowpass',
-                rolloff: -24
-            },
-            filterEnvelope: {
-                attack: 0.02,
-                decay: 0.2,
-                sustain: 0.2,
+        
+        // Initialize transport and complete setup
+        Tone.Transport.scheduleRepeat((time) => {
+            this.playStep(time);
+        }, "16n");
+
+        Tone.Transport.bpm.value = 150;
+        this.isInitialized = true;
+
+        return true;
+    } catch (error) {
+        console.error('Audio initialization error:', error);
+        this.showStatus('Error initializing audio system', 3000);
+        return false;
+    }
+}      sustain: 0.2,
                 release: 0.5,
                 baseFrequency: 200,
                 octaves: 7,

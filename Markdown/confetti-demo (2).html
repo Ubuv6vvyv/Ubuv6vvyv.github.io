@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {			
+            background: linear-gradient(135deg, #0f0f0f, #1c1c1c);
+            margin: 0;
+            overflow: hidden;
+            transition: background 0.2s ease;
+        }
+        /* Optimized minimal keyframes */
+        @keyframes quickFlash {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes quickShake {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-5px) rotate(-2deg); }
+            75% { transform: translateX(5px) rotate(2deg); }
+        }
+    </style>
+</head>
+<body>
+<script>
+(function() {
+    // Debounce function to prevent excessive triggering
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Load Confetti Library (via CDN)
+    const loadScript = (src, callback) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = callback;
+        document.head.appendChild(script);
+    };
+
+    loadScript('https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js', () => {
+        console.log('Confetti.js loaded');
+
+        // Performance-optimized spectacular effects
+        const spectacularEffects = [
+            {
+                name: 'QuickBlast',
+                particleCount: 500,
+                spread: 270,
+                startVelocity: 50,
+                gravity: 0.5,
+                colors: ['#FF4500', '#FF6347', '#FFFF00', '#FFFFFF'],
+                scalar: 1.2,
+                ticks: 150,
+                pageEffect: 'quickFlash'
+            },
+            {
+                name: 'RapidPulse',
+                particleCount: 400,
+                spread: 220,
+                startVelocity: 40,
+                gravity: 0.4,
+                colors: ['#00FFFF', '#1E90FF', '#4169E1', '#FFFFFF'],
+                scalar: 1,
+                ticks: 120,
+                pageEffect: 'quickShake'
+            },
+            {
+                name: 'ExplosiveSpark',
+                particleCount: 600,
+                spread: 300,
+                startVelocity: 60,
+                gravity: 0.6,
+                colors: ['#8A2BE2', '#9400D3', '#FF00FF', '#FFFFFF'],
+                scalar: 1.3,
+                ticks: 180,
+                pageEffect: 'rapidGlitch'
+            }
+        ];
+
+        // Optimized Page Effects
+        const pageEffects = {
+            quickFlash: (overlay) => {
+                Object.assign(overlay.style, {
+                    backgroundColor: 'white',
+                    animation: 'quickFlash 0.2s ease-out',
+                    zIndex: '9999'
+                });
+                
+                // Quick cleanup
+                setTimeout(() => overlay.remove(), 250);
+            },
+            quickShake: (overlay) => {
+                document.body.style.animation = 'quickShake 0.3s linear';
+                
+                // Quick cleanup
+                setTimeout(() => {
+                    document.body.style.animation = '';
+                    overlay.remove();
+                }, 350);
+            },
+            rapidGlitch: (overlay) => {
+                Object.assign(overlay.style, {
+                    backgroundColor: 'rgba(128,0,128,0.5)',
+                    filter: 'contrast(200%) brightness(150%)',
+                    mixBlendMode: 'color-dodge',
+                    animation: 'quickFlash 0.15s steps(2, end) infinite'
+                });
+                
+                // Quick cleanup
+                setTimeout(() => overlay.remove(), 200);
+            }
+        };
+
+        // Create performance-friendly overlay
+        const createQuickOverlay = () => {
+            const overlay = document.createElement('div');
+            Object.assign(overlay.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100vw',
+                height: '100vh',
+                pointerEvents: 'none'
+            });
+            document.body.appendChild(overlay);
+            return overlay;
+        };
+
+        // Trigger Spectacular Confetti with Optimized Effects
+        const triggerSpectacularConfetti = debounce((event) => {
+            // Randomly select an effect
+            const effect = spectacularEffects[Math.floor(Math.random() * spectacularEffects.length)];
+
+            // Trigger confetti with minimal overhead
+            confetti({
+                particleCount: effect.particleCount,
+                spread: effect.spread,
+                startVelocity: effect.startVelocity,
+                gravity: effect.gravity,
+                colors: effect.colors,
+                scalar: effect.scalar,
+                ticks: effect.ticks,
+                origin: {
+                    x: event.pageX / window.innerWidth,
+                    y: event.pageY / window.innerHeight
+                }
+            });
+
+            // Create and trigger page effect
+            const overlay = createQuickOverlay();
+            pageEffects[effect.pageEffect](overlay);
+        }, 300); // 300ms debounce to prevent spam
+
+        // Click handling with spectacle probability
+        let clickCount = 0;
+        const handleClick = (event) => {
+            // Probabilistic spectacular effect
+            const spectacleChance = Math.random() * (clickCount * 0.2);
+            
+            if (spectacleChance > 0.5) {
+                triggerSpectacularConfetti(event);
+                clickCount = 0;
+            } else {
+                // Lightweight fallback confetti
+                confetti({
+                    particleCount: 50,
+                    spread: 30,
+                    origin: {
+                        x: event.pageX / window.innerWidth,
+                        y: event.pageY / window.innerHeight
+                    }
+                });
+                clickCount++;
+            }
+        };
+
+        // Attach click event
+        document.addEventListener('click', handleClick);
+    });
+})();
+</script>
+</body>
+</html>

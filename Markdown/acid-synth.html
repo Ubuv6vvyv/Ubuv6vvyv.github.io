@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Acid House Synthesizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #fff; 
+            font-family: 'Arial', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+        }
+        .panel { 
+            background: #2a2a2a; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .controls { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 20px; 
+        }
+        .control { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            background: #333;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .control label { 
+            margin-bottom: 8px; 
+            font-size: 0.9em;
+            color: #4CAF50;
+        }
+        .value-display {
+            font-size: 0.8em;
+            color: #fff;
+            margin-top: 4px;
+        }
+        input[type="range"] { 
+            width: 100%; 
+            margin: 8px 0;
+            accent-color: #4CAF50;
+        }
+        select, input[type="number"] { 
+            background: #444; 
+            color: #fff; 
+            border: 1px solid #666; 
+            padding: 5px;
+            border-radius: 4px;
+            width: 90%;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(16, 1fr); 
+            gap: 5px; 
+            margin: 15px 0; 
+            background: #333;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .step { 
+            aspect-ratio: 1;
+            background: #444; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .step:hover {
+            background: #555;
+        }
+        .step.active { 
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        .step.accent { 
+            background: #ff4444;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+        }
+        .step.current { 
+            border: 2px solid #fff;
+            transform: scale(1.1);
+        }
+        .transport { 
+            display: flex; 
+            gap: 15px; 
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+        button:hover { 
+            background: #45a049;
+            transform: scale(1.05);
+        }
+        #initButton { 
+            background: #ff5722; 
+            font-size: 1.4em; 
+            padding: 20px 40px; 
+            margin: 30px auto; 
+            display: block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        #mainControls { 
+            display: none; 
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #mainControls.visible { 
+            display: block;
+            opacity: 1;
+        }
+        .status {
+            text-align: center;
+            color: #4CAF50;
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        h1, h3 {
+            color: #4CAF50;
+            text-align: center;
+        }
+        .grid-labels {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enhanced Acid House Synthesizer</h1>
+        <button id="initButton">Click to Start Synthesizer</button>
+        <div class="status" id="status"></div>
+        <div id="mainControls">
+            <div class="transport">
+                <button id="playButton">Play</button>
+                <button id="clearButton">Clear Pattern</button>
+                <div class="control">
+                    <label>BPM</label>
+                    <input type="number" id="tempo" value="140" min="60" max="200">
+                </div>
+                <div class="control">
+                    <label>Pattern</label>
+                    <select id="patternSelect"></select>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>Synthesizer Controls</h3>
+                <div class="controls">
+                    <div class="control">
+                        <label>Cutoff Frequency</label>
+                        <input type="range" id="cutoff" min="50" max="15000" value="1000">
+                        <div class="value-display" id="cutoffDisplay">1000 Hz</div>
+                    </div>
+                    <div class="control">
+                        <label>Resonance</label>
+                        <input type="range" id="resonance" min="0" max="40" value="10">
+                        <div class="value-display" id="resonanceDisplay">10</div>
+                    </div>
+                    <div class="control">
+                        <label>Filter Envelope</label>
+                        <input type="range" id="envMod" min="0" max="1" step="0.01" value="0.5">
+                        <div class="value-display" id="envModDisplay">50%</div>
+                    </div>
+                    <div class="control">
+                        <label>Decay Time</label>
+                        <input type="range" id="decay" min="0.1" max="2" step="0.01" value="0.3">
+                        <div class="value-display" id="decayDisplay">0.3s</div>
+                    </div>
+                </div>
+                
+                <div class="controls" style="margin-top: 20px;">
+                    <div class="control">
+                        <label>Drive</label>
+                        <input type="range" id="drive" min="0" max="50" value="20">
+                        <div class="value-display" id="driveDisplay">20</div>
+                    </div>
+                    <div class="control">
+                        <label>Sub Oscillator</label>
+                        <input type="range" id="subLevel" min="0" max="1" step="0.01" value="0.5">
+                        <div class="value-display" id="subDisplay">50%</div>
+                    </div>
+                    <div class="control">
+                        <label>Distortion</label>
+                        <input type="range" id="distortion" min="0" max="100" value="30">
+                        <div class="value-display" id="distortionDisplay">30%</div>
+                    </div>
+                    <div class="control">
+                        <label>Delay Mix</label>
+                        <input type="range" id="delayMix" min="0" max="1" step="0.01" value="0.2">
+                        <div class="value-display" id="delayDisplay">20%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>Sequencer</h3>
+                <div class="grid-labels">
+                    <span>Notes</span>
+                </div>
+                <div id="noteGrid" class="grid"></div>
+                <div class="grid-labels">
+                    <span>Steps (Click to activate)</span>
+                </div>
+                <div id="stepGrid" class="grid"></div>
+                <div class="grid-labels">
+                    <span>Accents (Click for emphasis)</span>
+                </div>
+                <div id="accentGrid" class="grid"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const NUM_PATTERNS = 4, STEPS = 16;
+        const NOTES = ['C1','D1','E1','F1','G1','A1','B1','C2','D2','E2','F2','G2'];
+        let audioInitialized = false, isPlaying = false, currentStep = 0, currentPattern = 0;
+        let synth, subOsc, distortion, drive, delay, lfo;
+        let patterns = Array(NUM_PATTERNS).fill().map(() => Array(STEPS).fill().map(() => ({
+            note: 'C1', active: false, accent: false
+        })));
+
+        const updateStatus = (message) => {
+            document.getElementById('status').textContent = message;
+        };
+
+        const initAudio = async () => {
+            try {
+                await Tone.start();
+                updateStatus('Initializing audio...');
+                
+                // Create audio context and check its state
+                if (Tone.context.state !== 'running') {
+                    await Tone.context.resume();
+                }
+                
+                createSynth();
+                initUI();
+                document.getElementById('initButton').style.display = 'none';
+                document.getElementById('mainControls').classList.add('visible');
+                audioInitialized = true;
+                updateStatus('Synthesizer ready! Click steps to create a pattern.');
+            } catch (error) {
+                console.error('Audio initialization failed:', error);
+                updateStatus('Audio initialization failed. Please try again.');
+            }
+        };
+
+        const createSynth = () => {
+            // Main synth with improved settings
+            synth = new Tone.MonoSynth({
+                oscillator: { type: 'sawtooth' },
+                envelope: { 
+                    attack: 0.001,
+                    decay: 0.3,
+                    sustain: 0,
+                    release: 0.1
+                },
+                filter: {
+                    Q: 10,
+                    type: 'lowpass',
+                    rolloff: -24
+                },
+                volume: -6 // Prevent clipping
+            }).connect(new Tone.Limiter(-3));
+
+            // Sub oscillator for bass
+            subOsc = new Tone.MonoSynth({
+                oscillator: { type: 'sine' },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.3,
+                    sustain: 0,
+                    release: 0.1
+                },
+                volume: -12
+            });
+
+            // Effects chain
+            distortion = new Tone.Distortion(0.5);
+            drive = new Tone.Overdrive(0.5);
+            delay = new Tone.PingPongDelay({
+                delayTime: "8n",
+                feedback: 0.6,
+                wet: 0.2
+            });
+            lfo = new Tone.LFO({
+                frequency: 1,
+                min: 200,
+                max: 2000
+            }).start();
+
+            // Connect everything
+            subOsc.connect(drive);
+            synth.connect(distortion);
+            distortion.connect(drive);
+            drive.connect(delay);
+            delay.toDestination();
+            lfo.connect(synth.filter.frequency);
+        };
+
+        const initUI = () => {
+            const noteGrid = document.getElementById('noteGrid');
+            const stepGrid = document.getElementById('stepGrid');
+            const accentGrid = document.getElementById('accentGrid');
+            const patternSelect = document.getElementById('patternSelect');
+
+            // Create grids
+            for (let i = 0; i < STEPS; i++) {
+                const noteSelect = document.createElement('select');
+                NOTES.forEach(note => {
+                    const option = document.createElement('option');
+                    option.value = option.textContent = note;
+                    noteSelect.appendChild(option);
+                });
+                noteSelect.addEventListener('change', e => {
+                    patterns[currentPattern][i].note = e.target.value;
+                    // Preview the note when selected
+                    if (patterns[currentPattern][i].active && !isPlaying) {
+                        synth.triggerAttackRelease(e.target.value, '16n');
+                    }
+                });
+                noteGrid.appendChild(noteSelect);
+
+                const stepBtn = document.createElement('button');
+                stepBtn.className = 'step';
+                stepBtn.addEventListener('click', () => {
+                    patterns[currentPattern][i].active = !patterns[currentPattern][i].active;
+                    stepBtn.classList.toggle('active');
+                    // Preview the step when activated
+                    if (patterns[currentPattern][i].active && !isPlaying) {
+                        synth.triggerAttackRelease(patterns[currentPattern][i].note, '16n');
+                    }
+                });
+                stepGrid.appendChild(stepBtn);
+
+                const accentBtn = document.createElement('button');
+                accentBtn.className = 'step';
+                accentBtn.addEventListener('click', () => {
+                    patterns[currentPattern][i].accent = !patterns[currentPattern][i].accent;
+                    accentBtn.classList.toggle('accent');
+                });
+                accentGrid.appendChild(accentBtn);
+            }
+
+            // Pattern selection
+            for (let i = 0; i < NUM_PATTERNS; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Pattern ${i + 1}`;
+                patternSelect.appendChild(option);
+            }
+
+            patternSelect.addEventListener('change', e => {
+                currentPattern = parseInt(e.target.value);
+                updatePatternDisplay();
+            });
+
+            document.getElementById('clearButton').addEventListener('click', clearCurrentPattern);
+            setupControlListeners();
+            
+            // Initial pattern display
+            updatePatternDisplay();
+        };
+
+        const setupControlListeners = () => {
+            const updateValueDisplay = (id, value, suffix = '') => {
+                document.getElementById(`${id}Display`).textContent = value + suffix;
+            };
+
+            const controls = {
+                cutoff: {
+                    handler: v => { 
+                        synth.filter.frequency.value = v;
+                        updateValueDisplay('cutoff', v, ' Hz');
+                    }
+                },
+                resonance: {
+                    handler: v => {
+                        synth.filter.Q.value = v;
+                        updateValueDisplay('resonance', v);
+                    }
+                },
+                envMod: {
+                    handler: v => {
+                        synth.filterEnvelope.amount = v * 8000;
+                        updateValueDisplay('envMod', Math.round(v * 100), '%');
+                    }
+                },
+                decay: {
+                    handler: v => {
+                        synth.envelope.decay = v;
+                        synth.filterEnvelope.decay = v;
+                        updateValueDisplay('decay', v.toFixed(2), 's');
+                    }
+                },
+                drive: {
+                    handler: v => {
+                        drive.drive = v;
+                        updateValueDisplay('drive', v);
+                    }
+                },
+                subLevel: {
+                    handler: v => {
+                        subOsc.volume.value = Tone.gainToDb(v);
+                        updateValueDisplay('sub', Math.round(v * 100), '%');
+                    }
+                },
+                distortion: {
+                    handler: v => {
+                        distortion.distortion = v / 100;
+                        updateValueDisplay('distortion', v, '%');
+                    }
+                },
+                delayMix: {
+                    handler: v => {
+                        delay.wet.value = v;
+                        updateValueDisplay('delay', Math.round(v * 100), '%');
+                    }
+                },
+                tempo: {
+                    handler: v => Tone.Transport.bpm.value = v
+                }
+            };
+
+            Object.entries(controls).forEach(([id, control]) => {
+                const element = document.getElementById(id);
+                element.addEventListener('input', e => {
+                    const value = parseFloat(e.target.value);
+                    control.handler(value);
+                });
+                // Initialize displays
+                control.handler(parseFloat(element.value));
+            });
+        };
+
+        const updatePatternDisplay = () => {
+            patterns[currentPattern].forEach((step, i) => {
+                const noteSelect = document.getElementById('noteGrid').children[i];
+                const stepBtn = document.getElementById('stepGrid').children[i];
+                const accentBtn = document.getElementById('accentGrid').children[i];
+                
+                noteSelect.value = step.note;
+                stepBtn.classList.toggle('active', step.active);
+                accentBtn.classList.toggle('accent', step.accent);
+            });
+        };
+
+        const clearCurrentPattern = () => {
+            patterns[currentPattern] = Array(STEPS).fill().map(() => ({
+                note: 'C1', active: false, accent: false
+            }));
+            updatePatternDisplay();
+            updateStatus('Pattern cleared. Create a new pattern!');
+        };
+
+        const sequencerLoop = new Tone.Loop(time => {
+            if (!audioInitialized) return;
+            
+            const step = patterns[currentPattern][currentStep];
+            document.querySelectorAll('#stepGrid .step').forEach(s => s.classList.remove('current'));
+            document.querySelectorAll('#stepGrid .step')[currentStep].classList.add('current');
+            
+            if (step.active) {
+                const baseFreq = synth.filter.frequency.value;
+                const baseQ = synth.filter.Q.value;
+                
+                if (step.accent) {
+                    synth.volume.value = -3; // Reduced from 5 to prevent clipping
+                    synth.filter.frequency.value = baseFreq * 1.5;
+                    synth.filter.Q.value = baseQ * 1.25;
+                } else {
+                    synth.volume.value = -6;
+                    synth.filter.frequency.value = baseFreq;
+                    synth.filter.Q.value = baseQ;
+                }
+                
+                // Trigger both main synth and sub oscillator
+                synth.triggerAttackRelease(step.note, '16n', time);
+                subOsc.triggerAttackRelease(Tone.Frequency(step.note).transpose(-12), '16n', time);
+            }
+            
+            currentStep = (currentStep + 1) % STEPS;
+        }, '16n');
+
+        // Initialize button event listener
+        document.getElementById('initButton').addEventListener('click', initAudio);
+
+        // Play/Stop button event listener
+        document.getElementById('playButton').addEventListener('click', () => {
+            if (!audioInitialized) {
+                updateStatus('Please initialize audio first!');
+                return;
+            }
+            
+            if (!isPlaying) {
+                Tone.Transport.start();
+                sequencerLoop.start();
+                isPlaying = true;
+                document.getElementById('playButton').textContent = 'Stop';
+                updateStatus('Playing pattern...');
+            } else {
+                Tone.Transport.stop();
+                sequencerLoop.stop();
+                isPlaying = false;
+                currentStep = 0;
+                document.getElementById('playButton').textContent = 'Play';
+                document.querySelectorAll('#stepGrid .step').forEach(s => s.classList.remove('current'));
+                updateStatus('Stopped playback.');
+            }
+        });
+
+        // Set initial tempo
+        Tone.Transport.bpm.value = 140;
+    </script>
+</body>
+</html>
+                

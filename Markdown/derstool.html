@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<meta charset="UTF-8">
+<meta content="width=device-width, initial-scale=1" name="viewport">
+<title>Advanced Data Parser</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1e;
+    --text-primary: #e0e0e0;
+    --text-accent: #00ff00;
+    --border-color: #444;
+    --highlight-color: #333;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: 'Courier New', monospace;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    padding: 20px;
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, .5);
+  }
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  button, input[type="file"], select, textarea {
+    width: 100%;
+    background-color: var(--highlight-color);
+    color: var(--text-accent);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 10px;
+  }
+  textarea {
+    min-height: 200px;
+    resize: vertical;
+  }
+  .error-container {
+    background-color: #2c0000;
+    color: #f44;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    display: none;
+  }
+  .data-table-container {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-top: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table td, table th {
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    text-align: left;
+  }
+  table th {
+    background-color: var(--highlight-color);
+    color: var(--text-accent);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .table-default {
+    border: 1px solid var(--border-color);
+  }
+  .table-light {
+    background-color: #f4f4f4;
+    color: #333;
+  }
+  .table-dark {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  .table-banded tr:nth-child(even) {
+    background-color: var(--highlight-color);
+  }
+  .table-grid {
+    border: 1px solid #555;
+  }
+  .table-material {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, .1);
+    border-radius: 4px;
+  }
+</style>
+
+<div class="container">
+  <h1>Advanced Data Parser</h1>
+  <div class="controls">
+    <select id="file-type">
+      <option value="text">Plain Text</option>
+      <option value="csv">CSV</option>
+      <option value="json">JSON</option>
+      <option value="excel">Excel</option>
+    </select>
+    <select id="table-theme">
+      <option value="default">Default Theme</option>
+      <option value="light">Light Theme</option>
+      <option value="dark">Dark Theme</option>
+      <option value="banded">Banded Theme</option>
+      <option value="grid">Grid Theme</option>
+      <option value="material">Material Theme</option>
+    </select>
+  </div>
+
+  <input accept=".txt,.csv,.json,.xls,.xlsx,.html" id="file-input" type="file">
+  <textarea id="data-input" placeholder="Paste your data here or use file upload..."></textarea>
+
+  <div class="controls">
+    <button id="parse-btn">Parse Data</button>
+    <button id="download-btn" style="display:none">Download HTML</button>
+    <button id="clear-btn">Clear</button>
+  </div>
+
+  <div class="error-container" id="error-container"></div>
+
+  <div class="data-table-container">
+    <table id="parsed-data-table"></table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+<script>
+// Optimize global scope and reduce memory usage
+(function() {
+    // Utility Functions
+    const $ = (selector) => document.querySelector(selector);
+    const $all = (selector) => document.querySelectorAll(selector);
+
+    // Enhanced Data Handling
+    class DataParser {
+        static deepFlatten(obj, prefix = '') {
+            const result = {};
+            const flatten = (value, currentPrefix) => {
+                if (value === null || value === undefined) return {};
+                if (Array.isArray(value)) {
+                    return value.reduce((acc, item, index) => {
+                        const key = `${currentPrefix}[${index}]`;
+                        if (typeof item === 'object' && item !== null) {
+                            return { ...acc, ...flatten(item, key + '.') };
+                        }
+                        acc[key] = item;
+                        return acc;
+                    }, {});
+                }
+
+                if (typeof value === 'object' && value !== null) {
+                    return Object.entries(value).reduce((acc, [k, v]) => {
+                        const newPrefix = currentPrefix ? `${currentPrefix}${k}.` : `${k}.`;
+                        if (typeof v === 'object' && v !== null) {
+                            return { ...acc, ...flatten(v, newPrefix) };
+                        }
+                        acc[currentPrefix + k] = v;
+                        return acc;
+                    }, {});
+                }
+
+                return { [currentPrefix.slice(0, -1)]: value };
+            };
+
+            return flatten(obj, prefix);
+        }
+
+        static safeStringify(value) {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value);
+                } catch {
+                    return '[Object]';
+                }
+            }
+            return String(value);
+        }
+
+        static parseData(rawInput, fileType) {
+            switch(fileType) {
+                case 'json':
+                    const jsonData = JSON.parse(rawInput);
+                    return Array.isArray(jsonData) 
+                        ? jsonData.map(this.deepFlatten) 
+                        : [this.deepFlatten(jsonData)];
+
+                case 'csv':
+                    const csvResults = Papa.parse(rawInput, { 
+                        header: true,
+                        skipEmptyLines: true
+                    });
+                    return csvResults.data;
+
+                case 'text':
+                    return rawInput
+                        .split('\n')
+                        .filter(line => line.trim() !== '')
+                        .map((line) => {
+                            return { text: line };
+                        });
+
+                case 'excel':
+                    const excelData = XLSX.read(rawInput, { type: 'binary' });
+                    return excelData.SheetNames.reduce((acc, sheetName) => {
+                        const sheetData = XLSX.utils.sheet_to_json(excelData.Sheets[sheetName]);
+                        acc.push(...sheetData);
+                        return acc;
+                    }, []);
+
+                default:
+                    return [];
+            }
+        }
+    }
+
+    const parseInputData = () => {
+        const fileInput = $('#file-input');
+        const textInput = $('#data-input');
+        const fileType = $('#file-type').value;
+        const inputData = fileInput.files.length ? fileInput.files[0] : textInput.value;
+        if (fileInput.files.length) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const parsedData = DataParser.parseData(reader.result, fileType);
+                displayData(parsedData);
+            };
+            reader.readAsText(inputData);
+        } else {
+            const parsedData = DataParser.parseData(inputData, fileType);
+            displayData(parsedData);
+        }
+    };
+
+    const displayData = (data) => {
+        const table = $('#parsed-data-table');
+        table.innerHTML = '';
+        const theme = $('#table-theme').value;
+        const processedData = data.map((row) => {
+            return `<tr>${Object.values(row).map(value => `<td>${DataParser.safeStringify(value)}</td>`).join('')}</tr>`;
+        }).join('');
+
+        table.className = `table-${theme}`;
+        table.innerHTML = `<thead><tr>${Object.keys(data[0]).map(key => `<th>${key}</th>`).join('')}</tr></thead>${processedData}`;
+        $('#download-btn').style.display = 'inline-block';
+    };
+
+    $('#parse-btn').addEventListener('click', parseInputData);
+    $('#clear-btn').addEventListener('click', () => {
+        $('#data-input').value = '';
+        $('#file-input').value = '';
+        $('#parsed-data-table').innerHTML = '';
+    });
+})();
+</script>
+</html>

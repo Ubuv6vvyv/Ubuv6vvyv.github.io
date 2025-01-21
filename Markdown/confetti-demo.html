@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {			
+            background: linear-gradient(135deg, #0f0f0f, #1c1c1c);
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<script>
+(function() {
+    // Load Confetti Library (via CDN)
+    const loadScript = (src, callback) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = callback;
+        document.head.appendChild(script);
+    };
+
+    loadScript('https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js', () => {
+        console.log('Confetti.js loaded');
+
+        // Refined small-scale confetti with softer parameters
+        const triggerRegularConfetti = (event) => {
+            confetti({
+                particleCount: 100, // Reduced from 300
+                spread: 30, // Increased spread for a softer effect
+                origin: {
+                    x: event.pageX / window.innerWidth,
+                    y: event.pageY / window.innerHeight
+                },
+                colors: ['#FF6347', '#00FF00', '#FFFF00'],
+                opacity: 0.6, // Reduced opacity for softer look
+                angle: Math.random() * 90 + 45, // Constrained angle for more controlled spread
+                gravity: 0.8, // Reduced gravity for gentler fall
+                ticks: 150, // Reduced tick count
+                zIndex: 9999,
+                scalar: 0.5 // Increased scalar for slightly larger particles
+            });
+        };
+
+        // Spectacular confetti with more refined effects
+        const triggerSpectacularConfetti = (event, scale = 1) => {
+            const effects = [
+                {
+                    // Elegant radial burst
+                    particleCount: 1500 * scale,
+                    spread: 180 * scale,
+                    colors: ['#FF4500', '#00BFFF', '#FFD700', '#7B68EE'],
+                    shapes: ['circle', 'star'],
+                    angle: 90,
+                    scalar: 2 * scale,
+                    startVelocity: 50 * scale,
+                    ticks: 2000,
+                    gravity: 0.2,
+                    drift: 1,
+                    opacity: 0.7
+                },
+                {
+                    // Cascading wave effect
+                    particleCount: 1200 * scale,
+                    spread: 250 * scale,
+                    colors: ['#1E90FF', '#FF69B4', '#32CD32'],
+                    angle: 60,
+                    gravity: 0.3,
+                    scalar: 1.5 * scale,
+                    startVelocity: 40 * scale,
+                    ticks: 1800,
+                    opacity: 0.8
+                }
+            ];
+
+            const selectedEffect = effects[Math.floor(Math.random() * effects.length)];
+
+            confetti({
+                ...selectedEffect,
+                origin: {
+                    x: event.pageX / window.innerWidth,
+                    y: event.pageY / window.innerHeight
+                }
+            });
+
+            // Enhanced page effects with more subtle transitions
+            triggerPageEffects(event, scale);
+        };
+
+        // Refined page effects with smoother transitions
+        const triggerPageEffects = (event, scale) => {
+            // Soft lens flare with smoother animation
+            const lensFlare = document.createElement('div');
+            Object.assign(lensFlare.style, {
+                position: 'absolute',
+                top: `${event.pageY - 300}px`,
+                left: `${event.pageX - 300}px`,
+                width: `${400 * scale}px`,
+                height: `${400 * scale}px`,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 70%)',
+                animation: 'softBurst 0.5s ease-out'
+            });
+            document.body.appendChild(lensFlare);
+
+            // Soft burst keyframe
+            const softBurstCSS = document.createElement('style');
+            softBurstCSS.innerHTML = `
+            @keyframes softBurst {
+                0% { transform: scale(0.1); opacity: 1; }
+                100% { transform: scale(2.5); opacity: 0; }
+            }
+            `;
+            document.head.appendChild(softBurstCSS);
+
+            // Remove lens flare after animation
+            setTimeout(() => lensFlare.remove(), 500);
+
+            // Subtle blur and light transition
+            const blurEffect = document.createElement('div');
+            Object.assign(blurEffect.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100vw',
+                height: '100vh',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(5px)',
+                zIndex: '9998',
+                transition: 'all 0.3s ease-out'
+            });
+            document.body.appendChild(blurEffect);
+
+            setTimeout(() => blurEffect.remove(), 300);
+        };
+
+        // Intelligent click handling with refined streak logic
+        let clickStreak = 0;
+        let lastEffectTime = Date.now();
+        const minimumClicksBeforeBigEffect = 4;
+
+        const handleClick = (event) => {
+            const currentTime = Date.now();
+            const timeSinceLastEffect = currentTime - lastEffectTime;
+
+            // Reset streak if too much time has passed
+            if (timeSinceLastEffect > 4000) {
+                clickStreak = 0;
+            }
+
+            // More nuanced probability for spectacular effects
+            const chanceForSpectacular = 
+                clickStreak >= minimumClicksBeforeBigEffect ? 
+                Math.random() < 0.25 : 
+                Math.random() < 0.05;
+
+            if (chanceForSpectacular) {
+                triggerSpectacularConfetti(event, 1);
+                clickStreak = 0;
+            } else {
+                triggerRegularConfetti(event);
+                clickStreak++;
+            }
+
+            lastEffectTime = currentTime;
+        };
+
+        // Attach click event
+        document.addEventListener('click', handleClick);
+    });
+})();
+</script>
+</body>
+</html>

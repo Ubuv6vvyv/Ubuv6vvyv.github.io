@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acid Synth</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body{background:#1a1a1a;color:#fff;font-family:Arial,sans-serif;margin:0;padding:20px}
+        .c{max-width:900px;margin:0 auto}
+        .p{background:#2a2a2a;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 4px 6px #0003}
+        .ct{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px}
+        .cl{display:flex;flex-direction:column;align-items:center;background:#333;padding:10px;border-radius:6px}
+        .cl label{margin-bottom:8px;font-size:.9em;color:#4CAF50}
+        .v{font-size:.8em;color:#fff;margin-top:4px}
+        input[type=range]{width:100%;margin:8px 0;accent-color:#4CAF50}
+        select,input[type=number]{background:#444;color:#fff;border:1px solid #666;padding:5px;border-radius:4px;width:90%}
+        .g{display:grid;grid-template-columns:repeat(16,1fr);gap:5px;margin:15px 0;background:#333;padding:10px;border-radius:6px}
+        .s{aspect-ratio:1;background:#444;border:none;border-radius:4px;cursor:pointer;transition:.2s}
+        .s:hover{background:#555}
+        .s.a{background:#4CAF50;box-shadow:0 0 10px #4caf5080}
+        .s.ac{background:#f44;box-shadow:0 0 10px #ff444480}
+        .s.cu{border:2px solid #fff;transform:scale(1.1)}
+        .t{display:flex;gap:15px;margin-bottom:20px;align-items:center}
+        button{background:#4CAF50;color:#fff;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-size:1em;transition:.2s}
+        button:hover{background:#45a049;transform:scale(1.05)}
+        #i{background:#ff5722;font-size:1.4em;padding:20px 40px;margin:30px auto;display:block}
+        #m{display:none;opacity:0;transition:.5s}
+        #m.visible{display:block;opacity:1}
+        .st{text-align:center;color:#4CAF50;margin:10px 0;font-size:1.1em}
+        h1,h3{color:#4CAF50;text-align:center}
+        .gl{display:flex;justify-content:space-between;margin:10px 0;color:#4CAF50}
+    </style>
+</head>
+<body>
+    <div class="c">
+        <h1>Acid Synth</h1>
+        <button id="i">Start</button>
+        <div class="st" id="st"></div>
+        <div id="m">
+            <div class="t">
+                <button id="pb">Play</button>
+                <button id="cb">Clear</button>
+                <div class="cl"><label>BPM</label><input type="number" id="tp" value="140" min="60" max="200"></div>
+                <div class="cl"><label>Pattern</label><select id="ps"></select></div>
+            </div>
+            <div class="p">
+                <h3>Controls</h3>
+                <div class="ct">
+                    <div class="cl"><label>Cutoff</label><input type="range" id="cf" min="50" max="15000" value="1000"><div class="v" id="cfD">1000 Hz</div></div>
+                    <div class="cl"><label>Resonance</label><input type="range" id="rs" min="0" max="40" value="10"><div class="v" id="rsD">10</div></div>
+                    <div class="cl"><label>Filter Env</label><input type="range" id="em" min="0" max="1" step="0.01" value="0.5"><div class="v" id="emD">50%</div></div>
+                    <div class="cl"><label>Decay</label><input type="range" id="dc" min="0.1" max="2" step="0.01" value="0.3"><div class="v" id="dcD">0.3s</div></div>
+                </div>
+                <div class="ct" style="margin-top:20px">
+                    <div class="cl"><label>Drive</label><input type="range" id="dr" min="0" max="50" value="20"><div class="v" id="drD">20</div></div>
+                    <div class="cl"><label>Sub</label><input type="range" id="sl" min="0" max="1" step="0.01" value="0.5"><div class="v" id="slD">50%</div></div>
+                    <div class="cl"><label>Dist</label><input type="range" id="dt" min="0" max="100" value="30"><div class="v" id="dtD">30%</div></div>
+                    <div class="cl"><label>Delay</label><input type="range" id="dm" min="0" max="1" step="0.01" value="0.2"><div class="v" id="dmD">20%</div></div>
+                </div>
+            </div>
+            <div class="p">
+                <h3>Sequencer</h3>
+                <div class="gl"><span>Notes</span></div>
+                <div id="ng" class="g"></div>
+                <div class="gl"><span>Steps</span></div>
+                <div id="sg" class="g"></div>
+                <div class="gl"><span>Accents</span></div>
+                <div id="ag" class="g"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+const n=['C1','D1','E1','F1','G1','A1','B1','C2','D2','E2','F2','G2'],p=Array(4).fill().map(()=>Array(16).fill().map(()=>({n:'C1',a:!1,c:!1}))),u=e=>document.getElementById('st').textContent=e;let s,o,d1,d2,dl,l,i=!1,y=!1,c=0,t=0;const createSynth=()=>{s=new Tone.MonoSynth({oscillator:{type:'sawtooth'},envelope:{attack:.001,decay:.3,sustain:0,release:.1},filter:{Q:10,type:'lowpass',rolloff:-24},filterEnvelope:{attack:.001,decay:.3,sustain:0,release:.1,baseFrequency:200,octaves:4},volume:-6}),o=new Tone.MonoSynth({oscillator:{type:'sine'},envelope:{attack:.001,decay:.3,sustain:0,release:.1},volume:-12}),d1=new Tone.Distortion({distortion:.4,oversample:'4x'}),d2=new Tone.Distortion({distortion:.2,oversample:'2x'}),dl=new Tone.PingPongDelay({delayTime:'8n',feedback:.6,wet:.2}),l=new Tone.LFO({frequency:.5,min:200,max:2e3}).start(),s.connect(d1),d1.connect(d2),o.connect(d2),d2.connect(dl),dl.toDestination(),l.connect(s.filter.frequency)},initUI=()=>{const e=document.getElementById('ng'),g=document.getElementById('sg'),a=document.getElementById('ag'),s=document.getElementById('ps');[e,g,a].forEach(e=>e.innerHTML=''),s.innerHTML='';for(let i=0;i<16;i++){const l=document.createElement('select');n.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n,l.appendChild(o)}),l.addEventListener('change',e=>{p[t][i].n=e.target.value,p[t][i].a&&!y&&s.triggerAttackRelease(e.target.value,'16n')}),e.appendChild(l);const b=document.createElement('button');b.className='s',b.addEventListener('click',()=>{p[t][i].a=!p[t][i].a,b.classList.toggle('a'),p[t][i].a&&!y&&s.triggerAttackRelease(p[t][i].n,'16n')}),g.appendChild(b);const c=document.createElement('button');c.className='s',c.addEventListener('click',()=>{p[t][i].c=!p[t][i].c,c.classList.toggle('ac')}),a.appendChild(c)}for(let i=0;i<4;i++){const o=document.createElement('option');o.value=i,o.textContent=`Pattern ${i+1}`,s.appendChild(o)}s.addEventListener('change',e=>{t=parseInt(e.target.value),updatePattern()}),document.getElementById('cb').addEventListener('click',()=>{p[t]=Array(16).fill().map(()=>({n:'C1',a:!1,c:!1})),updatePattern()}),setupControls(),updatePattern()},setupControls=()=>{const c={cf:{h:v=>{s.filter.frequency.value=v,document.getElementById('cfD').textContent=v+' Hz'}},rs:{h:v=>{s.filter.Q.value=v,document.getElementById('rsD').textContent=v}},em:{h:v=>{s.filterEnvelope.amount=8e3*v,document.getElementById('emD').textContent=Math.round(100*v)+'%'}},dc:{h:v=>{s.envelope.decay=v,s.filterEnvelope.decay=v,document.getElementById('dcD').textContent=v.toFixed(2)+'s'}},dr:{h:v=>{d1.distortion=v/50,d2.distortion=v/100,document.getElementById('drD').textContent=v}},sl:{h:v=>{o.volume.value=Tone.gainToDb(v),document.getElementById('slD').textContent=Math.round(100*v)+'%'}},dt:{h:v=>{const d=v/100;d1.wet.value=d,d2.wet.value=.7*d,document.getElementById('dtD').textContent=v+'%'}},dm:{h:v=>{dl.wet.value=v,document.getElementById('dmD').textContent=Math.round(100*v)+'%'}},tp:{h:v=>Tone.Transport.bpm.value=v}};Object.entries(c).forEach(([i,{h}])=>{const e=document.getElementById(i);e.addEventListener('input',v=>h(parseFloat(v.target.value))),h(parseFloat(e.value))})},updatePattern=()=>{p[t].forEach((s,i)=>{const g=document.getElementById('ng').children[i],b=document.getElementById('sg').children[i],a=document.getElementById('ag').children[i];g.value=s.n,b.classList.toggle('a',s.a),a.classList.toggle('ac',s.c)})};const loop=new Tone.Loop(time=>{if(!i)return;const s=p[t][c];document.querySelectorAll('#sg .s').forEach(s=>s.classList.remove('cu')),document.querySelectorAll('#sg .s')[c].classList.add('cu'),s.a&&(s.c?(synth.volume.value=-3,synth.filter.frequency.value*=1.5,synth.filter.Q.value*=1.25,d1.distortion*=1.2):(synth.volume.value=-6,synth.filter.frequency.value=synth.filter.frequency.baseValue,synth.filter.Q.value=synth.filter.Q.baseValue,d1.distortion/=1.2),synth.triggerAttackRelease(s.n,'16n',time),o.triggerAttackRelease(Tone.Frequency(s.n).transpose(-12),'16n',time)),c=(c+1)%16},'16n');document.getElementById('i').addEventListener('click',async()=>{try{await Tone.start(),await Tone.context.resume(),u('Starting...'),createSynth(),initUI(),document.getElementById('i').style.display='none',document.getElementById('m').classList.add('visible'),i=!0,u('Ready!')}catch(e){console.error(e),u('Start failed, try again')}}),document.getElementById('pb').addEventListener('click',async()=>{if(!i)return void u('Please start first');try{y?(Tone.Transport.stop(),loop.stop(),y=!1,c=0,document.getElementById('pb').textContent='Play',document.querySelectorAll('#sg .s').forEach(s=>s.classList.remove('cu'))):(await Tone.start(),Tone.Transport.start(),loop.start(),y=!0,document.getElementById('pb').textContent='Stop')}catch(e){console.error(e),u('Playback error')}}),Tone.Transport.bpm.value=140;
+    </script>
+</body>
+</html>

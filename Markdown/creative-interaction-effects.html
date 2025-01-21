@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cosmic Interaction Playground</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(45deg, #000033, #000066, #000099);
+            cursor: none;
+            font-family: 'Arial', sans-serif;
+        }
+        #cosmic-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transition: all 0.1s ease-out;
+        }
+        #background-stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #title {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            font-size: 2rem;
+            opacity: 0.7;
+            z-index: 10;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">Cosmic Interaction Playground</div>
+    <div id="background-stars"></div>
+    <div id="cosmic-cursor"></div>
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+
+    <script>
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const cosmicCursor = document.getElementById('cosmic-cursor');
+        const backgroundStars = document.getElementById('background-stars');
+        const confetti = window.confetti.create(confettiCanvas, { 
+            resize: true,
+            useWorker: true 
+        });
+
+        // Cosmic cursor with trailing effect
+        function createCosmicCursor() {
+            const cursor = document.createElement('div');
+            cursor.style.width = '20px';
+            cursor.style.height = '20px';
+            cursor.style.borderRadius = '50%';
+            cursor.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(135,206,250,0.5) 50%, rgba(0,0,0,0) 70%)';
+            cursor.style.boxShadow = '0 0 20px 5px rgba(135,206,250,0.5)';
+            cosmicCursor.appendChild(cursor);
+        }
+
+        // Starry background generator
+        function createStarryBackground() {
+            for (let i = 0; i < 200; i++) {
+                const star = document.createElement('div');
+                star.style.position = 'absolute';
+                star.style.width = `${Math.random() * 2}px`;
+                star.style.height = star.style.width;
+                star.style.borderRadius = '50%';
+                star.style.background = 'white';
+                star.style.opacity = Math.random();
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                backgroundStars.appendChild(star);
+            }
+        }
+
+        // Cosmic interaction effects
+        function createCosmicExplosion(x, y) {
+            const colors = [
+                '#4A90E2', '#50E3C2', '#9013FE', 
+                '#FF6B6B', '#FFD93D', '#6A5ACD'
+            ];
+
+            // Primary cosmic burst
+            confetti({
+                particleCount: 300,
+                spread: 360,
+                startVelocity: 40,
+                gravity: 0.3,
+                origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                colors: colors,
+                scalar: 1.5,
+                shapes: ['circle', 'star']
+            });
+
+            // Secondary wave with different dynamics
+            setTimeout(() => {
+                confetti({
+                    particleCount: 200,
+                    spread: 270,
+                    startVelocity: 30,
+                    gravity: 0.5,
+                    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                    colors: colors,
+                    scalar: 1.2,
+                    shapes: ['triangle', 'circle']
+                });
+            }, 100);
+
+            // Orbital scatter effect
+            setTimeout(() => {
+                confetti({
+                    particleCount: 150,
+                    spread: 180,
+                    startVelocity: 20,
+                    gravity: 0.1,
+                    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                    colors: colors,
+                    scalar: 0.8,
+                    shapes: ['star']
+                });
+            }, 200);
+        }
+
+        // Page shake and light effects
+        function cosmicPageInteraction() {
+            // Subtle cosmic vibration
+            document.body.style.animation = 'cosmicVibration 0.3s infinite';
+            
+            // Cosmic light pulse
+            document.body.style.background = 'linear-gradient(45deg, #000044, #000077, #0000AA)';
+            
+            setTimeout(() => {
+                document.body.style.animation = '';
+                document.body.style.background = 'linear-gradient(45deg, #000033, #000066, #000099)';
+            }, 500);
+        }
+
+        // Event Handlers
+        const hammer = new Hammer(document.body);
+        hammer.on('tap', (e) => {
+            const { x, y } = e.center;
+            createCosmicExplosion(x, y);
+        });
+
+        hammer.on('press', (e) => {
+            const { x, y } = e.center;
+            cosmicPageInteraction();
+            createCosmicExplosion(x, y);
+        });
+
+        // Mouse move tracking for cosmic cursor
+        document.addEventListener('mousemove', (e) => {
+            cosmicCursor.style.left = `${e.clientX - 10}px`;
+            cosmicCursor.style.top = `${e.clientY - 10}px`;
+        });
+
+        // Random cosmic events
+        setInterval(() => {
+            if (Math.random() < 0.05) {
+                const x = Math.random() * window.innerWidth;
+                const y = Math.random() * window.innerHeight;
+                createCosmicExplosion(x, y);
+            }
+        }, 5000);
+
+        // Add cosmic vibration animation
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes cosmicVibration {
+                0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                25% { transform: translate(-2px, 2px) rotate(-1deg); }
+                50% { transform: translate(2px, -2px) rotate(1deg); }
+                75% { transform: translate(-2px, -2px) rotate(0deg); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // Initialize
+        createCosmicCursor();
+        createStarryBackground();
+    </script>
+</body>
+</html>

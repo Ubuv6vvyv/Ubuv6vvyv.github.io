@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acid Techno Sound Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            background-color: #1b1b1b;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #2b2b2b;
+            border-radius: 8px;
+        }
+        h2, h3 {
+            margin-top: 0;
+        }
+        .slider {
+            width: 100%;
+        }
+        button, input[type="file"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover, input[type="file"]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Acid Techno Sound Generator</h1>
+    
+    <div class="section">
+        <h2>Sound Generator Controls</h2>
+        <h3>Oscillator</h3>
+        <label>Pitch: <input type="range" id="osc-pitch" min="-2220" max="2200" step="1" value="300" class="slider"></label>
+        
+        <h3>Filter</h3>
+        <label>Cutoff Frequency: <input type="range" id="filter-cutoff" min="-2000" max="2000" step="1" value="800" class="slider"></label>
+        <label>Resonance: <input type="range" id="filter-resonance" min="1" max="100" step="1" value="20" class="slider"></label>
+        
+        <h3>Envelope</h3>
+        <label>Attack: <input type="range" id="env-attack" min="-100" max="50" step="10" value="0.01" class="slider"></label>
+        <label>Decay: <input type="range" id="env-decay" min="-10" max="100" step="0.1" value="0.5" class="slider"></label>
+        <label>Sustain: <input type="range" id="env-sustain" min="0" max="1" step="0.01" value="0.5" class="slider"></label>
+        <label>Release: <input type="range" id="env-release" min="-50" max="50" step="0.1" value="0.5" class="slider"></label>
+        
+        <button id="start-synth">Start Synth</button>
+        <button id="stop-synth">Stop Synth</button>
+    </div>
+
+    <div class="section">
+        <h2>Audio File Controls (Optional)</h2>
+        <input type="file" id="audio-file" accept="audio/*">
+        <button id="play-file">Play Uploaded Audio</button>
+        <button id="stop-file">Stop Audio</button>
+        
+        <h3>Effects</h3>
+        <label>Reverb Decay: <input type="range" id="file-reverb-decay" min="0" max="10" step="0.1" value="3" class="slider"></label>
+        <label>Delay Feedback: <input type="range" id="file-delay-feedback" min="0" max="1" step="0.01" value="0.5" class="slider"></label>
+    </div>
+</div>
+
+<script>
+    // Synthesizer setup for Acid Techno
+    const synth = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' }, // Acid sound typically uses a sawtooth wave
+        filter: { type: 'lowpass', rolloff: -24 }, // Low-pass filter with resonance
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0.6, release: 0.4 }, // Quick attack for squelch
+        filterEnvelope: { attack: 0.005, decay: 0.5, sustain: 0.5, baseFrequency: 500, octaves: 4, release: 0.5 } // Filter modulation for squelch
+    }).toDestination();
+
+    // Adding distortion for extra "grit"
+    const distortion = new Tone.Distortion(0.8).toDestination();
+    synth.connect(distortion);
+
+    // Loop setup for continuous play
+    const loop = new Tone.Loop(time => {
+        synth.triggerAttackRelease("C3", "8n", time);
+    }, "16n");
+
+    // Synth Controls
+    document.getElementById('osc-pitch').addEventListener('input', (e) => {
+        synth.oscillator.frequency.value = e.target.value;
+    });
+
+    document.getElementById('filter-cutoff').addEventListener('input', (e) => {
+        synth.filterEnvelope.baseFrequency = e.target.value;
+    });
+
+    document.getElementById('filter-resonance').addEventListener('input', (e) => {
+        synth.filter.Q.value = e.target.value;
+    });
+
+    document.getElementById('env-attack').addEventListener('input', (e) => {
+        synth.envelope.attack = e.target.value;
+    });
+
+    document.getElementById('env-decay').addEventListener('input', (e) => {
+        synth.envelope.decay = e.target.value;
+    });
+
+    document.getElementById('env-sustain').addEventListener('input', (e) => {
+        synth.envelope.sustain = e.target.value;
+    });
+
+    document.getElementById('env-release').addEventListener('input', (e) => {
+        synth.envelope.release = e.target.value;
+    });
+
+    // Start/Stop Synth Loop
+    document.getElementById('start-synth').addEventListener('click', () => {
+        // Resuming the AudioContext after user interaction
+        if (Tone.context.state !== 'running') {
+            Tone.context.resume().then(() => {
+                loop.start(0);
+                Tone.Transport.start();
+            });
+        } else {
+            loop.start(0);
+            Tone.Transport.start();
+        }
+    });
+
+    document.getElementById('stop-synth').addEventListener('click', () => {
+        loop.stop();
+        Tone.Transport.stop();
+    });
+
+    // Audio File Handling
+    let player;
+    document.getElementById('audio-file').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                Tone.Buffer.fromUrl(event.target.result, buffer => {
+                    player = new Tone.Player(buffer).toDestination();
+                    player.connect(reverb);
+                    player.connect(delay);
+                    console.log("Audio file loaded and ready to play.");
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    });
+
+    document.getElementById('play-file').addEventListener('click', () => {
+        if (player) {
+            player.start();
+            console.log("Playing uploaded audio file.");
+        } else {
+            alert('Please upload an audio file first.');
+        }
+    });
+
+    document.getElementById('stop-file').addEventListener('click', () => {
+        if (player) {
+            player.stop();
+            console.log("Audio file playback stopped.");
+        }
+    });
+
+    document.getElementById('file-reverb-decay').addEventListener('input', (e) => {
+        reverb.decay = e.target.value;
+        console.log(`Reverb decay set to ${e.target.value}`);
+    });
+
+    document.getElementById('file-delay-feedback').addEventListener('input', (e) => {
+        delay.feedback.value = e.target.value;
+        console.log(`Delay feedback set to ${e.target.value}`);
+    });
+
+    // Effects setup for audio file
+    const reverb = new Tone.Reverb({ decay: 3 }).toDestination();
+    const delay = new Tone.FeedbackDelay("8n", 0.5).toDestination();
+
+    synth.connect(reverb);
+    synth.connect(delay);
+</script>
+
+</body>
+</html>

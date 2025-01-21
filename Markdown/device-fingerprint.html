@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Device Fingerprinting</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .fingerprint-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        pre { 
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕵️ Device Fingerprint Explorer</h1>
+    
+    <div id="errorContainer" style="color: red;"></div>
+    
+    <div id="fingerprintResults">
+        <div class="fingerprint-section">
+            <h2>🌐 Network & Connectivity</h2>
+            <pre id="networkInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>📱 Device Information</h2>
+            <pre id="deviceInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>🔋 Battery Status</h2>
+            <pre id="batteryInfo"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>📍 Geolocation</h2>
+            <pre id="geoLocation"></pre>
+        </div>
+        
+        <div class="fingerprint-section">
+            <h2>🌈 Unique Browser Characteristics</h2>
+            <pre id="uniqueCharacteristics"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Error handling utility
+        function handleError(message) {
+            console.error(message);
+            document.getElementById('errorContainer').textContent += message + '\n';
+        }
+
+        // Network Information
+        async function getNetworkInfo() {
+            const networkInfo = document.getElementById('networkInfo');
+            try {
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                networkInfo.textContent = JSON.stringify({
+                    type: connection?.type,
+                    effectiveType: connection?.effectiveType,
+                    downlinkMax: connection?.downlinkMax,
+                    rtt: connection?.rtt,
+                    saveData: connection?.saveData
+                }, null, 2);
+            } catch (error) {
+                handleError('Network Info Error: ' + error.message);
+            }
+        }
+
+        // Device Information using UAParser
+        function getDeviceInfo() {
+            const deviceInfo = document.getElementById('deviceInfo');
+            const parser = new UAParser();
+            const result = parser.getResult();
+            
+            deviceInfo.textContent = JSON.stringify({
+                browser: result.browser,
+                device: result.device,
+                os: result.os,
+                cpu: result.cpu,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                colorDepth: window.screen.colorDepth,
+                pixelRatio: window.devicePixelRatio
+            }, null, 2);
+        }
+
+        // Battery Status
+        async function getBatteryInfo() {
+            const batteryInfo = document.getElementById('batteryInfo');
+            try {
+                const battery = await navigator.getBattery();
+                batteryInfo.textContent = JSON.stringify({
+                    charging: battery.charging,
+                    level: battery.level * 100 + '%',
+                    chargingTime: battery.chargingTime,
+                    dischargingTime: battery.dischargingTime
+                }, null, 2);
+            } catch (error) {
+                handleError('Battery Info Error: ' + error.message);
+            }
+        }
+
+        // Geolocation
+        function getGeolocation() {
+            const geoLocation = document.getElementById('geoLocation');
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    geoLocation.textContent = JSON.stringify({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        altitude: position.coords.altitude,
+                        heading: position.coords.heading,
+                        speed: position.coords.speed
+                    }, null, 2);
+                },
+                (error) => {
+                    handleError('Geolocation Error: ' + error.message);
+                }
+            );
+        }
+
+        // Unique Browser Characteristics
+        function getUniqueCharacteristics() {
+            const uniqueChars = document.getElementById('uniqueCharacteristics');
+            
+            const characteristics = {
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                languages: navigator.languages,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                maxTouchPoints: navigator.maxTouchPoints,
+                doNotTrack: navigator.doNotTrack,
+                platformFingerprint: [
+                    navigator.userAgent,
+                    screen.width + 'x' + screen.height,
+                    navigator.language,
+                    new Date().getTimezoneOffset()
+                ].join('|')
+            };
+
+            uniqueChars.textContent = JSON.stringify(characteristics, null, 2);
+        }
+
+        // Initialize all fingerprinting functions
+        async function initFingerprinting() {
+            try {
+                getNetworkInfo();
+                getDeviceInfo();
+                getBatteryInfo();
+                getGeolocation();
+                getUniqueCharacteristics();
+            } catch (error) {
+                handleError('Initialization Error: ' + error.message);
+            }
+        }
+
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', initFingerprinting);
+    </script>
+</body>
+</html>

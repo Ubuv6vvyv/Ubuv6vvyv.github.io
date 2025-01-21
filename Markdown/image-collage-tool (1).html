@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Collage Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .canvas-container {
+            margin: 0 auto;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .remove-button {
+            background: #ff4444;
+        }
+        .remove-button:hover {
+            background: #cc0000;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .opacity-control {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px;
+            border-radius: 4px;
+            display: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .opacity-slider {
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <input type="file" id="imageUpload" multiple accept="image/*">
+            <select id="layoutType" onchange="updateLayout()">
+                <option value="free">Free Arrange</option>
+                <option value="grid">Auto Grid</option>
+                <option value="horizontal">Single Row</option>
+                <option value="vertical">Single Column</option>
+            </select>
+            <button onclick="downloadCanvas()">Download</button>
+            <button onclick="clearCanvas()" class="remove-button">Clear All</button>
+        </div>
+        <div id="canvasContainer"></div>
+    </div>
+
+    <script>
+        let canvas;
+        let images = [];
+        
+        function initCanvas() {
+            const containerWidth = Math.min(1200, window.innerWidth - 40);
+            const containerHeight = window.innerHeight - 200;
+
+            canvas = new fabric.Canvas('canvas', {
+                width: containerWidth,
+                height: containerHeight,
+                backgroundColor: 'white',
+                preserveObjectStacking: true
+            });
+
+            // Enhanced controls configuration
+            fabric.Object.prototype.transparentCorners = false;
+            fabric.Object.prototype.cornerColor = '#00a0f5';
+            fabric.Object.prototype.cornerStyle = 'circle';
+            fabric.Object.prototype.borderColor = '#00a0f5';
+            fabric.Object.prototype.cornerSize = 10;
+
+            // Add opacity control
+            canvas.on('selection:created', addOpacityControl);
+            canvas.on('selection:updated', addOpacityControl);
+            canvas.on('selection:cleared', removeOpacityControl);
+
+            // Add double-click to remove
+            canvas.on('mouse:dblclick', function(options) {
+                if (options.target) {
+                    const index = images.indexOf(options.target);
+                    if (index > -1) {
+                        images.splice(index, 1);
+                        canvas.remove(options.target);
+                        canvas.renderAll();
+                    }
+                }
+            });
+        }
+
+        function addOpacityControl(e) {
+            removeOpacityControl();
+
+            const object = e.selected[0];
+            if (!object) return;
+
+            const control = document.createElement('div');
+            control.className = 'opacity-control';
+            control.innerHTML = `
+                <input type="range" class="opacity-slider" 
+                       min="0" max="100" value="${object.opacity * 100}"
+                       title="Opacity">
+            `;
+
+            document.body.appendChild(control);
+
+            const zoom = canvas.getZoom();
+            const rect = canvas.getElement().getBoundingClientRect();
+            const objRect = object.getBoundingRect();
+            
+            control.style.left = `${rect.left + (objRect.left * zoom)}px`;
+            control.style.top = `${rect.top + (objRect.top * zoom) - 30}px`;
+            control.style.display = 'block';
+
+            const slider = control.querySelector('.opacity-slider');
+            slider.addEventListener('input', function(e) {
+                object.set('opacity', e.target.value / 100);
+                canvas.renderAll();
+            });
+        }
+
+        function removeOpacityControl() {
+            const controls = document.getElementsByClassName('opacity-control');
+            Array.from(controls).forEach(control => control.remove());
+        }
+
+        function addImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fabric.Image.fromURL(e.target.result, function(img) {
+                    // Scale image to reasonable size if too large
+                    const maxSize = 500;
+                    if (img.width > maxSize || img.height > maxSize) {
+                        const scale = maxSize / Math.max(img.width, img.height);
+                        img.scale(scale);
+                    }
+
+                    img.set({
+                        left: Math.random() * (canvas.width - img.width * img.scaleX),
+                        top: Math.random() * (canvas.height - img.height * img.scaleY)
+                    });
+
+                    images.push(img);
+                    canvas.add(img);
+                    
+                    if (document.getElementById('layoutType').value !== 'free') {
+                        updateLayout();
+                    }
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateLayout() {
+            const layoutType = document.getElementById('layoutType').value;
+            
+            switch(layoutType) {
+                case 'free':
+                    // Do nothing, leave images where they are
+                    break;
+                case 'grid':
+                    arrangeGrid();
+                    break;
+                case 'horizontal':
+                    arrangeHorizontal();
+                    break;
+                case 'vertical':
+                    arrangeVertical();
+                    break;
+            }
+        }
+
+        function arrangeGrid() {
+            if (images.length === 0) return;
+
+            const padding = 20;
+            const cols = Math.ceil(Math.sqrt(images.length));
+            const rows = Math.ceil(images.length / cols);
+
+            const cellWidth = (canvas.width - (padding * (cols + 1))) / cols;
+            const cellHeight = (canvas.height - (padding * (rows + 1))) / rows;
+
+            images.forEach((img, index) => {
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+
+                const scale = Math.min(
+                    cellWidth / (img.width / img.scaleX),
+                    cellHeight / (img.height / img.scaleY)
+                );
+
+                img.set({
+                    scaleX: scale,
+                    scaleY: scale,
+                    left: padding + col * (cellWidth + padding),
+                    top: padding + row * (cellHeight + padding)
+                });
+
+                img.setCoords();
+            });
+
+            canvas.renderAll();
+        }
+
+        function arrangeHorizontal() {
+            if (images.length === 0) return;
+
+            const padding = 20;
+            const imageWidth = (canvas.width - (padding * (images.length + 1))) / images.length;
+            const imageHeight = canvas.height - (padding * 2);
+
+            images.forEach((img, index) => {
+                const scale = Math.min(
+                    imageWidth / (img.width / img.scaleX),
+                    imageHeight / (img.height / img.scaleY)
+                );
+
+                img.set({
+                    scaleX: scale,
+                    scaleY: scale,
+                    left: padding + index * (imageWidth + padding),
+                    top: padding
+                });
+
+                img.setCoords();
+            });
+
+            canvas.renderAll();
+        }
+
+        function arrangeVertical() {
+            if (images.length === 0) return;
+
+            const padding = 20;
+            const imageWidth = canvas.width - (padding * 2);
+            const imageHeight = (canvas.height - (padding * (images.length + 1))) / images.length;
+
+            images.forEach((img, index) => {
+                const scale = Math.min(
+                    imageWidth / (img.width / img.scaleX),
+                    imageHeight / (img.height / img.scaleY)
+                );
+
+                img.set({
+                    scaleX: scale,
+                    scaleY: scale,
+                    left: padding,
+                    top: padding + index * (imageHeight + padding)
+                });
+
+                img.setCoords();
+            });
+
+            canvas.renderAll();
+        }
+
+        function clearCanvas() {
+            images = [];
+            canvas.clear();
+            canvas.backgroundColor = 'white';
+            canvas.renderAll();
+        }
+
+        function downloadCanvas() {
+            const link = document.createElement('a');
+            link.download = 'collage.png';
+            link.href = canvas.toDataURL({
+                format: 'png',
+                quality: 1
+            });
+            link.click();
+        }
+
+        // Initialize
+        window.onload = function() {
+            initCanvas();
+
+            document.getElementById('imageUpload').addEventListener('change', function(e) {
+                Array.from(e.target.files).forEach(file => addImage(file));
+            });
+        };
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const containerWidth = Math.min(1200, window.innerWidth - 40);
+            const containerHeight = window.innerHeight - 200;
+            
+            canvas.setDimensions({
+                width: containerWidth,
+                height: containerHeight
+            });
+
+            if (document.getElementById('layoutType').value !== 'free') {
+                updateLayout();
+            }
+        });
+    </script>
+</body>
+</html>

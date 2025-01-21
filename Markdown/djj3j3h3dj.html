@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Universal Table Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Universal Table Converter</h2>
+        
+        <textarea 
+            id="inputData" 
+            class="w-full h-40 p-3 border rounded-md mb-4 font-mono"
+            placeholder="Paste CSV, HTML Table, JSON, or Excel-copied data here..."
+        ></textarea>
+        
+        <div class="flex space-x-4 mb-4">
+            <select id="parseType" class="border rounded p-2">
+                <option value="csv">CSV/TSV</option>
+                <option value="json">JSON</option>
+                <option value="html">HTML Table</option>
+            </select>
+            
+            <button 
+                onclick="convertTable()" 
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+                Convert Table
+            </button>
+        </div>
+
+        <div id="tableContainer" class="overflow-x-auto"></div>
+    </div>
+
+    <script>
+    function convertTable() {
+        const inputData = document.getElementById('inputData').value;
+        const parseType = document.getElementById('parseType').value;
+        const container = document.getElementById('tableContainer');
+        container.innerHTML = ''; // Clear previous results
+
+        try {
+            let parsedData = [];
+            let headers = [];
+
+            switch(parseType) {
+                case 'csv':
+                    const csvResult = Papa.parse(inputData, { header: true });
+                    headers = csvResult.meta.fields;
+                    parsedData = csvResult.data;
+                    break;
+
+                case 'json':
+                    const jsonData = JSON.parse(inputData);
+                    if (Array.isArray(jsonData) && jsonData.length > 0) {
+                        headers = Object.keys(jsonData[0]);
+                        parsedData = jsonData;
+                    }
+                    break;
+
+                case 'html':
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = inputData;
+                    const table = tempDiv.querySelector('table');
+                    if (table) {
+                        headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+                        parsedData = Array.from(table.querySelectorAll('tr'))
+                            .slice(1)
+                            .map(tr => 
+                                Array.from(tr.querySelectorAll('td')).map(td => td.textContent)
+                            );
+                    }
+                    break;
+            }
+
+            if (parsedData.length === 0) {
+                alert('No data could be parsed. Check your input.');
+                return;
+            }
+
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'w-full text-sm border-collapse mt-4';
+
+            // Create header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.className = 'bg-gray-200';
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                th.className = 'border px-3 py-2 text-left font-semibold';
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create body
+            const tbody = document.createElement('tbody');
+            parsedData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-100 border-b';
+                
+                // Ensure row is an object or array
+                const rowData = Array.isArray(row) ? row : Object.values(row);
+                
+                rowData.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    td.className = 'border px-3 py-2';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            container.appendChild(table);
+        } catch (error) {
+            alert('Error parsing data: ' + error.message);
+        }
+    }
+    </script>
+</body>
+</html>

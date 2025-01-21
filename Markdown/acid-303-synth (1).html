@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Acid Bass Synthesizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* Previous styles remain the same */
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .control-panel {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .knob-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .knob {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .knob label {
+            margin-bottom: 5px;
+            color: #ddd;
+            text-align: center;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .sequencer {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+            margin: 20px 0;
+        }
+        .step {
+            aspect-ratio: 1;
+            background: #333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .step.active {
+            background: #4CAF50;
+        }
+        .step.accent {
+            background: #ff4444;
+        }
+        .step.current {
+            border: 2px solid #fff;
+        }
+        .transport {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #tempo {
+            width: 60px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+        }
+        .note-selector {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+            margin: 10px 0;
+        }
+        .note-selector select {
+            width: 100%;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 2px;
+        }
+        .accent-row {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+            margin: 10px 0;
+        }
+        .accent-step {
+            aspect-ratio: 1;
+            background: #333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .accent-step.active {
+            background: #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Modern Acid Bass Synthesizer</h1>
+        
+        <div class="transport">
+            <button id="startButton">Start Audio</button>
+            <button id="playButton">Play/Stop</button>
+            <label>BPM: <input type="number" id="tempo" value="140" min="60" max="200"></label>
+        </div>
+
+        <div class="control-panel">
+            <h2>Synth Controls</h2>
+            <div class="knob-container">
+                <div class="knob">
+                    <label>Cutoff</label>
+                    <input type="range" id="cutoff" min="50" max="15000" value="1000">
+                </div>
+                <div class="knob">
+                    <label>Resonance</label>
+                    <input type="range" id="resonance" min="0" max="40" value="10">
+                </div>
+                <div class="knob">
+                    <label>Env Mod</label>
+                    <input type="range" id="envMod" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <div class="knob">
+                    <label>Decay</label>
+                    <input type="range" id="decay" min="0.1" max="2" step="0.01" value="0.3">
+                </div>
+                <div class="knob">
+                    <label>Distortion</label>
+                    <input type="range" id="distortion" min="0" max="100" value="20">
+                </div>
+                <div class="knob">
+                    <label>Drive</label>
+                    <input type="range" id="drive" min="0" max="50" value="10">
+                </div>
+                <div class="knob">
+                    <label>Sub Bass</label>
+                    <input type="range" id="subOsc" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <div class="knob">
+                    <label>Delay Mix</label>
+                    <input type="range" id="delayMix" min="0" max="1" step="0.01" value="0.2">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h2>Sequencer</h2>
+            <div class="note-selector" id="noteSelector"></div>
+            <div class="sequencer" id="sequencer"></div>
+            <div class="accent-row" id="accentRow"></div>
+        </div>
+    </div>
+
+    <script>
+        let isPlaying = false;
+        let currentStep = 0;
+        const steps = 16;
+        const notes = ['C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1', 'C2', 'D2', 'E2', 'F2', 'G2'];
+        let sequence = Array(steps).fill(null).map(() => ({
+            note: 'C1',
+            active: false,
+            accent: false
+        }));
+
+        // Initialize audio context only after user interaction
+        let audioContextStarted = false;
+        let synth, subOsc, distortion, drive, delay;
+
+        document.getElementById('startButton').addEventListener('click', async () => {
+            if (!audioContextStarted) {
+                await Tone.start();
+                initializeAudio();
+                audioContextStarted = true;
+                document.getElementById('startButton').textContent = 'Audio Ready';
+                document.getElementById('startButton').disabled = true;
+            }
+        });
+
+        function initializeAudio() {
+            // Create sub oscillator for deep bass
+            subOsc = new Tone.Synth({
+                oscillator: {
+                    type: 'sine'
+                },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.3,
+                    sustain: 0,
+                    release: 0.1
+                }
+            });
+
+            // Create main synth
+            synth = new Tone.MonoSynth({
+                oscillator: {
+                    type: 'sawtooth'
+                },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.3,
+                    sustain: 0,
+                    release: 0.1
+                },
+                filter: {
+                    Q: 10,
+                    type: 'lowpass',
+                    rolloff: -24
+                }
+            });
+
+            // Effects chain
+            distortion = new Tone.Distortion(0.8);
+            drive = new Tone.Overdrive(0.8);
+            delay = new Tone.PingPongDelay({
+                delayTime: "8n",
+                feedback: 0.6,
+                wet: 0.2
+            });
+
+            // Connect everything
+            subOsc.connect(drive);
+            synth.connect(distortion);
+            distortion.connect(drive);
+            drive.connect(delay);
+            delay.toDestination();
+        }
+
+        // Create note selectors and step buttons
+        const noteSelector = document.getElementById('noteSelector');
+        const sequencerGrid = document.getElementById('sequencer');
+        const accentRow = document.getElementById('accentRow');
+
+        // Initialize note selectors
+        for (let i = 0; i < steps; i++) {
+            const select = document.createElement('select');
+            notes.forEach(note => {
+                const option = document.createElement('option');
+                option.value = note;
+                option.textContent = note;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', (e) => {
+                sequence[i].note = e.target.value;
+            });
+            noteSelector.appendChild(select);
+        }
+
+        // Initialize sequencer steps and accent row
+        for (let i = 0; i < steps; i++) {
+            // Create step button
+            const step = document.createElement('button');
+            step.className = 'step';
+            step.addEventListener('click', () => {
+                sequence[i].active = !sequence[i].active;
+                step.classList.toggle('active');
+            });
+            sequencerGrid.appendChild(step);
+
+            // Create accent button
+            const accent = document.createElement('button');
+            accent.className = 'accent-step';
+            accent.addEventListener('click', () => {
+                sequence[i].accent = !sequence[i].accent;
+                accent.classList.toggle('active');
+            });
+            accentRow.appendChild(accent);
+        }
+
+        // Control handlers
+        document.getElementById('cutoff').addEventListener('input', (e) => {
+            if (synth) synth.filter.frequency.value = e.target.value;
+        });
+
+        document.getElementById('resonance').addEventListener('input', (e) => {
+            if (synth) synth.filter.Q.value = e.target.value;
+        });
+
+        document.getElementById('envMod').addEventListener('input', (e) => {
+            if (synth) synth.filterEnvelope.amount = e.target.value * 8000;
+        });
+
+        document.getElementById('decay').addEventListener('input', (e) => {
+            if (synth) {
+                synth.envelope.decay = parseFloat(e.target.value);
+                synth.filterEnvelope.decay = parseFloat(e.target.value);
+            }
+        });
+
+        document.getElementById('distortion').addEventListener('input', (e) => {
+            if (distortion) distortion.distortion = e.target.value / 100;
+        });
+
+        document.getElementById('drive').addEventListener('input', (e) => {
+            if (drive) drive.drive = e.target.value;
+        });
+
+        document.getElementById('subOsc').addEventListener('input', (e) => {
+            if (subOsc) subOsc.volume.value = Tone.gainToDb(parseFloat(e.target.value));
+        });
+
+        document.getElementById('delayMix').addEventListener('input', (e) => {
+            if (delay) delay.wet.value = e.target.value;
+        });
+
+        // Sequencer logic
+        let sequencerLoop = new Tone.Loop((time) => {
+            if (!audioContextStarted) return;
+            
+            const step = sequence[currentStep];
+            const steps = document.querySelectorAll('.step');
+            
+            steps.forEach(s => s.classList.remove('current'));
+            steps[currentStep].classList.add('current');
+            
+            if (step.active) {
+                if (step.accent) {
+                    synth.volume.value = 5;
+                    synth.filter.frequency.value *= 2;
+                    synth.filter.Q.value *= 1.5;
+                } else {
+                    synth.volume.value = 0;
+                    synth.filter.frequency.value = document.getElementById('cutoff').value;
+                    synth.filter.Q.value = document.getElementById('resonance').value;
+                }
+                
+                // Trigger both main synth and sub oscillator
+                synth.triggerAttackRelease(step.note, '16n', time);
+                subOsc.triggerAttackRelease(Tone.Frequency(step.note).transpose(-12), '16n', time);
+            }
+            
+            currentStep = (currentStep + 1) % steps;
+        }, '16n');
+
+        // Transport controls
+        document.getElementById('playButton').addEventListener('click', async () => {
+            if (!audioContextStarted) {
+                alert('Please click "Start Audio" first!');
+                return;
+            }
+            
+            if (!isPlaying) {
+                Tone.Transport.start();
+                sequencerLoop.start();
+                isPlaying = true;
+                document.getElementById('playButton').textContent = 'Stop';
+            } else {
+                Tone.Transport.stop();
+                sequencerLoop.stop();
+                isPlaying = false;
+                currentStep = 0;
+                document.getElementById('playButton').textContent = 'Play';
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('current'));
+            }
+        });
+
+        // Initialize tempo
+        Tone.Transport.bpm.value = 140;
+    </script>
+</body>
+</html>

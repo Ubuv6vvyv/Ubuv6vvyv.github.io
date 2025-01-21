@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confetti Explosion</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #000;
+            cursor: pointer;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #explosion-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        #flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            opacity: 0;
+            z-index: 10000;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+        }
+        #title {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            font-size: 2rem;
+            opacity: 0.7;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">Click Anywhere for Explosion!</div>
+    <div id="flash"></div>
+    <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+    
+    <button id="demo" class="button" onclick="removeButton(event)">
+        demo
+      </button>
+
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <script>
+        const flash = document.getElementById('flash');
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confetti = window.confetti.create(confettiCanvas, { 
+            resize: true,
+            useWorker: true 
+        });
+
+        function createNuclearExplosionEffect(x, y) {
+            // Dark pulse
+            flash.style.backgroundColor = 'black';
+            flash.style.opacity = 0.2;
+            
+            setTimeout(() => {
+                // Bright flash like atomic explosion
+                flash.style.backgroundColor = 'white';
+                flash.style.opacity = 1;
+                
+                // Multiple confetti waves
+                const colors = [
+                    '#ff0000', '#ff6b6b', '#4ecdc4', 
+                    '#45b7d1', '#f9d5e5', '#eeac99'
+                ];
+
+                // Initial massive burst
+                confetti({
+                    particleCount: 500,
+                    spread: 360,
+                    startVelocity: 50,
+                    gravity: 0.5,
+                    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                    colors: colors,
+                    scalar: 1.5
+                });
+
+                // Secondary waves
+                setTimeout(() => {
+                    confetti({
+                        particleCount: 300,
+                        spread: 270,
+                        startVelocity: 50,
+                        gravity: 0.8,
+                        origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                        colors: colors,
+                        scalar: 1.3
+                    });
+                }, 100);
+
+                setTimeout(() => {
+                    confetti({
+                        particleCount: 200,
+                        spread: 180,
+                        startVelocity: 30,
+                        gravity: 0.3,
+                        origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+                        colors: colors,
+                        scalar: 1
+                    });
+                }, 50);
+
+                // Fade out flash
+                setTimeout(() => {
+                    flash.style.opacity = 0;
+                }, 100);
+            }, 100);
+        }
+
+        document.addEventListener('click', (e) => {
+            const { clientX, clientY } = e;
+            createNuclearExplosionEffect(clientX, clientY);
+        });
+
+        // Random autonomous explosion
+        setInterval(() => {
+            if (Math.random() < 0.05) {
+                const x = Math.random() * window.innerWidth;
+                const y = Math.random() * window.innerHeight;
+                createNuclearExplosionEffect(x, y);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>
+
+

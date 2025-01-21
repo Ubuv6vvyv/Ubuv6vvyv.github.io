@@ -1,0 +1,132 @@
+l<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Vulnerability Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #results { margin-top: 20px; padding: 10px; border: 1px solid #ddd; max-height: 300px; overflow-y: auto; }
+        button { margin: 5px; padding: 10px; cursor: pointer; }
+        #loading { display: none; color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>Security Vulnerability Tester</h1>
+
+<div>
+    <label for="paramListUrl">Parameter List URL:</label>
+    <input type="text" id="paramListUrl" placeholder="Enter URL of parameter list..." style="width: 60%;" />
+</div>
+<div>
+    <label for="targetUrl">Target URL:</label>
+    <input type="text" id="targetUrl" placeholder="Enter target site URL..." style="width: 60%;" />
+</div>
+<button onclick="startTest()">Start</button>
+<button onclick="pauseTest()">Pause</button>
+<button onclick="resumeTest()">Resume</button>
+<button onclick="clearResults()">Clear</button>
+<button onclick="downloadResults()">Download</button>
+
+<div id="loading">Testing in progress...</div>
+<div id="results"></div>
+
+<script>
+let pause = false;
+let results = [];
+
+async function fetchParameterList(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch parameter list.");
+        return (await response.text()).split('\n').filter(Boolean);
+    } catch (error) {
+        displayResult(`Error fetching parameter list: ${error.message}`, "error");
+        return [];
+    }
+}
+
+async function testUrl(targetUrl, parameter) {
+    // Normalize the URL by removing any trailing slash from targetUrl before appending the parameter
+    const normalizedUrl = targetUrl.replace(/\/+$/, '') + '/' + parameter.replace(/^\/+/, '');
+    
+    try {
+        const response = await fetch(normalizedUrl, { method: 'GET' });
+        if (response.ok) {
+            const text = await response.text();
+            analyzeResponse(normalizedUrl, text, parameter);
+        } else {
+            displayResult(`${normalizedUrl} returned status: ${response.status}`, "warning");
+        }
+    } catch (error) {
+        displayResult(`${normalizedUrl} error: ${error.message}`, "error");
+    }
+}
+
+
+function analyzeResponse(url, text, parameter) {
+    if (/error|warning|exception|forbidden/i.test(text)) {
+        displayResult(`Potential vulnerability detected at ${url} using parameter: ${parameter}`, "vulnerability");
+    } else {
+        displayResult(`No issues detected at ${url}`, "info");
+    }
+}
+
+function displayResult(message, type) {
+    const div = document.createElement('div');
+    div.textContent = message;
+    div.style.color = type === "vulnerability" ? "red" : type === "error" ? "darkred" : "green";
+    document.getElementById('results').appendChild(div);
+    results.push(message);
+}
+
+async function startTest() {
+    pause = false;
+    document.getElementById('loading').style.display = 'block';
+    const paramListUrl = document.getElementById('paramListUrl').value;
+    const targetUrl = document.getElementById('targetUrl').value;
+
+    if (!paramListUrl || !targetUrl) {
+        displayResult("Please provide both Parameter List URL and Target URL.", "error");
+        return;
+    }
+
+    const parameters = await fetchParameterList(paramListUrl);
+    for (const parameter of parameters) {
+        if (pause) break;
+        await testUrl(targetUrl, parameter);
+    }
+
+    document.getElementById('loading').style.display = 'none';
+}
+
+function pauseTest() {
+    pause = true;
+    displayResult("Testing paused.", "info");
+}
+
+function resumeTest() {
+    if (pause) {
+        pause = false;
+        startTest();
+        displayResult("Testing resumed.", "info");
+    }
+}
+
+function clearResults() {
+    document.getElementById('results').innerHTML = "";
+    results = [];
+}
+
+function downloadResults() {
+    const blob = new Blob([results.join('\n')], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'test_results.txt';
+    link.click();
+}
+</script>
+
+</body>
+</html>
