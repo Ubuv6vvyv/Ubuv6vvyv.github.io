@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <style>
+        .container {
+            max-width: 100%;
+            padding: 1rem;
+        }
+
+        .preview-container {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+
+        .preview-box {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            border-radius: 4px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .controls {
+            margin-bottom: 1rem;
+        }
+
+        .output-box {
+            width: 100%;
+            min-height: 200px;
+            margin: 1rem 0;
+            padding: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            background: #0066cc;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0052a3;
+        }
+
+        .format-toggle {
+            margin-right: 1rem;
+        }
+
+        #pdf-preview {
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <input type="file" id="pdf-input" accept=".pdf" />
+            <select class="format-toggle" id="format-toggle">
+                <option value="html">HTML</option>
+                <option value="markdown">Markdown</option>
+            </select>
+        </div>
+
+        <div class="preview-container">
+            <div class="preview-box" id="pdf-preview"></div>
+            <div class="preview-box" id="converted-preview"></div>
+        </div>
+
+        <textarea class="output-box" id="output" readonly></textarea>
+
+        <div class="button-group">
+            <button id="copy-btn">Copy Output</button>
+            <button id="clear-btn">Clear All</button>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const pdfInput = document.getElementById('pdf-input');
+        const formatToggle = document.getElementById('format-toggle');
+        const pdfPreview = document.getElementById('pdf-preview');
+        const convertedPreview = document.getElementById('converted-preview');
+        const output = document.getElementById('output');
+        const copyBtn = document.getElementById('copy-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        let currentPdfText = '';
+
+        pdfInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async function(event) {
+                    const typedarray = new Uint8Array(event.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    
+                    // Display first page in preview
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    pdfPreview.innerHTML = '';
+                    pdfPreview.appendChild(canvas);
+
+                    // Extract text from all pages
+                    currentPdfText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        currentPdfText += pageText + '\n\n';
+                    }
+
+                    updateOutput();
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        formatToggle.addEventListener('change', updateOutput);
+
+        function updateOutput() {
+            const format = formatToggle.value;
+            let convertedText = '';
+
+            if (format === 'html') {
+                convertedText = `<div class="document">
+    ${currentPdfText.split('\n\n').map(p => `<p>${p}</p>`).join('\n    ')}
+</div>`;
+            } else {
+                convertedText = currentPdfText.split('\n\n').map(p => p.trim()).join('\n\n');
+            }
+
+            output.value = convertedText;
+            convertedPreview.innerHTML = format === 'html' ? 
+                convertedText : 
+                marked.parse(convertedText);
+        }
+
+        copyBtn.addEventListener('click', () => {
+            output.select();
+            document.execCommand('copy');
+        });
+
+        clearBtn.addEventListener('click', () => {
+            pdfInput.value = '';
+            pdfPreview.innerHTML = '';
+            convertedPreview.innerHTML = '';
+            output.value = '';
+            currentPdfText = '';
+        });
+    </script>
+</body>
+</html>
