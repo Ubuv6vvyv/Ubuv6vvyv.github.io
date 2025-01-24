@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Collage Generator</title>
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        #canvasContainer {
+            max-width: 100%;
+            overflow: auto;
+            position: relative;
+        }
+        #zoomControl {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+        }
+        #numberStyleControls {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container mx-auto max-w-4xl bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-4 text-center">Enhanced Image Collage Generator</h1>
+        <div>
+        <pre> test </pre>
+        <div class="mb-4">
+            <input 
+                type="file" 
+                id="imageInput" 
+                multiple 
+                accept="image/*" 
+                class="w-full p-2 border rounded"
+            >
+        </div>
+
+        <div class="flex space-x-4 mb-4">
+            <button 
+                id="generateCollageBtn" 
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                disabled
+            >
+                Generate Collage
+            </button>
+            <button 
+                id="shuffleBtn" 
+                class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
+                disabled
+            >
+                Shuffle Images
+            </button>
+            <button 
+                id="downloadBtn" 
+                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                disabled
+            >
+                Download Collage
+            </button>
+        </div>
+
+        <div class="flex items-center mb-4">
+            <input 
+                type="checkbox" 
+                id="numberOverlayCheckbox" 
+                class="mr-2"
+                onchange="document.getElementById('numberStyleControls').style.display = this.checked ? 'block' : 'none'"
+            >
+            <label for="numberOverlayCheckbox">Add Number Overlay</label>
+        </div>
+
+        <div id="numberStyleControls" class="mb-4 grid grid-cols-2 gap-4">
+            <div>
+                <label for="numberSizeInput" class="block">Number Size</label>
+                <input 
+                    type="number" 
+                    id="numberSizeInput" 
+                    min="10" 
+                    max="100" 
+                    value="50" 
+                    class="w-full p-2 border rounded"
+                >
+            </div>
+            <div>
+                <label for="numberColorInput" class="block">Number Color</label>
+                <input 
+                    type="color" 
+                    id="numberColorInput" 
+                    value="#FFFFFF" 
+                    class="w-full p-2 border rounded"
+                >
+            </div>
+            <div>
+                <label for="numberBackgroundColorInput" class="block">Number Background</label>
+                <input 
+                    type="color" 
+                    id="numberBackgroundColorInput" 
+                    value="#000000" 
+                    class="w-full p-2 border rounded"
+                >
+            </div>
+            <div>
+                <label for="fontSelect" class="block">Font</label>
+                <select 
+                    id="fontSelect" 
+                    class="w-full p-2 border rounded"
+                >
+                    <option value="Arial">Arial</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Verdana">Verdana</option>
+                </select>
+            </div>
+            <div>
+                <label for="numberStyleSelect" class="block">Number Style</label>
+                <select 
+                    id="numberStyleSelect" 
+                    class="w-full p-2 border rounded"
+                >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                    <option value="bold italic">Bold Italic</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="canvasContainer" class="relative border-2 border-dashed border-gray-300">
+            <div id="zoomControl" class="bg-white p-2 rounded shadow">
+                <input 
+                    type="range" 
+                    id="zoomSlider" 
+                    min="0.1" 
+                    max="2" 
+                    step="0.1" 
+                    value="1"
+                >
+            </div>
+            <canvas id="collageCanvas"></canvas>
+        </div>
+    </div>
+    
+    
+<div class="guide-container bg-white p-4 rounded-lg shadow-lg">
+<h2 class="text-2xl font-bold mb-4">How to Use the Image Collage Generator</h2>
+<ol class="list-decimal ml-4">
+<li>
+<span class="font-bold">Upload Your Images:</span> Click the "Choose Files" button to select the images you want to include in your collage. You can select multiple images at once.
+</li>
+<li>
+<span class="font-bold">Select the Right Number of Images:</span> Make sure you've selected a number of images that can form a perfect square (1, 4, 9, 16, 25). If you select the wrong number, you'll get an error message.
+</li>
+<li>
+<span class="font-bold">Generate Your Collage:</span> Click the "Generate Collage" button to create your collage. Your images will be arranged in a grid.
+</li>
+<li>
+<span class="font-bold">Add a Number Overlay (Optional):</span> If you want to add numbers to each image in your collage, check the "Add Number Overlay" box.
+</li>
+<li>
+<span class="font-bold">Zoom In or Out:</span> Use the zoom slider to make your collage bigger or smaller.
+</li>
+<li>
+<span class="font-bold">Download Your Collage:</span> Click the "Download Collage" button to save your collage as a PNG image.
+</li>
+</ol>
+</div>
+
+    <script>
+        class ImageCollageGenerator {
+            constructor() {
+                this.canvas = new fabric.Canvas('collageCanvas');
+                this.images = [];
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.getElementById('imageInput').addEventListener('change', this.handleImageUpload.bind(this));
+                document.getElementById('generateCollageBtn').addEventListener('click', this.generateCollage.bind(this));
+                document.getElementById('shuffleBtn').addEventListener('click', this.shuffleImages.bind(this));
+                document.getElementById('downloadBtn').addEventListener('click', this.downloadCollage.bind(this));
+                document.getElementById('zoomSlider').addEventListener('input', this.handleZoom.bind(this));
+            }
+
+            handleImageUpload(event) {
+                const files = Array.from(event.target.files);
+                this.images = [];
+                const squareNumbers = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100];
+
+                // Validate image count for grid arrangements
+                if (!squareNumbers.includes(files.length)) {
+                    const nearestSquare = squareNumbers.reduce((prev, curr) => 
+                        Math.abs(curr - files.length) < Math.abs(prev - files.length) ? curr : prev
+                    );
+                    const difference = Math.abs(files.length - nearestSquare);
+                    
+                    alert(`Please select a number of images closer to a perfect grid (1, 4, 9, 16, 25, 36, 49, 64, 81, 100). 
+                    You may want to remove ${difference} ${difference === 1 ? 'image' : 'images'} to create a better grid.`);
+                    
+                    event.target.value = '';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.images.push(e.target.result);
+                        if (this.images.length === files.length) {
+                            document.getElementById('generateCollageBtn').disabled = false;
+                            document.getElementById('shuffleBtn').disabled = false;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            shuffleImages() {
+                // Fisher-Yates shuffle algorithm
+                for (let i = this.images.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.images[i], this.images[j]] = [this.images[j], this.images[i]];
+                }
+                this.generateCollage();
+            }
+
+            generateCollage() {
+                const gridSize = Math.sqrt(this.images.length);
+                const canvasWidth = Math.min(1200, window.innerWidth - 40);
+                const cellSize = canvasWidth / gridSize;
+
+                this.canvas.setWidth(canvasWidth);
+                this.canvas.setHeight(canvasWidth);
+                this.canvas.clear();
+
+                this.images.forEach((imgSrc, index) => {
+                    fabric.Image.fromURL(imgSrc, (img) => {
+                        const scale = cellSize / Math.max(img.width, img.height);
+                        img.set({
+                            scaleX: scale,
+                            scaleY: scale,
+                            left: (index % gridSize) * cellSize,
+                            top: Math.floor(index / gridSize) * cellSize
+                        });
+
+                        this.canvas.add(img);
+
+                        if (document.getElementById('numberOverlayCheckbox').checked) {
+                            this.addNumberOverlay(index, img, cellSize);
+                        }
+
+                        if (index === this.images.length - 1) {
+                            document.getElementById('downloadBtn').disabled = false;
+                        }
+                    });
+                });
+            }
+
+            addNumberOverlay(index, img, cellSize) {
+                const numberSize = document.getElementById('numberSizeInput').value;
+                const numberColor = document.getElementById('numberColorInput').value;
+                const bgColor = document.getElementById('numberBackgroundColorInput').value;
+                const font = document.getElementById('fontSelect').value;
+                const fontStyle = document.getElementById('numberStyleSelect').value;
+
+                const numberText = new fabric.Text((index + 1).toString(), {
+                    fontSize: numberSize,
+                    fontFamily: font,
+                    fill: numberColor,
+                    fontStyle: fontStyle.includes('italic') ? 'italic' : 'normal',
+                    fontWeight: fontStyle.includes('bold') ? 'bold' : 'normal',
+                    left: img.left + 10,
+                    top: img.top + 10,
+                    backgroundColor: bgColor,
+                    padding: 5
+                });
+
+                this.canvas.add(numberText);
+            }
+
+            handleZoom(event) {
+                const zoomLevel = parseFloat(event.target.value);
+                this.canvas.setZoom(zoomLevel);
+                this.canvas.renderAll();
+            }
+
+            downloadCollage() {
+                const originalWidth = this.canvas.getWidth();
+                const originalHeight = this.canvas.getHeight();
+
+                const exportScaleFactor = 4;
+                const scaledWidth = originalWidth * exportScaleFactor;
+                const scaledHeight = originalHeight * exportScaleFactor;
+
+                this.canvas.setWidth(scaledWidth);
+                this.canvas.setHeight(scaledHeight);
+                this.canvas.setZoom(exportScaleFactor);
+                this.canvas.renderAll();
+
+                const dataURL = this.canvas.toDataURL({
+                    format: 'png',
+                    quality: 1.0
+                });
+
+                this.canvas.setWidth(originalWidth);
+                this.canvas.setHeight(originalHeight);
+                this.canvas.setZoom(1);
+                this.canvas.renderAll();
+
+                const link = document.createElement('a');
+                link.setAttribute('download', 'image-collage.png');
+                link.setAttribute('href', dataURL);
+                link.click();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageCollageGenerator();
+        });
+    </script>
+</body>
+</html>
