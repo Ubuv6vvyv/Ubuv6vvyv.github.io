@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Collage Generator</title>
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        #canvasContainer {
+            max-width: 100%;
+            overflow: auto;
+            position: relative;
+        }
+        #zoomControl {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container mx-auto max-w-4xl bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-4 text-center">Image Collage Generator</h1>
+        
+        <div class="mb-4">
+            <input 
+                type="file" 
+                id="imageInput" 
+                multiple 
+                accept="image/*" 
+                class="w-full p-2 border rounded"
+            >
+        </div>
+
+        <div class="flex space-x-4 mb-4">
+            <button 
+                id="generateCollageBtn" 
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                disabled
+            >
+                Generate Collage
+            </button>
+            <button 
+                id="downloadBtn" 
+                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                disabled
+            >
+                Download Collage
+            </button>
+        </div>
+
+        <div class="flex items-center mb-4">
+            <input 
+                type="checkbox" 
+                id="numberOverlayCheckbox" 
+                class="mr-2"
+            >
+            <label for="numberOverlayCheckbox">Add Number Overlay</label>
+        </div>
+
+        <div id="canvasContainer" class="relative border-2 border-dashed border-gray-300">
+            <div id="zoomControl" class="bg-white p-2 rounded shadow">
+                <input 
+                    type="range" 
+                    id="zoomSlider" 
+                    min="0.1" 
+                    max="2" 
+                    step="0.1" 
+                    value="1"
+                >
+            </div>
+            <canvas id="collageCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Image Collage Generator Core Logic
+        class ImageCollageGenerator {
+            constructor() {
+                this.canvas = new fabric.Canvas('collageCanvas');
+                this.images = [];
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.getElementById('imageInput').addEventListener('change', this.handleImageUpload.bind(this));
+                document.getElementById('generateCollageBtn').addEventListener('click', this.generateCollage.bind(this));
+                document.getElementById('downloadBtn').addEventListener('click', this.downloadCollage.bind(this));
+                document.getElementById('zoomSlider').addEventListener('input', this.handleZoom.bind(this));
+            }
+
+            handleImageUpload(event) {
+                const files = Array.from(event.target.files);
+                this.images = [];
+                const squareNumbers = [1, 4, 9, 16, 25];
+
+                // Validate image count for square arrangements
+                if (!squareNumbers.includes(files.length)) {
+                    alert('Please select a number of images that can form a perfect square (1, 4, 9, 16, 25)');
+                    event.target.value = '';
+                    return;
+                }
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.images.push(e.target.result);
+                        if (this.images.length === files.length) {
+                            document.getElementById('generateCollageBtn').disabled = false;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            generateCollage() {
+                const gridSize = Math.sqrt(this.images.length);
+                const canvasWidth = Math.min(1200, window.innerWidth - 40);
+                const cellSize = canvasWidth / gridSize;
+
+                this.canvas.setWidth(canvasWidth);
+                this.canvas.setHeight(canvasWidth);
+                this.canvas.clear();
+
+                this.images.forEach((imgSrc, index) => {
+                    fabric.Image.fromURL(imgSrc, (img) => {
+                        const scale = cellSize / Math.max(img.width, img.height);
+                        img.set({
+                            scaleX: scale,
+                            scaleY: scale,
+                            left: (index % gridSize) * cellSize,
+                            top: Math.floor(index / gridSize) * cellSize
+                        });
+
+                        this.canvas.add(img);
+
+                        if (document.getElementById('numberOverlayCheckbox').checked) {
+                            const numberText = new fabric.Text((index + 1).toString(), {
+                                fontSize: cellSize / 5,
+                                fill: 'white',
+                                stroke: 'black',
+                                strokeWidth: 1,
+                                left: img.left + 10,
+                                top: img.top + 10
+                            });
+                            this.canvas.add(numberText);
+                        }
+
+                        if (index === this.images.length - 1) {
+                            document.getElementById('downloadBtn').disabled = false;
+                        }
+                    });
+                });
+            }
+
+            handleZoom(event) {
+                const zoomLevel = parseFloat(event.target.value);
+                this.canvas.setZoom(zoomLevel);
+                this.canvas.renderAll();
+            }
+
+            downloadCollage() {
+                const originalWidth = this.canvas.getWidth();
+                const originalHeight = this.canvas.getHeight();
+
+                // Scale up the canvas temporarily for high-resolution export
+                const exportScaleFactor = 4; // Increase this for even higher resolution
+                const scaledWidth = originalWidth * exportScaleFactor;
+                const scaledHeight = originalHeight * exportScaleFactor;
+
+                // Temporarily scale the canvas
+                this.canvas.setWidth(scaledWidth);
+                this.canvas.setHeight(scaledHeight);
+                this.canvas.setZoom(exportScaleFactor);
+                this.canvas.renderAll(); // Re-render to apply scaling
+
+                // Generate the high-resolution data URL
+                const dataURL = this.canvas.toDataURL({
+                    format: 'png',
+                    quality: 1.0
+                });
+
+                // Restore the canvas to its original size
+                this.canvas.setWidth(originalWidth);
+                this.canvas.setHeight(originalHeight);
+                this.canvas.setZoom(1);
+                this.canvas.renderAll(); // Re-render to restore the original state
+
+                // Trigger the download
+                const link = document.createElement('a');
+                link.setAttribute('download', 'image-collage.png');
+                link.setAttribute('href', dataURL);
+                link.click();
+            }
+        }
+
+        // Initialize the generator on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageCollageGenerator();
+        });
+    </script>
+</body>
+</html>
