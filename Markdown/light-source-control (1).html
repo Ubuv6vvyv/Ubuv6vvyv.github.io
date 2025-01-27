@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Source Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .control-section {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        button, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        #debugLog {
+            background-color: #f0f0f0;
+            font-family: monospace;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-section">
+        <h2>Light Source Control</h2>
+        <select id="lightMode">
+            <option value="steady">Steady Light</option>
+            <option value="strobe">Classic Strobe</option>
+        </select>
+        <button id="lightToggle">Enable Light Source</button>
+        <div id="debugLog"></div>
+    </div>
+
+    <script>
+        const lightToggle = document.getElementById('lightToggle');
+        const lightMode = document.getElementById('lightMode');
+        const debugLog = document.getElementById('debugLog');
+
+        function log(message) {
+            debugLog.textContent += message + '\n';
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(message);
+        }
+
+        class LightController {
+            constructor() {
+                this.activeStream = null;
+                this.lightTrack = null;
+                this.lightInterval = null;
+            }
+
+            stopAllLightSources() {
+                if (this.lightInterval) {
+                    clearInterval(this.lightInterval);
+                    this.lightInterval = null;
+                }
+
+                if (this.lightTrack) {
+                    this.lightTrack.enabled = false;
+                }
+
+                if (this.activeStream) {
+                    this.activeStream.getTracks().forEach(track => track.stop());
+                    this.activeStream = null;
+                }
+            }
+
+            async getCameraStream() {
+                const constraints = { 
+                    video: { 
+                        facingMode: 'environment',
+                        advanced: [{ torch: true }]
+                    } 
+                };
+
+                try {
+                    log('Attempting to access camera');
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const track = stream.getVideoTracks()[0];
+                    
+                    log(`Camera track obtained: ${track.label}`);
+                    return { stream, track };
+                } catch (error) {
+                    log(`Camera access error: ${error.message}`);
+                    throw error;
+                }
+            }
+
+            async activateLight(mode) {
+                this.stopAllLightSources();
+
+                try {
+                    const { stream, track } = await this.getCameraStream();
+                    this.activeStream = stream;
+                    this.lightTrack = track;
+
+                    // Light mode implementation
+                    switch(mode) {
+                        case 'steady':
+                            track.enabled = true;
+                            break;
+                        case 'strobe':
+                            this.lightInterval = setInterval(() => {
+                                track.enabled = !track.enabled;
+                            }, 500);
+                            break;
+                    }
+                } catch (error) {
+                    log(`Light activation failed: ${error.message}`);
+                    alert('Could not activate light source. Check permissions.');
+                }
+            }
+        }
+
+        const lightController = new LightController();
+
+        lightToggle.addEventListener('click', async () => {
+            try {
+                await lightController.activateLight(lightMode.value);
+                lightToggle.textContent = 'Disable Light Source';
+            } catch (error) {
+                log(`Initialization error: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

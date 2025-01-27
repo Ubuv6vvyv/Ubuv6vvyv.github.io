@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Light Source Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .control-section {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        button, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        #debugLog {
+            background-color: #f0f0f0;
+            font-family: monospace;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-section">
+        <h2>Advanced Light Source Control</h2>
+        <select id="lightMode">
+            <option value="steady">Steady Light</option>
+            <option value="strobe">Classic Strobe</option>
+            <option value="fastStrobe">Fast Strobe</option>
+            <option value="pulse">Pulse</option>
+            <option value="sos">SOS Signal</option>
+            <option value="dance">Dance Party</option>
+        </select>
+        <button id="lightToggle">Enable Light Source</button>
+        <div id="debugLog"></div>
+    </div>
+
+    <script>
+        const lightToggle = document.getElementById('lightToggle');
+        const lightMode = document.getElementById('lightMode');
+        const debugLog = document.getElementById('debugLog');
+
+        // Logging function
+        function log(message) {
+            debugLog.textContent += message + '\n';
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(message);
+        }
+
+        class LightController {
+            constructor() {
+                this.activeStream = null;
+                this.lightTrack = null;
+                this.lightInterval = null;
+            }
+
+            // Method to stop any existing light sources
+            stopAllLightSources() {
+                if (this.lightInterval) {
+                    clearInterval(this.lightInterval);
+                    this.lightInterval = null;
+                }
+
+                if (this.lightTrack) {
+                    this.lightTrack.stop();
+                    this.lightTrack = null;
+                }
+
+                if (this.activeStream) {
+                    this.activeStream.getTracks().forEach(track => track.stop());
+                    this.activeStream = null;
+                }
+            }
+
+            // Multiple camera access strategies
+            async getCameraStream() {
+                const constraintSets = [
+                    // Most comprehensive constraints
+                    {
+                        video: {
+                            facingMode: 'environment',
+                            advanced: [
+                                {torch: true},
+                                {zoom: { ideal: 1, max: 2 }},
+                                {width: { min: 640, ideal: 1280 }},
+                                {height: { min: 480, ideal: 720 }}
+                            ]
+                        }
+                    },
+                    // Fallback configurations
+                    { video: { facingMode: 'environment' } },
+                    { video: true }
+                ];
+
+                for (const constraints of constraintSets) {
+                    try {
+                        log(`Attempting camera access with constraints: ${JSON.stringify(constraints)}`);
+                        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        
+                        // Get the first video track
+                        const track = stream.getVideoTracks()[0];
+                        log(`Camera track obtained: ${track.label}`);
+
+                        // Log capabilities
+                        const capabilities = track.getCapabilities();
+                        log(`Camera capabilities: ${JSON.stringify(capabilities)}`);
+
+                        return { stream, track };
+                    } catch (error) {
+                        log(`Camera access failed: ${error.message}`);
+                    }
+                }
+
+                throw new Error('Could not access any camera');
+            }
+
+            // Experimental light source methods
+            async activateLight(mode) {
+                this.stopAllLightSources();
+
+                try {
+                    // Try multiple light activation methods
+                    await this.tryWebTorch(mode);
+                } catch (webTorchError) {
+                    log(`Web Torch failed: ${webTorchError.message}`);
+                    
+                    try {
+                        await this.tryCameraFlash(mode);
+                    } catch (cameraFlashError) {
+                        log(`Camera Flash failed: ${cameraFlashError.message}`);
+                        
+                        try {
+                            await this.tryScreenLight(mode);
+                        } catch (screenLightError) {
+                            log(`Screen Light failed: ${screenLightError.message}`);
+                            alert('Could not activate light source');
+                        }
+                    }
+                }
+            }
+
+            async tryWebTorch(mode) {
+                const { stream, track } = await this.getCameraStream();
+                this.activeStream = stream;
+                this.lightTrack = track;
+
+                // Attempt to apply torch constraint
+                try {
+                    await track.applyConstraints({ advanced: [{ torch: true }] });
+                    log('Torch constraint applied successfully');
+                } catch (constraintError) {
+                    log(`Torch constraint error: ${constraintError.message}`);
+                }
+
+                // Light mode implementations
+                switch(mode) {
+                    case 'steady':
+                        track.enabled = true;
+                        break;
+                    case 'strobe':
+                        this.lightInterval = setInterval(() => {
+                            track.enabled = !track.enabled;
+                        }, 500);
+                        break;
+                    case 'fastStrobe':
+                        this.lightInterval = setInterval(() => {
+                            track.enabled = !track.enabled;
+                        }, 100);
+                        break;
+                    case 'pulse':
+                        let pulseIntensity = 0;
+                        let increasing = true;
+                        this.lightInterval = setInterval(() => {
+                            track.enabled = pulseIntensity > 0.5;
+                            
+                            if (increasing) {
+                                pulseIntensity += 0.1;
+                                if (pulseIntensity >= 1) increasing = false;
+                            } else {
+                                pulseIntensity -= 0.1;
+                                if (pulseIntensity <= 0) increasing = true;
+                            }
+                        }, 200);
+                        break;
+                    case 'sos':
+                        const sosPattern = [100, 100, 100, 300, 300, 100, 100, 100];
+                        let index = 0;
+                        this.lightInterval = setInterval(() => {
+                            track.enabled = index % 2 === 0;
+                            index = (index + 1) % sosPattern.length;
+                        }, 250);
+                        break;
+                    case 'dance':
+                        const dancePatterns = [
+                            { interval: 200, duty: 0.6 },
+                            { interval: 150, duty: 0.7 },
+                            { interval: 300, duty: 0.4 }
+                        ];
+                        let patternIndex = 0;
+                        this.lightInterval = setInterval(() => {
+                            const currentPattern = dancePatterns[patternIndex];
+                            track.enabled = Math.random() < currentPattern.duty;
+                            
+                            // Cycle through patterns
+                            patternIndex = (patternIndex + 1) % dancePatterns.length;
+                        }, 300);
+                        break;
+                }
+            }
+
+            async tryCameraFlash(mode) {
+                // Placeholder for specific camera flash API calls
+                log('Attempting camera flash method');
+                throw new Error('Camera flash method not implemented');
+            }
+
+            async tryScreenLight(mode) {
+                // Screen-based light fallback
+                log('Attempting screen-based light method');
+                throw new Error('Screen light method not implemented');
+            }
+        }
+
+        // Instantiate light controller
+        const lightController = new LightController();
+
+        lightToggle.addEventListener('click', async () => {
+            try {
+                await lightController.activateLight(lightMode.value);
+                lightToggle.textContent = 'Disable Light Source';
+                lightToggle.onclick = () => {
+                    lightController.stopAllLightSources();
+                    lightToggle.textContent = 'Enable Light Source';
+                    lightToggle.onclick = null;
+                };
+            } catch (error) {
+                log(`Light activation error: ${error.message}`);
+                alert('Could not activate light source');
+            }
+        });
+    </script>
+</body>
+</html>

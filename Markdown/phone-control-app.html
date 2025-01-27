@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibration Massage Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .vibration-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .intensity-control {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .intensity-control label {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .intensity-control input {
+            flex: 2;
+        }
+        .pattern-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .pattern-btn {
+            padding: 10px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .pattern-btn.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .control-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #startVibrate {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #stopVibrate {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="vibration-container">
+        <h1>Vibration Massage Control</h1>
+
+        <div class="intensity-control">
+            <label for="intensitySlider">Intensity</label>
+            <input type="range" id="intensitySlider" min="0" max="100" value="50">
+            <span id="intensityValue">50%</span>
+        </div>
+
+        <div class="pattern-selector">
+            <button class="pattern-btn" data-pattern="gentle">Gentle</button>
+            <button class="pattern-btn" data-pattern="moderate">Moderate</button>
+            <button class="pattern-btn" data-pattern="intense" class="active">Intense</button>
+            <button class="pattern-btn" data-pattern="wave">Wave</button>
+            <button class="pattern-btn" data-pattern="pulse">Pulse</button>
+            <button class="pattern-btn" data-pattern="random">Random</button>
+        </div>
+
+        <div class="control-buttons">
+            <button id="startVibrate">Start Massage</button>
+            <button id="stopVibrate">Stop</button>
+        </div>
+    </div>
+
+    <script>
+        // Vibration Patterns
+        const vibrationPatterns = {
+            gentle: (intensity) => {
+                const base = intensity * 0.5;
+                return [base, 100, base/2, 100];
+            },
+            moderate: (intensity) => {
+                const base = intensity * 0.75;
+                return [base, 50, base, 50];
+            },
+            intense: (intensity) => {
+                const base = intensity;
+                return [base, 30, base, 30];
+            },
+            wave: (intensity) => {
+                const pattern = [];
+                for (let i = 0; i < 10; i++) {
+                    const wave = intensity * (Math.sin(i * 0.5) * 0.5 + 0.5);
+                    pattern.push(wave, 50);
+                }
+                return pattern;
+            },
+            pulse: (intensity) => {
+                const pattern = [];
+                for (let i = 0; i < 8; i++) {
+                    pattern.push(intensity, 50, intensity/2, 50);
+                }
+                return pattern;
+            },
+            random: (intensity) => {
+                const pattern = [];
+                for (let i = 0; i < 10; i++) {
+                    const randomVariation = intensity * (0.5 + Math.random() * 0.5);
+                    pattern.push(randomVariation, 100);
+                }
+                return pattern;
+            }
+        };
+
+        // UI Element References
+        const intensitySlider = document.getElementById('intensitySlider');
+        const intensityValue = document.getElementById('intensityValue');
+        const startVibrate = document.getElementById('startVibrate');
+        const stopVibrate = document.getElementById('stopVibrate');
+        const patternButtons = document.querySelectorAll('.pattern-btn');
+
+        // State Variables
+        let currentPattern = 'intense';
+        let currentVibrationInterval = null;
+
+        // Intensity Slider Event
+        intensitySlider.addEventListener('input', () => {
+            intensityValue.textContent = `${intensitySlider.value}%`;
+        });
+
+        // Pattern Selection
+        patternButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons
+                patternButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Add active class to clicked button
+                button.classList.add('active');
+                
+                // Update current pattern
+                currentPattern = button.dataset.pattern;
+            });
+        });
+
+        // Start Vibration
+        startVibrate.addEventListener('click', () => {
+            if (!('vibrate' in navigator)) {
+                alert('Vibration not supported on this device.');
+                return;
+            }
+
+            const intensity = parseInt(intensitySlider.value);
+            const pattern = vibrationPatterns[currentPattern](intensity);
+
+            function runVibrationPattern() {
+                navigator.vibrate(pattern);
+                currentVibrationInterval = setTimeout(runVibrationPattern, pattern.reduce((a, b) => a + b, 0));
+            }
+
+            runVibrationPattern();
+        });
+
+        // Stop Vibration
+        stopVibrate.addEventListener('click', () => {
+            if (currentVibrationInterval) {
+                clearTimeout(currentVibrationInterval);
+            }
+            navigator.vibrate(0);
+        });
+    </script>
+</body>
+</html>

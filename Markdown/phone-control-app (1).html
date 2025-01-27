@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Phone Feature Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .control-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .control-section h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .pattern-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .pattern-button:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Advanced Device Controller</h1>
+
+    <div class="control-section" id="torchControl">
+        <h2>Torch Control</h2>
+        <button id="torchToggle">Enable Torch</button>
+        <label for="torchMode">Torch Mode</label>
+        <select id="torchMode">
+            <option value="steady">Steady</option>
+            <option value="strobe">Strobe</option>
+            <option value="sos">SOS Signal</option>
+        </select>
+        <label for="torchSpeed">Flash Speed</label>
+        <input type="range" id="torchSpeed" min="1" max="10" value="5">
+    </div>
+
+    <div class="control-section" id="vibrateControl">
+        <h2>Vibration Massage Control</h2>
+        
+        <div>
+            <label for="vibrationMin">Minimum Strength</label>
+            <input type="range" id="vibrationMin" min="0" max="100" value="20">
+            
+            <label for="vibrationMax">Maximum Strength</label>
+            <input type="range" id="vibrationMax" min="0" max="100" value="80">
+        </div>
+
+        <div class="pattern-grid">
+            <button class="pattern-button" data-pattern="gentle-wave">Gentle Wave</button>
+            <button class="pattern-button" data-pattern="pulse-rhythm">Pulse Rhythm</button>
+            <button class="pattern-button" data-pattern="deep-knead">Deep Knead</button>
+            <button class="pattern-button" data-pattern="rolling-wave">Rolling Wave</button>
+            <button class="pattern-button" data-pattern="escalating">Escalating</button>
+            <button class="pattern-button" data-pattern="random-pulse">Random Pulse</button>
+        </div>
+
+        <div>
+            <button id="startVibrate">Start Massage</button>
+            <button id="stopVibrate">Stop Massage</button>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced Vibration Control
+        const vibrationPatterns = {
+            'gentle-wave': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 20; i++) {
+                    const intensity = min + (max - min) * (Math.sin(i * 0.5) * 0.5 + 0.5);
+                    pattern.push(Math.floor(intensity), Math.floor(intensity / 2));
+                }
+                return pattern;
+            },
+            'pulse-rhythm': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 10; i++) {
+                    pattern.push(Math.floor(max), 50, Math.floor(min), 50);
+                }
+                return pattern;
+            },
+            'deep-knead': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 15; i++) {
+                    pattern.push(Math.floor(max), 100, Math.floor(min), 50);
+                }
+                return pattern;
+            },
+            'rolling-wave': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 30; i++) {
+                    const intensity = min + (max - min) * Math.abs(Math.sin(i * 0.3));
+                    pattern.push(Math.floor(intensity), 50);
+                }
+                return pattern;
+            },
+            'escalating': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 10; i++) {
+                    const intensity = min + (max - min) * (i / 10);
+                    pattern.push(Math.floor(intensity), 100);
+                }
+                return pattern;
+            },
+            'random-pulse': (min, max) => {
+                const pattern = [];
+                for (let i = 0; i < 20; i++) {
+                    const randomIntensity = Math.floor(min + Math.random() * (max - min));
+                    pattern.push(randomIntensity, 50);
+                }
+                return pattern;
+            }
+        };
+
+        const minStrength = document.getElementById('vibrationMin');
+        const maxStrength = document.getElementById('vibrationMax');
+        const startVibrate = document.getElementById('startVibrate');
+        const stopVibrate = document.getElementById('stopVibrate');
+        let currentVibrationInterval = null;
+
+        const patternButtons = document.querySelectorAll('.pattern-button');
+        let currentPattern = 'gentle-wave';
+
+        patternButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                currentPattern = button.dataset.pattern;
+                patternButtons.forEach(b => b.style.backgroundColor = '#2196F3');
+                button.style.backgroundColor = '#1565C0';
+            });
+        });
+
+        startVibrate.addEventListener('click', () => {
+            if (!('vibrate' in navigator)) {
+                alert('Vibration not supported on this device.');
+                return;
+            }
+
+            // Generate pattern based on current selection
+            const pattern = vibrationPatterns[currentPattern](
+                parseInt(minStrength.value), 
+                parseInt(maxStrength.value)
+            );
+
+            // Continuous looping
+            function runVibrationPattern() {
+                navigator.vibrate(pattern);
+                currentVibrationInterval = setTimeout(runVibrationPattern, pattern.reduce((a, b) => a + b, 0));
+            }
+
+            runVibrationPattern();
+        });
+
+        stopVibrate.addEventListener('click', () => {
+            if (currentVibrationInterval) {
+                clearTimeout(currentVibrationInterval);
+            }
+            navigator.vibrate(0);
+        });
+
+        // Torch Control with Multiple Approaches
+        const torchToggle = document.getElementById('torchToggle');
+        const torchMode = document.getElementById('torchMode');
+        const torchSpeed = document.getElementById('torchSpeed');
+
+        let torchStream = null;
+        let torchInterval = null;
+
+        async function initTorch() {
+            try {
+                // Multiple fallback methods for torch access
+                torchStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        advanced: [{torch: true}]
+                    }
+                });
+
+                const track = torchStream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                
+                if (capabilities.torch) {
+                    await track.applyConstraints({
+                        advanced: [{torch: true}]
+                    });
+                }
+                
+                return track;
+            } catch (error) {
+                console.error('Torch initialization error:', error);
+                alert('Could not initialize torch. Check device compatibility.');
+                return null;
+            }
+        }
+
+        torchToggle.addEventListener('click', async () => {
+            const track = await initTorch();
+            if (!track) return;
+
+            const mode = torchMode.value;
+            const speed = 1000 / torchSpeed.value;
+
+            switch(mode) {
+                case 'steady':
+                    track.enabled = true;
+                    break;
+                case 'strobe':
+                    track.enabled = !track.enabled;
+                    torchInterval = setInterval(() => {
+                        track.enabled = !track.enabled;
+                    }, speed);
+                    break;
+                case 'sos':
+                    // International SOS signal: 3 short, 3 long, 3 short
+                    const sosPattern = [100,50,100,50,100,300,300,50,300,50,300,300,100,50,100,50,100];
+                    let sosIndex = 0;
+                    torchInterval = setInterval(() => {
+                        track.enabled = sosIndex % 2 === 0;
+                        sosIndex = (sosIndex + 1) % sosPattern.length;
+                    }, sosPattern[sosIndex]);
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

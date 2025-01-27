@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Torch Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .control-section {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        select, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+        }
+        #debugInfo {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-section">
+        <h2>Torch Control</h2>
+        <select id="torchMode">
+            <option value="steady">Steady</option>
+            <option value="strobe">Strobe</option>
+            <option value="sos">SOS Signal</option>
+        </select>
+        <button id="torchToggle">Enable Torch</button>
+        <div id="debugInfo"></div>
+    </div>
+
+    <script>
+        const torchToggle = document.getElementById('torchToggle');
+        const torchMode = document.getElementById('torchMode');
+        const debugInfo = document.getElementById('debugInfo');
+
+        // Comprehensive camera access strategy
+        const cameraConstraintSets = [
+            // Most permissive configuration
+            {
+                video: {
+                    facingMode: 'environment',
+                    advanced: [
+                        {torch: true},
+                        {zoom: { ideal: 1, max: 2 }},
+                        {width: { min: 640, ideal: 1280 }},
+                        {height: { min: 480, ideal: 720 }}
+                    ]
+                }
+            },
+            // Secondary configuration
+            {
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280, max: 1920 },
+                    height: { ideal: 720, max: 1080 }
+                }
+            },
+            // Minimal configuration
+            {
+                video: { facingMode: 'environment' }
+            }
+        ];
+
+        let activeStream = null;
+        let torchTrack = null;
+        let torchInterval = null;
+
+        function updateDebugInfo(message) {
+            debugInfo.textContent += message + '\n';
+        }
+
+        async function attemptTorchAccess(constraints) {
+            try {
+                updateDebugInfo(`Attempting access with constraints: ${JSON.stringify(constraints)}`);
+                
+                // Stop any existing stream
+                if (activeStream) {
+                    activeStream.getTracks().forEach(track => track.stop());
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                activeStream = stream;
+
+                const track = stream.getVideoTracks()[0];
+                updateDebugInfo(`Camera track obtained: ${track.label}`);
+
+                // Check and log capabilities
+                const capabilities = track.getCapabilities();
+                updateDebugInfo(`Camera capabilities: ${JSON.stringify(capabilities)}`);
+
+                // Attempt to apply torch constraint
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ torch: true }]
+                    });
+                    updateDebugInfo('Torch constraint applied successfully');
+                } catch (constraintError) {
+                    updateDebugInfo(`Constraint application error: ${constraintError.message}`);
+                }
+
+                return track;
+            } catch (error) {
+                updateDebugInfo(`Access failed: ${error.message}`);
+                return null;
+            }
+        }
+
+        torchToggle.addEventListener('click', async () => {
+            // Reset debug info
+            debugInfo.textContent = '';
+
+            // Try multiple constraint sets
+            for (const constraints of cameraConstraintSets) {
+                torchTrack = await attemptTorchAccess(constraints);
+                if (torchTrack) break;
+            }
+
+            if (!torchTrack) {
+                updateDebugInfo('Could not access camera/torch');
+                return;
+            }
+
+            // Clear any existing intervals
+            if (torchInterval) {
+                clearInterval(torchInterval);
+                torchInterval = null;
+            }
+
+            const mode = torchMode.value;
+            switch(mode) {
+                case 'steady':
+                    torchTrack.enabled = true;
+                    updateDebugInfo('Steady torch mode activated');
+                    break;
+                case 'strobe':
+                    torchInterval = setInterval(() => {
+                        torchTrack.enabled = !torchTrack.enabled;
+                    }, 250);
+                    updateDebugInfo('Strobe torch mode activated');
+                    break;
+                case 'sos':
+                    const sosPattern = [100, 100, 100, 300, 300, 100, 100, 100];
+                    let patternIndex = 0;
+                    torchInterval = setInterval(() => {
+                        torchTrack.enabled = patternIndex % 2 === 0;
+                        patternIndex = (patternIndex + 1) % sosPattern.length;
+                    }, sosPattern[patternIndex]);
+                    updateDebugInfo('SOS torch mode activated');
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
