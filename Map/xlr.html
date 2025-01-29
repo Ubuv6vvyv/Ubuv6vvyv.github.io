@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Explorer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            padding: 16px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        button {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 767px) {
+            #map {
+                height: 300px;
+            }
+        }
+
+        .info-panel {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: 16px;
+        }
+
+        .panel-section h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        #wiki-info {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .poi-item {
+            margin-bottom: 12px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .poi-item strong {
+            color: #2c3e50;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .poi-item p {
+            color: #666;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+
+        .poi-item a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .poi-item a:hover {
+            text-decoration: underline;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading-spinner.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Location Explorer</h1>
+        
+        <div class="search-box">
+            <input type="text" id="address-input" placeholder="Enter an address" autofocus>
+            <button onclick="searchLocation()">Search</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #FF0000;"></div>
+                    <span>Search Location</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #4285F4;"></div>
+                    <span>Train Stations</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #FFEB3B;"></div>
+                    <span>Shopping</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #4CAF50;"></div>
+                    <span>Attractions</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <div class="panel-section">
+                <h2>Nearby Information</h2>
+                <div id="wiki-info">
+                    <div class="loading-spinner">Loading...</div>
+                </div>
+                <div id="nearby-places"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let service;
+        let infowindow;
+        const API_KEY = 'AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA';
+
+        // Initialize Google Maps
+        function initMap() {
+            const defaultLocation = { lat: 51.5074, lng: -0.1278 }; // London as default
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: defaultLocation,
+                zoom: 14,
+                styles: [
+                    {
+                        featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{ visibility: "off" }]
+                    }
+                ],
+                mapTypeControl: false,
+                fullscreenControl: true,
+                streetViewControl: false
+            });
+            
+            service = new google.maps.places.PlacesService(map);
+            infowindow = new google.maps.InfoWindow();
+
+            // Add enter key listener for search
+            document.getElementById('address-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchLocation();
+                }
+            });
+        }
+
+        // Search for entered location
+        function searchLocation() {
+            const address = document.getElementById('address-input').value;
+            if (!address) {
+                alert('Please enter an address');
+                return;
+            }
+
+            showLoading(true);
+            const geocoder = new google.maps.Geocoder();
+
+            geocoder.geocode({ address: address }, (results, status) => {
+                if (status === 'OK') {
+                    const location = results[0].geometry.location;
+                    map.setCenter(location);
+                    
+                    clearMarkers();
+                    
+                    new google.maps.Marker({
+                        map: map,
+                        position: location,
+                        animation: google.maps.Animation.DROP,
+                        icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    });
+
+                    searchNearbyPlaces(location);
+                    getWikipediaInfo(location.lat(), location.lng());
+                } else {
+                    showLoading(false);
+                    alert('Address not found. Please try again.');
+                }
+            });
+        }
+
+        function showLoading(show) {
+            const spinner = document.querySelector('.loading-spinner');
+            if (show) {
+                spinner.classList.add('active');
+                document.getElementById('wiki-info').innerHTML = '';
+                document.getElementById('nearby-places').innerHTML = '';
+            } else {
+                spinner.classList.remove('active');
+            }
+        }
+
+        let markers = [];
+
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+        }
+
+        function searchNearbyPlaces(location) {
+            const placesTypes = [
+                { type: 'train_station', icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' },
+                { type: 'shopping_mall', icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png' },
+                { type: 'tourist_attraction', icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' }
+            ];
+
+            document.getElementById('nearby-places').innerHTML = '<h3>Nearby Places:</h3>';
+
+            let completedRequests = 0;
+            placesTypes.forEach(placeType => {
+                const request = {
+                    location: location,
+                    radius: '1500',
+                    type: placeType.type
+                };
+
+                service.nearbySearch(request, (results, status) => {
+                    completedRequests++;
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        results.slice(0, 5).forEach(place => {
+                            createMarker(place, placeType.icon);
+                            addPlaceToList(place, placeType.type);
+                        });
+                    }
+                    if (completedRequests === placesTypes.length) {
+                        showLoading(false);
+                    }
+                });
+            });
+        }
+
+        function createMarker(place, iconUrl) {
+            const marker = new google.maps.Marker({
+                map: map,
+                position: place.geometry.location,
+                icon: iconUrl,
+                animation: google.maps.Animation.DROP
+            });
+
+            markers.push(marker);
+
+            marker.addListener('click', () => {
+                const content = `
+                    <div style="padding: 8px;">
+                        <strong style="font-size: 16px;">${place.name}</strong>
+                        <p style="margin: 8px 0;">${place.vicinity}</p>
+                        ${place.rating ? `
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span>Rating: ${place.rating}</span>
+                                <span style="color: #FFD700;">★</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                infowindow.setContent(content);
+                infowindow.open(map, marker);
+            });
+        }
+
+        function addPlaceToList(place, type) {
+            const placesList = document.getElementById('nearby-places');
+            const placeDiv = document.createElement('div');
+            placeDiv.className = 'poi-item';
+            placeDiv.innerHTML = `
+                <strong>${place.name}</strong>
+                <p>Type: ${type.replace('_', ' ').toUpperCase()}</p>
+                <p>Address: ${place.vicinity}</p>
+                ${place.rating ? `
+                    <p>Rating: ${place.rating} <span style="color: #FFD700;">★</span></p>
+                ` : ''}
+            `;
+            placesList.appendChild(placeDiv);
+        }
+
+        function getWikipediaInfo(lat, lng) {
+            const wikiEndpoint = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gsradius=1000&gscoord=${lat}|${lng}&format=json&origin=*`;
+
+            fetch(wikiEndpoint)
+                .then(response => response.json())
+                .then(data => {
+                    const articles = data.query.geosearch;
+                    if (articles.length > 0) {
+                        const wikiInfo = document.getElementById('wiki-info');
+                        wikiInfo.innerHTML = '<h3>Nearby Points of Interest:</h3>';
+                        
+                        articles.slice(0, 5).forEach(article => {
+                            getWikiExtract(article.pageid, wikiInfo);
+                        });
+                    } else {
+                        document.getElementById('wiki-info').innerHTML = 
+                            '<div class="poi-item">No Wikipedia articles found nearby.</div>';
+                        showLoading(false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching Wikipedia data:', error);
+                    document.getElementById('wiki-info').innerHTML = 
+                        '<div class="poi-item">Error loading Wikipedia information.</div>';
+                    showLoading(false);
+                });
+        }
+
+        function getWikiExtract(pageId, container) {
+            const extractEndpoint = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageId}&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;
+
+            fetch(extractEndpoint)
+                .then(response => response.json())
+                .then(data => {
+                    const page = data.query.pages[pageId];
+                    const extract = page.extract.split('.')[0] + '.';
+                    
+                    const articleDiv = document.createElement('div');
+                    articleDiv.className = 'poi-item';
+                    articleDiv.innerHTML = `
+                        <strong>${page.title}</strong>
+                        <p>${extract}</p>
+                        <a href="${page.fullurl}" target="_blank">Read more →</a>
+                    `;
+                    container.appendChild(articleDiv);
+                })
+                .catch(error => console.error('Error fetching Wikipedia extract:', error));
+        }
+    </script>
+    <script async
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places&callback=initMap">
+    </script>
+</body>
+</html>
