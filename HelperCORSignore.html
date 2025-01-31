@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Anywhere Proxy Service</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            color: #333;
+        }
+        #iframe-container {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            height: 500px;
+            width: 100%;
+            display: none;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+        input {
+            width: 300px;
+        }
+        button {
+            cursor: pointer;
+            background-color: #ff7b7b;
+            color: white;
+            border: none;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #ff4c4c;
+        }
+        .terms {
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        #output-container {
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            background-color: #f4f4f9;
+            border: 1px solid #ccc;
+            resize: none;
+        }
+        #button-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>URL Extractor with CORS Anywhere</h1>
+    <div>
+        <label for="url-input">Enter URL:</label>
+        <input id="url-input" type="text" placeholder="Enter URL">
+        <button id="go-button">Go</button>
+        <button id="clear-button">Clear</button>
+    </div>
+    <div class="terms">
+        <p>Please <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">read and accept the CORS Anywhere Terms</a> before proceeding.</p>
+    </div>
+
+    <div id="iframe-container">
+        <iframe id="iframe"></iframe>
+    </div>
+
+    <div id="output-container">
+        <textarea id="output-textarea" readonly placeholder="Extracted data will appear here..."></textarea>
+    </div>
+
+    <div id="button-container"></div> <!-- Area to dynamically add buttons -->
+
+    <script>
+        const corsAnywhereUrl = 'https://cors-anywhere.herokuapp.com/'; // CORS Anywhere Proxy URL
+
+        // Function to dynamically create buttons
+        function createButton(buttonText, bookmarkletCode) {
+            const buttonContainer = document.getElementById('button-container');
+            const button = document.createElement('button');
+            button.textContent = buttonText;
+            button.onclick = function() {
+                executeBookmarkletInIframe(bookmarkletCode);
+            };
+            buttonContainer.appendChild(button);
+        }
+
+        // Function to execute bookmarklet code inside the iframe
+        function executeBookmarkletInIframe(bookmarkletCode) {
+            const iframe = document.getElementById('iframe');
+            const iframeWindow = iframe.contentWindow; // Get the iframe's window object
+            const iframeDocument = iframeWindow.document; // Get the iframe's document
+
+            // Execute the bookmarklet inside the iframe
+            const script = iframeDocument.createElement('script');
+            script.textContent = bookmarkletCode;
+            iframeDocument.body.appendChild(script);
+        }
+
+        // Function to clear the iframe and output
+        function clearContent() {
+            const iframeContainer = document.getElementById('iframe-container');
+            const iframe = document.getElementById('iframe');
+            iframeContainer.style.display = 'none'; // Hide iframe
+            iframe.src = ''; // Clear iframe content
+            document.getElementById('output-textarea').value = ''; // Clear output text area
+        }
+
+        // Event listener for the Go button to load the URL
+        document.getElementById('go-button').addEventListener('click', function() {
+            const url = document.getElementById('url-input').value;
+            if (url) {
+                const iframeContainer = document.getElementById('iframe-container');
+                const iframe = document.getElementById('iframe');
+                iframeContainer.style.display = 'block'; // Show iframe
+
+                // Fetch the target page content using CORS Anywhere and inject it into iframe
+                fetch(corsAnywhereUrl + url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest', // Add the required header
+                        'Origin': window.location.origin,    // Specify the origin
+                    }
+                })
+                .then(response => response.text())
+                .then(content => {
+                    // Inject the content into the iframe
+                    const doc = iframe.contentWindow.document;
+                    doc.open();
+                    doc.write(content);
+                    doc.close();
+                })
+                .catch(error => {
+                    console.error('Error fetching content:', error);
+                    alert('Failed to fetch the content.');
+                });
+            }
+        });
+
+        // Initialize the clear button
+        document.getElementById('clear-button').addEventListener('click', clearContent);
+
+        // Tool list for bookmarklets (from your table)
+        const tools = [
+            { description: "Extract all URLs (hrefs, anchors) to a new tab", code: "javascript:(function(){let links=[...document.querySelectorAll('a')].map(a=>a.href).join('\\n');open().document.write('<pre>'+links+'</pre>');})();" },
+            { description: "Extract all visible text (no code/scripts) to a new tab", code: "javascript:(function(){let text=document.body.innerText;open().document.write('<pre>'+text+'</pre>');})();" },
+            { description: "Extract all images as thumbnails and list URLs", code: "javascript:(function(){let imgs=[...document.images].map(i=>'&lt;img src=\"'+i.src+'\" style=\"max-width:100px;\"&gt; '+i.src).join('<br>');open().document.write(imgs);})();" },
+            { description: "Remove all CSS styles", code: "javascript:(function(){document.querySelectorAll('link[rel=\"stylesheet\"],style').forEach(e=>e.remove());})();" },
+            { description: "Get all script links & function names", code: "javascript:(function(){let scripts=[...document.scripts].map(s=>s.src||'inline script').join('\\n');console.log(scripts);})();" },
+            { description: "Get all CSS links", code: "javascript:(function(){let styles=[...document.querySelectorAll('link[rel=\"stylesheet\"]')].map(l=>l.href).join('\\n');console.log(styles);})();" },
+            { description: "Reveal all password fields", code: "javascript:(function(){document.querySelectorAll('input[type=\"password\"]').forEach(e=>e.type='text');})();" },
+            { description: "Remove all images from page", code: "javascript:(function(){document.querySelectorAll('img').forEach(i=>i.remove());})();" },
+            { description: "Show all hidden elements", code: "javascript:(function(){document.querySelectorAll('*').forEach(e=>e.style.display='block');})();" },
+            { description: "Highlight all links on page", code: "javascript:(function(){document.querySelectorAll('a').forEach(a=>a.style.background='yellow');})();" },
+            { description: "Auto-scroll to bottom", code: "javascript:(function(){window.scrollTo(0,document.body.scrollHeight);})();" },
+            { description: "Disable all JavaScript (temporary)", code: "javascript:(function(){document.querySelectorAll('script').forEach(s=>s.remove());})();" },
+        ];
+
+        // Create buttons from tools list
+        tools.forEach(tool => {
+            createButton(tool.description, tool.code);
+        });
+    </script>
+</body>
+</html>
