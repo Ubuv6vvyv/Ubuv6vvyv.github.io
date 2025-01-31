@@ -1,167 +1,254 @@
-<html><head><style>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Italian Hotels Map</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        #map { 
+            height: 400px; 
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: sans-serif;
+            border: 2px solid #444;
+            background-color: #fff;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #222;
+            color: #fff;
+            text-transform: uppercase;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f8f8;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+            cursor: pointer;
+        }
+        .selected {
+            background-color: #e0e7ff !important;
+        }
+        .icon-button {
+            background: none;
+            border: none;
+            color: #c00;
+            cursor: pointer;
+            padding: 5px;
+            margin: 0 5px;
+        }
+        .icon-button:hover {
+            color: #900;
+        }
+        .cancellation-date {
+            background-color: #ffefef;
+            color: #c00;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+        .total-row td {
+            border-top: 2px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <table id="hotelTable">
+        <thead>
+            <tr>
+                <th>Hotel Name</th>
+                <th>Address</th>
+                <th>Price (AUD)</th>
+                <th>Check-in</th>
+                <th>Check-out</th>
+                <th>Cancellation Deadline</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
 
+    <script>
+        const hotels = [
+            {
+                name: "Sant' Ambrogio Flat",
+                address: "Via Edmondo de Amicis 61, Milan City Centre, 20123 Milan, Italy",
+                price: 718,
+                checkIn: "8 June",
+                checkOut: "11 June",
+                cancellation: "31 May 2025",
+                coordinates: [45.4581, 9.1760],
+                trainStation: {
+                    name: "Milano Centrale",
+                    distance: "5.4 km"
+                },
+                airport: {
+                    name: "Milan Malpensa Airport",
+                    distance: "52 km"
+                }
+            },
+            {
+                name: "Piccolo Principe Affittacamere",
+                address: "Piazza Don Minzoni 5 piano 1, 19016 Monterosso al Mare, Italy",
+                price: 335,
+                checkIn: "11 June",
+                checkOut: "12 June",
+                cancellation: "27 May 2025",
+                coordinates: [44.1464, 9.6492],
+                trainStation: {
+                    name: "Monterosso al Mare Train Station",
+                    distance: "0.18 km"
+                },
+                airport: {
+                    name: "Genoa Airport",
+                    distance: "97 km"
+                }
+            },
+            {
+                name: "B&B Emozioni Fiorentine",
+                address: "Piazza Della Repubblica 3, Santa Maria Novella, 50123 Florence, Italy",
+                price: 968,
+                checkIn: "12 June",
+                checkOut: "15 June",
+                cancellation: "7 June 2025",
+                coordinates: [43.7721, 11.2538],
+                trainStation: {
+                    name: "Firenze Santa Maria Novella",
+                    distance: "1.0 km"
+                },
+                airport: {
+                    name: "Florence Airport",
+                    distance: "4.7 km"
+                }
+            },
+            {
+                name: "Tenuta Santo Pietro",
+                address: "Podere Santo Pietro 29, 53026 Pienza, Italy",
+                price: 320,
+                checkIn: "15 June",
+                checkOut: "16 June",
+                cancellation: "16 May 2025",
+                coordinates: [43.0773, 11.6786],
+                trainStation: {
+                    name: "Chiusi-Chianciano Terme",
+                    distance: "38.4 km"
+                },
+                airport: {
+                    name: "Florence Airport",
+                    distance: "128 km"
+                }
+            },
+            {
+                name: "La Caravella di Positano - Relais & Beach",
+                address: "Via Rampa Teglia, 23, 84017 Positano, Italy",
+                price: 2045,
+                checkIn: "16 June",
+                checkOut: "18 June",
+                cancellation: "2 June 2025",
+                coordinates: [40.6287, 14.4842],
+                trainStation: {
+                    name: "Piano di Sorrento",
+                    distance: "14.5 km"
+                },
+                airport: {
+                    name: "Naples Airport",
+                    distance: "33.1 km"
+                }
+            }
+        ];
 
+        //  map
+        const map = L.map('map').setView([42.8333, 12.8333], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
+        //  hotel
+        const markers = {};
+        hotels.forEach(hotel => {
+            const marker = L.marker(hotel.coordinates)
+                .bindPopup(`
+                    <b>${hotel.name}</b><br>
+                    ${hotel.address}<br>
+                    Price: AUD ${hotel.price}<br>
+                    Check-in: ${hotel.checkIn}<br>
+                    Check-out: ${hotel.checkOut}<br>
+                    Cancellation: ${hotel.cancellation}<br>
+                    <small>Train: ${hotel.trainStation.distance} to ${hotel.trainStation.name}<br>
+                    Airport: ${hotel.airport.distance} to ${hotel.airport.name}</small>
+                `)
+                .addTo(map);
+            markers[hotel.name] = marker;
+        });
 
+        //  table
+        const tbody = document.querySelector('#hotelTable tbody');
+        let totalPrice = 0;
 
+        hotels.forEach(hotel => {
+            totalPrice += hotel.price;
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${hotel.name}</td>
+                <td>${hotel.address}</td>
+                <td>AUD ${hotel.price}</td>
+                <td>${hotel.checkIn}</td>
+                <td>${hotel.checkOut}</td>
+                <td class="cancellation-date">${hotel.cancellation}</td>
+                <td>
+                    <button class="icon-button" onclick="showTrain('${hotel.name}')">🚂 Train</button>
+                    <button class="icon-button" onclick="showAirport('${hotel.name}')">✈️ Airport</button>
+                    <button class="icon-button" onclick="showHotel('${hotel.name}')">🏨 Hotel</button>
+                </td>
+            `;
 
+            row.addEventListener('click', () => {
+                document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+                row.classList.add('selected');
+                markers[hotel.name].openPopup();
+                map.setView(markers[hotel.name].getLatLng(), 13);
+            });
+        });
 
-body {
-   color: black;
-}
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: sans-serif;
-    border: 2px solid #444;
-    background-color: #fff;
-  }
+        
+        const totalRow = tbody.insertRow();
+        totalRow.className = 'total-row';
+        totalRow.innerHTML = `
+            <td colspan="2">Total</td>
+            <td>AUD ${totalPrice}</td>
+            <td colspan="4"></td>
+        `;
 
-  th, td {
-    border: 1px solid #ddd;
-    padding: 12px;
-    text-align: left;
-    font-size: 14px;
-  }
+        
+        window.showTrain = (hotelName) => {
+            const hotel = hotels.find(h => h.name === hotelName);
+            const url = `https://www.google.com/maps/dir/${encodeURIComponent(hotel.address)}/${encodeURIComponent(hotel.trainStation.name)}`;
+            window.open(url, '_blank');
+        };
 
-  th {
-    background-color: #222;
-    color: #fff;
-    text-transform: uppercase;
-  }
+        window.showAirport = (hotelName) => {
+            const hotel = hotels.find(h => h.name === hotelName);
+            const url = `https://www.google.com/maps/dir/${encodeURIComponent(hotel.address)}/${encodeURIComponent(hotel.airport.name)}`;
+            window.open(url, '_blank');
+        };
 
-  tr:nth-child(even) {
-    background-color: #f8f8f8;
-  }
-
-  tr:hover {
-    background-color: #f1f1f1;
-  }
-
-  td a {
-    color: #c00;
-    text-decoration: none;
-    font-weight: bold;
-  }
-
-  td a:hover {
-    text-decoration: underline;
-  }
-
-  /* Highlight cancellation and payment dates */
-  td.cancellation {
-    color: #c00;
-    font-weight: bold;
-  }
-
-  td.payment {
-    color: #c00;
-    font-weight: bold;
-    background-color: #ffeeee;
-  }
-
-  tfoot td {
-    font-weight: bold;
-    background-color: #222;
-    color: #fff;
-  }
-</style>
-
-
-
-
-
-
-
-
-
-
-</head><body><table>
-<thead>
-<tr>
-<th>Hotel Name</th>
-<th>Address</th>
-<th>Price (AUD)</th>
-<th>Check-in Date</th>
-<th>Check-out Date</th>
-<th>Cancellation Deadline</th>
-<th>Distance to Train Station</th>
-<th>Train Station Directions</th>
-<th>Distance to Airport</th>
-<th>Airport Directions</th>
-<th>Payment Due Date</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Sant&#39; Ambrogio Flat</td>
-<td><a href="https://www.google.com/maps/search/?api=1&amp;query=Sant%27+Ambrogio+Flat+Via+Edmondo+de+Amicis+61,+Milan">Via Edmondo de Amicis 61, Milan</a></td>
-<td>718</td>
-<td>8 June</td>
-<td>11 June</td>
-<td>31 May 2025</td>
-<td>5.4 km to Milano Centrale</td>
-<td><a href="https://www.google.com/maps/dir/Sant%27+Ambrogio+Flat+Via+Edmondo+de+Amicis+61,+Milan/Milano+Centrale,+Piazza+Duca+d&#39;Aosta,+Milan,+Italy">Directions</a></td>
-<td>52 km to Milan Malpensa Airport</td>
-<td><a href="https://www.google.com/maps/dir/Sant%27+Ambrogio+Flat+Via+Edmondo+de+Amicis+61,+Milan/Milan+Malpensa+Airport,+21010+Ferno+VA,+Italy">Directions</a></td>
-<td>30 May</td>
-</tr>
-<tr>
-<td>Piccolo Principe Affittacamere</td>
-<td><a href="https://www.google.com/maps/search/?api=1&amp;query=Piccolo+Principe+Affittacamere+Piazza+Don+Minzoni+5,+Monterosso+al+Mare">Piazza Don Minzoni 5, Monterosso al Mare</a></td>
-<td>335</td>
-<td>11 June</td>
-<td>12 June</td>
-<td>27 May 2025</td>
-<td>0.18 km to Monterosso al Mare Train Station</td>
-<td><a href="https://www.google.com/maps/dir/Piccolo+Principe+Affittacamere+Piazza+Don+Minzoni+5,+Monterosso+al+Mare/Monterosso+al+Mare+Train+Station,+19016+Monterosso+al+Mare,+SP,+Italy">Directions</a></td>
-<td>97 km to Genoa Airport</td>
-<td><a href="https://www.google.com/maps/dir/Piccolo+Principe+Affittacamere+Piazza+Don+Minzoni+5,+Monterosso+al+Mare/Genoa+Cristoforo+Colombo+Airport,+16154+Genoa,+Metropolitan+City+of+Genoa,+Italy">Directions</a></td>
-<td>26 May</td>
-</tr>
-<tr>
-<td>B&amp;B Emozioni Fiorentine</td>
-<td><a href="https://www.google.com/maps/search/?api=1&amp;query=B%26B+Emozioni+Fiorentine+Piazza+Della+Repubblica+3,+Florence">Piazza Della Repubblica 3, Florence</a></td>
-<td>968</td>
-<td>12 June</td>
-<td>15 June</td>
-<td>7 June 2025</td>
-<td>1.0 km to Firenze Santa Maria Novella Train Station</td>
-<td><a href="https://www.google.com/maps/dir/B%26B+Emozioni+Fiorentine+Piazza+Della+Repubblica+3,+Florence/Firenze+Santa+Maria+Novella+Train+Station,+Florence,+Italy">Directions</a></td>
-<td>4.7 km to Florence Airport</td>
-<td><a href="https://www.google.com/maps/dir/B%26B+Emozioni+Fiorentine+Piazza+Della+Repubblica+3,+Florence/Florence+Airport,+Peretola+(FLR">Directions</a>,+50127+Florence,+Metropolitan+City+of+Florence,+Italy)</td>
-<td>5 June</td>
-</tr>
-<tr>
-<td>Tenuta Santo Pietro</td>
-<td><a href="https://www.google.com/maps/search/?api=1&amp;query=Tenuta+Santo+Pietro+Podere+Santo+Pietro+29,+Pienza">Podere Santo Pietro 29, Pienza</a></td>
-<td>320</td>
-<td>15 June</td>
-<td>16 June</td>
-<td>16 May 2025</td>
-<td>38.4 km to Chiusi-Chianciano Terme Train Station</td>
-<td><a href="https://www.google.com/maps/dir/Tenuta+Santo+Pietro+Podere+Santo+Pietro+29,+Pienza/Chiusi-Chianciano+Terme+Train+Station,+53045+Chiusi,+Province+of+Siena,+Italy">Directions</a></td>
-<td>128 km to Florence Airport</td>
-<td><a href="https://www.google.com/maps/dir/Tenuta+Santo+Pietro+Podere+Santo+Pietro+29,+Pienza/Florence+Airport,+Peretola+(FLR">Directions</a>,+50127+Florence,+Metropolitan+City+of+Florence,+Italy)</td>
-<td>14 May</td>
-</tr>
-<tr>
-<td>La Caravella di Positano</td>
-<td><a href="https://www.google.com/maps/search/?api=1&amp;query=La+Caravella+di+Positano+Via+Rampa+Teglia,+23,+Positano">Via Rampa Teglia, 23, Positano</a></td>
-<td>2,045</td>
-<td>16 June</td>
-<td>18 June</td>
-<td>2 June 2025</td>
-<td>14.5 km to Piano di Sorrento Train Station</td>
-<td><a href="https://www.google.com/maps/dir/La+Caravella+di+Positano+Via+Rampa+Teglia,+23,+Positano/Piano+di+Sorrento+Train+Station,+80063+Piano+di+Sorrento,+Metropolitan+City+of+Naples,+Italy">Directions</a></td>
-<td>33.1 km to Naples Airport</td>
-<td><a href="https://www.google.com/maps/dir/La+Caravella+di+Positano+Via+Rampa+Teglia,+23,+Positano/Naples+International+Airport+(NAP">Directions</a>,+80144+Naples,+Metropolitan+City+of+Naples,+Italy)</td>
-<td>31 May</td>
-</tr>
-<tr>
-      <td colspan="2">Total</td>
-      <td><b>4,386</b></td>
-      </tr>
-</tbody>
-</table>
-</body></html>
+        window.showHotel = (hotelName) => {
+            const hotel = hotels.find(h => h.name === hotelName);
+            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hotel.address)}`;
+            window.open(url, '_blank');
+        };
+    </script>
+</body>
+</html>
