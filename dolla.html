@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Billionaire Wealth Visualizer 2.0</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0"></script>
+  <style>
+    :root {
+      --primary: #1a1a1a;
+      --secondary: #2d2d2d;
+      --accent: #00ff9d;
+      --text: #ffffff;
+      --text-secondary: #b3b3b3;
+      --shadow: rgba(0,0,0,0.2);
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: var(--primary);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .ticker-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(26,26,26,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--accent);
+      padding: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+    }
+
+    .ticker-item {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      background: var(--secondary);
+    }
+
+    .accent { color: var(--accent); }
+
+    .container {
+      max-width: 1200px;
+      margin: 4rem auto 2rem;
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 4px 6px var(--shadow);
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .stat-box {
+      background: var(--primary);
+      padding: 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    .stat-value {
+      font-size: 1.125rem;
+      color: var(--accent);
+      margin-top: 0.25rem;
+    }
+    .dot-matrix {
+      display: grid;
+      grid-template-columns: repeat(100, 1fr);
+      gap: 1px;
+      background: var(--primary);
+      padding: 0.5rem;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .dot {
+      width: 3px;
+      height: 3px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      opacity: 0.3;
+      transition: opacity 0.3s;
+    }
+
+    .dot.active {
+      background: var(--accent);
+      opacity: 1;
+    }
+
+    .spending-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .spend-item {
+      background: var(--primary);
+      padding: 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 0.75rem;
+    }
+
+    .spend-item:hover {
+      background: var(--accent);
+      color: var(--primary);
+    }
+
+    .spend-price {
+      font-size: 0.875rem;
+      color: var(--accent);
+      margin-top: 0.25rem;
+    }
+
+    .spend-item:hover .spend-price {
+      color: var(--primary);
+    }
+
+    .money-left {
+      font-size: 1rem;
+      color: var(--accent);
+      margin: 0.5rem 0;
+      text-align: right;
+    }
+
+    .comparison-fact {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin: 0.25rem 0;
+      padding: 0.5rem;
+      background: var(--primary);
+      border-radius: 4px;
+    }
+
+    /* Add to existing styles */
+    .spending-history {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      padding: 0.25rem;
+      border-bottom: 1px solid var(--primary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .salary-comparison {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-style: italic;
+    }
+
+    .chart-container {
+      height: 200px;
+      position: relative;
+    }
+
+    input, button {
+      background: var(--primary);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    button {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: var(--accent);
+      color: var(--primary);
+    }
+
+    .billionaire-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .billionaire-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem;
+      background: var(--primary);
+      border-radius: 4px;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--primary);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 0.25rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0;
+      transition: width 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <div class="ticker-container">
+    <div class="ticker-item">Time Elapsed: <span id="timeElapsed" class="accent">0:00</span></div>
+    <div class="ticker-item">Musk: <span id="muskWealth" class="accent">$0</span></div>
+    <div class="ticker-item">Bezos: <span id="bezosWealth" class="accent">$0</span></div>
+    <div class="ticker-item">Your Earnings: <span id="yourWealth" class="accent">$0</span></div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2 class="card-title">Start Visualizing</h2>
+      <input type="number" id="salaryInput" placeholder="Enter your yearly salary" min="1">
+      <button onclick="startVisualization()">Begin</button>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Real-time Comparison</h2>
+      <div class="chart-container">
+        <canvas id="wealthChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Wealth Growth Per Second</h2>
+      <div class="billionaire-list">
+        <div class="billionaire-item">
+          <span>Elon Musk</span>
+          <span id="muskRate">$0/s</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="muskProgress"></div>
+          </div>
+        </div>
+        <div class="billionaire-item">
+          <span>Jeff Bezos</span>
+          <span id="bezosRate">$0/s</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="bezosProgress"></div>
+          </div>
+        </div>
+        <div class="billionaire-item">
+          <span>You</span>
+          <span id="yourRate">$0/s</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="yourProgress"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+ <div class="card">
+      <h2 class="card-title">Spend a Billionaire's Money</h2>
+      <div class="money-left">Remaining: $<span id="moneyLeft">1000000000</span>
+      <pre>Click on the item to buy it!</pre></div>
+      <div class="spending-grid" id="spendingGrid"></div>
+      <div class="spending-history" id="spendingHistory"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Perspective</h2>
+      <div class="comparison-grid">
+        <div class="stat-box">
+          <div>Years to earn $1B at your rate</div>
+          <div id="yearsToEarn" class="stat-value">-</div>
+        </div>
+        <div class="stat-box">
+          <div>Your earnings vs Musk (24h)</div>
+          <div id="dayComparison" class="stat-value">-</div>
+        </div>
+      </div>
+    </div>
+       <div class="card">
+      <h2 class="card-title">Visualizing a Billion</h2>
+      <div class="dot-matrix" id="dotMatrix"></div>
+      <div class="comparison-fact">Each dot represents $1,000,000</div>
+    </div>
+
+   
+    <div class="card">
+      <h2 class="card-title">Wealth Comparisons</h2>
+      <div id="comparisons"></div>
+    </div>
+  </div>
+
+  <script>
+    const MUSK_RATE = 750; // $ per second
+    const BEZOS_RATE = 650; // $ per second
+    let userSalary = 0;
+    let startTime;
+    let chart;
+    let animationId;
+    const SPENDING_ITEMS = [
+      { name: "Average House", price: 500000, icon: "🏠" },
+      { name: "Tesla Model S", price: 130000, icon: "🚗" },
+      { name: "College Education", price: 200000, icon: "🎓" },
+      { name: "Private Island", price: 50000000, icon: "🏝" },
+      { name: "Luxury Yacht", price: 300000000, icon: "🛥" },
+      { name: "Private Jet", price: 100000000, icon: "✈️" },
+      { name: "Super Bowl Ad", price: 7000000, icon: "📺" },
+      { name: "Professional Sports Team", price: 800000000, icon: "🏈" },
+      { name: "Luxury Watch (Rolex)", price: 40000, icon: "⌚" },
+      { name: "McDonald's Franchise", price: 2000000, icon: "🍔" },
+      { name: "Hollywood Mansion", price: 25000000, icon: "🏡" },
+      { name: "Lamborghini Aventador", price: 500000, icon: "🏎" },
+      { name: "One Night in a Presidential Suite", price: 30000, icon: "🏨" },
+      { name: "Diamond Ring", price: 100000, icon: "💍" },
+      { name: "Mega Shopping Spree", price: 50000, icon: "🛍" },
+      { name: "NBA Courtside Season Tickets", price: 600000, icon: "🏀" },
+      { name: "Gold-Plated Toilet", price: 75000, icon: "🚽" },
+      { name: "Private Concert with Beyoncé", price: 2000000, icon: "🎤" },
+      { name: "10-Carat Diamond", price: 1500000, icon: "💎" },
+      { name: "Ferrari LaFerrari", price: 1500000, icon: "🏎" },
+      { name: "Boeing 747", price: 400000000, icon: "🛩" },
+      { name: "Luxury Mega-Mansion", price: 75000000, icon: "🏰" },
+      { name: "Michelin Star Dinner", price: 5000, icon: "🍽" },
+      { name: "Rolls-Royce Phantom", price: 450000, icon: "🚘" },
+      { name: "Crypto Bored Ape NFT", price: 150000, icon: "🦧" },
+      { name: "SpaceX Ticket to Mars", price: 500000000, icon: "🚀" },
+      { name: "Entire Private Zoo", price: 10000000, icon: "🐘" },
+      { name: "FIFA World Cup Final VIP Experience", price: 200000, icon: "⚽" },
+      { name: "Personal Chef for a Year", price: 100000, icon: "👨‍🍳" },
+      { name: "Unlimited First-Class Flights for Life", price: 5000000, icon: "🎟" },
+      { name: "Stock in Apple (1%)", price: 3000000000, icon: "📈" },
+      { name: "100-Foot Mega-Yacht", price: 60000000, icon: "🛳" },
+      { name: "Formula 1 Team", price: 500000000, icon: "🏎️" },
+      { name: "Build a Skyscraper", price: 1000000000, icon: "🏗" },
+      { name: "An Entire Town", price: 20000000, icon: "🏘" },
+      { name: "Pet Tiger", price: 15000, icon: "🐅" },
+      { name: "Private Amusement Park", price: 35000000, icon: "🎡" },
+      { name: "Underground Doomsday Bunker", price: 3000000, icon: "🏚" },
+      { name: "Luxury Space Hotel Stay (1 Week)", price: 5000000, icon: "🛰" },
+      { name: "Naming Rights to a Stadium", price: 500000000, icon: "🏟" },
+      { name: "The Mona Lisa (Hypothetically)", price: 850000000, icon: "🖼" }
+];
+
+
+    let moneyLeft = 1000000000;
+    let purchaseHistory = [];
+
+    function initDotMatrix() {
+      const matrix = document.getElementById('dotMatrix');
+      matrix.innerHTML = '';
+      for (let i = 0; i < 1000; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        matrix.appendChild(dot);
+      }
+    }
+
+    function updateDotMatrix(spent) {
+      const dots = document.querySelectorAll('.dot');
+      const activeDots = Math.floor(spent / 1000000);
+      dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index < activeDots);
+      });
+    }
+
+    function initSpendingGrid() {
+      const grid = document.getElementById('spendingGrid');
+      grid.innerHTML = SPENDING_ITEMS.map(item => `
+        <div class="spend-item" onclick="spend(${item.price}, '${item.name}', '${item.icon}')">
+          <div>${item.icon} ${item.name}</div>
+          <div class="spend-price">$${formatNumber(item.price)}</div>
+        </div>
+      `).join('');
+    }
+
+    function spend(amount, name, icon) {
+      if (moneyLeft >= amount) {
+        moneyLeft -= amount;
+        purchaseHistory.unshift({ name, amount, icon });
+        updateSpendingDisplay();
+        updateDotMatrix(1000000000 - moneyLeft);
+        updateComparisons();
+      }
+    }
+
+    function updateSpendingDisplay() {
+      document.getElementById('moneyLeft').textContent = formatNumber(moneyLeft);
+      
+      const history = document.getElementById('spendingHistory');
+      history.innerHTML = purchaseHistory.slice(0, 5).map(purchase => `
+        <div class="history-item">
+          <span>${purchase.icon} ${purchase.name}</span>
+          <span>$${formatNumber(purchase.amount)}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateComparisons() {
+      const comparisons = document.getElementById('comparisons');
+      const yearsToEarnBillion = (1000000000 / userSalary).toFixed(1);
+      const yearsToEarnCurrent = (moneyLeft / userSalary).toFixed(1);
+      const spentAmount = 1000000000 - moneyLeft;
+      const yearsToEarnSpent = (spentAmount / userSalary).toFixed(1);
+      confetti({ particleCount: 30, spread: 30, origin: { y: 0.6 } });
+      
+      comparisons.innerHTML = `
+        <div class="comparison-fact">You would need to work ${formatNumber(yearsToEarnBillion)} years to earn $1 billion</div>
+        <div class="comparison-fact">The remaining $${formatNumber(moneyLeft)} would take you ${formatNumber(yearsToEarnCurrent)} years to earn</div>
+        <div class="comparison-fact">You've spent ${formatNumber(spentAmount)} which would take you ${formatNumber(yearsToEarnSpent)} years to earn</div>
+        <div class="comparison-fact">A billionaire earns your annual salary ($${formatNumber(userSalary)}) in ${((userSalary / MUSK_RATE) / 3600).toFixed(1)} hours</div>
+      `;
+    }
+
+
+    function startVisualization() {
+      const input = document.getElementById('salaryInput');
+      userSalary = parseFloat(input.value);
+      
+      if (!userSalary || userSalary <= 0) {
+        alert('Please enter a valid salary');
+        return;
+      }
+
+      if (animationId) cancelAnimationFrame(animationId);
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      startTime = Date.now();
+      initChart();
+      animate();
+      initDotMatrix();
+      initSpendingGrid();
+      updateComparisons();
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('wealthChart').getContext('2d');
+      
+      if (chart) chart.destroy();
+      
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Musk',
+            data: [],
+            borderColor: '#00ff9d',
+            tension: 5
+          }, {
+            label: 'Bezos',
+            data: [],
+            borderColor: '#ff9d00',
+            tension: 0.3
+          }, {
+            label: 'You',
+            data: [],
+            borderColor: '#ff00ff',
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: {
+                color: '#ffffff',
+                font: { size: 10 }
+              }
+            }
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: value => '$' + formatNumber(value),
+                color: '#b3b3b3',
+                font: { size: 10 }
+              }
+            },
+            x: {
+              ticks: {
+                color: '#b3b3b3',
+                font: { size: 10 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    let frameCounter = 0;
+function animate() {
+  frameCounter++;
+  
+  if (frameCounter % 5 === 0) { // Update every 3rd frame (~20 FPS)
+    const elapsed = (Date.now() - startTime) / 1000;
+    const muskEarned = elapsed * MUSK_RATE;
+    const bezosEarned = elapsed * BEZOS_RATE;
+    const userEarned = elapsed * (userSalary / (365 * 24 * 60 * 60));
+
+    updateTickers(elapsed, muskEarned, bezosEarned, userEarned);
+    updateChart(muskEarned, bezosEarned, userEarned);
+    updateRates(userEarned);
+    updatePerspective(userEarned);
+  }
+
+  requestAnimationFrame(animate);
+}
+
+
+    function updateTickers(elapsed, muskEarned, bezosEarned, userEarned) {
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = Math.floor(elapsed % 60);
+      document.getElementById('timeElapsed').textContent = 
+        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      document.getElementById('muskWealth').textContent = '$' + formatNumber(muskEarned);
+      document.getElementById('bezosWealth').textContent = '$' + formatNumber(bezosEarned);
+      document.getElementById('yourWealth').textContent = '$' + formatNumber(userEarned);
+    }
+
+    function updateChart(muskEarned, bezosEarned, userEarned) {
+      if (chart.data.labels.length > 80) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(dataset => dataset.data.shift());
+      }
+      
+      function handleButtonClick(callback) {
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+      callback();
+    }
+    
+    function triggerConfetti() {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
+      
+      chart.data.labels.push('');
+      chart.data.datasets[0].data.push(muskEarned);
+      chart.data.datasets[1].data.push(bezosEarned);
+      chart.data.datasets[2].data.push(userEarned);
+      chart.update('none');
+    }
+
+    function updateRates(userEarned) {
+      document.getElementById('muskRate').textContent = '$' + formatNumber(MUSK_RATE) + '/s';
+      document.getElementById('bezosRate').textContent = '$' + formatNumber(BEZOS_RATE) + '/s';
+      document.getElementById('yourRate').textContent = 
+        '$' + formatNumber(userSalary / (365 * 24 * 60 * 60)) + '/s';
+
+      const maxRate = Math.max(MUSK_RATE, BEZOS_RATE);
+      document.getElementById('muskProgress').style.width = 
+        (MUSK_RATE / maxRate * 100) + '%';
+      document.getElementById('bezosProgress').style.width = 
+        (BEZOS_RATE / maxRate * 100) + '%';
+      document.getElementById('yourProgress').style.width = 
+        ((userSalary / (365 * 24 * 60 * 60)) / maxRate * 100) + '%';
+    }
+
+    function updatePerspective(userEarned) {
+      const yearsToEarn = (1000000000 / (userSalary)).toFixed(1);
+      document.getElementById('yearsToEarn').textContent = formatNumber(yearsToEarn);
+
+      const userDaily = userSalary / 365;
+      const muskDaily = MUSK_RATE * 86400;
+      const ratio = (userDaily / muskDaily * 100).toFixed(6);
+      document.getElementById('dayComparison').textContent = ratio + '%';
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+      if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+      if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+      return num.toFixed(2);
+    }
+
+    // Initialize chart on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('salaryInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') startVisualization();
+        initDotMatrix();
+      initSpendingGrid();
+      });
+    });
+  </script>
+</body>
+</html>
