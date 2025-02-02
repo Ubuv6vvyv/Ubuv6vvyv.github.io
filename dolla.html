@@ -12,19 +12,31 @@
       --secondary: #2d2d2d;
       --accent: #00ff9d;
       --text: #ffffff;
-      --text-secondary: #b3b3b3;
+      --text-secondary: #33ff7fc0;
       --shadow: rgba(0,0,0,0.2);
     }
     
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     body {
-      background: var(--primary);
-      color: var(--text);
+  background: linear-gradient(-90deg, #000c2c, #011a0a, #011a1ad1, #1a1a2e);
+  background-size: 400% 400%;
+  animation: gradientBG 30s ease infinite;
+  color: var(--text);
       font-family: system-ui, -apple-system, sans-serif;
       font-size: 14px;
-      line-height: 1.5;
-    }
+      line-height: 1.2;
+      
+     
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+      
+    
 
     .ticker-container {
       position: fixed;
@@ -35,11 +47,11 @@
       background: rgba(26,26,26,0.95);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--accent);
-      padding: 0.5rem;
+      padding: 0.8rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.875rem;
+      font-size: 0.775rem;
     }
 
     .ticker-item {
@@ -123,19 +135,19 @@
 
     .spending-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
       gap: 0.5rem;
       margin-top: 0.5rem;
     }
 
     .spend-item {
       background: var(--primary);
-      padding: 0.5rem;
+      padding: 0.3rem;
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.2s;
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.5rem;
     }
 
     .spend-item:hover {
@@ -187,6 +199,12 @@
     .salary-comparison {
       color: var(--text-secondary);
       font-size: 0.75rem;
+      font-style: italic;
+    }
+    
+     p {
+      color: var(--text-secondary);
+      font-size: 0.6rem;
       font-style: italic;
     }
 
@@ -241,6 +259,31 @@
       width: 0;
       transition: width 0.5s;
     }
+    
+      
+        .wealth-stack {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            height: 300px;
+            border-bottom: 2px solid gold;
+        }
+
+        .stack-item {
+            width: 50px;
+            background: red;
+            transition: height 0.5s ease-in-out;
+        }
+
+        .stack-labels {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: black;
+        }
+    
+
   </style>
 </head>
 <body>
@@ -308,7 +351,8 @@
         </div>
         <div class="stat-box">
           <div>Your earnings vs Musk (24h)</div>
-          <div id="dayComparison" class="stat-value">-</div>
+          <div id="dayComparison" class="stat-value"><p>Time to Earn $1B: <span id="yearsToEarn"></span>
+</div>
         </div>
       </div>
     </div>
@@ -318,11 +362,50 @@
       <div class="comparison-fact">Each dot represents $1,000,000</div>
     </div>
 
-   
+
     <div class="card">
-      <h2 class="card-title">Wealth Comparisons</h2>
-      <div id="comparisons"></div>
+  <h2 class="card-title">Wealth Comparison Over Time</h2>
+  <input type="range" id="wealthSlider" min="0" max="100" value="0" oninput="updateSlider(this.value)">
+  <div id="sliderValue">Year 0</div>
+  <div class="comparison-grid">
+    <div class="stat-box">
+      <div>Musk's Wealth</div>
+      <div id="muskSliderWealth" class="stat-value">$0</div>
     </div>
+    <div class="stat-box">
+      <div>Bezos's Wealth</div>
+      <div id="bezosSliderWealth" class="stat-value">$0</div>
+    </div>
+    <div class="stat-box">
+      <div>Your Wealth</div>
+      <div id="yourSliderWealth" class="stat-value">$0</div>
+    </div>
+  </div>
+  
+  <p>Time to Earn $1B: <span id="yearsToEarn"></span></p>
+<p>Months to Earn $1B: <span id="monthsToEarn"></span></p>
+<p>Days to Earn $1B: <span id="daysToEarn"></span></p>
+<p>Your Daily Earnings vs. Musk: <span id="dayComparison"></span></p>
+<p>Your Hourly Earnings vs. Musk: <span id="hourComparison"></span></p>
+<p>Time to Earn Musk's Daily Earnings: <span id="daysForMuskDaily"></span></p>
+<p>Time to Earn Musk's Hourly Earnings: <span id="hoursForMuskHourly"></span></p>
+
+</div>
+    
+
+<script>
+  function updateSlider(value) {
+    const years = parseInt(value);
+    const muskWealth = years * MUSK_RATE * 365 * 24 * 60 * 60;
+    const bezosWealth = years * BEZOS_RATE * 365 * 24 * 60 * 60;
+    const yourWealth = years * (userSalary / (365 * 24 * 60 * 60)) * 365 * 24 * 60 * 60;
+
+    document.getElementById('sliderValue').textContent = `Year ${years}`;
+    document.getElementById('muskSliderWealth').textContent = `$${formatNumber(muskWealth)}`;
+    document.getElementById('bezosSliderWealth').textContent = `$${formatNumber(bezosWealth)}`;
+    document.getElementById('yourSliderWealth').textContent = `$${formatNumber(yourWealth)}`;
+  }
+</script>
   </div>
 
   <script>
@@ -593,14 +676,34 @@ function animate() {
     }
 
     function updatePerspective(userEarned) {
-      const yearsToEarn = (1000000000 / (userSalary)).toFixed(1);
-      document.getElementById('yearsToEarn').textContent = formatNumber(yearsToEarn);
+    const yearsToEarn = (1000000000 / userSalary).toFixed(1);
+    const monthsToEarn = (yearsToEarn * 12).toFixed(1);
+    const daysToEarn = (yearsToEarn * 365).toFixed(1);
+    
+    document.getElementById('yearsToEarn').textContent = formatNumber(yearsToEarn) + " years";
+    document.getElementById('monthsToEarn').textContent = formatNumber(monthsToEarn) + " months";
+    document.getElementById('daysToEarn').textContent = formatNumber(daysToEarn) + " days";
 
-      const userDaily = userSalary / 365;
-      const muskDaily = MUSK_RATE * 86400;
-      const ratio = (userDaily / muskDaily * 100).toFixed(6);
-      document.getElementById('dayComparison').textContent = ratio + '%';
-    }
+    // Daily Earnings Comparison
+    const userDaily = userSalary / 365;
+    const muskDaily = MUSK_RATE * 86400;
+    const ratioDaily = (userDaily / muskDaily * 100).toFixed(6);
+    document.getElementById('dayComparison').textContent = ratioDaily + '%';
+
+    // Hourly Earnings Comparison
+    const userHourly = userSalary / (365 * 24);
+    const muskHourly = MUSK_RATE * 3600;
+    const ratioHourly = (userHourly / muskHourly * 100).toFixed(6);
+    document.getElementById('hourComparison').textContent = ratioHourly + '%';
+
+    // Time for User to Earn Musk’s Daily Income
+    const daysToEarnMuskDaily = (muskDaily / userDaily).toFixed(1);
+    document.getElementById('daysForMuskDaily').textContent = formatNumber(daysToEarnMuskDaily) + " days";
+
+    // Time for User to Earn Musk’s Hourly Income
+    const hoursToEarnMuskHourly = (muskHourly / userHourly).toFixed(1);
+    document.getElementById('hoursForMuskHourly').textContent = formatNumber(hoursToEarnMuskHourly) + " hours";
+}
 
     function formatNumber(num) {
       if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
@@ -608,6 +711,9 @@ function animate() {
       if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
       return num.toFixed(2);
     }
+    
+
+
 
     // Initialize chart on page load
     document.addEventListener('DOMContentLoaded', () => {
@@ -618,5 +724,10 @@ function animate() {
       });
     });
   </script>
+  <script>
+
+  // Call updateWealthStack() in animate()
+</script>
+
 </body>
 </html>
