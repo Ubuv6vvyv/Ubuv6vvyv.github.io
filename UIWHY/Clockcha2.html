@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Clock Calibration Tool</title>
+  <style>
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f9fafb;
+      color: #1f2937;
+    }
+
+    .clock-container {
+      width: 200px;
+      height: 200px;
+      border: 2px solid #2563eb;
+      border-radius: 50%;
+      position: relative;
+      margin: 30px auto;
+      background: white;
+      transition: all 0.5s ease;
+    }
+
+    .hand {
+      position: absolute;
+      bottom: 50%;
+      left: 50%;
+      transform-origin: 50% 100%;
+      background: #1f2937;
+      border-radius: 1px;
+      transition: all 0.3s ease;
+    }
+
+    #hourHand {
+      width: 4px;
+      height: 50px;
+      margin-left: -2px;
+    }
+
+    #minuteHand {
+      width: 3px;
+      height: 70px;
+      margin-left: -1.5px;
+      background: #4b5563;
+    }
+
+    #secondHand {
+      width: 1px;
+      height: 80px;
+      margin-left: -0.5px;
+      background: #ef4444;
+    }
+
+    .control-group {
+      margin: 20px 0;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: opacity 0.5s ease;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    .status {
+      text-align: center;
+      margin: 10px 0;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .error { color: #dc2626; }
+    .warning { color: #d97706; }
+    .info { color: #2563eb; }
+    
+    .number {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      text-align: center;
+      line-height: 20px;
+      font-size: 12px;
+      transition: all 0.5s ease;
+    }
+
+    .hidden {
+      display: none;
+      opacity: 0;
+    }
+
+    .control-section {
+      margin-bottom: 30px;
+    }
+
+    .control-section h3 {
+      color: #2563eb;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Clock Calibration Tool</h2>
+  <p>Please adjust the clock to match your system time. Use the controls below to fix any deviation.</p>
+  
+  <div class="clock-container" id="clock">
+    <div id="hourHand" class="hand"></div>
+    <div id="minuteHand" class="hand"></div>
+    <div id="secondHand" class="hand"></div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div id="controlSections"></div>
+
+  <script>
+    const CONTROLS = {
+      basic: {
+        title: "Basic Adjustments",
+        controls: {
+          hour: { label: "Hour Adjustment", min: 0, max: 11, step: 1, default: 0 },
+          minute: { label: "Minute Adjustment", min: 0, max: 59, step: 1, default: 0 }
+        },
+        showAt: 0
+      },
+      timing: {
+        title: "Timing Calibration",
+        controls: {
+          drift: { label: "Drift Compensation", min: 0.1, max: 2.0, step: 0.1, default: 1.0 },
+          sync: { label: "Sync Rate", min: 0.5, max: 1.5, step: 0.1, default: 1.0 }
+        },
+        showAt: 5
+      },
+      precision: {
+        title: "Precision Tuning",
+        controls: {
+          stability: { label: "Temporal Stability", min: 0.1, max: 2.0, step: 0.1, default: 1.0 },
+          alignment: { label: "Phase Alignment", min: -5, max: 5, step: 0.5, default: 0 }
+        },
+        showAt: 10
+      },
+      advanced: {
+        title: "Advanced Parameters",
+        controls: {
+          tension: { label: "Hand Tension", min: 0.5, max: 1.5, step: 0.1, default: 1.0 },
+          inertia: { label: "Temporal Inertia", min: 0.1, max: 2.0, step: 0.1, default: 1.0 }
+        },
+        showAt: 15
+      },
+      expert: {
+        title: "Expert Calibration",
+        controls: {
+          quantum: { label: "Quantum Coherence", min: 0.1, max: 2.0, step: 0.1, default: 1.0 },
+          entropy: { label: "Entropy Reduction", min: 0.1, max: 2.0, step: 0.1, default: 1.0 }
+        },
+        showAt: 20
+      }
+    };
+
+    const state = {
+      adjustments: 0,
+      chaos: 1.0,
+      lastUpdate: Date.now(),
+      settings: {},
+      activeControls: new Set(['basic'])
+    };
+
+    // Initialize settings from controls
+    Object.entries(CONTROLS).forEach(([section, {controls}]) => {
+      Object.entries(controls).forEach(([key, config]) => {
+        state.settings[key] = config.default;
+      });
+    });
+
+    function createControlSection(sectionId, sectionConfig) {
+      const section = document.createElement('div');
+      section.className = 'control-section hidden';
+      section.id = `section-${sectionId}`;
+      
+      const title = document.createElement('h3');
+      title.textContent = sectionConfig.title;
+      section.appendChild(title);
+
+      Object.entries(sectionConfig.controls).forEach(([key, config]) => {
+        const group = document.createElement('div');
+        group.className = 'control-group';
+        group.innerHTML = `
+          <div class="control-label">
+            <span>${config.label}</span>
+            <span id="${key}Value">${config.default}</span>
+          </div>
+          <input type="range" 
+                 id="${key}Control"
+                 min="${config.min}"
+                 max="${config.max}"
+                 step="${config.step}"
+                 value="${config.default}">
+        `;
+        section.appendChild(group);
+
+        const control = group.querySelector(`#${key}Control`);
+        control.addEventListener('input', (e) => {
+          state.settings[key] = parseFloat(e.target.value);
+          document.getElementById(`${key}Value`).textContent = e.target.value;
+          handleAdjustment();
+        });
+      });
+
+      return section;
+    }
+
+    function initializeControls() {
+      const container = document.getElementById('controlSections');
+      Object.entries(CONTROLS).forEach(([sectionId, config]) => {
+        const section = createControlSection(sectionId, config);
+        container.appendChild(section);
+      });
+      // Show initial controls
+      document.getElementById('section-basic').classList.remove('hidden');
+    }
+
+    function addClockNumbers() {
+      const clock = document.getElementById('clock');
+      for (let i = 1; i <= 12; i++) {
+        const number = document.createElement('div');
+        number.className = 'number';
+        number.textContent = i;
+        const angle = (i * 30 - 90) * (Math.PI / 180);
+        const radius = 85;
+        number.style.left = `${100 + radius * Math.cos(angle)}px`;
+        number.style.top = `${100 + radius * Math.sin(angle)}px`;
+        clock.appendChild(number);
+      }
+    }
+
+    function updateClock() {
+      const now = Date.now();
+      const timeDiff = (now - state.lastUpdate) / 1000;
+      state.lastUpdate = now;
+
+      // Apply increasingly complex effects based on chaos level
+      const baseWobble = Math.sin(now / 1000) * (state.chaos - 1);
+      const quantumEffect = state.settings.quantum ? Math.sin(now / 500) * (state.settings.quantum - 1) : 0;
+      const entropyEffect = state.settings.entropy ? Math.cos(now / 750) * (state.settings.entropy - 1) : 0;
+      
+      // Calculate hand positions with increasing complexity
+      const hourAngle = (state.settings.hour * 30) + 
+                       baseWobble + 
+                       (state.settings.tension ? Math.sin(now / 1200) * state.settings.tension : 0);
+      
+      const minuteAngle = (state.settings.minute * 6) + 
+                         baseWobble * 2 + 
+                         (state.settings.inertia ? Math.cos(now / 800) * state.settings.inertia : 0);
+      
+      const secondAngle = (now / 1000 % 60) * 6 + 
+                         baseWobble * 3 + 
+                         quantumEffect + 
+                         entropyEffect;
+
+      // Apply transformations
+      document.getElementById('hourHand').style.transform = `rotate(${hourAngle}deg)`;
+      document.getElementById('minuteHand').style.transform = `rotate(${minuteAngle}deg)`;
+      document.getElementById('secondHand').style.transform = `rotate(${secondAngle}deg)`;
+
+      // Subtle number displacement based on chaos and settings
+      if (state.chaos > 1.1) {
+        document.querySelectorAll('.number').forEach((num, i) => {
+          const displacement = (state.chaos - 1) * 
+                             Math.sin(now / 1000 + i) * 
+                             (state.settings.stability || 1);
+          num.style.transform = `translate(${displacement}px, ${displacement}px)`;
+        });
+      }
+
+      // Apply clock face effects
+      if (state.chaos > 1.2) {
+        const clockContainer = document.getElementById('clock');
+        const distortion = Math.sin(now / 2000) * (state.chaos - 1) * 0.5;
+        clockContainer.style.transform = `scale(${1 + distortion * 0.01}) rotate(${distortion}deg)`;
+      }
+
+      requestAnimationFrame(updateClock);
+    }
+
+    function showStatus(message, type = '') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `status ${type}`;
+      status.style.opacity = 1;
+      setTimeout(() => {
+        status.style.opacity = 0;
+      }, 5000);
+    }
+
+    function handleAdjustment() {
+      state.adjustments++;
+      
+      // Very gradual chaos increase
+      state.chaos *= 1.12;
+
+      // Check for new control unlocks
+      Object.entries(CONTROLS).forEach(([sectionId, config]) => {
+        if (state.adjustments >= config.showAt && !state.activeControls.has(sectionId)) {
+          state.activeControls.add(sectionId);
+          const section = document.getElementById(`section-${sectionId}`);
+          section.classList.remove('hidden');
+          
+          // Show appropriate message
+          const messages = {
+            timing: "Notice: Clock drift detected. Additional calibration options available.",
+            precision: "Temporal stability variance observed. Precision controls enabled.",
+            advanced: "Warning: Complex temporal anomalies detected. Advanced tuning recommended.",
+            expert: "Caution: Quantum decoherence detected. Expert calibration required."
+          };
+          
+          if (messages[sectionId]) {
+            showStatus(messages[sectionId], 'info');
+          }
+        }
+      });
+
+      // Show increasingly concerning messages as chaos increases
+      if (state.chaos > 2.0) {
+        showStatus("Critical: Temporal stability compromised", "error");
+      } else if (state.chaos > 1.7) {
+        showStatus("Warning: Significant temporal distortion detected", "warning");
+      } else if (state.chaos > 1.4) {
+        showStatus("Notice: Minor temporal anomalies detected", "info");
+      }
+    }
+
+    // Initialize everything
+    initializeControls();
+    addClockNumbers();
+    updateClock();
+  </script>
+</body>
+</html>
