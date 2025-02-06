@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+    <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>
+                        CodeCast: Bookmarklet to Chrome Extension
+                    </title>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js">
+                    </script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
+                    </script>
+                    <style>
+                        :root {
+            --bg-dark: #1a1a2e;
+            --bg-darker: #16213e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #gold;
+            --accent-color: crimson;
+            --border-color: darkred;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.3;
+            margin: 5px;
+            padding: 3px;
+        }
+
+        .container {
+            max-width: 768px;
+            margin: 0 auto;
+            background-color: var(--bg-darker);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2 {
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+font-size: 0.9em;
+        }
+
+        label {
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 15px;
+            font-size: 0.7em;
+        }
+
+        input[type="text"], 
+        textarea {
+            width: 95%;
+            padding: 8px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: gold;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            border-radius: 4px;
+
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 0.6em;
+            transition: background-color 0.3s ease;
+        }
+
+        #convert {
+            background-color: var(--accent-color);
+            color: var(--text-primary);
+        }
+
+        #convert:hover {
+            background-color: #1e2749;
+        }
+
+        #clear {
+            background-color: #6b2737;
+            color: var(--text-primary);
+        }
+
+        #clear:hover {
+            background-color: #4a1d27;
+        }
+
+        #outputPreview {
+            background-color: var(--bg-dark);
+            color: #39ff14;  /* Hacker green */
+            height: 300px;
+            overflow-y: auto;
+            font-size: 0.8em;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+color: red;  
+            border: 1px solid var(--border-color);
+        }
+
+        .checkbox-group input {
+            margin-right: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>
+                            CodeCast: Bookmarklet → Chrome Extension
+                        </h1>
+                        <div class="input-group">
+                            <label for="extensionName">
+                                Extension Name
+                            </label>
+                            <input id="extensionName" type="text" value="CodeCast Bookmarklet">
+                            </div>
+                            <div class="input-group">
+                                <label for="extensionVersion">
+                                    Version
+                                </label>
+                                <input id="extensionVersion" type="text" value="1.0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="extensionPermissions">
+                                        Permissions (comma-separated)
+                                    </label>
+                                    <input id="extensionPermissions" type="text" value="activeTab,scripting">
+                                        <div class="permissions-info">
+                                            Common permissions (click to add):
+                                            <div id="permissionTags">
+                                            </div>
+                                            <br>
+                                                <small>
+                                                    • activeTab: Required to interact with current tab
+                                                    <br>
+                                                        • scripting: Required to inject/execute scripts
+                                                        <br>
+                                                            • storage: Save extension data
+                                                            <br>
+                                                                • tabs: Access browser tabs
+                                                                <br>
+                                                                    • cookies: Read/write cookies
+                                                                    <br>
+                                                                        • webRequest: Modify network requests
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="checkbox-group">
+                                                            <input id="enablePopup" type="checkbox">
+                                                                <label for="enablePopup">
+                                                                    Enable Popup Info Page
+                                                                </label>
+                                                            </div>
+
+<div class="container">
+                                                            <div class="input-group">
+                                                                <label for="bookmarkletInput">
+                                                                    Bookmarklet JavaScript
+                                                                </label>
+                                                                <textarea id="bookmarkletInput" rows="6" placeholder="Paste your JavaScript bookmarklet code here">
+                                                                </textarea>
+                                                            </div>
+                                                            <div class="button-group">
+                                                                <button id="convert">
+                                                                    Convert to Extension
+                                                                </button>
+                                                                <button id="clear">
+                                                                    Clear All
+                                                                </button>
+                                                            </div>
+                                                            <div class="input-group">
+                                                                <label>
+                                                                    Generated Files Preview
+                                                                </label>
+                                                                <textarea id="outputPreview" readonly>
+                                                                </textarea>
+                                                            </div>
+                                                        </div>
+  </div>                                                      <script>
+                                                            // Initialize permission tags
+        const commonPermissions = [
+            'activeTab',
+            'scripting',
+            'storage',
+            'tabs',
+            'cookies',
+            'webRequest'
+        ];
+
+        const permissionTags = document.getElementById('permissionTags');
+        commonPermissions.forEach(perm => {
+            const tag = document.createElement('span');
+            tag.className = 'permission-tag';
+            tag.textContent = perm;
+            tag.onclick = () => addPermission(perm);
+            permissionTags.appendChild(tag);
+        });
+
+        function addPermission(permission) {
+            const input = document.getElementById('extensionPermissions');
+            const currentPerms = input.value.split(',').map(p => p.trim());
+            if (!currentPerms.includes(permission)) {
+                currentPerms.push(permission);
+                input.value = currentPerms.join(', ');
+            }
+        }
+
+        document.getElementById('convert').addEventListener('click', () => {
+            const name = document.getElementById('extensionName').value || 'Converted Bookmarklet';
+            const version = document.getElementById('extensionVersion').value || '1.0';
+            const permissions = document.getElementById('extensionPermissions').value.split(',').map(p => p.trim());
+            const bookmarkletCode = document.getElementById('bookmarkletInput').value.trim().replace(/^javascript:/, '');
+            const enablePopup = document.getElementById('enablePopup').checked;
+
+            if (!bookmarkletCode) return alert('Please provide a valid bookmarklet.');
+
+            // [Rest of the script remains the same as in the previous version]
+            const manifest = {
+                manifest_version: 3,
+                name,
+                version,
+                description: 'Converted bookmarklet to Chrome extension',
+                permissions,
+                icons: {
+                    "16": "icons/icon16.png",
+                    "48": "icons/icon48.png",
+                    "128": "icons/icon128.png"
+                },
+                action: enablePopup ? { default_popup: "popup.html" } : { default_icon: "icons/icon128.png" }
+            };
+            if (!enablePopup) manifest.background = { service_worker: "background.js" };
+
+            const backgroundScript = !enablePopup ? `
+chrome.action.onClicked.addListener(async (tab) => {
+    if (!tab.id) return;
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+                ${bookmarkletCode}
+            }
+        });
+    } catch (error) {
+        console.error("Failed to execute script:", error);
+    }
+});
+` : '';
+
+            const popupHTML = enablePopup ? `
+                                                            <!DOCTYPE html>
+                                                                <html>
+                                                                    <head>
+                                                                        <title>
+                                                                            ${name}
+                                                                        </title>
+                                                                    </head>
+                                                                    <body>
+                                                                        <h1>
+                                                                            ${name}
+                                                                        </h1>
+                                                                        <p>
+                                                                            Click the extension icon to run your bookmarklet!
+                                                                        </p>
+                                                                    </body>
+                                                                </html>
+                                                                ` : '';
+
+            const icons = generateIcons(name);
+
+            const zip = new JSZip();
+            zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+            if (backgroundScript) zip.file("background.js", backgroundScript);
+            if (popupHTML) zip.file("popup.html", popupHTML);
+            const iconsFolder = zip.folder("icons");
+            icons.forEach(icon => iconsFolder.file(icon.name, icon.data.split(',')[1], { base64: true }));
+
+            zip.generateAsync({ type: "blob" }).then(blob => saveAs(blob, `${name.replace(/\s+/g, '_')}_extension.zip`));
+
+            document.getElementById('outputPreview').value = `
+manifest.json:\n${JSON.stringify(manifest, null, 2)}
+${backgroundScript ? `\nbackground.js:\n${backgroundScript}` : ''}
+${popupHTML ? `\npopup.html:\n${popupHTML}` : ''}
+            `;
+        });
+
+        document.getElementById('clear').addEventListener('click', () => {
+            document.getElementById('extensionName').value = 'CodeCast Bookmarklet';
+            document.getElementById('extensionVersion').value = '1.0';
+            document.getElementById('extensionPermissions').value = 'activeTab,scripting';
+            document.getElementById('bookmarkletInput').value = '';
+            document.getElementById('enablePopup').checked = false;
+            document.getElementById('outputPreview').value = '';
+        });
+
+        function generateIcons(text) {
+            const sizes = [16, 48, 128];
+            return sizes.map(size => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                // Dark theme background
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, size, size);
+
+                // Accent border
+                ctx.strokeStyle = '#4a5568';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0, 0, size, size);
+
+                // Text
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = `${size / 3}px 'Roboto', monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text[0].toUpperCase(), size / 2, size / 2);
+
+                return { name: `icon${size}.png`, data: canvas.toDataURL('image/png') };
+            });
+        }
+                                                            </script>
+                                                        </body>
+                                                    </html>
