@@ -1,351 +1,483 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=0.75">
-	<title>Diacriticism Text Generator</title>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/zeroclipboard/2.3.0/ZeroClipboard.min.js"></script>
-	<style>
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-			max-width: 768px;
-			margin: 2rem auto;
-			padding: 0 1rem;
-			background: #f5f5f5;
-		}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unicode Transformer & Diacriticism Tool</title>
+  <!-- Include jQuery for the diacriticism module -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f4; padding: 10px; font-size: 14px; line-height: 1.6; }
+    .container { max-width: 100%; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,.1); padding: 15px; margin-bottom: 20px; }
+    textarea { width: 100%; min-height: 80px; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; resize: vertical; }
+    .effect-group { margin-bottom: 10px; padding: 8px; background: #f9f9f9; border-radius: 4px; font-size: 11px; line-height: 1.4; word-break: break-word; max-height: 300px; overflow-y: auto; }
+    .effect-group h3 { margin-bottom: 4px; }
+    .history-item { margin-bottom: 5px; padding: 5px; background: #f0f0f0; border-radius: 3px; transition: background .2s; font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .history-item span { white-space: pre-wrap; }
+    .history-item:hover { background: #e0e0e0; }
+    .copy-btn { background: #6c757d; color: #fff; border: none; padding: 2px 6px; border-radius: 3px; margin-left: 5px; font-size: 10px; cursor: pointer; }
+    .copy-btn:hover { background: #5a6268; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+    .slider-container { flex: 1; display: flex; flex-direction: column; min-width: 100px; }
+    input[type=range] { width: 100%; }
+    .button-container { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+    button { background: #4a90e2; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; transition: all .2s; cursor: pointer; }
+    button:hover { background: #357abd; transform: translateY(-1px); }
+    button:active { transform: translateY(1px); }
+    button:disabled { background: #a0a0a0; cursor: not-allowed; }
+    .clear-btn { background: #e74c3c; font-size: 10px; padding: 4px 8px; }
+    .status-container { display: flex; align-items: center; margin: 10px 0; padding: 5px; background: #f8f9fa; border-radius: 4px; }
+    .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    .status-running { background-color: #4CAF50; box-shadow: 0 0 5px #4CAF50; }
+    .status-stopped { background-color: #f44336; }
+    .status-paused { background-color: #FFC107; }
+    .effect-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 
-		.container {
-			background: white;
-			padding: 2rem;
-			border-radius: 8px;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-		}
-
-		h1 {
-			color: #333;
-			margin-bottom: 1.5rem;
-			text-align: center;
-		}
-
-		.input-group {
-			margin-bottom: 1.0rem;
-		}
-
-		label {
-			display: block;
-			margin-bottom: 0.5rem;
-			color: #555;
-			font-weight: 500;
-		}
-
-		select, input[type="text"] {
-			width: 90%;
-			padding: 0.8rem;
-			border: 2px solid #118122;
-			border-radius: 4px;
-			font-size: 1.0rem;
-			margin-bottom: 1rem;
-		}
-
-		select:focus, input[type="text"]:focus {
-			outline: none;
-			border-color: #4a90e2;
-			box-shadow: 0 0 0 2px rgba(74,144,226,0.2);
-		}
-
-		#output {
-			min-height: 300px;
-			padding: 1.5rem;
-			background: #f8f9fa;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			font-size: 1.25rem;
-			margin-bottom: 1rem;
-			word-wrap: break-word;
-			cursor: pointer;
-		}
-
-		#output:hover {
-			background: #eef1f5;
-		}
-
-		.copy-hint {
-			display: block;
-			text-align: center;
-			color: #888;
-			font-size: 0.875rem;
-			margin-top: 0.5rem;
-		}
-
-		.copied {
-			position: fixed;
-			top: 20px;
-			right: 20px;
-			background: #4CAF50;
-			color: white;
-			padding: 10px 20px;
-			border-radius: 4px;
-			display: none;
-		}
-    .effect-section {
-            margin: 15px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #fafafa;
-}
-
-textarea {
-            width: 100%;
-            margin: 10px 0;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-            min-height: 60px;
-        }
-
-
-	</style>
+    /* Styles for the diacriticism section */
+    .diac-container { max-width: 100%; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,.1); padding: 15px; }
+    .diac-container h2 { margin-bottom: 10px; }
+    .diac-container label { display: block; margin-top: 10px; font-size: 14px; }
+    .diac-container input[type="text"], .diac-container select { width: 100%; padding: 8px; margin: 5px 0 10px; font-size: 14px; border: 1px solid #ddd; border-radius: 4px; }
+    .copied { display: none; background: #d4edda; padding: 5px; border-radius: 4px; margin-top: 5px; font-size: 12px; }
+    #output { white-space: pre-wrap; font-size: 16px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-top: 10px; }
+  </style>
 </head>
 <body>
-	<div class="container">
-		<h1>whatever</h1>
-
-		<div class="input-group">
-			<label for="preset-select">Select Style:</label>
-			<select id="preset-select"></select>
-		</div>
-
-		<div class="input-group">
-			<label for="input-text">Enter Text:</label>
-			<input type="text" id="input-text" placeholder="Type something...">
-		</div>
-
-		<div class="input-group">
-			<label for="output">Your Result (click to copy):</label>
-			<div id="output"></div>
-			<span class="copy-hint">Click the text above to copy to clipboard</span>
-		</div>
-	</div>
-	<div class="copied">
-		Copied to clipboard!
-	</div>
-<div class="container">
-        <h1>Busted Effect Generator WIP</h1>
-        
-        <div class="input-section effect-section">
-            <h2>Input Text</h2>
-            <textarea id="inputText" placeholder="Enter your text here..."></textarea>
-            <button onclick="generateAll()">Generate All Effects</button>
-        </div>
-
-        <div class="effect-section">
-            <h3>1. Stacking</h3>
-            <div class="description">Combines vertical stacking with Thai and Arabic diacritics</div>
-            <textarea id="stackingEffect" readonly></textarea>
-            <button onclick="copyToClipboard('stackingEffect')">Copy</button>
-        </div>
-
-        <div class="effect-section">
-            <h3>2. Directional</h3>
-            <div class="description">Mixes RTL/LTR markers with spacing characters</div>
-            <textarea id="directionalEffect" readonly></textarea>
-            <button onclick="copyToClipboard('directionalEffect')">Copy</button>
-        </div>
-
-        <div class="effect-section">
-            <h3>3. Mixed Script Overload</h3>
-            <div class="description">Combines Burmese, Arabic, and Korean characters</div>
-            <textarea id="mixedEffect" readonly></textarea>
-            <button onclick="copyToClipboard('mixedEffect')">Copy</button>
-        </div>
-
-        <div class="effect-section">
-            <h3>4. Invisible Widening</h3>
-            <div class="description">Uses zero-width spaces and widening characters</div>
-            <textarea id="invisibleEffect" readonly></textarea>
-            <button onclick="copyToClipboard('invisibleEffect')">Copy</button>
-        </div>
-
-<div class="effect-section">
-            <h3>BROKEN SORRY</h3>
-            <div class="description">Tall</div>
-            <textarea id="thaiStackk" readonly></textarea>
-            <button onclick="copyToClipboard('thaiStackk')">Copy</button>
-        </div>
-
-        <div class="effect-section">
-            <h3>5. Ultimate Chaos</h3>
-            <div class="description">Combines all effects with right-side characters</div>
-            <textarea id="ultimateEffect" readonly></textarea>
-            <button onclick="copyToClipboard('ultimateEffect')">Copy</button>
-        </div>
-    </div>
-
+	
+	
+	  <!-- Diacriticism Section -->
+  <div class="diac-container" id="diac-container">
+    <h2>Nonsense Tool</h2>
+    <label for="input-text">Input Text:</label>
+    <input type="text" id="input-text" placeholder="Type some text here..." value="">
     
-<h3>Misc</h3>
-	<textarea style="width:100%;height:500px;font-size:11px;">
-		WIDEST
+    <label for="preset-select">Select Preset:</label>
+    <select id="preset-select"></select>
+    
+    <div id="output" title="Click to copy diacriticated text"></div>
+    <div class="copied">Copied to clipboard!</div>
+  </div>
+
+  <!-- Unicode Transformer Section -->
+  <div class="container" id="transformer-container">
+    <h2>Auto Gen</h2>
+    <textarea id="inputText" placeholder="Enter text here...">Dumb</textarea>
+    <div class="controls">
+      <div class="slider-container">
+        <label>Chaos Level</label>
+        <!-- Chaos slider now ranges from 1 to 100 (step 1) for greater responsiveness -->
+        <input type="range" id="chaosSlider" min="1" max="100" step="1" value="50">
+      </div>
+      <div class="slider-container">
+        <!-- This slider now controls both the pattern length and iterations -->
+        <label>Pattern Length / Iterations</label>
+        <input type="range" id="patternSlider" min="1" max="20" step="1" value="10">
+      </div>
+    </div>
+    <div class="auto-controls">
+      <div class="slider-container">
+        <label>Timeout (ms)</label>
+        <input type="range" id="timeoutSlider" min="100" max="5000" step="100" value="1000">
+      </div>
+    </div>
+    <div class="button-container">
+      <button onclick="transformer.generateEffects()">Transform Once</button>
+      <button id="autoGenerateBtn">Start Auto</button>
+      <button id="stopAutoBtn" disabled>Stop Auto</button>
+      <button id="retryBtn">Retry</button>
+      <button id="clearAllBtn">Clear All</button>
+    </div>
+    <div class="status-container">
+      <span id="statusIndicator" class="status-indicator status-stopped"></span>
+      <span id="statusText">Stopped</span>
+    </div>
+    <div class="effect-columns" id="effectContainer"></div>
+  </div>
 
 
-		*Ancient Scripts*l
-		- 𒐫 
-		- 𒐪 
-		- 𒐩 
-		- 𒈙 
-		- 𒁎 
-		- 𒀱 
-		- 𒅃 
-		- 𒈓 
-		- 𒍙 
-		- 𒊎 
-		- 𒄡 
-		- 𒅌 
-		- 𒁏 
-		- 𒀰 
-		- 𒌄 
-		- 𒀱 
-		- 𒁎 
-		- 𒅃 
-		- 𒈓 
-		- 𒍙 
-		- 𒊎 
-		- 𒄡 
-		- 𒅌 
-		- 𒁏 
-		- 𒀰 
+  <!-- Unicode Transformer Script -->
+  <script>
+    /* ────────────────────────────────────────────── */
+    /* Unicode Sets – including both original sets and new ones for ASCII effects, borders, spaces, etc. */
+    const UNICODE_SETS = {
+      wave: ['～','〜','〰','〽','߸','᠈','꘎','꘏','﹌','﹏'],
+      dots: ['•','‧','∙','·','▪','⦁','⸰','⸱','⸲','⸳','०','૦','෦'],
+      stacked: ['॰','᭠','᭡','᭢','᭣','᭤','᭥','᭦','᭧','᭨','᭩','᭪','᭫'],
+      invisible: ['\u200B','\u200C','\u200D','\u2060','\u00AD','\u034F','\u061C','\u115F','\u1160'],
+      zalgo: {
+        up: ['\u0300','\u0301','\u0302','\u0303','\u0304','\u0305','\u0306','\u0307','\u0308','\u0309'],
+        mid: ['\u0310','\u0311','\u0312','\u0313','\u0314','\u0315','\u0316','\u0317','\u0318','\u0319'],
+        down: ['\u0320','\u0321','\u0322','\u0323','\u0324','\u0325','\u0326','\u0327','\u0328','\u0329']
+      },
+      spiral: ['◌','◍','◎','◉','◐','◑','◒','◓','◔','◕','◖','◗','◴','◵','◶','◷'],
+      boxes: ['□','▢','▣','▤','▥','▦','▧','▨','▩','▪','▫','▬','▭','▮','▯'],
+      stars: ['★','☆','✡','✢','✣','✤','✥','✦','✧','✨','✩','✪','✫','✬','✭','✮','✯','✰'],
+      arrows: ['←','↑','→','↓','↔','↕','↖','↗','↘','↙','↚','↛','↜','↝','↞','↟'],
+      brackets: ['「','」','『','』','【','】','〖','〗','［','］','｛','｝','《','》','〈','〉'],
+      lines: ['─','━','│','┃','┄','┅','┆','┇','┈','┉','┊','┋','┌','┍','┎','┏'],
+      math: ['∀','∁','∂','∃','∄','∅','∆','∇','∈','∉','∊','∋','∌','∍','∎','∏'],
+      music: ['♩','♪','♫','♬','♭','♮','♯','𝄞','𝄢','𝄪','𝄫','𝄯','𝄰','𝄱','𝄲','𝄳'],
+      cards: ['♠','♡','♢','♣','♤','♥','♦','♧','♨','♩','♪','♫','♬','♭','♮','♯'],
+      chess: ['♔','♕','♖','♗','♘','♙','♚','♛','♜','♝','♞','♟'],
+      domino: ['🀱','🀲','🀳','🀴','🀵','🀶','🀷','🀸','🀹','🀺','🀻','🀼','🀽','🀾','🀿'],
+      faces: ['☺','☹','☻','😀','😁','😂','😃','😄','😅','😆','😇','😈','😉','😊','😋'],
+      // Joining characters (e.g. Thai tone marks) for stacking effects.
+      joining: ['\u0E31','\u0E34','\u0E35','\u0E36','\u0E37','\u0E47','\u0E48','\u0E49','\u0E4A','\u0E4B','\u0E4C','\u0E4D'],
+      // Additional sets for expanded patterns:
+      ascii: ['~','`','!','@','#','$','%','^','&','*','(',')','-','_','=','+','[',']','{','}','\\','|',';',':',"'",'"',',','.','<','>','/','?'],
+      borders: ['┌','┐','└','┘','─','│','┼','┬','┴','├','┤'],
+      spaces: [' ', '  ', '   '],
+      special: ['§','¶','©','®','™','¤'],
+      gigantic: ['𠀋','𠁊','𠂤','𠃌','𠄼'],
+      uncommon: ['☂','☃','☄','★','☆','☇','☈','☉','☊','☋','☌','☍']
+    };
 
-		Other Characters
-		- Ǆ (Latin Extended-B)
-		- ؁ (Arabic)
-		- ‱ (General Punctuation)
-		- ஹ (Tamil)
-		- ௸ (Tamil)
-		- ௵ (Tamil)
-		- ꧄ (Supplemental Arrows-B)
-		- ꧅ (Supplemental Arrows-B)
-		- ⸻ (Miscellaneous Mathematical Symbols-B)
-		- ﷽ (Alchemical Symbols)
+    /* ────────────────────────────────────────────── */
+    /* Helper: r() returns a random string chosen from a set.
+       The length is scaled by the chaos factor. */
+    function r(set, n, chaos) {
+      return Array.from({length: Math.floor(n * chaos / 5)}, () =>
+        set[Math.floor(Math.random() * set.length)]
+      ).join('');
+    }
 
+    /* ────────────────────────────────────────────── */
+    /* Helper: applyJoining() adds joining (tone) marks only to valid letters. */
+    function applyJoining(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          return ch + r(UNICODE_SETS.joining, 1, chaos);
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* ────────────────────────────────────────────── */
+    /* TRANSFORMS – original transforms plus new ones for extended patterns.
+       The “smart” transform (added later) uses intelligently designed templates. */
+    const TRANSFORMS = {
+      wave: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.wave, 1, chaos)).join(''),
+      dotBorder: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.dots, 1, chaos) + ch + r(UNICODE_SETS.dots, 1, chaos)).join(''),
+      stacked: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.stacked, 1, chaos)).join(''),
+      boxed: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.boxes, 1, chaos) + ch + r(UNICODE_SETS.boxes, 1, chaos)).join(''),
+      starred: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.stars, 1, chaos) + ch).join(''),
+      arrowed: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.arrows, 1, chaos)).join(''),
+      bracketed: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.brackets, 1, chaos) + ch + r(UNICODE_SETS.brackets, 1, chaos)).join(''),
+      musical: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.music, 1, chaos)).join(''),
+      cards: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.cards, 1, chaos) + ch).join(''),
+      chess: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.chess, 1, chaos) + ch).join(''),
+      domino: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.domino, 1, chaos)).join(''),
+      faces: (text, chaos) =>
+        text.split('').map(ch => ch + r(UNICODE_SETS.faces, 1, chaos)).join(''),
+      zalgoGlitch: (text, chaos) =>
+        text.split('').map(ch => {
+          const count = Math.floor(chaos / 2);
+          return ch + r(UNICODE_SETS.zalgo.up, count, 1) + r(UNICODE_SETS.zalgo.mid, count, 1) + r(UNICODE_SETS.zalgo.down, count, 1);
+        }).join(''),
+      joined: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.joining, 1, chaos) + ch + r(UNICODE_SETS.joining, 1, chaos)).join(''),
+      asciiPattern: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.ascii, 1, chaos) + ch + r(UNICODE_SETS.ascii, 1, chaos)).join(''),
+      bordered: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.borders, 1, chaos) + ch + r(UNICODE_SETS.borders, 1, chaos)).join(''),
+      spaced: (text, chaos) =>
+        text.split('').join(r(UNICODE_SETS.spaces, 1, chaos)),
+      special: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.special, 1, chaos) + ch + r(UNICODE_SETS.special, 1, chaos)).join(''),
+      gigantic: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.gigantic, 1, chaos) + ch + r(UNICODE_SETS.gigantic, 1, chaos)).join(''),
+      uncommon: (text, chaos) =>
+        text.split('').map(ch => r(UNICODE_SETS.uncommon, 1, chaos) + ch + r(UNICODE_SETS.uncommon, 1, chaos)).join('')
+    };
 
-		LONG ONES
+    /* ────────────────────────────────────────────── */
+    /* Smart Templates – intelligently place effects on valid letters */
 
+    /* Template 1: Border & Join */
+    function templateBorderJoin(text, chaos) {
+      let result = text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let borderChar = UNICODE_SETS.borders[Math.floor(Math.random() * UNICODE_SETS.borders.length)];
+          let inner = ch;
+          if (Math.random() < chaos / 100) {
+            inner += r(UNICODE_SETS.joining, 1, chaos);
+          }
+          return borderChar + inner + borderChar;
+        }
+        return ch;
+      }).join('');
+      if (Math.random() < chaos / 100) {
+        let outerBorder = UNICODE_SETS.boxes[Math.floor(Math.random() * UNICODE_SETS.boxes.length)];
+        result = outerBorder + result + outerBorder;
+      }
+      return result;
+    }
 
+    /* Template 2: Dot Spacing */
+    function templateDotSpacing(text, chaos) {
+      let dot = UNICODE_SETS.dots[Math.floor(Math.random() * UNICODE_SETS.dots.length)];
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          if (Math.random() < chaos / 100) {
+            ch += r(UNICODE_SETS.joining, 1, chaos);
+          }
+        }
+        return ch;
+      }).join(dot);
+    }
 
+    /* Template 3: Line Overlay */
+    function templateLineOverlay(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let line = UNICODE_SETS.lines[Math.floor(Math.random() * UNICODE_SETS.lines.length)];
+          if (Math.random() < chaos / 100) {
+            ch += r(UNICODE_SETS.joining, 1, chaos);
+          }
+          return ch + line;
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* Template 4: Random Mix */
+    function templateRandomMix(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let rand = Math.random();
+          if (rand < 0.33) {
+            let borderChar = UNICODE_SETS.borders[Math.floor(Math.random() * UNICODE_SETS.borders.length)];
+            ch = borderChar + ch + borderChar;
+          } else if (rand < 0.66) {
+            let dot = UNICODE_SETS.dots[Math.floor(Math.random() * UNICODE_SETS.dots.length)];
+            ch = dot + ch + dot;
+          } else {
+            let line = UNICODE_SETS.lines[Math.floor(Math.random() * UNICODE_SETS.lines.length)];
+            ch = ch + line;
+          }
+          if (Math.random() < chaos / 100) {
+            ch += r(UNICODE_SETS.joining, 1, chaos);
+          }
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* Template 5: Surround */
+    function templateSurround(text, chaos) {
+      let width = text.length;
+      let borderChar = UNICODE_SETS.boxes[Math.floor(Math.random() * UNICODE_SETS.boxes.length)];
+      let top = borderChar.repeat(width + 4);
+      let bottom = top;
+      let middle = borderChar + ' ' + text + ' ' + borderChar;
+      return top + "\n" + middle + "\n" + bottom;
+    }
 
+    /* Template 6: Wave Cascade */
+    function templateWaveCascade(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let wave = UNICODE_SETS.wave[Math.floor(Math.random() * UNICODE_SETS.wave.length)];
+          // With 50% chance prepend or append the wave
+          if (Math.random() < 0.5) {
+            return wave + ch + (Math.random() < chaos / 100 ? r(UNICODE_SETS.joining, 1, chaos) : '');
+          } else {
+            return ch + wave + (Math.random() < chaos / 100 ? r(UNICODE_SETS.joining, 1, chaos) : '');
+          }
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* Template 7: Stacked Dots */
+    function templateStackedDots(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let dot = UNICODE_SETS.dots[Math.floor(Math.random() * UNICODE_SETS.dots.length)];
+          let stack = UNICODE_SETS.stacked[Math.floor(Math.random() * UNICODE_SETS.stacked.length)];
+          return dot + ch + stack;
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* Template 8: Bordered Zalgo */
+    function templateBorderedZalgo(text, chaos) {
+      return text.split('').map(ch => {
+        if (/\p{L}/u.test(ch)) {
+          let border = UNICODE_SETS.borders[Math.floor(Math.random() * UNICODE_SETS.borders.length)];
+          let count = Math.floor(chaos / 20) + 1;
+          let zalgoPart = r(UNICODE_SETS.zalgo.up, count, 1) +
+                          r(UNICODE_SETS.zalgo.mid, count, 1) +
+                          r(UNICODE_SETS.zalgo.down, count, 1);
+          return border + ch + zalgoPart + border;
+        }
+        return ch;
+      }).join('');
+    }
 
+    /* Smart Transform: randomly selects one of the smart templates */
+    function smartTransform(text, chaos) {
+      const templates = [
+        templateBorderJoin,
+        templateDotSpacing,
+        templateLineOverlay,
+        templateRandomMix,
+        templateSurround,
+        templateWaveCascade,
+        templateStackedDots,
+        templateBorderedZalgo
+      ];
+      const chosen = templates[Math.floor(Math.random() * templates.length)];
+      return chosen(text, chaos);
+    }
 
+    /* Add the smart transform to the list. */
+    TRANSFORMS.smart = (text, chaos) => smartTransform(text, chaos);
 
+    /* ────────────────────────────────────────────── */
+    /* UnicodeTransformer class – handles DOM, events, generation, and auto-generation. */
+    class UnicodeTransformer {
+      constructor() {
+        this.initDOM();
+        this.createEffectGroups();
+        this.bindEvents();
+        this.autoInterval = null;
+      }
+      initDOM() {
+        this.elements = {
+          input: document.getElementById('inputText'),
+          autoBtn: document.getElementById('autoGenerateBtn'),
+          stopBtn: document.getElementById('stopAutoBtn'),
+          retryBtn: document.getElementById('retryBtn'),
+          clearAllBtn: document.getElementById('clearAllBtn'),
+          statusIndicator: document.getElementById('statusIndicator'),
+          statusText: document.getElementById('statusText'),
+          effectContainer: document.getElementById('effectContainer')
+        };
+      }
+      createEffectGroups() {
+        Object.keys(TRANSFORMS).forEach(key => {
+          const group = document.createElement('div');
+          group.className = 'effect-group';
+          group.innerHTML = `<h3>${key.replace(/([A-Z])/g, ' $1').replace(/^./, t => t.toUpperCase())} <button class="clear-btn" onclick="transformer.clearSection('${key}Preview')">Clear</button></h3><div id="${key}Preview"></div>`;
+          this.elements.effectContainer.appendChild(group);
+        });
+      }
+      bindEvents() {
+        this.elements.autoBtn.addEventListener('click', () => this.startAutoGeneration());
+        this.elements.stopBtn.addEventListener('click', () => this.stopAutoGeneration());
+        this.elements.retryBtn.addEventListener('click', () => this.generateEffects());
+        this.elements.clearAllBtn.addEventListener('click', () => this.clearAllEffects());
+        document.getElementById('chaosSlider').addEventListener('input', () => this.generateEffects());
+        document.getElementById('patternSlider').addEventListener('input', () => this.generateEffects());
+        document.getElementById('timeoutSlider').addEventListener('input', () => this.generateEffects());
+      }
+      updateStatus(state) {
+        const statuses = {
+          running: { class: 'status-running', text: 'Running' },
+          stopped: { class: 'status-stopped', text: 'Stopped' },
+          paused: { class: 'status-paused', text: 'Paused' }
+        };
+        this.elements.statusIndicator.className = `status-indicator ${statuses[state].class}`;
+        this.elements.statusText.textContent = statuses[state].text;
+      }
+      getSettings() {
+        // Get chaos from chaosSlider.
+        const chaos = parseInt(document.getElementById('chaosSlider').value);
+        // Use patternSlider value for both pattern length and iterations.
+        const pattern = parseInt(document.getElementById('patternSlider').value);
+        // Timeout is read from the timeout slider.
+        const timeout = parseInt(document.getElementById('timeoutSlider').value);
+        return { chaos, pattern, iterations: pattern, timeout };
+      }
+      generateEffects() {
+        const inputText = this.elements.input.value;
+        if (!inputText) return;
+        const settings = this.getSettings();
+        Object.entries(TRANSFORMS).forEach(([key, transformFn]) => {
+          try {
+            let transformed = transformFn(inputText, settings.chaos);
+            // For all transforms except "smart" (which already applies effects intelligently),
+            // apply joining (tone) marks only to valid letters.
+            if (key !== 'smart') {
+              transformed = applyJoining(transformed, settings.chaos);
+            }
+            const previewContainer = document.getElementById(`${key}Preview`);
+            const effectItem = document.createElement('div');
+            effectItem.className = 'history-item';
+            const effectText = document.createElement('span');
+            effectText.textContent = transformed;
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(transformed).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 500);
+              }).catch(err => console.error('Copy failed:', err));
+            });
+            effectItem.appendChild(effectText);
+            effectItem.appendChild(copyBtn);
+            previewContainer.insertBefore(effectItem, previewContainer.firstChild);
+          } catch (err) {
+            console.error(`Error in transform ${key}:`, err);
+          }
+        });
+      }
+      startAutoGeneration() {
+        const settings = this.getSettings();
+        this.elements.autoBtn.disabled = true;
+        this.elements.stopBtn.disabled = false;
+        this.updateStatus('running');
+        let count = 0;
+        this.autoInterval = setInterval(() => {
+          if (count >= settings.iterations) {
+            this.stopAutoGeneration();
+          } else {
+            this.generateEffects();
+            count++;
+          }
+        }, settings.timeout);
+      }
+      stopAutoGeneration() {
+        clearInterval(this.autoInterval);
+        this.elements.autoBtn.disabled = false;
+        this.elements.stopBtn.disabled = true;
+        this.updateStatus('stopped');
+      }
+      clearSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          section.innerHTML = '';
+        }
+      }
+      clearAllEffects() {
+        Object.keys(TRANSFORMS).forEach(key => {
+          this.clearSection(`${key}Preview`);
+        });
+      }
+    }
 
+    const transformer = new UnicodeTransformer();
+    transformer.generateEffects();
+  </script>
 
-
-
-
-
-
-		ด้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็ "Ỏ̷͖͈̞̩͎̻̫̫̜͉̠̫͕̭̭̫̫̹̗̹͈̼̠̖͍͚̥͈̮̼͕̠̤̯̻̥̬̗̼̳̤̳̬̪̹͚̞̼̠͕̼̠̦͚̫͔̯̹͉͉̘͎͕̼̣̝͙̱̟̹̩̟̳̦̭͉̮̖̭̣̣̞̙̗̜̺̭̻̥͚͙̝̦̲̱͉͖͉̰̦͎̫̣̼͎͍̠̮͓̹̹͉̤̰̗̙͕͇͔̱͕̭͈̳̗̭͔̘̖̺̮̜̠͖̘͓̳͕̟̠̱̫̤͓͔̘̰̲͙͍͇̙͎̣̼̗̖͙̯͉̠̟͈͍͕̪͓̝̩̦̖̹̼̠̘̮͚̟͉̺̜͍͓̯̳̱̻͕̣̳͉̻̭̭̱͍̪̩̭̺͕̺̼̥̪͖̦̟͎̻̰"    I้็้้็้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้็้็้้๋้็้้่้็้้๊้็้้ D้็้้็้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้็้็้้๋้็้้่้็้้็O้้้้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้็้็้้๋้็้้็N้้้้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้็้็้้็T้้้้้้้็้็้้๋้็้้่้็้้็๊้้้้้้้ K้็้้็้้้้็้็้้๋้็้้่้็้้็N้้้้้้้็้็้้๋้็้้็O้้้้้้้็้็้้็W้้้้้้้
-
-
-
-
-	</textarea>
-	<textarea style="width:100%;height:500px;font-size:11px;">
-
-
-
-		Unicode Character Groups
-
-		Spacing Characters
-		- `\u2000` (En Quad)
-		- `\u2001` (Em Quad)
-		- `\u2002` (En Space)
-		- `\u2003` (Em Space)
-		- `\u2004` (Three-Per-Em Space)
-		- `\u2005` (Four-Per-Em Space)
-		- `\u2006` (Six-Per-Em Space)
-		- `\u2007` (Figure Space)
-		- `\u2008` (Punctuation Space)
-		- `\u2009` (Thin Space)
-		- `\u200A` (Hair Space)
-		- `\u200B` (Zero-Width Space) ‌
-		- `\u200C` (Zero-Width Non-Joiner) ⁠
-		- `\u200D` (Zero-Width Joiner) ⁡
-		- `\u200E` (Left-To-Right Mark) ‎
-		- `\u200F` (Right-To-Left Mark) ‏
-
-		Widening Characters
-		- `\u02BE` (Modifier Letter) ʾ
-		- `\u02BF` (Modifier Letter) ʿ
-		- `\u1DC0` (Combining Dotted Horizontal Bar) ᷀
-		- `\u1DC1` (Combining Dotted Vertical Bar) ᷁
-		- `\u1DC2` (Combining Dotted Vertical Bar) ᷂
-
-		Directional Characters
-		- `\u202A` (Left-To-Right Embedding) ‎
-		- `\u202B` (Right-To-Left Embedding) ‏
-		- `\u202C` (Pop Directional Formatting) ‬
-		- `\u202D` (Left-To-Right Override) ‎
-		- `\u202E` (Right-To-Left Override) ‏
-		- `\u202F` (Narrow No-Break Space)
-
-		Obscure Characters
-		- `\u034F` (Combining Grapheme Joiner) ͏
-		- `\u035C` (Combining Double Breve) ͜
-		- `\u0360` (Combining Double Tilde) ͠
-		- `\u1AB0` (Combining Double Diacritical Mark) ᪰
-		- `\u1AB1` (Combining Double Diacritical Mark) ᪱
-
-		Mixed Characters
-		- `\u102A` (Myanmar Letter) ည
-		- `\u0601` (Arabic Sign) ؁
-		- `\u3164` (Hangul Filler) ㅤ
-		- `\u200B\u200C\u200D` (Zero-Width Space, Zero-Width Non-Joiner, Zero-Width Joiner) ‌⁠⁡
-
-		Stacking Characters
-		- `\u030D` (Combining Vertical Line) ̍
-		- `\u030E` (Combining Vertical Line) ̎
-		- `\u0310` (Combining Caret) ̐
-		- `\u0311` (Combining Caret) ̑
-		- `\u0312` (Combining Tilde) ̒
-		- `\u0313` (Combining Tilde) ̓
-		- `\u0314` (Combining Macron) ̔
-		- `\u0315` (Combining Macron) ̕
-		- `\u1DC4` (Combining Dotted Horizontal Bar) ᷄
-		- `\u1DC5` (Combining Dotted Vertical Bar) ᷅
-		- `\u1DC6` (Combining Dotted Vertical Bar) ᷆
-		- `\u1DC7` (Combining Dotted Horizontal Bar) ᷇
-		- `\u0651` (Arabic Sign) َ
-		- `\u0652` (Arabic Sign) ُ
-		- `\u0653` (Arabic Sign) ِ
-		- `\u102B` (Myanmar Letter) ဋ
-		- `\u102C` (Myanmar Letter) ဌ
-		- `\u0E31` (Thai Character) ั
-		- `\u0E34` (Thai Character) ำ
-
-
-
-		Right-Side Characters
-		- `\u05B6` (Hebrew Point) ֶ
-		- `\u0901` (Devanagari Sign) ँ
-		- `\u0902` (Devanagari Sign) ं
-		- `\u0903` (Devanagari Sign) ः
-		- `\u0E33` (Thai Character) ั
-		- `\u0E34` (Thai Character) ำ
-		- `\u0E35` (Thai Character) ิ
-		- `\u203A` (Single Low-9 Quotation Mark) ‚
-		- `\u203B` (Single High-Reversed-9 Quotation Mark) ‛
-	</textarea>
-
-
-
-	<script>
+  <!-- Diacriticism Script -->
+  <script>
 		// Main diacriticism implementation
 		var diacriticism = (function() {
 			var presets = getPresets();
@@ -421,8 +553,7 @@ textarea {
 			};
 			return diacriticismApi;
 
-			function updateData(data,
-				value) {
+			function updateData(data, value) {
 				for (var i = 0; i < value.length; i++) {
 					if (data.length <= i || data[i].base != value.charAt(i)) {
 						if (data.length > i + 1 && data[i + 1].base == value.charAt(i)) {
@@ -487,15 +618,11 @@ textarea {
 			// New Thai stacking pattern
 			function criticizeThaiStack(data) {
 				const thaiMarks = [
-					'\u0E49',
-					// tone mark mai tho
-					'\u0E47',
-					// maitaikhu
-					'\u0E4B',
-					// mai chattawa
-					'\u0E48',
-					// mai ek
-					'\u0E4A' // mai tri
+					'\u0E49', // tone mark mai tho
+					'\u0E47', // maitaikhu
+					'\u0E4B', // mai chattawa
+					'\u0E48', // mai ek
+					'\u0E4A'  // mai tri
 				];
 
 				var incomplet = false;
@@ -521,19 +648,16 @@ textarea {
 					});
 			}
 
-			function criticizeHattedTower(data,
-				n,
-				marker) {
+			function criticizeHattedTower(data, n, marker) {
 				n = 10;
-				marker = function(base,
-					i) {
+				marker = function(base, i) {
 					return String.fromCharCode(768 + 4 + (1 - i % 2));
 				};
 
 				var incomplet = false;
 				data.forEach(function(d) {
 					if (typeof d.count == 'undefined') {
-						d.count = typeof n == 'function' ? n(): n;
+						d.count = typeof n == 'function' ? n() : n;
 					}
 					if (d.base != ' ') {
 						if (d.marks.length < d.count) {
@@ -550,16 +674,14 @@ textarea {
 				return incomplet;
 			}
 
-			function criticizeMarkN(data,
-				n,
-				marker) {
+			function criticizeMarkN(data, n, marker) {
 				var incomplet = false;
 				data.forEach(function(d) {
 					if (typeof d.count == 'undefined') {
-						d.count = typeof n == 'function' ? n(): n;
+						d.count = typeof n == 'function' ? n() : n;
 					}
 					if (d.base != ' ' && d.marks.length < d.count) {
-						var c = typeof marker == 'function' ? marker(d.base, d.marks.length): marker;
+						var c = typeof marker == 'function' ? marker(d.base, d.marks.length) : marker;
 						if (c) {
 							d.marks.push(c);
 							incomplet = true;
@@ -569,8 +691,7 @@ textarea {
 				return incomplet;
 			}
 
-			function criticizeStorm(data,
-				c) {
+			function criticizeStorm(data, c) {
 				var incomplet = false;
 				data.forEach(function(d) {
 					if (typeof d.rainCount == 'undefined') {
@@ -610,18 +731,15 @@ textarea {
 				return incomplet;
 			}
 
-			function getRandi(minVal,
-				maxVal) {
+			function getRandi(minVal, maxVal) {
 				return (function(min, max) {
 					return function() {
 						return min + Math.floor(Math.random() * (max - min));
 					};
-				})(minVal,
-					maxVal);
+				})(minVal, maxVal);
 			}
 
-			function randi(min,
-				max) {
+			function randi(min, max) {
 				return min + Math.floor(Math.random() * (max - min));
 			}
 
@@ -774,93 +892,15 @@ textarea {
 			});
 
 			// Handle input changes
-			document.getElementById('input-text').addEventListener('input',
-				function(e) {
+			document.getElementById('input-text').addEventListener('input', function(e) {
 					d.val(e.target.value);
 				});
 
 			// Handle preset changes
-			select.addEventListener('change',
-				function(e) {
+			select.addEventListener('change', function(e) {
 					d.preset(e.target.value);
 				});
 		});
 	</script>
-
-<script>
-        const spacingChars = ["\u2000","\u2001","\u2002","\u2003","\u2004","\u2005","\u2006","\u2007","\u2008","\u2009","\u200A","\u200B","\u200C","\u200D","\u200E","\u200F"];
-        const wideningChars = ["\u02BE","\u02BF","\u1DC0","\u1DC1","\u1DC2"];
-        const directionalChars = ["\u202A","\u202B","\u202C","\u202D","\u202E","\u202F"];
-        const obscureChars = ["\u034F","\u035C","\u0360","\u1AB0","\u1AB1"];
-        const mixedChars = ["\u102A","\u0601","\u3164","\u200B\u200C\u200D"];
-        const stackingChars = ["\u030D","\u030E","\u0310","\u0311","\u0312","\u0313","\u0314","\u0315","\u1DC4","\u1DC5","\u1DC6","\u1DC7","\u0651","\u0652","\u0653","\u102B","\u102C","\u0E31","\u0E34"];
-        const rightSideChars = ["\u0615","\u0656","\u0670","\u05B4","\u05B5","\u05B6","\u0901","\u0902","\u0903","\u0E33","\u0E34","\u0E35","\u203A","\u203B"];
-const thaiStackkk = '้'.repeat(10) + '็'.repeat(10);
-
-        function generateStackingEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return char;
-                return char + stackingChars.join('') + rightSideChars.slice(0, 5).join('');
-            }).join('');
-        }
-
-function generateThaiEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return char;
-                return 'ด' + thaiStackkk + char + thaiStackkk + '้'.repeat(5) + '็'.repeat(5);
-            }).join('');
-        }
-
-        function generateDirectionalEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return char;
-                return char + directionalChars.slice(0, 3).join('') + spacingChars.slice(0, 3).join('');
-            }).join('');
-        }
-
-        function generateMixedEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return char;
-                return char + mixedChars.join('') + obscureChars.join('');
-            }).join('');
-        }
-
-        function generateInvisibleEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return '\u200B\u200C\u200D';
-                return char + wideningChars.join('') + spacingChars.slice(-3).join('');
-            }).join('');
-        }
-
-        function generateUltimateEffect(text) {
-            return Array.from(text).map(char => {
-                if (char === ' ') return char;
-                return char + 
-                    stackingChars.slice(0, 5).join('') + 
-                    directionalChars.slice(0, 2).join('') + 
-                    rightSideChars.slice(0, 3).join('') + 
-                    mixedChars.slice(0, 2).join('') + 
-                    obscureChars.slice(0, 2).join('');
-            }).join('');
-        }
-
-        function generateAll() {
-            const input = document.getElementById('inputText').value;
-            
-            document.getElementById('stackingEffect').value = generateStackingEffect(input);
-            document.getElementById('directionalEffect').value = generateDirectionalEffect(input);
-            document.getElementById('mixedEffect').value = generateMixedEffect(input);
-document.getElementById('thaiStackk').value = generateMixedEffect(input);
-            document.getElementById('invisibleEffect').value = generateInvisibleEffect(input);
-            document.getElementById('ultimateEffect').value = generateUltimateEffect(input);
-        }
-
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            element.select();
-            document.execCommand('copy');
-            alert('Copied to clipboard!');
-        }
-    </script>
 </body>
 </html>
