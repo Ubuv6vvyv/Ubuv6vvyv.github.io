@@ -16,40 +16,19 @@
       font-family: Arial, sans-serif;
       min-width: 280px;
     }
-    .control-group {
-      margin: 12px 0;
-    }
-    label {
-      display: inline-block;
-      width: 140px;
-      font-size: 14px;
-    }
-    input[type="range"],
-    input[type="color"],
-    select {
-      vertical-align: middle;
-    }
-    input[type="range"] {
-      width: 120px;
-    }
+    .control-group { margin: 12px 0; }
+    label { display: inline-block; width: 140px; font-size: 14px; }
+    input[type="range"], input[type="color"], select { vertical-align: middle; }
+    input[type="range"] { width: 120px; }
     .value-display {
-      display: inline-block;
-      width: 40px;
-      text-align: right;
-      margin-left: 8px;
-      font-size: 12px;
+      display: inline-block; width: 40px; text-align: right;
+      margin-left: 8px; font-size: 12px;
     }
     /* Hide advanced controls by default */
-    .advanced-controls {
-      display: none;
-    }
-    .advanced-controls.show {
-      display: block;
-    }
+    .advanced-controls { display: none; }
+    .advanced-controls.show { display: block; }
     /* Rotate arrow when advanced controls are shown */
-    .arrow.up {
-      transform: rotate(180deg);
-    }
+    .arrow.up { transform: rotate(180deg); }
   </style>
 </head>
 <body>
@@ -94,14 +73,14 @@
       <div class="control-group">
         <label>Rotation:</label>
         <!-- Global scene rotation applied independently -->
-        <input type="range" id="rotationSpeed" min="0" max="2" step="0.1" value="0.3">
-        <span class="value-display">0.30</span>
+        <input type="range" id="rotationSpeed" min="0" max="2" step="0.1" value="0.1">
+        <span class="value-display">0.1</span>
       </div>
       <div class="control-group">
         <label>Camera Distance:</label>
-        <!-- Base camera distance; dynamic zoom-out is added based on scene extent -->
-        <input type="range" id="camDistance" min="10" max="50" step="1" value="15">
-        <span class="value-display">15</span>
+        <!-- Base camera distance; dynamic zoom-out added based on scene extent -->
+        <input type="range" id="camDistance" min="1" max="50" step="1" value="1">
+        <span class="value-display">1</span>
       </div>
       <div class="control-group">
         <label>Complexity:</label>
@@ -110,8 +89,8 @@
       </div>
       <div class="control-group">
         <label>Branching:</label>
-        <input type="range" id="branchChance" min="0.01" max="0.1" step="0.01" value="0.03">
-        <span class="value-display">0.03</span>
+        <input type="range" id="branchChance" min="0.01" max="0.1" step="0.01" value="0.01">
+        <span class="value-display">0.01</span>
       </div>
     </div>
   </div>
@@ -119,38 +98,34 @@
   <canvas id="canvas"></canvas>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // Toggle advanced options display
+    // Toggle advanced options display.
     const toggleButton = document.getElementById('toggleAdvanced');
     const advancedControls = document.querySelector('.advanced-controls');
     const arrow = document.querySelector('.arrow');
-    
     toggleButton.addEventListener('click', () => {
       advancedControls.classList.toggle('show');
       arrow.classList.toggle('up');
     });
     
-    // Three.js Setup
+    // Three.js setup.
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     
-    // Enhanced lighting system
+    // Lighting.
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    
     const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight1.position.set(1, 1, 1);
     scene.add(directionalLight1);
-    
     const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight2.position.set(-1, -1, -1);
     scene.add(directionalLight2);
-    
     const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
     scene.add(hemisphereLight);
     
-    // Material with enhanced visibility
+    // Material.
     let pipeMaterial = new THREE.MeshStandardMaterial({
       color: 0x4488ff,
       metalness: 0.7,
@@ -159,10 +134,14 @@
       emissiveIntensity: 0.2
     });
     
-    // Global pipes array
+    // Global array for pipe segments.
     let pipes = [];
     
-    // PipeSegment class with unified starting-branch logic
+    // Constants to limit complexity.
+    const MAX_PIPE_COUNT = 1000;       // Maximum count of fully grown pipes.
+    const PIPE_LIFECYCLE = 300000;      // 5 minutes.
+    
+    // PipeSegment class.
     class PipeSegment {
       constructor(startPoint, direction, length = 2, generation = 0) {
         this.startPoint = startPoint;
@@ -170,24 +149,28 @@
         this.length = length;
         this.children = [];
         this.mesh = null;
-        this.growth = 0;
+        this.growth = 0;  // 0 means not grown, 1 means fully grown.
         this.generation = generation;
+        // Flags to ensure each pipe spawns its branches only once.
+        this.mainSpawned = false;
+        this.extraSpawned = false;
+        this.birthTime = Date.now();
+        this.colorOffset = Math.random() * 10;
         this.createMesh();
-        this.colorOffset = Math.random() * 10; // For rainbow effect
+        // Initialize the pipe's Y-scale to match growth (starts at 0)
+        this.mesh.scale.y = this.growth;
       }
     
       createMesh() {
-        const segments = 12; // Smoother pipes
+        const segments = 12;
         const geometry = new THREE.CylinderGeometry(0.15, 0.15, this.length, segments);
-        // Translate geometry so that its base is at (0,0,0) rather than centered.
+        // Translate so the base is at (0,0,0)
         geometry.translate(0, this.length / 2, 0);
     
         this.material = pipeMaterial.clone();
         this.mesh = new THREE.Mesh(geometry, this.material);
-        // Position the mesh so that its base is exactly at startPoint.
         this.mesh.position.copy(this.startPoint);
     
-        // Align the cylinder (which extends along positive Y) with the given direction.
         const axis = new THREE.Vector3(0, 1, 0);
         const quaternion = new THREE.Quaternion();
         quaternion.setFromUnitVectors(axis, this.direction.clone().normalize());
@@ -196,41 +179,37 @@
         scene.add(this.mesh);
       }
     
-      // Grow the pipe from its base. When fully grown, spawn branch(es).
+      // Grow the pipe; returns false if not yet fully grown.
       grow(delta) {
         if (this.growth < 1) {
           this.growth += delta;
           if (this.growth > 1) this.growth = 1;
-          // Scale along Y so that only the top extends outward.
           this.mesh.scale.y = this.growth;
           return false;
         }
-        // Once fully grown, if no branch exists, always spawn one (ensuring continuity).
-        if (this.children.length === 0) {
+        // Once fully grown, spawn the main branch once.
+        if (!this.mainSpawned) {
           this.addBranch();
+          this.mainSpawned = true;
         }
-        // Additionally, if the number of children is less than the Complexity slider value,
-        // spawn extra branches based on the Branching slider probability.
-        let maxBranches = parseInt(controls.complexity.value);
+        // Optionally spawn an extra branch (only once) if the overall fully grown count is low.
         let branchProb = parseFloat(controls.branchChance.value);
-        if (this.children.length < maxBranches && Math.random() < branchProb) {
+        if (!this.extraSpawned && fullPipeCount() < MAX_PIPE_COUNT / 2 && Math.random() < branchProb) {
           this.addBranch();
+          this.extraSpawned = true;
         }
         return true;
       }
     
-      // Spawns a new branch starting exactly at the tip of this pipe.
+      // Spawn a new branch starting at the tip.
       addBranch() {
-        // Calculate the tip position: startPoint + (direction * length)
         const endPoint = new THREE.Vector3()
           .copy(this.startPoint)
           .addScaledVector(this.direction, this.length);
     
-        // Decide new direction.
-        const turnProbability = 0.8; // 80% chance to turn sharply.
+        const turnProbability = 0.3;
         let newDirection;
         if (Math.random() < turnProbability) {
-          // Choose one of the 6 cardinal directions that is nearly perpendicular.
           const allowed = [
             new THREE.Vector3(1, 0, 0),
             new THREE.Vector3(-1, 0, 0),
@@ -240,19 +219,18 @@
             new THREE.Vector3(0, 0, -1)
           ];
           const perpendicular = allowed.filter(v => Math.abs(this.direction.dot(v)) < 0.1);
-          if (perpendicular.length > 0) {
-            newDirection = perpendicular[Math.floor(Math.random() * perpendicular.length)];
-          } else {
-            newDirection = this.direction.clone();
-          }
+          newDirection = (perpendicular.length > 0)
+                         ? perpendicular[Math.floor(Math.random() * perpendicular.length)]
+                         : this.direction.clone();
         } else {
-          // Otherwise, continue in the same direction.
           newDirection = this.direction.clone();
         }
     
-        const newLength = 2 + Math.random() * 3; // Random length between 2 and 5.
+        const newLength = 2 + Math.random() * 5;
         const newPipe = new PipeSegment(endPoint, newDirection, newLength, this.generation + 1);
         this.children.push(newPipe);
+        // Add the new pipe to the global array immediately.
+        pipes.push(newPipe);
         return newPipe;
       }
     
@@ -266,16 +244,16 @@
       }
     }
     
-    // Reset thresholds
-    const PIPE_LIFECYCLE = 30000; // Base lifecycle: 30 seconds.
-    const MAX_PIPES = 75;         // Base maximum number of pipes.
-    let startTime = Date.now();
-    let shouldReset = false;
+    // Helper: Count only fully grown pipes that have been alive for at least 500 ms.
+    function fullPipeCount() {
+      const now = Date.now();
+      return pipes.filter(pipe => pipe.growth >= 1 && (now - pipe.birthTime > 500)).length;
+    }
     
-    // Pattern creation functions – each creates one or more initial pipe(s).
+    // Pattern creation functions.
     function createClassic() {
       const startPoint = new THREE.Vector3(0, -5, 0);
-      const direction = new THREE.Vector3(0, 1, 0); // upward.
+      const direction = new THREE.Vector3(0, 1, 0);
       const initialLength = 2 + Math.random() * 3;
       let root = new PipeSegment(startPoint, direction, initialLength);
       pipes.push(root);
@@ -292,15 +270,15 @@
         const startPoint = new THREE.Vector3(startX, startY, startZ);
         const tangentX = -radius * Math.sin(angle);
         const tangentZ = radius * Math.cos(angle);
-        const tangentY = 0.5; // slight upward component.
+        const tangentY = 0.5;
         const direction = new THREE.Vector3(tangentX, tangentY, tangentZ).normalize();
         pipes.push(new PipeSegment(startPoint, direction));
       }
     }
     
     function createGrid() {
-      const gridSize = 3;
-      const spacing = 3;
+      const gridSize = 2;
+      const spacing = 2;
       for (let i = -Math.floor(gridSize/2); i <= Math.floor(gridSize/2); i++) {
         for (let j = -Math.floor(gridSize/2); j <= Math.floor(gridSize/2); j++) {
           const startPoint = new THREE.Vector3(i * spacing, -5, j * spacing);
@@ -335,31 +313,21 @@
     }
     
     function createInitialPipes() {
-      pipes.length = 0; // Clear pipes array.
+      pipes = [];
       const patValue = parseInt(document.getElementById('pat').value);
       switch(patValue) {
-        case 0:
-          createClassic();
-          break;
-        case 1:
-          createSpiral();
-          break;
-        case 2:
-          createGrid();
-          break;
-        case 3:
-          createRandom();
-          break;
-        case 4:
-          createFountain();
-          break;
-        default:
-          createClassic();
-          break;
+        case 0: createClassic(); break;
+        case 1: createSpiral(); break;
+        case 2: createGrid(); break;
+        case 3: createRandom(); break;
+        case 4: createFountain(); break;
+        default: createClassic(); break;
       }
+      // Restart the timer.
+      startTime = Date.now();
     }
     
-    // Controls setup.
+    // Controls.
     const controls = {
       growthRate: document.getElementById('growthRate'),
       rotationSpeed: document.getElementById('rotationSpeed'),
@@ -372,12 +340,11 @@
       branchChance: document.getElementById('branchChance')
     };
     
-    // Update value displays for range inputs.
+    // Update value displays.
     Object.entries(controls).forEach(([key, element]) => {
       if (element.type === 'range') {
         const display = element.nextElementSibling;
         element.addEventListener('input', () => {
-          // For camDistance and complexity, show no decimals.
           if (key === 'camDistance' || key === 'complexity') {
             display.textContent = parseFloat(element.value).toFixed(0);
           } else {
@@ -387,26 +354,26 @@
       }
     });
     
-    // When the pattern selector changes, clear the current pipes and start anew.
+    // Reset when pattern changes.
     controls.pattern.addEventListener('change', () => {
       resetScene();
     });
     
-    let lastTime = 0;
     function resetScene() {
+      // Remove and dispose of all current pipes.
       pipes.forEach(pipe => {
         scene.remove(pipe.mesh);
         pipe.mesh.geometry.dispose();
         pipe.material.dispose();
       });
-      pipes.length = 0;
+      pipes = [];
       createInitialPipes();
-      startTime = Date.now();
-      shouldReset = false;
     }
     
-    // Global rotation variable for independent scene rotation.
+    // Global scene rotation.
     let globalRotation = 0;
+    let lastTime = performance.now();
+    let startTime = Date.now();
     
     function animate(currentTime) {
       requestAnimationFrame(animate);
@@ -417,20 +384,20 @@
       const rainbowMode = controls.rainbowMode.checked;
       const colorShiftSpeed = parseFloat(controls.colorShiftSpeed.value);
     
-      // Extend thresholds based on the Complexity slider so that more intricate patterns get more time.
+      // Use a long lifecycle (scaled by complexity) before resetting.
       const complexityVal = parseInt(controls.complexity.value);
-      let effectiveMaxPipes = MAX_PIPES * complexityVal;
       let effectiveLifecycle = PIPE_LIFECYCLE * complexityVal;
-    
-      // Reset the scene if too many pipes exist or if the scene has been running too long.
-      if (pipes.length >= effectiveMaxPipes || Date.now() - startTime > effectiveLifecycle) {
-        if (!shouldReset) {
-          shouldReset = true;
-          setTimeout(resetScene, 1000);
-        }
+      if (Date.now() - startTime > effectiveLifecycle) {
+        resetScene();
       }
     
-      // Update brightness.
+      // Only count fully grown (and older than 500ms) pipes.
+      let matureCount = fullPipeCount();
+      if (matureCount > MAX_PIPE_COUNT) {
+        resetScene();
+      }
+    
+      // Update lighting.
       const brightness = parseFloat(document.getElementById('brightness').value);
       directionalLight1.intensity = brightness;
       directionalLight2.intensity = brightness * 0.8;
@@ -442,34 +409,24 @@
       pipes.forEach(pipe => {
         pipe.grow(delta * growthRate);
         pipe.updateColor(baseColor, rainbowMode, currentTime * colorShiftSpeed);
-        // Add any newly spawned children to the global pipes array.
-        pipe.children.forEach(child => {
-          if (pipes.indexOf(child) === -1 && pipes.length < effectiveMaxPipes) {
-            pipes.push(child);
-          }
-        });
       });
     
-      // Independently update global rotation based on the Rotation slider.
+      // Update global scene rotation.
       const rotationSpeed = parseFloat(controls.rotationSpeed.value);
       globalRotation += rotationSpeed * delta;
       scene.rotation.y = globalRotation;
       scene.rotation.x = Math.sin(currentTime * 0.0005) * 0.2;
     
-      // Dynamic camera scaling:
-      // Start with the base camera distance from the slider...
+      // Dynamic camera scaling.
       let baseCamDist = parseFloat(controls.camDistance.value);
-      // ...and compute the maximum distance of any pipe node from the scene center.
       let maxDistance = 0;
       pipes.forEach(pipe => {
         let d = pipe.mesh.position.length();
         if (d > maxDistance) maxDistance = d;
       });
-      // Calculate the desired camera distance as the base plus an offset proportional to the pattern’s extent.
-      let desiredCamDist = baseCamDist + maxDistance * 1.5;
-      // Smoothly interpolate the camera’s z‑position toward the desired distance.
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, desiredCamDist, 0.01);
-      // Ensure the camera is centered.
+      let desiredCamDist = baseCamDist + maxDistance * 1.1;
+      // Use a slow lerp to reduce jitter.
+      camera.position.z = THREE.MathUtils.lerp(camera.position.z, desiredCamDist, 0.015);
       camera.position.x = 0;
       camera.position.y = 0;
       camera.lookAt(scene.position);
@@ -479,9 +436,9 @@
     
     // Set an initial camera position.
     if (window.innerHeight > window.innerWidth) {
-      camera.position.z = 20;
+      camera.position.z = 1;
     } else {
-      camera.position.z = 15;
+      camera.position.z = 1;
     }
     
     window.addEventListener('orientationchange', () => {
@@ -493,10 +450,10 @@
       }, 100);
     });
     
-    // Initialize the scene.
-    camera.position.z = 15;
+    // Initialize.
+    camera.position.z = 1;
     createInitialPipes();
-    animate(0);
+    animate(performance.now());
   </script>
 </body>
 </html>
