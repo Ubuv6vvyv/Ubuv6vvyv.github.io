@@ -28,14 +28,183 @@
       pointer-events: none;
       z-index: 10;
     }
+    #config-panel {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      font-family: sans-serif;
+      font-size: 12px;
+      z-index: 100;
+      transition: transform 0.3s ease;
+      border-radius: 8px 0 0 8px;
+      padding: 12px;
+      right: 0;
+      width: 220px;
+      max-width: 80vw;
+    }
+
+    /* Desktop positioning */
+    @media (min-width: 601px) {
+      #config-panel {
+        top: 20px;
+        max-height: calc(100vh - 40px);
+      }
+      #config-panel.minimized {
+        transform: translateX(calc(100% - 30px));
+      }
+    }
+
+    /* Mobile positioning */
+    @media (max-width: 600px) {
+      #config-panel {
+        bottom: 20px;
+        max-height: 60vh;
+        transform-origin: bottom right;
+      }
+      #config-panel.minimized {
+        transform: translateX(100%);
+      }
+      .minimize-btn {
+        position: absolute;
+        left: -30px;
+        top: 0;
+        width: 30px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.85);
+        border-radius: 8px 0 0 8px;
+      }
+    }
+
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+    .minimize-btn {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 5px;
+      font-size: 18px;
+    }
+    .control-group {
+      margin-bottom: 12px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .control-group input[type="range"] {
+      width: 100%;
+      margin: 2px 0;
+    }
+    .value-display {
+      float: right;
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    /* Scrollable content area */
+    .controls-container {
+      overflow-y: auto;
+      max-height: calc(100% - 30px);
+      padding-right: 5px;
+    }
+    
+    /* Custom scrollbar */
+    .controls-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    .controls-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .controls-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body>
   <div id="overlay">Tap to grow a new tree</div>
   <canvas id="canvas"></canvas>
+  
+  <div id="config-panel">
+    <button class="minimize-btn">≡</button>
+    <div class="controls-container">
+      <div class="config-header">
+        <span>Tree Controls</span>
+      </div>
+      <div class="control-group">
+        <label>Max Levels <span class="value-display" id="levels-value">8</span></label>
+        <input type="range" id="max-levels" min="3" max="12" value="8" step="1">
+      </div>
+      <div class="control-group">
+        <label>Branch Thickness <span class="value-display" id="thickness-value">1.0</span></label>
+        <input type="range" id="trunk-thickness" min="0.5" max="2" value="1.0" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>Growth Speed <span class="value-display" id="speed-value">0.15</span></label>
+        <input type="range" id="growth-speed" min="0.05" max="0.3" value="0.15" step="0.01">
+      </div>
+      <div class="control-group">
+        <label>Branch Angle <span class="value-display" id="angle-value">30°</span></label>
+        <input type="range" id="branch-angle" min="10" max="60" value="30" step="5">
+      </div>
+      <div class="control-group">
+        <label>Branch Length <span class="value-display" id="length-value">0.7</span></label>
+        <input type="range" id="length-ratio" min="0.4" max="0.9" value="0.7" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Branches Per Split <span class="value-display" id="split-value">3</span></label>
+        <input type="range" id="branches-per-split" min="2" max="5" value="3" step="1">
+      </div>
+    </div>
+  </div>
+
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+
+    // Config panel functionality
+    const configPanel = document.getElementById('config-panel');
+    const minimizeBtn = document.querySelector('.minimize-btn');
+    
+    minimizeBtn.addEventListener('click', () => {
+      configPanel.classList.toggle('minimized');
+    });
+
+    // Tree configuration
+    let config = {
+      maxLevel: 8,
+      trunkThickness: 1.0,
+      growthSpeed: 0.15,
+      branchAngle: 30,
+      lengthRatio: 0.7,
+      branchesPerSplit: 3
+    };
+
+    // Update value displays and config when sliders change
+    function setupSlider(id, property, valueId, formatter = (x) => x) {
+      const slider = document.getElementById(id);
+      const valueDisplay = document.getElementById(valueId);
+      
+      slider.addEventListener('input', () => {
+        const value = parseFloat(slider.value);
+        config[property] = value;
+        valueDisplay.textContent = formatter(value);
+      });
+    }
+
+    setupSlider('max-levels', 'maxLevel', 'levels-value', (x) => Math.round(x));
+    setupSlider('trunk-thickness', 'trunkThickness', 'thickness-value', (x) => x.toFixed(1));
+    setupSlider('growth-speed', 'growthSpeed', 'speed-value', (x) => x.toFixed(2));
+    setupSlider('branch-angle', 'branchAngle', 'angle-value', (x) => x + '°');
+    setupSlider('length-ratio', 'lengthRatio', 'length-value', (x) => x.toFixed(2));
+    setupSlider('branches-per-split', 'branchesPerSplit', 'split-value', (x) => Math.round(x));
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
@@ -43,10 +212,10 @@
     let aspectRatio = window.innerWidth / window.innerHeight;
     let baseCameraHeight = aspectRatio < 1 ? 15 : 20;
     let cameraHeight = baseCameraHeight;
-    let targetZoom = 1; // Target zoom level
-    let currentZoom = 1; // Smoothly interpolated zoom
-    let zoomSpeed = 0.005; // Slower and smoother zoom
-    let maxZoomOut = 1.5; // Prevent excessive zoom-out
+    let targetZoom = 1;
+    let currentZoom = 1;
+    let zoomSpeed = 0.005;
+    let maxZoomOut = 1.5;
 
     const camera = new THREE.PerspectiveCamera(60, aspectRatio, 0.1, 100);
     camera.position.set(0, cameraHeight / 2, cameraHeight);
@@ -90,15 +259,13 @@
       growingBranches.push(branch);
 
       if (level < maxLevel) {
-        const numBranches = Math.floor(Math.random() * 2) + 2;
-
         setTimeout(() => {
-          for (let i = 0; i < numBranches; i++) {
-            const angle = THREE.MathUtils.degToRad(20 + Math.random() * 40);
+          for (let i = 0; i < config.branchesPerSplit; i++) {
+            const angle = THREE.MathUtils.degToRad(config.branchAngle + Math.random() * 20);
             const randomAxis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
             let newDir = direction.clone().applyAxisAngle(randomAxis, angle).normalize();
             newDir.add(new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2)).normalize();
-            const newLength = length * (0.7 + Math.random() * 0.1);
+            const newLength = length * (config.lengthRatio + Math.random() * 0.1);
             const newThickness = thickness * 0.7;
             const tipPosition = position.clone().add(direction.clone().normalize().multiplyScalar(length));
 
@@ -106,7 +273,6 @@
             branch.children.push(child);
           }
 
-          // Smoothly zoom out with gradual easing
           if (targetZoom < maxZoomOut) {
             targetZoom += 0.1;
           }
@@ -117,6 +283,11 @@
     }
 
     function generateGrowingTree() {
+      // Don't generate if clicking on config panel
+      if (event && configPanel.contains(event.target)) {
+        return;
+      }
+
       if (treeGroup) {
         scene.remove(treeGroup);
         treeGroup.traverse(child => {
@@ -129,14 +300,20 @@
       treeGroup = new THREE.Group();
       scene.add(treeGroup);
       growingBranches = [];
-      targetZoom = 1; // Reset zoom
+      targetZoom = 1;
 
-      const maxLevel = 8;
       const trunkLength = baseCameraHeight * 0.4;
-      const trunkThickness = 1.0;
       const startPosition = new THREE.Vector3(0, -baseCameraHeight / 2.2, 0);
 
-      createGrowingBranch(startPosition, new THREE.Vector3(0, 1, 0), trunkLength, trunkThickness, 0, maxLevel, treeGroup);
+      createGrowingBranch(
+        startPosition,
+        new THREE.Vector3(0, 1, 0),
+        trunkLength,
+        config.trunkThickness,
+        0,
+        config.maxLevel,
+        treeGroup
+      );
     }
 
     function animateGrowth() {
@@ -144,7 +321,7 @@
         let branch = growingBranches[i];
 
         if (branch.growing) {
-          branch.currentLength += 0.15;
+          branch.currentLength += config.growthSpeed;
           if (branch.currentLength >= branch.maxLength) {
             branch.currentLength = branch.maxLength;
             branch.growing = false;
@@ -159,7 +336,6 @@
       animateGrowth();
       treeGroup.rotation.y += 0.002;
 
-      // Smooth camera zoom-out using lerp (linear interpolation)
       currentZoom += (targetZoom - currentZoom) * zoomSpeed;
       camera.position.set(0, (cameraHeight / 2) * currentZoom, (cameraHeight * currentZoom));
       camera.lookAt(0, cameraHeight / 3, 0);
