@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Interactive 3D Kaleidoscope with Enhanced Bouncing Lasers</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      touch-action: manipulation;
+    }
+    canvas {
+      display: block;
+    }
+    #controls {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 8px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 8px;
+      border-radius: 8px;
+    }
+    #controls div {
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 90px;
+    }
+    button {
+      margin-top: 8px;
+      padding: 4px 2px;
+      background: #444;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #666;
+    }
+    /* Fullscreen flash overlay – simulates a laser beam striking your eyes */
+    #flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: white;
+      opacity: 0;
+      transition: opacity 0.1s ease-out;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <div>
+      <label>Panel Count: <span id="panelCountValue">12</span></label><br>
+      <input type="range" id="panelCount" min="1" max="50" value="12">
+    </div>
+    <div>
+      <label>Mirror Spread: <span id="mirrorSpreadValue">1.5</span></label><br>
+      <!-- Adjusts the radius at which mirror panels are arranged -->
+      <input type="range" id="mirrorSpread" min="-5" max="10" step="0.1" value="1.5">
+    </div>
+    <div>
+      <label>Laser Count: <span id="laserCountValue">10</span></label><br>
+      <input type="range" id="laserCount" min="1" max="100" value="10">
+    </div>
+    <div>
+      <label>Laser Angle: <span id="laserAngleValue">0.80</span></label><br>
+      <input type="range" id="laserAngle" min="0" max="6.28" step="0.1" value="0.8">
+    </div>
+    <div>
+      <label>Laser Width: <span id="laserWidthValue">2</span></label><br>
+      <input type="range" id="laserWidth" min="1" max="10" value="2">
+    </div>
+    <div>
+      <label>Movement Speed: <span id="movementSpeedValue">4.0</span></label><br>
+      <input type="range" id="movementSpeed" min="0" max="15" step="0.1" value="4">
+    </div>
+    <div>
+      <label>Flash Intensity: <span id="flashIntensityValue">0.8</span></label><br>
+      <input type="range" id="flashIntensity" min="0" max="1" step="0.1" value="0.8">
+    </div>
+    <div>
+      <label>Mirror Spin Speed: <span id="mirrorSpinSpeedValue">0.005</span></label><br>
+      <input type="range" id="mirrorSpinSpeed" min="0" max="0.10" step="0.001" value="0.005">
+    </div>
+    <div>
+      <label>Mirror Warble: <span id="mirrorWarbleValue">0.003</span></label><br>
+      <input type="range" id="mirrorWarble" min="0" max="0.05" step="0.001" value="0.003">
+    </div>
+    <button id="regenerate">🔄 Random</button>
+  </div>
+  <div id="flash"></div>
+  <canvas id="canvas"></canvas>
+  
+  <script type="module">
+    // Import Three.js from the CDN using an absolute URL.
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+
+    let scene, camera, renderer;
+    let mirrorGroup; // Group for the mirror panels.
+    let mirrors = [];  // Array of mirror meshes.
+    let lasers = [];   // Array of laser objects.
+    const LASER_BOUNCES = 8; // How many times each laser will bounce.
+    let clock = new THREE.Clock();
+
+    // UI-controlled parameters (default values).
+    let panelCount = 12;
+    let mirrorSpread = 1.5;
+    let laserCount = 10;
+    let baseLaserAngle = 0.8;
+    let laserWidth = 2;
+    let movementSpeed = 4;
+    let flashIntensity = 0.8;
+    let mirrorSpinSpeed = 0.005;
+    let mirrorWarble = 0.003;
+
+    // Additional variable: mirrorGroup random spin vector (for rotation in all axes).
+    let mirrorSpinVector = new THREE.Vector3();
+
+    // UI elements.
+    const panelCountSlider = document.getElementById('panelCount');
+    const panelCountValue = document.getElementById('panelCountValue');
+    const mirrorSpreadSlider = document.getElementById('mirrorSpread');
+    const mirrorSpreadValue = document.getElementById('mirrorSpreadValue');
+    const laserCountSlider = document.getElementById('laserCount');
+    const laserCountValue = document.getElementById('laserCountValue');
+    const laserAngleSlider = document.getElementById('laserAngle');
+    const laserAngleValue = document.getElementById('laserAngleValue');
+    const laserWidthSlider = document.getElementById('laserWidth');
+    const laserWidthValue = document.getElementById('laserWidthValue');
+    const movementSpeedSlider = document.getElementById('movementSpeed');
+    const movementSpeedValue = document.getElementById('movementSpeedValue');
+    const flashIntensitySlider = document.getElementById('flashIntensity');
+    const flashIntensityValue = document.getElementById('flashIntensityValue');
+    const mirrorSpinSpeedSlider = document.getElementById('mirrorSpinSpeed');
+    const mirrorSpinSpeedValue = document.getElementById('mirrorSpinSpeedValue');
+    const mirrorWarbleSlider = document.getElementById('mirrorWarble');
+    const mirrorWarbleValue = document.getElementById('mirrorWarbleValue');
+    const regenerateButton = document.getElementById('regenerate');
+    const flashOverlay = document.getElementById('flash');
+
+    // Flash timer ensures a flash event occurs at generation start.
+    let flashTimer = 0;
+
+    function init() {
+      // Create the scene and camera.
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 2, 8);
+      camera.lookAt(0, 0, 0);
+
+      // Set up the renderer.
+      renderer = new THREE.WebGLRenderer({ antialias: true, canvas: document.getElementById('canvas') });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      // Load an environment map for reflective mirrors.
+      const envMap = new THREE.CubeTextureLoader().setPath('https://threejs.org/examples/textures/cube/Bridge2/').load([
+          'posx.jpg', 'negx.jpg', 'posy.jpg', 'negy.jpg', 'posz.jpg', 'negz.jpg'
+      ]);
+      scene.environment = envMap;
+
+      // Add bright lighting.
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      directionalLight.position.set(5, 10, 7);
+      scene.add(directionalLight);
+
+      // Generate the kaleidoscope mirrors and lasers.
+      generateKaleidoscope();
+      generateLasers();
+
+      // Force an intense flash at the start of every generation.
+      triggerFlash(true);
+
+      // UI Event Listeners.
+      panelCountSlider.addEventListener('input', () => {
+        panelCount = parseInt(panelCountSlider.value);
+        panelCountValue.textContent = panelCount;
+        generateKaleidoscope();
+        generateLasers();
+        triggerFlash(true);
+      });
+      mirrorSpreadSlider.addEventListener('input', () => {
+        mirrorSpread = parseFloat(mirrorSpreadSlider.value);
+        mirrorSpreadValue.textContent = mirrorSpread.toFixed(1);
+        generateKaleidoscope();
+      });
+      laserCountSlider.addEventListener('input', () => {
+        laserCount = parseInt(laserCountSlider.value);
+        laserCountValue.textContent = laserCount;
+        generateLasers();
+      });
+      laserAngleSlider.addEventListener('input', () => {
+        baseLaserAngle = parseFloat(laserAngleSlider.value);
+        laserAngleValue.textContent = baseLaserAngle.toFixed(2);
+      });
+      laserWidthSlider.addEventListener('input', () => {
+        laserWidth = parseInt(laserWidthSlider.value);
+        laserWidthValue.textContent = laserWidth;
+        // Update linewidth for all lasers.
+        lasers.forEach(laser => {
+          laser.line.material.linewidth = laserWidth;
+          laser.line.material.needsUpdate = true;
+        });
+      });
+      movementSpeedSlider.addEventListener('input', () => {
+        movementSpeed = parseFloat(movementSpeedSlider.value);
+        movementSpeedValue.textContent = movementSpeed.toFixed(1);
+      });
+      flashIntensitySlider.addEventListener('input', () => {
+        flashIntensity = parseFloat(flashIntensitySlider.value);
+        flashIntensityValue.textContent = flashIntensity.toFixed(1);
+      });
+      mirrorSpinSpeedSlider.addEventListener('input', () => {
+        mirrorSpinSpeed = parseFloat(mirrorSpinSpeedSlider.value);
+        mirrorSpinSpeedValue.textContent = mirrorSpinSpeed.toFixed(3);
+      });
+      mirrorWarbleSlider.addEventListener('input', () => {
+        mirrorWarble = parseFloat(mirrorWarbleSlider.value);
+        mirrorWarbleValue.textContent = mirrorWarble.toFixed(3);
+      });
+      regenerateButton.addEventListener('click', () => {
+        generateKaleidoscope();
+        generateLasers();
+        triggerFlash(true);
+      });
+
+      window.addEventListener('resize', onWindowResize, false);
+      animate();
+    }
+
+    function onWindowResize(){
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Generate mirror panels arranged in a circle (a spherical kaleidoscope).
+    function generateKaleidoscope() {
+      if (mirrorGroup) {
+        scene.remove(mirrorGroup);
+      }
+      mirrorGroup = new THREE.Group();
+      scene.add(mirrorGroup);
+      mirrors = [];
+      // Use the user-controlled mirrorSpread value as the radius.
+      const radius = mirrorSpread;
+      // Generate a random spin vector for the mirror group (rotates in all axes).
+      mirrorSpinVector.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
+      for (let i = 0; i < panelCount; i++) {
+        const angle = (i / panelCount) * Math.PI * 2;
+        const panel = createMirrorPanel(angle, radius);
+        mirrorGroup.add(panel);
+        mirrors.push(panel);
+      }
+    }
+
+    // Create a single mirror panel with a reflective, mirror-like material.
+    function createMirrorPanel(angle, radius) {
+      const width = 1.5;
+      const height = 3;
+      const geometry = new THREE.PlaneGeometry(width, height);
+      const material = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(Math.random(), Math.random(), Math.random()),
+        metalness: 1,
+        roughness: 0,
+        envMap: scene.environment,
+        reflectivity: 1,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+      });
+      const panel = new THREE.Mesh(geometry, material);
+      panel.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+      // Orient the panel to face the center.
+      panel.lookAt(new THREE.Vector3(0, 0, 0));
+      return panel;
+    }
+
+    // Generate laser beams based on the current laser count.
+    // Each laser is an object with a base origin, a random phase (for independent oscillation), and its THREE.Line.
+    function generateLasers() {
+      // Remove any existing lasers.
+      lasers.forEach(laser => {
+        scene.remove(laser.line);
+      });
+      lasers = [];
+      for (let i = 0; i < laserCount; i++) {
+        // Randomize the base origin near the center.
+        let baseOrigin = new THREE.Vector3(
+          (Math.random() - 0.5) * 1.0,
+          (Math.random() - 0.5) * 1.0,
+          0
+        );
+        let phase = Math.random() * Math.PI * 2;
+        let laserObj = {
+          baseOrigin: baseOrigin,
+          baseAngle: baseLaserAngle,
+          phase: phase,
+          line: createLaserLine()
+        };
+        lasers.push(laserObj);
+        scene.add(laserObj.line);
+      }
+    }
+
+    // Create a laser line. The color is generated using HSL for maximum brightness.
+    // The material uses additive blending and full opacity so even thin beams look sharp and powerful.
+    function createLaserLine() {
+      const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const hue = Math.random();
+      const color = new THREE.Color().setHSL(hue, 1, 0.5);
+      const material = new THREE.LineBasicMaterial({
+        color: color,
+        linewidth: laserWidth,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthTest: true
+      });
+      const line = new THREE.Line(geometry, material);
+      return line;
+    }
+
+    // Compute a laser beam’s path as an array of points via raycasting.
+    // The beam bounces off mirror panels stored in the 'mirrors' array.
+    function computeLaserPath(origin, direction) {
+      let points = [];
+      points.push(origin.clone());
+      let currentOrigin = origin.clone();
+      let currentDir = direction.clone();
+      const raycaster = new THREE.Raycaster();
+      for (let bounce = 0; bounce < LASER_BOUNCES; bounce++) {
+        raycaster.set(currentOrigin, currentDir);
+        const intersections = raycaster.intersectObjects(mirrors, false);
+        if (intersections.length === 0) {
+          points.push(currentOrigin.clone().add(currentDir.clone().multiplyScalar(10)));
+          break;
+        }
+        let hit = intersections[0];
+        points.push(hit.point.clone());
+        // Calculate reflection using the mirror's outward normal.
+        let mirrorNormal = hit.object.getWorldDirection(new THREE.Vector3());
+        mirrorNormal.negate().normalize();
+        currentDir.reflect(mirrorNormal).normalize();
+        currentOrigin = hit.point.clone().add(currentDir.clone().multiplyScalar(0.01));
+      }
+      return points;
+    }
+
+    // Update each laser beam dynamically.
+    // Their origin and angle oscillate over time, and if any beam comes near the camera, trigger a flash.
+    function updateLasers(time) {
+      lasers.forEach(laser => {
+        let oscillation = Math.sin(time * movementSpeed + laser.phase) * 0.3;
+        let effectiveOrigin = laser.baseOrigin.clone().add(new THREE.Vector3(oscillation, oscillation, 0));
+        let effectiveAngle = baseLaserAngle + oscillation;
+        let direction = new THREE.Vector3(Math.cos(effectiveAngle), Math.sin(effectiveAngle), 0).normalize();
+        let newPoints = computeLaserPath(effectiveOrigin, direction);
+        laser.line.geometry.setFromPoints(newPoints);
+        // Trigger a flash if any point is very close to the camera.
+        newPoints.forEach(point => {
+          if (camera.position.distanceTo(point) < 1.0) {
+            triggerFlash();
+          }
+        });
+      });
+    }
+
+    // Trigger a flash effect: if forced, the flash lasts longer.
+    function triggerFlash(force = false) {
+      flashTimer = force ? 1.0 : 0.2;
+      flashOverlay.style.opacity = flashIntensity;
+    }
+
+    // Main animation loop.
+    function animate() {
+      requestAnimationFrame(animate);
+      let delta = clock.getDelta();
+      let elapsed = clock.getElapsedTime();
+      // Rotate the mirror group in all axes with user-controlled spin and random warble.
+      if (mirrorGroup) {
+        mirrorGroup.rotation.x += mirrorSpinSpeed * mirrorSpinVector.x + (Math.random() - 0.5) * mirrorWarble;
+        mirrorGroup.rotation.y += mirrorSpinSpeed * mirrorSpinVector.y + (Math.random() - 0.5) * mirrorWarble;
+        mirrorGroup.rotation.z += mirrorSpinSpeed * mirrorSpinVector.z + (Math.random() - 0.5) * mirrorWarble;
+      }
+      updateLasers(elapsed);
+      if (flashTimer > 0) {
+        flashTimer -= delta;
+        let newOpacity = Math.max(0, parseFloat(flashOverlay.style.opacity) - 0.02);
+        flashOverlay.style.opacity = newOpacity;
+      }
+      renderer.render(scene, camera);
+    }
+
+    // Initialize everything.
+    init();
+  </script>
+</body>
+</html>
