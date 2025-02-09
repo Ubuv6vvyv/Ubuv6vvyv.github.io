@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Fractal Tree</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      touch-action: manipulation;
+    }
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    #overlay {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">Tap to grow a new tree</div>
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    let aspectRatio = window.innerWidth / window.innerHeight;
+    let baseCameraHeight = aspectRatio < 1 ? 15 : 20;
+    let cameraHeight = baseCameraHeight;
+    let targetZoom = 1; // Target zoom level
+    let currentZoom = 1; // Smoothly interpolated zoom
+    let zoomSpeed = 0.005; // Slower and smoother zoom
+    let maxZoomOut = 1.5; // Prevent excessive zoom-out
+
+    const camera = new THREE.PerspectiveCamera(60, aspectRatio, 0.1, 100);
+    camera.position.set(0, cameraHeight / 2, cameraHeight);
+    camera.lookAt(0, cameraHeight / 3, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    scene.add(directionalLight);
+
+    let treeGroup = new THREE.Group();
+    scene.add(treeGroup);
+
+    let growingBranches = [];
+
+    function createGrowingBranch(position, direction, length, thickness, level, maxLevel, parentGroup) {
+      const geometry = new THREE.CylinderGeometry(thickness * 0.7, thickness, 0.1, 8);
+      geometry.translate(0, 0.05, 0);
+
+      const hue = level / maxLevel;
+      const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
+      const material = new THREE.MeshStandardMaterial({ color });
+
+      const branchMesh = new THREE.Mesh(geometry, material);
+      branchMesh.position.copy(position);
+
+      const axis = new THREE.Vector3(0, 1, 0);
+      const quat = new THREE.Quaternion();
+      quat.setFromUnitVectors(axis, direction.clone().normalize());
+      branchMesh.quaternion.copy(quat);
+
+      parentGroup.add(branchMesh);
+
+      const branch = { mesh: branchMesh, currentLength: 0.1, maxLength: length, growing: true, children: [] };
+      growingBranches.push(branch);
+
+      if (level < maxLevel) {
+        const numBranches = Math.floor(Math.random() * 2) + 2;
+
+        setTimeout(() => {
+          for (let i = 0; i < numBranches; i++) {
+            const angle = THREE.MathUtils.degToRad(20 + Math.random() * 40);
+            const randomAxis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+            let newDir = direction.clone().applyAxisAngle(randomAxis, angle).normalize();
+            newDir.add(new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2)).normalize();
+            const newLength = length * (0.7 + Math.random() * 0.1);
+            const newThickness = thickness * 0.7;
+            const tipPosition = position.clone().add(direction.clone().normalize().multiplyScalar(length));
+
+            const child = createGrowingBranch(tipPosition, newDir, newLength, newThickness, level + 1, maxLevel, parentGroup);
+            branch.children.push(child);
+          }
+
+          // Smoothly zoom out with gradual easing
+          if (targetZoom < maxZoomOut) {
+            targetZoom += 0.1;
+          }
+        }, 1000);
+      }
+
+      return branch;
+    }
+
+    function generateGrowingTree() {
+      if (treeGroup) {
+        scene.remove(treeGroup);
+        treeGroup.traverse(child => {
+          if (child.isMesh) {
+            child.geometry.dispose();
+            child.material.dispose();
+          }
+        });
+      }
+      treeGroup = new THREE.Group();
+      scene.add(treeGroup);
+      growingBranches = [];
+      targetZoom = 1; // Reset zoom
+
+      const maxLevel = 7;
+      const trunkLength = baseCameraHeight * 0.4;
+      const trunkThickness = 1.0;
+      const startPosition = new THREE.Vector3(0, -baseCameraHeight / 2.2, 0);
+
+      createGrowingBranch(startPosition, new THREE.Vector3(0, 1, 0), trunkLength, trunkThickness, 0, maxLevel, treeGroup);
+    }
+
+    function animateGrowth() {
+      for (let i = growingBranches.length - 1; i >= 0; i--) {
+        let branch = growingBranches[i];
+
+        if (branch.growing) {
+          branch.currentLength += 0.15;
+          if (branch.currentLength >= branch.maxLength) {
+            branch.currentLength = branch.maxLength;
+            branch.growing = false;
+          }
+          branch.mesh.scale.y = branch.currentLength / 0.1;
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      animateGrowth();
+      treeGroup.rotation.y += 0.002;
+
+      // Smooth camera zoom-out using lerp (linear interpolation)
+      currentZoom += (targetZoom - currentZoom) * zoomSpeed;
+      camera.position.set(0, (cameraHeight / 2) * currentZoom, (cameraHeight * currentZoom));
+      camera.lookAt(0, cameraHeight / 3, 0);
+
+      renderer.render(scene, camera);
+    }
+
+    function adjustCameraForScreen() {
+      aspectRatio = window.innerWidth / window.innerHeight;
+      baseCameraHeight = aspectRatio < 1 ? 15 : 20;
+      cameraHeight = baseCameraHeight;
+      camera.position.set(0, cameraHeight / 2, cameraHeight);
+      camera.lookAt(0, cameraHeight / 3, 0);
+      camera.aspect = aspectRatio;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    animate();
+
+    window.addEventListener('resize', adjustCameraForScreen);
+    window.addEventListener('click', generateGrowingTree);
+    window.addEventListener('touchend', generateGrowingTree);
+
+    adjustCameraForScreen();
+    generateGrowingTree();
+  </script>
+</body>
+</html>
