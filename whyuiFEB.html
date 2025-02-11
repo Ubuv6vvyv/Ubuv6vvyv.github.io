@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Security Verification Portal</title>
+  <style>
+    /* Dark animated gradient background */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      touch-action: none;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0d0d0d, #1a1a1a, #0d0d0d);
+      background-size: 400% 400%;
+      animation: gradientAnimation 15s ease infinite;
+    }
+    @keyframes gradientAnimation {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Header and Footer UI */
+    #header, #footer {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      text-align: center;
+      padding: 10px;
+      z-index: 101;
+font-size: 0.5em;
+    }
+    #header { top: 0; }
+    #footer { bottom: 0; font-size: 12px; }
+
+    /* Main game container */
+    #game-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 1;
+      transition: transform 0.5s ease;
+    }
+
+    /* Bright metallic ball with gradient and shimmer effect */
+    #ball {
+      position: absolute;
+      width: 25px;
+      height: 25px;
+      background: radial-gradient(circle at 40% 40%, #66ccff, #3399ff, #0066ff);
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(255,255,255,0.5), inset 0 0 10px rgba(0,0,0,0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.3s, height 0.3s;
+      z-index: 2;
+      animation: ballShimmer 10s infinite ease-in-out;
+    }
+    @keyframes ballShimmer {
+      0% { filter: brightness(1); }
+      50% { filter: brightness(1.2); }
+      100% { filter: brightness(1); }
+    }
+
+    /* Neon trail – starting at 50% opacity and fading out slowly */
+    .trail {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.9;
+      background: radial-gradient(circle at center, rgba(102,204,255,0.8), rgba(51,153,255,0.5) 50%, transparent 10%);
+      z-index: 1;
+    }
+
+    /* Verification hole with pulsating neon pink outline */
+    #hole {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle at center, #000, #111);
+      border: 2px solid #ff4081;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 25px rgba(255,64,129,0.5), inset 0 0 15px rgba(0,0,0,0.8);
+      animation: holePulse 3s infinite ease-in-out;
+      z-index: 2;
+    }
+    @keyframes holePulse {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    #hole::before {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      right: 5px;
+      bottom: 5px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, transparent, rgba(0,0,0,0.9));
+    }
+
+    /* Strobe overlay: covers full screen and flashes briefly */
+    #strobe-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0;
+      background: red;
+      transition: opacity 0.2s linear;
+    }
+
+    /* Cage overlay: locks the screen when device tilt is excessive */
+    #cage-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 120;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,0.2),
+        rgba(255,255,255,0.2) 10px,
+        transparent 10px,
+        transparent 20px
+      );
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #cage-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #ff4081;
+      font-size: 24px;
+      text-shadow: 0 0 10px rgba(255,64,129,0.8);
+      pointer-events: none;
+    }
+
+    /* Timer and mode indicator */
+    #timer {
+      position: fixed;
+      bottom: 60px;
+      right: 20px;
+      color: white;
+      font-size: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 102;
+    }
+    #mode-indicator {
+      position: fixed;
+      top: 70px;
+      left: 20px;
+      color: white;
+      font-size: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 5px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 102;
+    }
+    .hidden { display: none !important; }
+
+    /* Instruction panel with details */
+    #instructions {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      text-align: center;
+      background: rgba(0,0,0,0.8);
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 103;
+font-size: 0.5em;
+    }
+    #instructions h2 { margin: 0 0 10px; }
+    #instructions p { margin: 5px 0; }
+
+    /* Control panel – Boost button only */
+    #control-panel {
+      position: fixed;
+      bottom: 50px;
+      left: 100%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 5px 10px;
+      border-radius: 10px;
+      color: white;
+      z-index: 105;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    #control-panel button {
+      padding: 8px 12px;
+      background: #0066ff;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* Touch ripple effect */
+    .touch-effect {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 110;
+      animation: rippleEffect 0.5s ease-out forwards;
+    }
+    @keyframes rippleEffect {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(5);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header with title and instructions -->
+  <div id="header">
+    <h3>Security Verification Portal</h3>
+    <p>Please complete the following steps for verification to access the system.</p>
+  </div>
+
+  <!-- Main game container -->
+  <div id="game-container">
+    <div id="ball"></div>
+    <div id="hole"></div>
+  </div>
+
+  <!-- Strobe overlay for visual interference -->
+  <div id="strobe-overlay"></div>
+  
+  <!-- Cage overlay for excessive tilt -->
+  <div id="cage-overlay"><div id="cage-message">CAGE LOCKED<br>Adjust your device</div></div>
+
+  <!-- Timer and mode indicator -->
+  <div id="timer">Verifying...</div>
+  <div id="mode-indicator"></div>
+
+  <!-- Instruction panel -->
+  <div id="instructions">
+    <h2>Complete Motion Verification</h2>
+    <p>Guide the sphere into the verification portal by tilting your device.</p>
+    <pre>If you touch a side, a strobe will flash.<br> If you touch the hole, the view will zoom out – <br>then tap to continue verifying.</pre>
+    <small>Tap anywhere to begin</small>
+  </div>
+
+  <!-- Control Panel for extra interactivity (Boost button) -->
+  
+  <!-- Footer with company information -->
+  <div id="footer">
+    <p>&copy; 2025 SecureAccess Inc. All rights reserved.</p>
+  </div>
+
+  <script>
+    // Global function to create a ripple effect on touch/click events
+    function createTouchEffect(x, y) {
+      const effect = document.createElement('div');
+      effect.className = 'touch-effect';
+      effect.style.left = x + 'px';
+      effect.style.top = y + 'px';
+      document.body.appendChild(effect);
+      setTimeout(() => effect.remove(), 600);
+    }
+
+    // Add ripple effect for touch and mouse click events
+    document.addEventListener('touchstart', (e) => {
+      for (let touch of e.touches) {
+        createTouchEffect(touch.clientX, touch.clientY);
+      }
+    });
+    document.addEventListener('click', (e) => {
+      createTouchEffect(e.clientX, e.clientY);
+    });
+
+    class SecurityVerification {
+      constructor() {
+        this.ball = document.getElementById('ball');
+        this.hole = document.getElementById('hole');
+        this.instructions = document.getElementById('instructions');
+        this.timer = document.getElementById('timer');
+        this.modeIndicator = document.getElementById('mode-indicator');
+        this.container = document.getElementById('game-container');
+        this.strobeOverlay = document.getElementById('strobe-overlay');
+        this.cageOverlay = document.getElementById('cage-overlay');
+
+        // Initialize ball properties
+        this.ballSize = 25;
+        this.position = { x: window.innerWidth / 2, y: window.innerHeight - 100 };
+        this.velocity = { x: 0, y: 0 };
+        this.acceleration = { x: 0, y: 0 };
+
+        // Default physics values
+        this.defaultValues = {
+          friction: 0.985,
+          bounce: 2.8,
+          sensitivity: 0.4,
+          maxVelocity: 20
+
+        };
+        this.friction = this.defaultValues.friction;
+        this.bounce = this.defaultValues.bounce;
+        this.sensitivity = this.defaultValues.sensitivity;
+        this.maxVelocity = this.defaultValues.maxVelocity;
+
+        // Strobe settings
+        this.strobeFlashDuration = 50; // Duration of strobe flash in ms
+
+        // Orientation properties for cage effect
+        this.currentBeta = 0;   // Front/back tilt (in degrees)
+        this.currentGamma = 0;  // Left/right tilt (in degrees)
+        this.orientationThreshold = 45; // Tilt (in degrees) to trigger cage
+        this.isCaged = false;
+
+        // Flags for collision events
+        this.edgeStrobeTriggered = false;
+        this.holeTriggered = false;
+
+        this.startTime = null;
+        this.currentMode = null;
+        this.isDeflating = false;
+        this.strobeInterval = null;
+
+        // Bind event handlers
+        this.handleMotion = this.handleMotion.bind(this);
+        this.handleOrientation = this.handleOrientation.bind(this);
+        this.update = this.update.bind(this);
+        this.init = this.init.bind(this);
+
+        // Wait for user interaction to start
+        document.addEventListener('click', this.init, { once: true });
+        this.positionHole();
+
+        // Listen for device orientation events
+        window.addEventListener('deviceorientation', this.handleOrientation.bind(this));
+      }
+
+      // Create a trail element at the ball's current position
+      createTrail() {
+        const trail = document.createElement('div');
+        trail.className = 'trail';
+        trail.style.width = `${this.ballSize}px`;
+        trail.style.height = `${this.ballSize}px`;
+        trail.style.left = `${this.position.x}px`;
+        trail.style.top = `${this.position.y}px`;
+        this.container.appendChild(trail);
+        // Fade out over 4 seconds then remove after an additional second
+        setTimeout(() => {
+          trail.style.opacity = '0';
+          setTimeout(() => trail.remove(), 100);
+        }, 400);
+      }
+
+      // Set mode (retained for potential future use)
+      setMode(mode) {
+        if (this.currentMode === mode) return;
+        this.currentMode = mode;
+        if (this.strobeInterval) {
+          clearInterval(this.strobeInterval);
+          this.strobeInterval = null;
+          this.strobeOverlay.style.opacity = '0';
+        }
+        this.friction = this.defaultValues.friction;
+        this.bounce = this.defaultValues.bounce;
+        this.sensitivity = this.defaultValues.sensitivity;
+        this.maxVelocity = this.defaultValues.maxVelocity;
+        this.hole.classList.remove('blackhole-active');
+        this.modeIndicator.style.opacity = '1';
+        switch(mode) {
+          case 'slippery':
+            this.friction = 0.995;
+            this.bounce = 0.95;
+            this.modeIndicator.textContent = 'Warning: Low Friction Surface';
+            break;
+          case 'pinball':
+            this.bounce = 1.5;
+            this.modeIndicator.textContent = 'Warning: High Energy Environment';
+            break;
+          case 'heavy':
+            this.sensitivity = 1.2;
+            this.maxVelocity = 50;
+            this.modeIndicator.textContent = 'Warning: Gravitational Anomaly';
+            break;
+          case 'blackhole':
+            this.hole.classList.add('blackhole-active');
+            this.modeIndicator.textContent = 'Warning: Spatial Distortion';
+            break;
+          case 'strobe':
+            // Not used here
+            break;
+          default:
+            this.modeIndicator.style.opacity = '0';
+            break;
+        }
+        setTimeout(() => {
+          this.modeIndicator.style.opacity = '0';
+        }, 2000);
+      }
+
+      // Trigger a one-time strobe flash (edge collision effect)
+      triggerStrobe() {
+        this.strobeOverlay.style.opacity = '1';
+        setTimeout(() => {
+          this.strobeOverlay.style.opacity = '0';
+        }, this.strobeFlashDuration);
+      }
+
+      // Handle device orientation events for cage activation
+      handleOrientation(e) {
+        this.currentBeta = e.beta;     // Front/back tilt
+        this.currentGamma = e.gamma;   // Left/right tilt
+        if (Math.abs(e.beta) > this.orientationThreshold || Math.abs(e.gamma) > this.orientationThreshold) {
+          this.isCaged = true;
+        } else {
+          this.isCaged = false;
+        }
+      }
+
+      // Main update loop
+      update(timestamp) {
+        const deltaTime = (timestamp - this.lastUpdate) / 16;
+        this.lastUpdate = timestamp;
+        const elapsedTime = (Date.now() - this.startTime) / 1000;
+        this.timer.textContent = `Verification time: ${elapsedTime.toFixed(1)}s`;
+
+        // Create a trail if the ball is moving noticeably
+        if (Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1) {
+          this.createTrail();
+        }
+
+        // Increase ball size gradually (unless deflating)
+        if (!this.isDeflating) {
+          this.ballSize = Math.min(25 + (elapsedTime * 2), 200);
+          this.updateBallSize();
+        }
+
+        // Update ball physics (apply acceleration and friction)
+        this.velocity.x += this.acceleration.x * deltaTime;
+        this.velocity.y += this.acceleration.y * deltaTime;
+        this.velocity.x *= this.friction;
+        this.velocity.y *= this.friction;
+        const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2);
+        if (speed > this.maxVelocity) {
+          const ratio = this.maxVelocity / speed;
+          this.velocity.x *= ratio;
+          this.velocity.y *= ratio;
+        }
+        this.position.x += this.velocity.x * deltaTime;
+        this.position.y += this.velocity.y * deltaTime;
+        const ballRadius = this.ballSize / 2;
+
+        // Check for collision with the hole (trigger zoom-out if conditions met)
+        const dx = this.position.x - this.holePosition.x;
+        const dy = this.position.y - this.holePosition.y;
+        const distance = Math.sqrt(dx ** 2 + dy ** 2);
+        const speed_threshold = 5;
+        if (distance < 25 && speed < speed_threshold && this.ballSize < 60 && !this.holeTriggered) {
+          this.holeTriggered = true;
+          this.triggerHoleEvent();
+        } else if (distance < 40 && speed >= speed_threshold) {
+          // Bounce off the hole if moving too fast
+          this.velocity.x = -this.velocity.x * this.bounce * 2;
+          this.velocity.y = -this.velocity.y * this.bounce * 2;
+        }
+
+        // Check for collision with container edges
+        let collisionOccurred = false;
+        if (this.position.x < ballRadius) {
+          collisionOccurred = true;
+          this.position.x = ballRadius;
+          this.velocity.x = -this.velocity.x * this.bounce;
+        } else if (this.position.x > window.innerWidth - ballRadius) {
+          collisionOccurred = true;
+          this.position.x = window.innerWidth - ballRadius;
+          this.velocity.x = -this.velocity.x * this.bounce;
+        }
+        if (this.position.y < ballRadius) {
+          collisionOccurred = true;
+          this.position.y = ballRadius;
+          this.velocity.y = -this.velocity.y * this.bounce;
+        } else if (this.position.y > window.innerHeight - ballRadius) {
+          collisionOccurred = true;
+          this.position.y = window.innerHeight - ballRadius;
+          this.velocity.y = -this.velocity.y * this.bounce;
+        }
+        if (collisionOccurred && !this.edgeStrobeTriggered) {
+          this.triggerStrobe();
+          this.edgeStrobeTriggered = true;
+        }
+        if (!collisionOccurred) {
+          this.edgeStrobeTriggered = false;
+        }
+
+        // Update the ball's on-screen position
+        this.ball.style.transform = `translate(${this.position.x}px, ${this.position.y}px)`;
+
+        // Update the hole's position with a gentle offset based on orientation
+        const offsetX = (this.currentGamma || 0) * 0.5;
+        const offsetY = (this.currentBeta || 0) * 0.5;
+        const newHoleX = this.holeBasePosition.x + offsetX;
+        const newHoleY = this.holeBasePosition.y + offsetY;
+        this.hole.style.left = `${newHoleX}px`;
+        this.hole.style.top = `${newHoleY}px`;
+        this.holePosition = { x: newHoleX, y: newHoleY };
+
+        // Update the cage overlay based on device tilt
+        if (this.isCaged) {
+          this.cageOverlay.style.opacity = '1';
+          this.cageOverlay.style.pointerEvents = 'all';
+          // When caged, dampen motion
+          this.velocity.x = 0;
+          this.velocity.y = 0;
+        } else {
+          this.cageOverlay.style.opacity = '0';
+          this.cageOverlay.style.pointerEvents = 'none';
+        }
+
+        requestAnimationFrame(this.update);
+      }
+
+      // Update the ball's size in the DOM
+      updateBallSize() {
+        this.ball.style.width = `${this.ballSize}px`;
+        this.ball.style.height = `${this.ballSize}px`;
+      }
+
+      // Position the hole at a random base location (ensuring it doesn’t appear under the header)
+      positionHole() {
+        const headerOffset = 50;  // Ensure the hole appears below the header
+        const x = Math.random() * (window.innerWidth - 100) + 50;
+        const y = Math.random() * (window.innerHeight * 0.3) + headerOffset;
+        this.hole.style.left = `${x}px`;
+        this.hole.style.top = `${y}px`;
+        this.holeBasePosition = { x, y };
+        this.holePosition = { x, y };
+      }
+
+      // Initialize verification (request motion permission if needed)
+      async init() {
+        try {
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission === 'granted') {
+              this.startVerification();
+            }
+          } else {
+            this.startVerification();
+          }
+        } catch (error) {
+          alert('Motion sensors required for verification');
+        }
+      }
+
+      // Start the verification process
+      startVerification() {
+        this.instructions.classList.add('hidden');
+        this.startTime = Date.now();
+        window.addEventListener('devicemotion', this.handleMotion);
+        this.lastUpdate = performance.now();
+        requestAnimationFrame(this.update);
+      }
+
+      // Handle device motion events – the ball is extremely responsive (sensitivity doubled)
+      handleMotion(event) {
+        const landscape = window.innerWidth > window.innerHeight;
+        if (!this.holeTriggered) {
+          if (landscape) {
+            this.acceleration.x = event.accelerationIncludingGravity.x * this.sensitivity * 2;
+            this.acceleration.y = event.accelerationIncludingGravity.z * this.sensitivity * 2;
+          } else {
+            this.acceleration.x = event.accelerationIncludingGravity.x * this.sensitivity * 2;
+            this.acceleration.y = event.accelerationIncludingGravity.y * this.sensitivity * 2;
+          }
+        } else {
+          this.acceleration.x = 0;
+          this.acceleration.y = 0;
+        }
+      }
+
+      // Apply a temporary boost to the ball (triggered by the Boost button)
+      applyBoost() {
+        if (Math.abs(this.velocity.x) < 0.1 && Math.abs(this.velocity.y) < 0.1) {
+          this.velocity.x = 2;
+          this.velocity.y = -2;
+        } else {
+          this.velocity.x *= 1.5;
+          this.velocity.y *= 1.5;
+        }
+      }
+
+      // Trigger the hole event: zoom out the container and prompt the user to continue verifying.
+      triggerHoleEvent() {
+        this.container.style.transform = "scale(0.5)";
+        this.instructions.innerHTML = "<h2>Continue Verifying</h2><p>Please adjust your device to resume verification.</p><small>Tap to continue</small>";
+        this.instructions.classList.remove("hidden");
+        const resumeVerification = () => {
+          this.instructions.classList.add("hidden");
+          this.container.style.transform = "scale(1)";
+          this.holeTriggered = false;
+          document.removeEventListener("click", resumeVerification);
+        };
+        document.addEventListener("click", resumeVerification, { once: true });
+      }
+    }
+
+    // Instantiate the verification system
+    const verification = new SecurityVerification();
+
+    // Attach event listener to the Boost button
+    document.getElementById('boost-button').addEventListener('click', () => {
+      verification.applyBoost();
+    });
+  </script>
+</body>
+</html>
