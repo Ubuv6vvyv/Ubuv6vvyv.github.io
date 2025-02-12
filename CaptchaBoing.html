@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Motion CAPTCHA Verification</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0, #f0f0f0);
+            background-size: 600% 600%;
+            animation: gradientAnimation 20s ease infinite;
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #game-container {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #captcha-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 280px;
+        }
+
+        #captcha-text {
+            font-family: 'Courier New', monospace;
+            font-size: 32px;
+            letter-spacing: 3px;
+            color: #333;
+            position: relative;
+            height: 50px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        #missing-piece {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background: #4a90e2;
+            border-radius: 4px;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            transition: width 0.3s, height 0.3s;
+        }
+
+        .piece-slot {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background: rgba(74, 144, 226, 0.2);
+            border: 2px dashed #4a90e2;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .trail {
+            position: absolute;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0.2;
+            background: radial-gradient(circle at center, rgba(74,144,226,0.8), rgba(74,144,226,0.5) 50%, transparent 70%);
+            z-index: 1;
+        }
+
+        #timer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: #333;
+            font-size: 12px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333;
+            text-align: center;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #difficulty-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* New wall collision overlay */
+        #collision-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0);
+            pointer-events: none;
+            transition: background-color 0.1s ease;
+            z-index: 99;
+        }
+
+        /* New danger zones near walls */
+        .danger-zone {
+            position: absolute;
+            background: linear-gradient(90deg, 
+                rgba(255, 0, 0, 0.1) 0%,
+                rgba(255, 0, 0, 0) 100%);
+            pointer-events: none;
+        }
+
+        .danger-zone-left {
+            left: 0;
+            top: 0;
+            width: 50px;
+            height: 100%;
+        }
+
+        .danger-zone-right {
+            right: 0;
+            top: 0;
+            width: 50px;
+            height: 100%;
+            background: linear-gradient(270deg, 
+                rgba(255, 0, 0, 0.1) 0%,
+                rgba(255, 0, 0, 0) 100%);
+        }
+
+        .danger-zone-top {
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(180deg, 
+                rgba(255, 0, 0, 0.1) 0%,
+                rgba(255, 0, 0, 0) 100%);
+        }
+
+        .danger-zone-bottom {
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(0deg, 
+                rgba(255, 0, 0, 0.1) 0%,
+                rgba(255, 0, 0, 0) 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="captcha-container">
+            <div id="captcha-text">
+                <div class="piece-slot"></div>
+                RX7K9M
+            </div>
+        </div>
+        <div id="missing-piece"></div>
+        <div class="danger-zone danger-zone-left"></div>
+        <div class="danger-zone danger-zone-right"></div>
+        <div class="danger-zone danger-zone-top"></div>
+        <div class="danger-zone danger-zone-bottom"></div>
+    </div>
+    <div id="collision-overlay"></div>
+    <div id="timer">Verifying...</div>
+    <div id="difficulty-indicator"></div>
+    <div id="instructions">
+        Complete Motion Verification<br>
+        Guide missing piece to complete the CAPTCHA<br>
+        Avoid the walls!<br>
+        <small>Tap to begin</small>
+    </div>
+
+    <script>
+        class MotionCaptcha {
+            constructor() {
+                this.piece = document.getElementById('missing-piece');
+                this.slot = document.querySelector('.piece-slot');
+                this.instructions = document.getElementById('instructions');
+                this.timer = document.getElementById('timer');
+                this.difficultyIndicator = document.getElementById('difficulty-indicator');
+                this.container = document.getElementById('game-container');
+                this.collisionOverlay = document.getElementById('collision-overlay');
+                
+                this.position = { x: window.innerWidth / 2, y: window.innerHeight - 100 };
+                this.velocity = { x: 0, y: 0 };
+                this.acceleration = { x: 0, y: 0 };
+                
+                this.defaultValues = {
+                    friction: 0.985,
+                    bounce: 5,
+                    sensitivity: 0.3,
+                    wallForce: 15 // New wall repulsion force
+                };
+                
+                this.friction = this.defaultValues.friction;
+                this.bounce = this.defaultValues.bounce;
+                this.sensitivity = this.defaultValues.sensitivity;
+                this.wallForce = this.defaultValues.wallForce;
+                
+                this.startTime = null;
+                this.currentDifficulty = null;
+                this.wallCollisionCooldown = 0;
+                
+                this.handleMotion = this.handleMotion.bind(this);
+                this.update = this.update.bind(this);
+                this.init = this.init.bind(this);
+                
+                document.addEventListener('click', this.init, { once: true });
+                this.positionSlot();
+            }
+            
+            showWallCollision() {
+                this.collisionOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+                setTimeout(() => {
+                    this.collisionOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0)';
+                }, 100);
+            }
+
+            handleWallCollision(wall) {
+                if (Date.now() - this.wallCollisionCooldown < 200) return;
+                
+                this.wallCollisionCooldown = Date.now();
+                this.showWallCollision();
+
+                // Apply strong repulsion force based on which wall was hit
+                switch(wall) {
+                    case 'left':
+                        this.velocity.x = this.wallForce;
+                        break;
+                    case 'right':
+                        this.velocity.x = -this.wallForce;
+                        break;
+                    case 'top':
+                        this.velocity.y = this.wallForce;
+                        break;
+                    case 'bottom':
+                        this.velocity.y = -this.wallForce;
+                        break;
+                }
+            }
+
+            createTrail() {
+                const trail = document.createElement('div');
+                trail.className = 'trail';
+                trail.style.width = '30px';
+                trail.style.height = '40px';
+                trail.style.left = `${this.position.x}px`;
+                trail.style.top = `${this.position.y}px`;
+                this.container.appendChild(trail);
+                
+                setTimeout(() => {
+                    trail.style.opacity = '0';
+                    setTimeout(() => trail.remove(), 300);
+                }, 1000);
+            }
+            
+            setDifficulty(difficulty) {
+                if (this.currentDifficulty === difficulty) return;
+                this.currentDifficulty = difficulty;
+                
+                this.friction = this.defaultValues.friction;
+                this.bounce = this.defaultValues.bounce;
+                this.sensitivity = this.defaultValues.sensitivity;
+                this.wallForce = this.defaultValues.wallForce;
+                
+                this.difficultyIndicator.style.opacity = '1';
+                
+                switch(difficulty) {
+                    case 'wind':
+                        this.friction = 0.995;
+                        this.wallForce = 10;
+                        this.difficultyIndicator.textContent = 'Warning: Strong Winds';
+                        this.applyWindForce();
+                        break;
+                    case 'magnetic':
+                        this.bounce = 1.2;
+                        this.wallForce = 15;
+                        this.difficultyIndicator.textContent = 'Warning: Magnetic Field';
+                        break;
+                    case 'precision':
+                        this.sensitivity = 0.2;
+                        this.wallForce = 8;
+                        this.difficultyIndicator.textContent = 'Warning: Precision Required';
+                        break;
+                    default:
+                        this.difficultyIndicator.style.opacity = '0';
+                        break;
+                }
+                
+                setTimeout(() => {
+                    this.difficultyIndicator.style.opacity = '0';
+                }, 2000);
+            }
+            
+            applyWindForce() {
+                const windForce = Math.sin(Date.now() / 1000) * 0.2;
+                this.velocity.x += windForce;
+            }
+            
+            update(timestamp) {
+                const deltaTime = (timestamp - this.lastUpdate) / 16;
+                this.lastUpdate = timestamp;
+                
+                const elapsedTime = (Date.now() - this.startTime) / 1000;
+                this.timer.textContent = `Verification time: ${elapsedTime.toFixed(1)}s`;
+                
+                if (Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1) {
+                    this.createTrail();
+                }
+                
+                if (elapsedTime > 5 && elapsedTime < 10) {
+                    this.setDifficulty('wind');
+                } else if (elapsedTime > 15 && elapsedTime < 20) {
+                    this.setDifficulty('magnetic');
+                } else if (elapsedTime > 25 && elapsedTime < 30) {
+                    this.setDifficulty('precision');
+                } else {
+                    this.setDifficulty(null);
+                }
+                
+                this.velocity.x += this.acceleration.x * deltaTime;
+                this.velocity.y += this.acceleration.y * deltaTime;
+                this.velocity.x *= this.friction;
+                this.velocity.y *= this.friction;
+                
+                this.position.x += this.velocity.x * deltaTime;
+                this.position.y += this.velocity.y * deltaTime;
+                
+                // Enhanced wall collisions with strong repulsion
+                if (this.position.x < 15) {
+                    this.position.x = 15;
+                    this.handleWallCollision('left');
+                } else if (this.position.x > window.innerWidth - 15) {
+                    this.position.x = window.innerWidth - 15;
+                    this.handleWallCollision('right');
+                }
+                
+                if (this.position.y < 20) {
+                    this.position.y = 20;
+                    this.handleWallCollision('top');
+                } else if (this.position.y > window.innerHeight - 20) {
+                    this.position.y = window.innerHeight - 20;
+                    this.handleWallCollision('bottom');
+                }
+                
+                // Check for slot collision
+                const slotRect = this.slot.getBoundingClientRect();
+                const dx = this.position.x - (slotRect.left + slotRect.width/2);
+                const dy = this.position.y - (slotRect.top + slotRect.height/2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 20 && Math.abs(this.velocity.x) < 3 && Math.abs(this.velocity.y) < 3) {
+                    alert('Verification successful!');
+                    window.location.reload();
+                    return;
+                }
+                
+                this.piece.style.transform = `translate(${this.position.x}px, ${this.position.y}px)`;
+                
+                requestAnimationFrame(this.update);
+            }
+            
+         positionSlot() {
+                const captchaText = document.getElementById('captcha-text');
+                const textRect = captchaText.getBoundingClientRect();
+                const randomPosition = Math.floor(Math.random() * 6);
+                this.slot.style.left = `${randomPosition * 25}px`;
+            }
+            
+            async init() {
+                try {
+                    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                        const permission = await DeviceMotionEvent.requestPermission();
+                        if (permission === 'granted') {
+                            this.startVerification();
+                        }
+                    } else {
+                        this.startVerification();
+                    }
+                } catch (error) {
+                    alert('Motion sensors required for verification');
+                }
+            }
+            
+            startVerification() {
+                this.instructions.classList.add('hidden');
+                this.startTime = Date.now();
+                window.addEventListener('devicemotion', this.handleMotion);
+                this.lastUpdate = performance.now();
+                requestAnimationFrame(this.update);
+            }
+            
+            handleMotion(event) {
+                const landscape = window.innerWidth > window.innerHeight;
+                
+                if (landscape) {
+                    this.acceleration.x = event.accelerationIncludingGravity.x * this.sensitivity;
+                    this.acceleration.y = event.accelerationIncludingGravity.z * this.sensitivity;
+                } else {
+                    this.acceleration.x = event.accelerationIncludingGravity.x * this.sensitivity;
+                    this.acceleration.y = event.accelerationIncludingGravity.y * this.sensitivity;
+                }
+                
+                // Apply magnetic effect near slot during magnetic difficulty
+                if (this.currentDifficulty === 'magnetic') {
+                    const slotRect = this.slot.getBoundingClientRect();
+                    const dx = this.position.x - (slotRect.left + slotRect.width/2);
+                    const dy = this.position.y - (slotRect.top + slotRect.height/2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 150) {
+                        const force = 0.2 * (1 - distance / 150);
+                        this.acceleration.x -= (dx / distance) * force;
+                        this.acceleration.y -= (dy / distance) * force;
+                    }
+                }
+
+                // Add wall avoidance force when near edges
+                const wallForceRange = 2; // Distance from wall where force starts
+                const maxWallForce = 2.7;
+
+                // Left wall avoidance
+                if (this.position.x < wallForceRange) {
+                    const force = (1 - this.position.x / wallForceRange) * maxWallForce;
+                    this.acceleration.x += force;
+                }
+                // Right wall avoidance
+                if (this.position.x > window.innerWidth - wallForceRange) {
+                    const force = (1 - (window.innerWidth - this.position.x) / wallForceRange) * maxWallForce;
+                    this.acceleration.x -= force;
+                }
+                // Top wall avoidance
+                if (this.position.y < wallForceRange) {
+                    const force = (1 - this.position.y / wallForceRange) * maxWallForce;
+                    this.acceleration.y += force;
+                }
+                // Bottom wall avoidance
+                if (this.position.y > window.innerHeight - wallForceRange) {
+                    const force = (1 - (window.innerHeight - this.position.y) / wallForceRange) * maxWallForce;
+                    this.acceleration.y -= force;
+                }
+            }
+        }
+        
+        const captcha = new MotionCaptcha();
+    </script>
+</body>
+</html>
