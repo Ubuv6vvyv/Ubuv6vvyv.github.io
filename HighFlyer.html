@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>High-Flyer Challenge</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+  <style>
+    /* Previous styles remain the same */
+    :root {
+      --primary: #FF6B6B;
+      --secondary: #4ECDC4;
+      --accent: #FFE66D;
+      --background: #2C3E50;
+      --text: #ECF0F1;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .title {
+      font-size: 2.5rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.1);
+      padding: 1rem;
+      border-radius: 10px;
+      backdrop-filter: blur(5px);
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 25px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    button:hover {
+      background: #ff8585;
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      min-height: 2.4rem;
+    }
+
+    .history {
+      background: rgba(255,255,255,0.1);
+      padding: 1rem;
+      border-radius: 10px;
+      margin-top: 2rem;
+    }
+
+    .history h2 {
+      color: var(--secondary);
+      margin-bottom: 1rem;
+    }
+
+    .history-list {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      padding: 0.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    #heightGraph {
+      width: 100%;
+      height: 150px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      margin: 1rem 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .graph-line {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: linear-gradient(to top, var(--primary), var(--secondary));
+      transition: height 0.1s;
+    }
+
+    @media (max-width: 480px) {
+      .title {
+        font-size: 2rem;
+      }
+      .stats {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title animate__animated animate__bounceIn">High-Flyer Challenge</h1>
+      <p>High Flyer: Phone Launch Hero/p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="currentHeight">0.00</div>
+        <div class="stat-label">Current Height (m)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="maxHeight">0.00</div>
+        <div class="stat-label">Max Height (m)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="rotation">0°</div>
+        <div class="stat-label">Rotation</div>
+      </div>
+    </div>
+
+    <div id="heightGraph">
+      <div class="graph-line"></div>
+    </div>
+
+    <div class="status" id="status">Ready for testing. Hint: Use your parents phone if you don't have one!</div>
+
+    <div class="controls">
+      <button id="startBtn" class="animate__animated animate__pulse animate__infinite">Start Test</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <div class="history">
+      <h2>Test History</h2>
+      <ul class="history-list" id="historyList"></ul>
+    </div>
+  </div>
+
+  <script>
+    class HighFlyerChallenge {
+      constructor() {
+        this.state = {
+          isRecording: false,
+          maxHeight: 0,
+          currentHeight: 0,
+          rotation: 0,
+          peakAcceleration: 0,
+          throwStartTime: 0,
+          throwEndTime: 0,
+          inFlight: false,
+          debugMode: false,
+          uiInterval: null,
+          lastFrameTime: 0,
+          frameCount: 0
+        };
+
+        this.constants = {
+          ACCEL_THRESHOLD: 15,    // m/s^2 threshold to detect throw start
+          LANDING_THRESHOLD: 12,  // (no longer used for landing detection)
+          GRAVITY: 9.81,          // m/s^2
+          MAX_HEIGHT_CAP: 10,     // meters
+          VELOCITY_SCALE: 0.1,    // Scale factor for converting acceleration to velocity
+          BUFFER_SIZE: 10,        // Size of acceleration buffer (unused in flight detection now)
+          MAX_HISTORY: 10         // Maximum number of history entries
+        };
+
+        this.accelBuffer = [];
+        this.history = this.loadHistory();
+
+        this.elements = {
+          startBtn: document.getElementById('startBtn'),
+          resetBtn: document.getElementById('resetBtn'),
+          currentHeight: document.getElementById('currentHeight'),
+          maxHeight: document.getElementById('maxHeight'),
+          rotation: document.getElementById('rotation'),
+          status: document.getElementById('status'),
+          historyList: document.getElementById('historyList'),
+          graphLine: document.querySelector('.graph-line')
+        };
+
+        this.bindEvents();
+        this.updateHistory();
+        this.checkPermissions();
+      }
+
+      loadHistory() {
+        try {
+          return JSON.parse(localStorage.getItem('highFlyerHistory')) || [];
+        } catch (e) {
+          console.error('Error loading history:', e);
+          return [];
+        }
+      }
+
+      bindEvents() {
+        this.elements.startBtn.addEventListener('click', () => this.startTest());
+        this.elements.resetBtn.addEventListener('click', () => this.reset());
+
+        window.addEventListener('devicemotion', this.handleMotionEvent.bind(this), false);
+        window.addEventListener('deviceorientation', this.handleOrientationEvent.bind(this), false);
+      }
+
+      async checkPermissions() {
+        try {
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            // iOS 13+ flow
+            const [motionPermission, orientationPermission] = await Promise.all([
+              DeviceMotionEvent.requestPermission(),
+              DeviceOrientationEvent.requestPermission()
+            ]);
+
+            if (motionPermission === 'granted' && orientationPermission === 'granted') {
+              this.setStatus('Sensors ready for testing');
+            } else {
+              this.handlePermissionDenied();
+            }
+          } else {
+            // Non-iOS devices
+            if (window.DeviceMotionEvent && window.DeviceOrientationEvent) {
+              this.setStatus('Sensors ready for testing');
+            } else {
+              this.handlePermissionDenied();
+            }
+          }
+        } catch (error) {
+          console.error('Error requesting sensor permissions:', error);
+          this.handlePermissionDenied();
+        }
+      }
+
+      handlePermissionDenied() {
+        this.setStatus('Sensor access not available');
+        this.elements.startBtn.disabled = true;
+      }
+
+      setStatus(message, animate = false) {
+        this.elements.status.textContent = message;
+        if (animate) {
+          this.elements.status.className = 'status animate__animated animate__flash';
+        } else {
+          this.elements.status.className = 'status';
+        }
+      }
+
+      startTest() {
+        Object.assign(this.state, {
+          isRecording: true,
+          throwStartTime: Date.now(),
+          maxHeight: 0,
+          currentHeight: 0,
+          peakAcceleration: 0,
+          throwEndTime: 0,
+          inFlight: false,
+          lastFrameTime: 0,
+          frameCount: 0
+        });
+
+        // Clear any previous acceleration buffer
+        this.accelBuffer = [];
+        this.elements.startBtn.disabled = true;
+        this.setStatus('Test in progress...', true);
+
+        // Clear any existing interval
+        if (this.state.uiInterval) {
+          clearInterval(this.state.uiInterval);
+        }
+
+        // Initialize UI update interval (~60fps)
+        this.state.uiInterval = setInterval(() => this.updateUI(), 16);
+      }
+
+      handleMotionEvent(event) {
+        if (!this.state.isRecording || !event.accelerationIncludingGravity) return;
+
+        const acceleration = event.accelerationIncludingGravity;
+        const accelMagnitude = Math.sqrt(
+          acceleration.x ** 2 +
+          acceleration.y ** 2 +
+          acceleration.z ** 2
+        );
+
+        this.processAcceleration(accelMagnitude);
+      }
+
+      processAcceleration(accelMagnitude) {
+        // Update acceleration buffer (retained if needed for debugging)
+        this.accelBuffer.push(accelMagnitude);
+        if (this.accelBuffer.length > this.constants.BUFFER_SIZE) {
+          this.accelBuffer.shift();
+        }
+
+        // Detect throw start (only once per test)
+        if (!this.state.inFlight && accelMagnitude > this.constants.ACCEL_THRESHOLD) {
+          this.startFlight(accelMagnitude);
+        }
+
+        // Update during flight if already started
+        if (this.state.inFlight) {
+          this.updateFlight(accelMagnitude);
+        }
+      }
+
+      startFlight(accelMagnitude) {
+        this.state.throwStartTime = Date.now();
+        this.state.inFlight = true;
+        this.state.peakAcceleration = accelMagnitude;
+      }
+
+      updateFlight(accelMagnitude) {
+        // Update peak acceleration if a larger value is recorded during the flight
+        if (accelMagnitude > this.state.peakAcceleration) {
+          this.state.peakAcceleration = accelMagnitude;
+        }
+
+        // Compute the time in air (in seconds)
+        const timeInAir = (Date.now() - this.state.throwStartTime) / 1000;
+        // Estimate current height using projectile motion
+        this.state.currentHeight = this.estimateCurrentHeight(timeInAir);
+        // Continuously update the maximum height reached during the flight
+        this.state.maxHeight = Math.max(this.state.maxHeight, this.state.currentHeight);
+
+        // Calculate expected flight time based on the current peak acceleration
+        const v0 = this.state.peakAcceleration * this.constants.VELOCITY_SCALE;
+        const expectedFlightTime = (2 * v0) / this.constants.GRAVITY; // total flight duration in ideal conditions
+
+        // If the object has been in the air longer than expected (plus a small buffer)
+        // or if the estimated height has essentially returned to zero after some minimal flight time,
+        // we complete the flight.
+        if (timeInAir >= expectedFlightTime + 0.1 || (timeInAir > 0.3 && this.state.currentHeight <= 0.05)) {
+          this.completeFlight();
+        }
+      }
+
+      estimateCurrentHeight(timeInAir) {
+        const v0 = this.state.peakAcceleration * this.constants.VELOCITY_SCALE;
+        const height = v0 * timeInAir - (0.5 * this.constants.GRAVITY * timeInAir * timeInAir);
+        return Math.max(0, Math.min(height, this.constants.MAX_HEIGHT_CAP));
+      }
+
+      handleOrientationEvent(event) {
+        if (!this.state.isRecording || (event.beta === null && event.gamma === null)) return;
+        
+        // Calculate a combined rotation value from beta and gamma angles
+        this.state.rotation = Math.sqrt(event.beta ** 2 + event.gamma ** 2);
+        this.elements.rotation.textContent = `${Math.round(this.state.rotation)}°`;
+      }
+
+      completeFlight() {
+        this.state.throwEndTime = Date.now();
+        this.calculateFinalHeight();
+        this.state.inFlight = false;
+        this.completeTest();
+      }
+
+      calculateFinalHeight() {
+        const v0 = this.state.peakAcceleration * this.constants.VELOCITY_SCALE;
+        const calculatedMax = (v0 * v0) / (2 * this.constants.GRAVITY);
+        // Ensure that the final max height is the highest value recorded during the flight
+        this.state.maxHeight = Math.max(this.state.maxHeight, calculatedMax);
+      }
+
+      updateUI() {
+        const currentHeightFormatted = this.state.currentHeight.toFixed(2);
+        const maxHeightFormatted = this.state.maxHeight.toFixed(2);
+
+        this.elements.currentHeight.textContent = currentHeightFormatted;
+        this.elements.maxHeight.textContent = maxHeightFormatted;
+
+        // Update the height graph line
+        const heightPercentage = (this.state.currentHeight / this.constants.MAX_HEIGHT_CAP) * 100;
+        this.elements.graphLine.style.height = `${Math.min(100, heightPercentage)}%`;
+
+        // Debug: frame counting (if debugMode is enabled)
+        if (this.state.debugMode) {
+          this.updateFrameCounter();
+        }
+      }
+
+      updateFrameCounter() {
+        this.state.frameCount++;
+        const now = Date.now();
+        if (now - this.state.lastFrameTime >= 1000) {
+          console.log(`FPS: ${this.state.frameCount}`);
+          this.state.frameCount = 0;
+          this.state.lastFrameTime = now;
+        }
+      }
+
+      completeTest() {
+        this.state.isRecording = false;
+        this.elements.startBtn.disabled = false;
+
+        // Calculate score and bonuses
+        const score = this.calculateScore();
+        
+        // Save the result to history
+        this.saveToHistory(score);
+        
+        // Clear the UI update interval
+        if (this.state.uiInterval) {
+          clearInterval(this.state.uiInterval);
+          this.state.uiInterval = null;
+        }
+
+        this.setStatus(`Test complete! Score: ${Math.round(score.total)}`);
+        this.elements.status.className = 'status animate__animated animate__bounceIn';
+      }
+
+      calculateScore() {
+        const baseScore = this.state.maxHeight * 1000;
+        const bonuses = [];
+        let totalScore = baseScore;
+
+        if (this.state.rotation > 360) {
+          totalScore *= 1.5;
+          bonuses.push("360° Rotation");
+        }
+
+        return { total: totalScore, bonuses };
+      }
+
+      saveToHistory(score) {
+        const entry = {
+          date: new Date().toLocaleString(),
+          height: this.state.maxHeight.toFixed(2),
+          rotation: Math.round(this.state.rotation),
+          score: Math.round(score.total),
+          bonuses: score.bonuses
+        };
+
+        this.history.unshift(entry);
+        if (this.history.length > this.constants.MAX_HISTORY) {
+          this.history.pop();
+        }
+
+        try {
+          localStorage.setItem('highFlyerHistory', JSON.stringify(this.history));
+        } catch (e) {
+          console.error('Error saving history:', e);
+        }
+
+        this.updateHistory();
+      }
+
+      updateHistory() {
+        this.elements.historyList.innerHTML = this.history.map(entry => `
+          <li class="history-item">
+            ${entry.date}: ${entry.height}m, ${entry.rotation}°
+            ${entry.bonuses.length ? `(${entry.bonuses.join(', ')})` : ''}
+            - Score: ${entry.score}
+          </li>
+        `).join('');
+      }
+
+      reset() {
+        // Reset state variables
+        Object.assign(this.state, {
+          maxHeight: 0,
+          currentHeight: 0,
+          rotation: 0,
+          peakAcceleration: 0,
+          throwStartTime: 0,
+          throwEndTime: 0,
+          inFlight: false
+        });
+
+        // Clear acceleration buffer
+        this.accelBuffer = [];
+
+        // Reset UI components
+        this.updateUI();
+        this.setStatus('Ready for testing');
+        this.elements.startBtn.disabled = false;
+        this.elements.graphLine.style.height = '0%';
+
+        // Clear any running interval
+        if (this.state.uiInterval) {
+          clearInterval(this.state.uiInterval);
+          this.state.uiInterval = null;
+        }
+      }
+    }
+
+    // Initialize the app when the DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = new HighFlyerChallenge();
+    });
+  </script>
+</body>
+</html>
