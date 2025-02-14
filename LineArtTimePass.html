@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sensor Line Art</title>
+  <style>
+    /* Reset and base styles */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #222;
+      color: #eee;
+      font-size: 0.8rem;
+    }
+    /* Divide the page into header, canvas, and toolbar */
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    header {
+      padding: 4px;
+      text-align: center;
+      background: #222;
+      color: #eee;
+    }
+    /* The canvas fills the available space */
+    #canvas {
+      width: 100%;
+      height: 100%;
+      background: black;
+      display: block;
+    }
+    /* A single compact controls div using grid */
+    .controls {
+      padding: 4px;
+      background: #222;
+      box-sizing: border-box;
+      display: grid;
+      /* Adjust columns as needed – here we use auto-fit */
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 4px;
+    }
+    .controls label, 
+    .controls input, 
+    .controls select, 
+    .controls button {
+      margin: 0;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+    .controls input[type="range"],
+    .controls input[type="color"],
+    .controls select {
+      margin-top: 2px;
+      cursor: pointer;
+    }
+    .controls button {
+      background: #444;
+      color: #eee;
+      border: none;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.3s;
+      font-size: 0.8rem;
+    }
+    .controls button:hover {
+      background: #666;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sensor induced line art, waste your time! </h1>
+  </header>
+  <canvas id="canvas"></canvas>
+  <div class="controls">
+    <!-- All controls are in one single div -->
+    <label>Color:
+      <input type="color" id="colorPicker" value="#00ff00">
+    </label>
+    <label>Thickness:
+      <input type="range" id="thickness" min="1" max="10" step="1" value="2">
+    </label>
+    <label>Sensitivity:
+      <input type="range" id="sensitivity" min="1" max="20" step="1" value="5">
+    </label>
+    <label>Speed:
+      <input type="range" id="speed" min="1" max="10" step="1" value="5">
+    </label>
+    <label>Variation:
+      <input type="range" id="variation" min="0" max="20" step="1" value="5">
+    </label>
+    <label>Jitter:
+      <input type="range" id="jitter" min="0" max="10" step="0.5" value="2">
+    </label>
+    <label>Split:
+      <input type="range" id="split" min="0" max="10" step="0.5" value="0">
+    </label>
+    <label>Trail Mode:
+      <input type="checkbox" id="trailMode" checked>
+    </label>
+    <label>Color Shift:
+      <input type="checkbox" id="colorShiftMode">
+    </label>
+    <label>Glow Mode:
+      <input type="checkbox" id="glowMode">
+    </label>
+    <label>Rainbow Mode:
+      <input type="checkbox" id="rainbowMode">
+    </label>
+    <label>Random Mode:
+      <input type="checkbox" id="randomMode">
+    </label>
+    <label>Path Type:
+      <select id="pathType">
+        <option value="default">Default</option>
+        <option value="mandala">Mandala</option>
+        <option value="geometric">Geometric</option>
+        <option value="frantic">Frantic</option>
+        <option value="gyroscope">Gyroscope</option>
+        <option value="bounce">Bounce</option>
+        <option value="zigzag">Zigzag</option>
+        <option value="explosion">Explosion</option>
+      </select>
+    </label>
+    <button id="clear">Clear</button>
+    <button id="save">Save</button>
+  </div>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const colorPicker = document.getElementById("colorPicker");
+    const thicknessSlider = document.getElementById("thickness");
+    const sensitivitySlider = document.getElementById("sensitivity");
+    const speedSlider = document.getElementById("speed");
+    const variationSlider = document.getElementById("variation");
+    const jitterSlider = document.getElementById("jitter");
+    const splitSlider = document.getElementById("split");
+    const trailMode = document.getElementById("trailMode");
+    const colorShiftMode = document.getElementById("colorShiftMode");
+    const glowMode = document.getElementById("glowMode");
+    const rainbowMode = document.getElementById("rainbowMode");
+    const randomMode = document.getElementById("randomMode");
+    const pathType = document.getElementById("pathType");
+    const clearButton = document.getElementById("clear");
+    const saveButton = document.getElementById("save");
+
+    // Resize canvas to match its displayed size (using client dimensions)
+    function resizeCanvas() {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    let lastX = x;
+    let lastY = y;
+    let hue = 0;
+    let angle = 0;
+    let randomChangeCounter = 0;
+    let latestMotion = null;
+    let drawingScheduled = false;
+
+    // Throttle drawing using requestAnimationFrame
+    function drawFrame() {
+      if (!latestMotion) {
+        drawingScheduled = false;
+        return;
+      }
+      const event = latestMotion;
+      latestMotion = null;
+      
+      let ax = event.accelerationIncludingGravity.x || 0;
+      let ay = event.accelerationIncludingGravity.y || 0;
+      const sensitivity = parseInt(sensitivitySlider.value);
+      const speed = parseInt(speedSlider.value);
+      const variation = parseInt(variationSlider.value);
+      const jitter = parseFloat(jitterSlider.value);
+      const split = parseFloat(splitSlider.value);
+
+      if (randomMode.checked && randomChangeCounter % 50 === 0) {
+        thicknessSlider.value = Math.floor(Math.random() * 10) + 1;
+        sensitivitySlider.value = Math.floor(Math.random() * 20) + 1;
+        speedSlider.value = Math.floor(Math.random() * 10) + 1;
+        variationSlider.value = Math.floor(Math.random() * 20);
+        jitterSlider.value = (Math.random() * 10).toFixed(1);
+        splitSlider.value = (Math.random() * 10).toFixed(1);
+        colorPicker.value =
+          "#" + ("000000" + Math.floor(Math.random() * 16777215).toString(16)).slice(-6);
+      }
+      randomChangeCounter++;
+
+      // Calculate new coordinates based on the selected path type
+      switch (pathType.value) {
+        case "mandala": {
+          let baseRadius = sensitivity * 10 + Math.abs(ax) * 2;
+          let innerRadius = speed * 5 + Math.abs(ay) * 2;
+          angle += 0.05 + ay * 0.005;
+          x = canvas.width / 2 + Math.cos(angle) * (baseRadius + innerRadius * Math.cos(angle * 3));
+          y = canvas.height / 2 + Math.sin(angle) * (baseRadius + innerRadius * Math.sin(angle * 3));
+          break;
+        }
+        case "geometric": {
+          let t = Date.now() * 0.002;
+          let offset = (ax + ay) * 0.5;
+          x = canvas.width / 2 + Math.cos(t + offset) * (speed * 10 + Math.abs(ax) * 2);
+          y = canvas.height / 2 + Math.sin(t + offset) * (speed * 10 + Math.abs(ay) * 2);
+          break;
+        }
+        case "frantic":
+          x += (Math.random() - 0.5) * speed * sensitivity * 10;
+          y += (Math.random() - 0.5) * speed * sensitivity * 10;
+          break;
+        case "gyroscope":
+          angle += 0.1;
+          x += Math.cos(angle) * speed * sensitivity;
+          y += Math.sin(angle) * speed * sensitivity;
+          break;
+        case "bounce":
+          x += ax * sensitivity * speed;
+          y -= ay * sensitivity * speed;
+          if (x <= 0 || x >= canvas.width) x = canvas.width - x;
+          if (y <= 0 || y >= canvas.height) y = canvas.height - y;
+          break;
+        case "zigzag":
+          x += Math.sign(Math.sin(angle)) * speed * sensitivity;
+          y += Math.sign(Math.cos(angle)) * speed * sensitivity;
+          angle += 0.1;
+          break;
+        case "explosion":
+          x += (Math.random() - 0.5) * 50;
+          y += (Math.random() - 0.5) * 50;
+          break;
+        default:
+          x += ax * sensitivity * speed;
+          y -= ay * sensitivity * speed;
+      }
+
+      // Add variation and jitter
+      x += Math.sin(Date.now() * 0.005) * variation;
+      y += Math.cos(Date.now() * 0.005) * variation;
+      x += (Math.random() - 0.5) * jitter;
+      y += (Math.random() - 0.5) * jitter;
+
+      // Wrap-around if out of bounds
+      if (x < 0) x = canvas.width;
+      if (x > canvas.width) x = 0;
+      if (y < 0) y = canvas.height;
+      if (y > canvas.height) y = 0;
+
+      // Set stroke style and effects
+      ctx.strokeStyle = colorPicker.value;
+      if (colorShiftMode.checked) {
+        hue = (hue + 2) % 360;
+        ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+      }
+      if (rainbowMode.checked) {
+        ctx.strokeStyle = `hsl(${Date.now() % 360}, 100%, 50%)`;
+      }
+      if (glowMode.checked) {
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.strokeStyle;
+      } else {
+        ctx.shadowBlur = 0;
+      }
+      ctx.lineWidth = thicknessSlider.value;
+      ctx.lineCap = "round";
+
+      // Draw line or dot depending on trail mode
+      ctx.beginPath();
+      if (trailMode.checked) {
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(x, y);
+      } else {
+        ctx.arc(x, y, thicknessSlider.value / 2, 0, 2 * Math.PI);
+      }
+      ctx.stroke();
+
+      // If split is enabled, draw offset duplicates
+      if (split > 0) {
+        let dx = x - lastX;
+        let dy = y - lastY;
+        let len = Math.sqrt(dx * dx + dy * dy) || 1;
+        let offsetX = (-dy / len) * split;
+        let offsetY = (dx / len) * split;
+
+        ctx.beginPath();
+        if (trailMode.checked) {
+          ctx.moveTo(lastX + offsetX, lastY + offsetY);
+          ctx.lineTo(x + offsetX, y + offsetY);
+        } else {
+          ctx.arc(x + offsetX, y + offsetY, thicknessSlider.value / 2, 0, 2 * Math.PI);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        if (trailMode.checked) {
+          ctx.moveTo(lastX - offsetX, lastY - offsetY);
+          ctx.lineTo(x - offsetX, y - offsetY);
+        } else {
+          ctx.arc(x - offsetX, y - offsetY, thicknessSlider.value / 2, 0, 2 * Math.PI);
+        }
+        ctx.stroke();
+      }
+
+      lastX = x;
+      lastY = y;
+      drawingScheduled = false;
+    }
+
+    function handleMotionEvent(event) {
+      latestMotion = event;
+      if (!drawingScheduled) {
+        drawingScheduled = true;
+        requestAnimationFrame(drawFrame);
+      }
+    }
+
+    window.addEventListener("devicemotion", handleMotionEvent);
+
+    clearButton.addEventListener("click", () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    saveButton.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = "line-art.png";
+      link.click();
+    });
+  </script>
+</body>
+</html>
