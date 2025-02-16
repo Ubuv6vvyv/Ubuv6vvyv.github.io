@@ -1,0 +1,429 @@
+
+<html>
+<head>
+  <title>Pattern Generator</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .controls {
+      flex: 1;
+      padding: 5px;
+      background: #fff;
+      overflow-y: auto;
+      font-size: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .control-top {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+    .control-top .pattern-select,
+    .control-top .color-picker {
+      margin: 2px;
+font-size: 30px;
+    }
+    .toggle-group {
+      display: flex;
+      gap: 2px;
+      flex-wrap: wrap;
+      margin: 2px;
+    }
+    .toggle-btn {
+      padding: 2px 4px;
+      background: #eee;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    .toggle-btn.active {
+      background: #007bff;
+      color: white;
+      border-color: #0056b3;
+    }
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(640px, 1fr));
+      gap: 5px;
+      width: 100%;
+      margin-bottom: 5px;
+    }
+    .slider-group {
+      padding: 4px;
+      background: #f8f8f8;
+      border-radius: 4px;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 15px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 2px;
+      width: 100%;
+    }
+    .action-buttons button {
+      flex: 1;
+      padding: 4px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .action-buttons button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="canvas-container">
+      <canvas id="illusionCanvas"></canvas>
+    </div>
+    <div class="controls">
+      <div class="control-top">
+        <select class="pattern-select" id="patternSelect">
+          <option value="circles">Hypnotic Spiral</option>
+          <option value="scary">Dark Pattern</option>
+        </select>
+        <div class="toggle-group">
+          <button class="toggle-btn" data-effect="invert">Invert</button>
+          <button class="toggle-btn" data-effect="rainbow">Rainbow</button>
+        </div>
+        <input type="color" id="colorPicker" class="color-picker" value="#000000">
+      </div>
+      <div class="sliders-grid">
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Elements</span>
+            <span id="elementsValue">30</span>
+          </div>
+          <input type="range" id="elements" min="5" max="200" step="1" value="30">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Line Width</span>
+            <span id="lineWidthValue">0.5</span>
+          </div>
+          <input type="range" id="lineWidth" min="0.01" max="6" step="0.001" value="0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Distortion (Careful)</span>
+            <span id="distortionValue">0</span>
+          </div>
+          <input type="range" id="distortion" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Wave Amplitude</span>
+            <span id="waveAmplitudeValue">25</span>
+          </div>
+          <input type="range" id="waveAmplitude" min="-25" max="285" step="1" value="50">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Wave Frequency</span>
+            <span id="waveFrequencyValue">1</span>
+          </div>
+          <input type="range" id="waveFrequency" min="-10" max="30" step="0.1" value="1">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Rotation Speed</span>
+            <span id="rotationSpeedValue">4</span>
+          </div>
+          <input type="range" id="rotationSpeed" min="0" max="50" step="0.1" value="4">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Wave Speed</span>
+            <span id="waveSpeedValue">1</span>
+          </div>
+          <input type="range" id="waveSpeed" min="0" max="50" step="0.01" value="1">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Circle Step</span>
+            <span id="angleStepValue">0.01</span>
+          </div>
+          <input type="range" id="angleStep" min="0.001" max="0.1" step="0.001" value="0.01">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Spike Resolution</span>
+            <span id="spikeStepValue">0.1</span>
+          </div>
+          <input type="range" id="spikeStep" min="0.01" max="0.5" step="0.01" value="0.1">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Spiral Multiplier</span>
+            <span id="spiralMultiplierValue">10</span>
+          </div>
+          <input type="range" id="spiralMultiplier" min="1" max="20" step="0.5" value="10">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Jitter Amount</span>
+            <span id="jitterValue">5</span>
+          </div>
+          <input type="range" id="jitter" min="0" max="20" step="0.1" value="5">
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button id="randomize">Randomize</button>
+        <button id="reset">Reset</button>
+        <button id="download">Download Canvas (PNG)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('illusionCanvas');
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let time = 0;
+    
+    const config = {
+      elements: 30,
+      lineWidth: 0.5,
+      rotationSpeed: 4,
+      waveSpeed: 1,
+      distortion: 0,
+      waveAmplitude: 25,
+      waveFrequency: 1,
+      angleStep: 0.01,
+      spikeStep: 0.1,
+      spiralMultiplier: 10,
+      jitter: 5,
+      pattern: 'circles',
+      color: '#000000',
+      effects: {
+        invert: true,
+        rainbow: false
+      }
+    };
+    
+    // Set invert toggle as active initially.
+    document.querySelector('[data-effect="invert"]').classList.add('active');
+    
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    function getColor(angle) {
+      if (config.effects.rainbow) {
+        const hue = (angle / (Math.PI * 2) * 360 + time * 50) % 360;
+        return `hsl(${hue}, 70%, 50%)`;
+      }
+      return config.color;
+    }
+    
+    function setupContext() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (config.pattern === 'scary' && !config.effects.invert) {
+        ctx.fillStyle = '#0d0d0d';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = config.color;
+      } else if (config.effects.invert) {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'white';
+      } else {
+        ctx.strokeStyle = config.color;
+      }
+      ctx.lineWidth = config.lineWidth;
+    }
+    
+    function drawHypnoticCircles() {
+      const center = canvas.width / 2;
+      const maxRadius = Math.min(canvas.width, canvas.height) * 0.45;
+      for (let i = 0; i < config.elements; i++) {
+        const radius = (i + 1) * (maxRadius / config.elements);
+        ctx.beginPath();
+        for (let angle = 0; angle < Math.PI * 2; angle += config.angleStep) {
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
+          const distortedRadius = radius +
+            Math.sin(angle * config.waveFrequency + time * config.waveSpeed) * config.waveAmplitude +
+            Math.random() * config.distortion;
+          const rotatedAngle = angle + time * config.rotationSpeed * (i % 2 ? 1 : -1) * 0.01;
+          const x = center + Math.cos(rotatedAngle) * distortedRadius;
+          const y = center + Math.sin(rotatedAngle) * distortedRadius;
+          angle === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    
+    function drawScaryPattern() {
+      const center = canvas.width / 2;
+      const maxRadius = Math.min(canvas.width, canvas.height) * 0.45;
+      // Draw spiral .
+      for (let i = 0; i < config.elements; i++) {
+        ctx.beginPath();
+        const spiralOffset = (i / config.elements) * Math.PI * 2;
+        for (let radius = 0; radius < maxRadius; radius += 2) {
+          const angle = (radius / maxRadius) * Math.PI * config.spiralMultiplier +
+            time * config.rotationSpeed + spiralOffset;
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
+          const distortion = Math.sin(angle * config.waveFrequency + time * config.waveSpeed) * config.waveAmplitude;
+          const noiseX = Math.random() * config.distortion;
+          const noiseY = Math.random() * config.distortion;
+          const extraJitter = (Math.random() - 0.5) * config.jitter;
+          const x = center + Math.cos(angle) * (radius + distortion) + noiseX + extraJitter;
+          const y = center + Math.sin(angle) * (radius + distortion) + noiseY + extraJitter;
+          radius === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      for (let i = 0; i < config.elements / 2; i++) {
+        ctx.beginPath();
+        const angle = (i / config.elements) * Math.PI * 4 + time * config.rotationSpeed;
+        if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
+        for (let t = 0; t <= 1; t += config.spikeStep) {
+          const spikeRadius = maxRadius * (0.5 + Math.sin(t * Math.PI * 2) * 0.3);
+          const extraJitter = (Math.random() - 0.5) * config.jitter;
+          const x = center + Math.cos(angle + t * Math.PI) * spikeRadius + extraJitter;
+          const y = center + Math.sin(angle + t * Math.PI) * spikeRadius + extraJitter;
+          t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    
+    function draw() {
+      setupContext();
+      switch (config.pattern) {
+        case 'circles':
+          drawHypnoticCircles();
+          break;
+        case 'scary':
+          drawScaryPattern();
+          break;
+      }
+      time += 0.016;
+      animationId = requestAnimationFrame(draw);
+    }
+    
+    function updateSliderValue(sliderId, value) {
+      document.getElementById(`${sliderId}Value`).textContent = value;
+      config[sliderId] = parseFloat(value);
+    }
+    
+    ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'distortion',
+     'waveAmplitude', 'waveFrequency', 'angleStep', 'spikeStep', 'spiralMultiplier', 'jitter'
+    ].forEach(id => {
+      const slider = document.getElementById(id);
+      slider.addEventListener('input', (e) => updateSliderValue(id, e.target.value));
+    });
+    
+    document.getElementById('patternSelect').addEventListener('change', (e) => {
+      config.pattern = e.target.value;
+    });
+    document.getElementById('colorPicker').addEventListener('input', (e) => {
+      config.color = e.target.value;
+    });
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const effect = btn.dataset.effect;
+        config.effects[effect] = !config.effects[effect];
+        btn.classList.toggle('active');
+      });
+    });
+    document.getElementById('download').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'pattern.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+    document.getElementById('randomize').addEventListener('click', () => {
+      ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'distortion',
+       'waveAmplitude', 'waveFrequency', 'angleStep', 'spikeStep', 'spiralMultiplier', 'jitter'
+      ].forEach(key => {
+        const slider = document.getElementById(key);
+        const randomValue = Math.random() * (slider.max - slider.min) + parseFloat(slider.min);
+        slider.value = randomValue;
+        updateSliderValue(key, randomValue);
+      });
+      Object.keys(config.effects).forEach(effect => {
+        config.effects[effect] = Math.random() > 0.01;
+        const btn = document.querySelector(`[data-effect="${effect}"]`);
+        btn.classList.toggle('active', config.effects[effect]);
+      });
+      const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+      document.getElementById('colorPicker').value = randomColor;
+      config.color = randomColor;
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      const defaultValues = {
+        elements: 30,
+        lineWidth: 0.5,
+        rotationSpeed: 4,
+        waveSpeed: 1,
+        distortion: 0,
+        waveAmplitude: 25,
+        waveFrequency: 1,
+        angleStep: 0.01,
+        spikeStep: 0.1,
+        spiralMultiplier: 10,
+        jitter: 5
+      };
+      Object.entries(defaultValues).forEach(([key, value]) => {
+        const slider = document.getElementById(key);
+        slider.value = value;
+        updateSliderValue(key, value);
+      });
+      Object.keys(config.effects).forEach(effect => {
+        config.effects[effect] = false;
+        const btn = document.querySelector(`[data-effect="${effect}"]`);
+        btn.classList.remove('active');
+      });
+      config.effects.invert = true;
+      document.querySelector('[data-effect="invert"]').classList.add('active');
+      document.getElementById('colorPicker').value = '#000000';
+      config.color = '#000000';
+    });
+    
+    draw();
+  </script>
+</body>
+</html>
