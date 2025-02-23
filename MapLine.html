@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <!-- Mobile-friendly viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enhanced City Roads Network Viewer</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+font-size: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    /* Sidebar panel for controls */
+    #controls {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      max-width: 30%;
+      background: rgba(255, 255, 255, 0.5);
+      padding: 5px;
+      border-radius: 8px;
+font-size: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 10;
+      overflow-y: auto;
+      max-height: 30%;
+    }
+    #controls h2, #controls h3, #controls h4 {
+      margin: 8px 0;
+    }
+    /* "My Location" button with subtle glow */
+    #getLocationBtn {
+      padding: 8px 16px;
+      margin: 5px 0;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #4285f4;
+      color: white;
+      font-weight: 500;
+      transition: background 0.2s;
+      width: 100%;
+      animation: buttonGlow 2s infinite;
+    }
+    @keyframes buttonGlow {
+      0% { box-shadow: 0 0 5px rgba(66,133,244,0.7); }
+      50% { box-shadow: 0 0 15px rgba(66,133,244,1); }
+      100% { box-shadow: 0 0 5px rgba(66,133,244,0.7); }
+    }
+    #controls button {
+      padding: 8px 16px;
+      margin: 5px 0;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #4285f4;
+      color: white;
+      font-weight: 500;
+font-size: 8px;
+      transition: background 0.2s;
+      width: 100%;
+    }
+    #controls button:hover {
+      background: #356ac3;
+    }
+    button.secondary {
+      background: #757575;
+    }
+    button.secondary:hover {
+      background: #616161;
+    }
+    #controls input[type="text"],
+    #controls select,
+    #controls input[type="color"] {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0 10px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #controls input[type="range"] {
+      width: 100%;
+    }
+    /* Sections within the sidebar */
+    #controls section {
+      margin-bottom: 15px;
+    }
+    details {
+      margin-bottom: 15px;
+    }
+    details summary {
+      font-weight: bold;
+      cursor: pointer;
+      padding: 5px 0;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+font-size: 8px;
+      margin: 5px 0;
+    }
+    .control-group label {
+      flex: 1;
+    }
+    /* Stats panel (bottom right) */
+    #stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.97);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      min-width: 60px;
+      z-index: 10;
+      display: none;
+    }
+    /* Loading overlay */
+    #loading {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.97);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 20;
+      text-align: center;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #4285f4;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Glow effect for map canvas during road rendering */
+    .glow {
+      animation: glowAnimation 1.5s ease-in-out infinite;
+    }
+    @keyframes glowAnimation {
+      0% { box-shadow: 0 0 5px rgba(66,133,244,0.7); }
+      50% { box-shadow: 0 0 20px rgba(66,133,244,1); }
+      100% { box-shadow: 0 0 5px rgba(66,133,244,0.7); }
+    }
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+      #controls {
+        max-width: 30%;
+max-height: 500px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Controls Sidebar -->
+  <div id="controls" class="panel">
+    <h2>City Roads Viewer</h2>
+    <!-- Navigation Section -->
+    <section id="navigation">
+      <h3>Navigation</h3>
+      <button id="getLocationBtn" onclick="getCurrentLocation()" title="Use current location">📍 My Location</button>
+      <input type="text" id="addressInput" placeholder="Enter address">
+    </section>
+    <!-- Actions Section -->
+    <section id="actions">
+      <h3>Actions</h3>
+      <button onclick="fetchRoads()">Fetch Roads</button>
+      <button class="secondary" onclick="clearRoads()">Clear Roads</button>
+    </section>
+    <!-- Advanced Settings (collapsible) -->
+    <details id="advancedSettings">
+      <summary>Advanced Settings</summary>
+      <!-- Road Types -->
+      <section id="roadTypes">
+        <h4>Road Types</h4>
+        <div class="control-group">
+          <input type="checkbox" id="highway" checked onchange="updateRoadVisibility('highway')">
+          <label for="highway">Highways</label>
+        </div>
+        <input type="color" id="highway-color" value="#FF0000" onchange="updateRoadTypeStyle('highway')">
+        <div class="control-group">
+          <input type="checkbox" id="primary" checked onchange="updateRoadVisibility('primary')">
+          <label for="primary">Primary Roads</label>
+        </div>
+        <input type="color" id="primary-color" value="#FFA500" onchange="updateRoadTypeStyle('primary')">
+        <div class="control-group">
+          <input type="checkbox" id="secondary" checked onchange="updateRoadVisibility('secondary')">
+          <label for="secondary">Secondary Roads</label>
+        </div>
+        <input type="color" id="secondary-color" value="#FFFF00" onchange="updateRoadTypeStyle('secondary')">
+        <div class="control-group">
+          <input type="checkbox" id="residential" checked onchange="updateRoadVisibility('residential')">
+          <label for="residential">Residential</label>
+        </div>
+        <input type="color" id="residential-color" value="#FFFFFF" onchange="updateRoadTypeStyle('residential')">
+      </section>
+      <!-- Map Style -->
+      <section id="mapStyles">
+        <h4>Map Style</h4>
+        <!-- Default to "Dark (No Labels)" -->
+        <select id="mapStyleSelect" onchange="updateMapStyle(this.value)">
+          <option value="dark" selected>Dark</option>
+          <option value="minimal">Minimal</option>
+          <option value="light">Light</option>
+          <option value="satellite">Satellite</option>
+        </select>
+      </section>
+      <!-- Animation Settings -->
+      <section id="animationSettings">
+        <h4>Animation Settings</h4>
+        <label>
+          <input type="checkbox" id="animateRoads"> Animate Road Drawing
+        </label>
+        <div class="control-group">
+          <label for="animationSpeed">Speed (ms/point):</label>
+          <input type="range" id="animationSpeed" min="10" max="100" step="5" value="30" onchange="updateAnimationSpeedDisplay()">
+          <span id="animationSpeedDisplay">30</span>
+        </div>
+      </section>
+      <!-- Export Options -->
+      <section id="exportControls">
+        <h4>Export Options</h4>
+        <button onclick="exportToSVG()">Export as SVG</button>
+        <button onclick="exportToImage()">Export as PNG</button>
+      </section>
+    </details>
+    <!-- Style Controls -->
+    <section id="styleControls">
+      <h3>Style Controls</h3>
+      <div class="control-group">
+        <label for="roadColor">Road Color:</label>
+        <!-- Default white for white road lines -->
+        <input type="color" id="roadColor" value="#FFFFFF" onchange="updateStyle()">
+      </div>
+      <div class="control-group">
+        <label for="opacity">Opacity:</label>
+        <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="1" onchange="updateStyle()">
+      </div>
+      <div class="control-group">
+        <label for="weight">Line Weight:</label>
+        <input type="range" id="weight" min="0.1" max="5" step="0.1" value="1" onchange="updateStyle()">
+      </div>
+    </section>
+  </div>
+
+  <!-- Stats Panel -->
+  <div id="stats" class="panel">
+    <h3>Network Stats</h3>
+    <p>Roads: <span id="roadCount">0</span></p>
+    <p>Total Length: <span id="totalLength">0</span> km</p>
+    <p>Area: <span id="areaCoverage">0</span> km²</p>
+    <p>Avg Length: <span id="averageLength">0</span> km</p>
+    <p>Nodes: <span id="totalNodes">0</span></p>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loadingText">Loading...</div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js"></script>
+  <script>
+    let map;
+    let roadLines = [];
+    let currentBounds = null;
+    let autocomplete;
+
+    // Here we define a dark style that removes all labels and icons.
+    const darkNoLabelsStyle = [
+      { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+      { elementType: "labels", stylers: [{ visibility: "off" }] }
+    ];
+
+    // Other style options remain as before.
+    const otherStyles = {
+      minimal: [
+        { elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+        { elementType: "labels", stylers: [{ visibility: "off" }] }
+      ],
+      light: [
+        { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+        { elementType: "labels", stylers: [{ visibility: "off" }] }
+      ],
+      satellite: null
+    };
+
+    function initMap() {
+      // Initialize map using the darkNoLabelsStyle.
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 13,
+        center: {lat: 40.7128, lng: -74.0060},
+        styles: darkNoLabelsStyle
+      });
+      map.addListener('bounds_changed', () => {
+        currentBounds = map.getBounds();
+      });
+      // Initialize Places Autocomplete.
+      const addressInput = document.getElementById('addressInput');
+      autocomplete = new google.maps.places.Autocomplete(addressInput);
+      autocomplete.bindTo('bounds', map);
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry) {
+          alert("No details available for input: '" + place.name + "'");
+          return;
+        }
+        map.setCenter(place.geometry.location);
+        map.setZoom(14);
+      });
+      // Automatically try to get user's location on load.
+      getCurrentLocation();
+    }
+
+    // getCurrentLocation automatically fetches roads and updates styles.
+    function getCurrentLocation() {
+      if (navigator.geolocation) {
+        const btn = document.getElementById('getLocationBtn');
+        btn.disabled = true;
+        btn.textContent = 'Locating...';
+        document.getElementById('loadingText').textContent = 'Locating...';
+        document.getElementById('loading').style.display = 'block';
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+            map.setCenter(pos);
+            map.setZoom(14);
+            setTimeout(() => {
+              document.getElementById('loadingText').textContent = 'Fetching roads...';
+              document.getElementById('map').classList.add('glow');
+              fetchRoads().then(() => {
+                // After fetching roads, reapply the dark style (no labels) and update road styling.
+                updateMapStyle(document.getElementById('mapStyleSelect').value);
+                updateStyle();
+                document.getElementById('map').classList.remove('glow');
+                document.getElementById('loading').style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = '📍 My Location';
+              });
+            }, 1000);
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            alert('Unable to get your location.');
+            document.getElementById('loading').style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = '📍 My Location';
+          }
+        );
+      } else {
+        alert('Geolocation not supported.');
+      }
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function updateStats(roads) {
+      let totalLength = 0, totalNodes = 0;
+      roads.forEach(road => {
+        const path = road.getPath();
+        totalNodes += path.getLength();
+        for (let i = 0; i < path.getLength()-1; i++) {
+          totalLength += calculateDistance(
+            path.getAt(i).lat(), path.getAt(i).lng(),
+            path.getAt(i+1).lat(), path.getAt(i+1).lng()
+          );
+        }
+      });
+      const ne = currentBounds.getNorthEast();
+      const sw = currentBounds.getSouthWest();
+      const areaCoverage = calculateDistance(ne.lat(), ne.lng(), sw.lat(), sw.lng());
+      document.getElementById('roadCount').textContent = roads.length;
+      document.getElementById('totalLength').textContent = totalLength.toFixed(2);
+      document.getElementById('areaCoverage').textContent = areaCoverage.toFixed(2);
+      document.getElementById('averageLength').textContent = (roads.length ? (totalLength/roads.length).toFixed(2) : 0);
+      document.getElementById('totalNodes').textContent = totalNodes;
+      document.getElementById('stats').style.display = 'block';
+    }
+
+    // updateStyle applies the user-controlled road color, opacity, and weight to all roads.
+    function updateStyle() {
+      const color = document.getElementById('roadColor').value;
+      const opacity = parseFloat(document.getElementById('opacity').value);
+      const weight = parseFloat(document.getElementById('weight').value);
+      roadLines.forEach(line => {
+        line.setOptions({ strokeColor: color, strokeOpacity: opacity, strokeWeight: weight });
+      });
+    }
+
+    // Animate polyline drawing using slider-controlled speed.
+    function animatePolyline(polyline, coordinates) {
+      let index = 0;
+      const interval = parseInt(document.getElementById('animationSpeed').value) || 30;
+      const animInterval = setInterval(() => {
+        index++;
+        polyline.setPath(coordinates.slice(0, index));
+        if (index >= coordinates.length) clearInterval(animInterval);
+      }, interval);
+    }
+
+    async function fetchRoads() {
+      if (!currentBounds) return;
+      document.getElementById('map').classList.add('glow');
+      const ne = currentBounds.getNorthEast();
+      const sw = currentBounds.getSouthWest();
+      const query = `
+        [out:json][timeout:25];
+        way[highway](${sw.lat()},${sw.lng()},${ne.lat()},${ne.lng()});
+        out body;
+        >;
+        out skel qt;
+      `;
+      document.getElementById('loading').style.display = 'block';
+      try {
+        const response = await axios.get('https://overpass-api.de/api/interpreter', { params: { data: query } });
+        const nodes = {};
+        response.data.elements.filter(el => el.type === 'node').forEach(node => {
+          nodes[node.id] = { lat: node.lat, lng: node.lon };
+        });
+        clearRoads();
+        const basicColor = document.getElementById('roadColor').value;
+        const opacity = parseFloat(document.getElementById('opacity').value);
+        const weight = parseFloat(document.getElementById('weight').value);
+        const animate = document.getElementById('animateRoads').checked;
+        response.data.elements.filter(el => el.type === 'way').forEach(way => {
+          const coords = way.nodes.map(id => nodes[id]).filter(Boolean);
+          if (coords.length > 1) {
+            let polylineOptions = {
+              path: animate ? [] : coords,
+              geodesic: true,
+              strokeColor: basicColor,
+              strokeOpacity: opacity,
+              strokeWeight: weight,
+              map: map
+            };
+            const polyline = new google.maps.Polyline(polylineOptions);
+            roadLines.push(polyline);
+            if (animate) animatePolyline(polyline, coords);
+          }
+        });
+        updateStats(roadLines);
+      } catch (error) {
+        console.error(error);
+        alert('Error fetching roads.');
+      } finally {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('map').classList.remove('glow');
+      }
+    }
+
+    function clearRoads() {
+      roadLines.forEach(line => line.setMap(null));
+      roadLines = [];
+      document.getElementById('stats').style.display = 'none';
+    }
+
+    function exportToSVG() {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "800");
+      svg.setAttribute("height", "600");
+      roadLines.forEach(line => {
+        const coords = line.getPath().getArray();
+        if (coords.length === 0) return;
+        let d = `M ${coords[0].lng()} ${coords[0].lat()}`;
+        coords.slice(1).forEach(pt => d += ` L ${pt.lng()} ${pt.lat()}`);
+        const pathElem = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        pathElem.setAttribute("d", d);
+        pathElem.setAttribute("stroke", line.get("strokeColor"));
+        pathElem.setAttribute("stroke-width", line.get("strokeWeight"));
+        pathElem.setAttribute("fill", "none");
+        svg.appendChild(pathElem);
+      });
+      const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "roads.svg";
+      a.click();
+    }
+
+    function exportToImage() {
+      const canvas = document.createElement("canvas");
+      canvas.width = map.getDiv().offsetWidth;
+      canvas.height = map.getDiv().offsetHeight;
+      const context = canvas.getContext("2d");
+      context.drawImage(map.getDiv(), 0, 0);
+      const a = document.createElement("a");
+      a.download = "roads.png";
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+    }
+
+    // updateAnimationSpeedDisplay updates the speed display.
+    function updateAnimationSpeedDisplay() {
+      const speed = document.getElementById('animationSpeed').value;
+      document.getElementById('animationSpeedDisplay').textContent = speed;
+    }
+  </script>
+  <script>
+    // Map style options for the selector.
+    const mapStyles = {
+      dark: darkNoLabelsStyle,  // our dark theme with no labels
+      minimal: otherStyles.minimal,
+      light: otherStyles.light,
+      satellite: null
+    };
+
+    function updateMapStyle(style) {
+      if (style === 'satellite') {
+        map.setMapTypeId('satellite');
+      } else if (style === 'dark') {
+        map.setMapTypeId('roadmap');
+        map.setOptions({ styles: darkNoLabelsStyle });
+      } else {
+        map.setMapTypeId('roadmap');
+        map.setOptions({ styles: mapStyles[style] });
+      }
+    }
+  </script>
+  <!-- Load Google Maps API with Places library -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places&callback=initMap" async defer></script>
+</body>
+</html>
