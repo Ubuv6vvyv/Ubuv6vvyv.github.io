@@ -1,2 +1,138 @@
-//Image Attribute Neat Grid
-javascript:function listAttributes(arr){let strOutput="<DIV>";strOutput+="<UL>";for(let i=0;i<arr.length;i++)strOutput+="<LI><SPAN class='propertyname'>"+arr[i].name+"</SPAN>: "+arr[i].value+"</LI>";return strOutput+="</UL></DIV>",strOutput}function isValidHttpUrl(strTest){let url;try{url=new URL(strTest)}catch(_){return!1}return"http:"===url.protocol||"https:"===url.protocol}function isValidImage(strTest){let re;return new RegExp("(?:.svg|.jpg|.jpeg|.gif|.png)%22).test(strTest)}function%20formatHTMLcellvalues(strCellinput){let%20strOutput;return%20strOutput=isValidHttpUrl(strCellinput)&&isValidImage(strCellinput)?%22%3CA%20HREF=%27%22+strCellinput+%22%27%20target=%27blank%27%3E%22+strCellinput+%22%3C/A%3E%3CBR%3E%3CIMG%20=%20SRC=%27%22+strCellinput+%22%27%3E%22:%22object%22==typeof%20strCellinput?listAttributes(strCellinput):null==strCellinput||0==String(strCellinput).trim().length?%22%22:String(strCellinput).trim(),strOutput}function%20setTableStyle(){let%20strOutput=%22%3CSTYLE%3E%22;return%20strOutput+=%22table,th,td%20{%20border:1px%20solid%20#9E9E9E;%20border-collapse:%20collapse%20%20}%22,strOutput+=%22th%20{%20background:%20#FFC107;%20}%22,strOutput+=%22img%20{%20height:100px;%20max-width:90%%20}%22,strOutput+=%22.propertyname%20{%20font-weight:bold;%20font-color:blue;%20}%22,strOutput+=%22%3C/STYLE%3E%22,strOutput}function%20formatPageHeaders(strHeader,strNotes=%22%22){let%20strOutput=%22%3CH1%3E%22+strHeader+%22%3C/H1%3E%22;return%20strOutput+=%22%3CSTRONG%3EPage%20URL:%20%3C/STRONG%3E%22,strOutput+=%22%3CA%20href='%22+location.href+%22'%20target='_blank'%3E%22+location.href+%22%3C/A%3E%3CBR%3E%22,strOutput+=%22%3CSTRONG%3EPage%20Title:%20%3C/STRONG%3E%22,strOutput+=document.title+%22%3CBR%3E%3CBR%3E%22,strOutput+=%22%22!=strNotes?%22%3CSTRONG%3ENOTE:%20%3C/STRONG%3E%22+strNotes+%22%3CBR%3E%3CBR%3E%22:%22%22,strOutput}function%20formatHTMLTableHeaders(){let%20strOutput=%22%3CTABLE%3E%22;strOutput+=%22%3CTR%3E%22;for(let%20i=0;i%3Carguments.length;i++)strOutput+=%22%3CTH%3E%22+arguments[i]+%22%3C/TH%3E%22;return%20strOutput+=%22%3C/TR%3E%22,strOutput}function%20formatHTMLTableRows(){let%20strOutput=%22%3CTR%3E%22;for(let%20i=0;i%3Carguments.length;i++)strOutput+=%22%3CTD%3E%22+formatHTMLcellvalues(arguments[i])+%22%3C/TD%3E%22;return%20strOutput+=%22%3C/TR%3E%22,strOutput}!function(){let%20pageH1=%22WLA%20Images%20Checker%20v01%22,pageNotes=%22%22,objCollection=document.images,pageHost=location.host,strHTMLlines=%22%22;strHTMLlines+=setTableStyle(),strHTMLlines+=formatPageHeaders(pageH1,%22%22),strHTMLlines+=formatHTMLTableHeaders(%22No%22,%22Image%20URL%22,%22Image%20Height%22,%22Image%20Width%22,%22Image%20Alt%20Text%22,%22Image%20Attributes%22);for(let%20i=0;i%3CobjCollection.length;i++){let%20objItem=objCollection[i];strHTMLlines+=formatHTMLTableRows(i+1,objItem.src,objItem.height,objItem.width,objItem.alt,objItem.attributes)}strHTMLlines+=%22%3C/TABLE%3E%22,strHTMLlines+=%22%3CBR%3E%3CBR%3E%3CDIV%20style='text-align:%20center;'%3E%3CCITE%3ECopyright:%20(c)%202021,%20Washington%20Alto%3C/CITE%3E%3C/DIV%3E%22;let%20myWin=window.open();myWin.document.writeln(strHTMLlines),myWin.document.close()}();
+javascript:(function(){
+    // Remove any existing modal to avoid duplicates
+    const existingModal = document.getElementById("imageGrabModal");
+    if(existingModal){ existingModal.remove(); }
+
+    // Create modal container
+    const modal = document.createElement("div");
+    modal.id = "imageGrabModal";
+    modal.style.position = "fixed";
+    modal.style.top = "20px";
+    modal.style.right = "20px";
+    modal.style.width = "320px";
+    modal.style.maxHeight = "80vh";
+    modal.style.backgroundColor = "rgba(255,255,255,0.95)";
+    modal.style.border = "1px solid #ccc";
+    modal.style.padding = "10px";
+    modal.style.overflowY = "auto";
+    modal.style.boxShadow = "0 0 10px rgba(0,0,0,0.5)";
+    modal.style.zIndex = "9999";
+
+    // Create header container with control buttons
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.marginBottom = "10px";
+
+    // Download All button: opens each non‑data image in a new tab
+    const downloadAllBtn = document.createElement("button");
+    downloadAllBtn.textContent = "Download All";
+    downloadAllBtn.style.fontSize = "12px";
+    downloadAllBtn.addEventListener("click", function(){
+        const anchors = grid.querySelectorAll("a.thumbnail-link");
+        anchors.forEach(a => {
+            window.open(a.href, "_blank");
+        });
+    });
+
+    // Rescan button: clears grid and rescans for images (excluding modal content)
+    const rescanBtn = document.createElement("button");
+    rescanBtn.textContent = "Rescan";
+    rescanBtn.style.fontSize = "12px";
+    rescanBtn.addEventListener("click", function(){
+        grid.innerHTML = "";
+        scanImages();
+    });
+
+    // Close button: removes the modal
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "Close";
+    closeBtn.style.fontSize = "12px";
+    closeBtn.addEventListener("click", function(){
+        modal.remove();
+    });
+
+    header.appendChild(downloadAllBtn);
+    header.appendChild(rescanBtn);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    // Create grid container for thumbnails
+    const grid = document.createElement("div");
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(100px, 1fr))";
+    grid.style.gap = "10px";
+    modal.appendChild(grid);
+
+    // Append modal to body
+    document.body.appendChild(modal);
+
+    // Utility: Check if URL is a data image
+    const isDataImage = src => src.startsWith("data:");
+
+    // IntersectionObserver for lazy loading thumbnails within grid
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if(entry.isIntersecting){
+                const imgEl = entry.target;
+                imgEl.src = imgEl.dataset.src;
+                obs.unobserve(imgEl);
+            }
+        });
+    }, { root: grid, rootMargin: "0px 0px 50px 0px" });
+
+    // Function to scan for images (excluding those within the modal)
+    function scanImages(){
+        const imgs = Array.from(document.querySelectorAll("img")).filter(img => !modal.contains(img));
+        imgs.forEach(img => {
+            const container = document.createElement("div");
+            container.style.textAlign = "center";
+            container.style.fontSize = "10px";
+            container.style.wordBreak = "break-all";
+            
+            if(isDataImage(img.src)){
+                // For data images, display a label
+                const label = document.createElement("div");
+                label.textContent = "Data Image";
+                label.style.fontStyle = "italic";
+                label.style.backgroundColor = "#f0f0f0";
+                label.style.padding = "5px";
+                label.style.border = "1px solid #ccc";
+                container.appendChild(label);
+            } else {
+                // Create anchor wrapping the thumbnail to open image in new tab
+                const link = document.createElement("a");
+                link.href = img.src;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.className = "thumbnail-link";
+                
+                // Create thumbnail image with lazy loading
+                const thumb = document.createElement("img");
+                thumb.dataset.src = img.src;
+                thumb.alt = "Thumbnail";
+                thumb.style.width = "100%";
+                thumb.style.height = "auto";
+                thumb.style.cursor = "pointer";
+                thumb.style.transition = "transform 0.2s ease-in-out";
+                // Optional: add a scale toggle on click (commented out to let anchor work normally)
+                // thumb.addEventListener("click", function(e){
+                //     thumb.style.transform = (thumb.style.transform === "scale(1.5)") ? "scale(1)" : "scale(1.5)";
+                // });
+                observer.observe(thumb);
+                
+                link.appendChild(thumb);
+                container.appendChild(link);
+            }
+            // Caption for image URL (shortened if too long)
+            const caption = document.createElement("div");
+            caption.textContent = isDataImage(img.src) ? "Data Image (not displayed)" : (img.src.length > 60 ? img.src.slice(0,57) + "..." : img.src);
+            container.appendChild(caption);
+            
+            grid.appendChild(container);
+        });
+    }
+    
+    // Initial image scan
+    scanImages();
+})();
