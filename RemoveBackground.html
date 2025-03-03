@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Background Remover</title>
+  <style>
+    /* Global Styles */
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f5f7;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+    }
+    /* Fixed Header with Compact Controls */
+    .controls-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #f5f5f7;
+      padding: 8px;
+      z-index: 1000;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-around;
+    }
+    .controls-header h2 {
+      margin: 0;
+      font-size: 18px;
+      flex: 1 100%;
+      text-align: center;
+    }
+    .controls-header .control-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      flex: 1 100%;
+    }
+    .controls-header .control-group > * {
+      margin: 2px;
+    }
+    .controls-header .slider {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .controls-header input[type="range"] {
+      width: 80px;
+    }
+    .controls-header input[type="color"] {
+      padding: 2px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .btn {
+      background: #0071e3;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn.upload {
+      background: #0071e3;
+    }
+    .btn.download {
+      background: #34c759;
+    }
+    .btn.reset {
+      background: #ff3b30;
+    }
+    .btn.eyedropper {
+      background: #5856d6;
+    }
+    .btn.invert {
+      background: #ff9500;
+    }
+    /* Main container adjusted to make room for fixed header */
+    .main-container {
+      padding-top: 120px; /* reserve space for header */
+      height: calc(100vh - 120px);
+      display: flex;
+      flex-direction: column;
+    }
+    /* Image Areas Container: Split 50/50 vertically */
+    .images-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .preview {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #eee;
+    }
+    .preview h3 {
+      margin: 4px;
+      font-size: 14px;
+      background: rgba(245,245,247,0.8);
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 10;
+      width: 100%;
+      text-align: center;
+      padding: 2px 0;
+    }
+    /* Image container and canvases: responsive scaling */
+    .image-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    .image-container img, 
+    #outputCanvas,
+    #maskCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    /* Checkerboard background for transparency indicator on output canvas */
+    #outputCanvas {
+      background-image: 
+        linear-gradient(45deg, #ccc 25%, transparent 25%), 
+        linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #ccc 75%), 
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+    /* Mask overlay on original image */
+    #maskCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    /* Eyedropper cursor */
+    .eyedropper-active {
+      cursor: crosshair;
+    }
+    /* Responsive adjustments for smaller devices */
+    @media (max-width: 480px) {
+      .controls-header h2 {
+        font-size: 16px;
+      }
+      .controls-header {
+        padding: 6px;
+      }
+      .btn {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .controls-header input[type="range"] {
+        width: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls-header">
+    <h2>Enhanced Background Remover</h2>
+    <div class="control-group">
+      <button class="btn upload" id="uploadBtn">Upload Image</button>
+      <input type="file" id="imageUpload" accept="image/*" style="display:none">
+      <div class="slider">
+        <label for="tolerance">Tol:</label>
+        <input type="range" id="tolerance" min="1" max="100" value="30">
+        <span id="toleranceValue">30</span>
+      </div>
+      <div>
+        <label for="colorPicker">BG:</label>
+        <input type="color" id="colorPicker" value="#ffffff">
+      </div>
+      <button class="btn eyedropper" id="eyedropperBtn">Eyedropper</button>
+      <div class="slider">
+        <label for="scaleSlider">Scale:</label>
+        <input type="range" id="scaleSlider" min="10" max="100" value="50">
+        <span id="scaleValue">50%</span>
+      </div>
+      <button class="btn invert" id="invertBtn">Invert Selection</button>
+    </div>
+  </div>
+  
+  <div class="main-container">
+    <div class="images-container">
+      <div class="preview" id="originalPreview">
+        <h3>Original Image</h3>
+        <div class="image-container">
+          <img id="inputImage" alt="Original Image">
+          <canvas id="maskCanvas"></canvas>
+        </div>
+      </div>
+      <div class="preview" id="resultPreview">
+        <h3>Preview</h3>
+        <canvas id="outputCanvas"></canvas>
+      </div>
+    </div>
+    <div class="control-group" style="padding: 4px; justify-content: center;">
+      <button class="btn download" id="downloadBtn">Download Image</button>
+      <button class="btn reset" id="resetBtn">Reset</button>
+    </div>
+  </div>
+  
+  <script>
+    // DOM Elements
+    const elements = {
+      imageUpload: document.getElementById('imageUpload'),
+      uploadBtn: document.getElementById('uploadBtn'),
+      inputImage: document.getElementById('inputImage'),
+      maskCanvas: document.getElementById('maskCanvas'),
+      outputCanvas: document.getElementById('outputCanvas'),
+      downloadBtn: document.getElementById('downloadBtn'),
+      tolerance: document.getElementById('tolerance'),
+      toleranceValue: document.getElementById('toleranceValue'),
+      colorPicker: document.getElementById('colorPicker'),
+      eyedropperBtn: document.getElementById('eyedropperBtn'),
+      scaleSlider: document.getElementById('scaleSlider'),
+      scaleValue: document.getElementById('scaleValue'),
+      invertBtn: document.getElementById('invertBtn'),
+      resetBtn: document.getElementById('resetBtn')
+    };
+    
+    let isEyedropperActive = false;
+    let invertSelection = false;
+    
+    // Event Listeners
+    elements.uploadBtn.addEventListener('click', () => elements.imageUpload.click());
+    elements.imageUpload.addEventListener('change', handleImageUpload);
+    elements.downloadBtn.addEventListener('click', downloadFullResImage);
+    elements.resetBtn.addEventListener('click', resetTool);
+    
+    elements.tolerance.addEventListener('input', function() {
+      elements.toleranceValue.textContent = this.value;
+      updatePreview();
+    });
+    
+    elements.colorPicker.addEventListener('input', function() {
+      updatePreview();
+    });
+    
+    elements.scaleSlider.addEventListener('input', function() {
+      elements.scaleValue.textContent = this.value + '%';
+      updatePreview();
+    });
+    
+    elements.invertBtn.addEventListener('click', function() {
+      invertSelection = !invertSelection;
+      elements.invertBtn.textContent = invertSelection ? 'Normal Selection' : 'Invert Selection';
+      updatePreview();
+    });
+    
+    elements.eyedropperBtn.addEventListener('click', activateEyedropper);
+    
+    // Activate eyedropper mode
+    function activateEyedropper() {
+      if (!elements.inputImage.src) return;
+      isEyedropperActive = true;
+      elements.inputImage.classList.add('eyedropper-active');
+    }
+    
+    // Handle click on the original image for eyedropper
+    elements.inputImage.addEventListener('click', function(e) {
+      if (!isEyedropperActive) return;
+      
+      const rect = elements.inputImage.getBoundingClientRect();
+      const scaleX = elements.inputImage.naturalWidth / rect.width;
+      const scaleY = elements.inputImage.naturalHeight / rect.height;
+      const x = Math.floor((e.clientX - rect.left) * scaleX);
+      const y = Math.floor((e.clientY - rect.top) * scaleY);
+      
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = elements.inputImage.naturalWidth;
+      offCanvas.height = elements.inputImage.naturalHeight;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(elements.inputImage, 0, 0);
+      const pixelData = offCtx.getImageData(x, y, 1, 1).data;
+      const hexColor = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
+      
+      elements.colorPicker.value = hexColor;
+      isEyedropperActive = false;
+      elements.inputImage.classList.remove('eyedropper-active');
+      updatePreview();
+    });
+    
+    // Handle image upload
+    function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        elements.inputImage.src = event.target.result;
+        elements.inputImage.onload = function() {
+          updateMaskCanvasSize();
+          updatePreview();
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    // Update maskCanvas size to match inputImage display size
+    function updateMaskCanvasSize() {
+      elements.maskCanvas.width = elements.inputImage.clientWidth;
+      elements.maskCanvas.height = elements.inputImage.clientHeight;
+    }
+    
+    // Update preview with processing on reduced resolution image
+    function updatePreview() {
+      if (!elements.inputImage.src) return;
+      const scaleFactor = parseInt(elements.scaleSlider.value) / 100;
+      const tolerance = parseInt(elements.tolerance.value);
+      const customColor = hexToRgb(elements.colorPicker.value);
+      
+      const result = processImageData(elements.inputImage, scaleFactor, invertSelection, tolerance, customColor);
+      
+      // Update preview canvas with processed image data
+      elements.outputCanvas.width = result.width;
+      elements.outputCanvas.height = result.height;
+      const ctx = elements.outputCanvas.getContext('2d');
+      ctx.putImageData(result.imageData, 0, 0);
+      
+      // Update mask overlay on the original image
+      updateMaskOverlay(result.maskData, result.width, result.height);
+    }
+    
+    // Process image data at a given scale factor and return processed image and mask data
+    function processImageData(img, scale, invert, tolerance, customColor) {
+      const width = Math.floor(img.naturalWidth * scale);
+      const height = Math.floor(img.naturalHeight * scale);
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = width;
+      offCanvas.height = height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(img, 0, 0, width, height);
+      
+      const imageData = offCtx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      // Estimate background color from four corners
+      const topLeft = getPixelColor(data, 0, 0, width);
+      const topRight = getPixelColor(data, width - 1, 0, width);
+      const bottomLeft = getPixelColor(data, 0, height - 1, width);
+      const bottomRight = getPixelColor(data, width - 1, height - 1, width);
+      
+      let bgColorR = Math.round((topLeft.r + topRight.r + bottomLeft.r + bottomRight.r) / 4);
+      let bgColorG = Math.round((topLeft.g + topRight.g + bottomLeft.g + bottomRight.g) / 4);
+      let bgColorB = Math.round((topLeft.b + topRight.b + bottomLeft.b + bottomRight.b) / 4);
+      
+      if (customColor) {
+        bgColorR = customColor.r;
+        bgColorG = customColor.g;
+        bgColorB = customColor.b;
+      }
+      
+      // Create mask data for overlay
+      const maskData = new ImageData(width, height);
+      const maskPixels = maskData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const diff = colorDifference(r, g, b, bgColorR, bgColorG, bgColorB);
+        let isSelected = diff < tolerance;
+        if (invert) {
+          isSelected = !isSelected;
+        }
+        if (isSelected) {
+          maskPixels[i] = 255;
+          maskPixels[i + 1] = 0;
+          maskPixels[i + 2] = 0;
+          maskPixels[i + 3] = 100;
+        } else {
+          maskPixels[i] = 0;
+          maskPixels[i + 1] = 0;
+          maskPixels[i + 2] = 0;
+          maskPixels[i + 3] = 0;
+        }
+        if (!invert) {
+          if (diff < tolerance) {
+            data[i + 3] = 0;
+          }
+        } else {
+          if (diff >= tolerance) {
+            data[i + 3] = 0;
+          }
+        }
+      }
+      
+      return { imageData: imageData, maskData: maskData, width: width, height: height };
+    }
+    
+    // Update mask overlay on the original image
+    function updateMaskOverlay(maskData, maskWidth, maskHeight) {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = maskWidth;
+      offCanvas.height = maskHeight;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.putImageData(maskData, 0, 0);
+      
+      elements.maskCanvas.width = elements.inputImage.clientWidth;
+      elements.maskCanvas.height = elements.inputImage.clientHeight;
+      const maskCtx = elements.maskCanvas.getContext('2d');
+      maskCtx.clearRect(0, 0, elements.maskCanvas.width, elements.maskCanvas.height);
+      maskCtx.drawImage(offCanvas, 0, 0, elements.maskCanvas.width, elements.maskCanvas.height);
+    }
+    
+    // Helper function to get pixel color
+    function getPixelColor(data, x, y, width) {
+      const index = (y * width + x) * 4;
+      return {
+        r: data[index],
+        g: data[index + 1],
+        b: data[index + 2]
+      };
+    }
+    
+    // Calculate color difference (Euclidean)
+    function colorDifference(r1, g1, b1, r2, g2, b2) {
+      return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
+    }
+    
+    // Hex to RGB conversion
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+    
+    // RGB to hex conversion
+    function rgbToHex(r, g, b) {
+      return "#" + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
+    }
+    
+    // Process full-resolution image for download
+    function downloadFullResImage() {
+      if (!elements.inputImage.src) return;
+      const tolerance = parseInt(elements.tolerance.value);
+      const customColor = hexToRgb(elements.colorPicker.value);
+      const result = processImageData(elements.inputImage, 1, invertSelection, tolerance, customColor);
+      
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = result.width;
+      tempCanvas.height = result.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.putImageData(result.imageData, 0, 0);
+      
+      const dataURL = tempCanvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = 'background-removed.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    // Reset the tool
+    function resetTool() {
+      elements.imageUpload.value = '';
+      elements.inputImage.src = '';
+      elements.downloadBtn.style.display = 'none';
+      invertSelection = false;
+      elements.invertBtn.textContent = 'Invert Selection';
+      elements.inputImage.classList.remove('eyedropper-active');
+      const maskCtx = elements.maskCanvas.getContext('2d');
+      maskCtx.clearRect(0, 0, elements.maskCanvas.width, elements.maskCanvas.height);
+    }
+    
+    // Adjust mask canvas on window resize
+    window.addEventListener('resize', updateMaskCanvasSize);
+  </script>
+</body>
+</html>
