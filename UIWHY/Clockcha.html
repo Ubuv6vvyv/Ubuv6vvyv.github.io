@@ -11,19 +11,22 @@
 			margin: 0;
 			padding: 15px;
 			text-align: center;
-			font-size: 20px;
+			font-size: 25px;
 		}
 		.instructions {
 			max-width: 600px;
-			margin: 0 auto 20px;
+			margin: 0 auto 40px;
 			padding: 15px;
 			background: #fff;
 			border-radius: 8px;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+font-size: 24px;
 		}
 		.target-time {
 			font-weight: bold;
-			color: #2c5282;
+			color: red;
+font-size: 65px;
+text-align: center;
 		}
 		.clock-container {
 			position: sticky;
@@ -48,12 +51,12 @@
 		}
 		#hourHand {
 			width: 6px;
-			height: 180px;
+			height: 140px;
 			margin-left: -3px;
 		}
 		#minuteHand {
-			width: 4px;
-			height: 140px;
+			width: 6px;
+			height: 180px;
 			margin-left: -2px;
 			background: #666;
 		}
@@ -90,13 +93,14 @@
 			background: #fff;
 			border-radius: 8px;
 			padding: 15px;
-			max-width: 500px;
+			max-width: 600px;
 			margin: 0 auto 20px;
 			text-align: left;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+
 		}
 		.section-title {
-			font-size: 16px;
+			font-size: 20px;
 			font-weight: bold;
 			margin-bottom: 5px;
 			color: #2c5282;
@@ -126,7 +130,7 @@
 			opacity: 0;
 		}
 		.stability-meter {
-			font-size: 14px;
+			font-size: 24px;
 			font-weight: bold;
 			color: #2c5282;
 			margin-bottom: 10px;
@@ -138,17 +142,28 @@
 			font-weight: bold;
 			margin-top: 10px;
 		}
+		#resetButton {
+			display: none;
+			padding: 10px 20px;
+			font-size: 18px;
+			border: none;
+			background: #2c5282;
+			color: #fff;
+			border-radius: 5px;
+			cursor: pointer;
+			margin-top: 20px;
+		}
 	</style>
 </head>
 <body>
 	<div class="instructions">
 		<h2>CAPTCHA Challenge</h2>
 		<p>
-			The clock is malfunctioning! Your goal is to calibrate it to show exactly <span class="target-time">9:30</span>.
+			The clock is malfunctioning! Your goal is to calibrate it to show exactly:</p> <p><span class="target-time">9:30</span> </p>
 			Use the control panel below to adjust various parameters and stabilize the clock hands.
 		</p>
 		<p>
-			<small>Tip: Start with the hour and minute adjustments before fine-tuning.</small>
+			<small>BE CAREFUL. Moving carelessly will break the clock. Start with the hour and minute adjustments before fine-tuning.</small>
 		</p>
 	</div>
 
@@ -212,8 +227,8 @@
 				Advanced Calibration
 			</div>
 			<div class="control-group">
-				<label for="rhythm">Rhythm Control <span class="value-display" id="rhythmVal">1.0</span></label>
-				<input type="range" id="rhythm" min="0.1" max="5" step="0.1" value="1.0">
+				<label for="rhythm">Rhythm Control <span class="value-display" id="rhythmVal">0.5</span></label>
+				<input type="range" id="rhythm" min="0.1" max="5" step="0.1" value="0.5">
 			</div>
 			<div class="control-group">
 				<label for="wobble">Oscillation Dampening <span class="value-display" id="wobbleVal">1.0</span></label>
@@ -225,71 +240,67 @@
 			</div>
 		</div>
 	</div>
+	<button id="resetButton">Reset Clock</button>
 
 	<script>
 		let stability = 100;
-		let stabilityDecayRate = 0.2; // Reduced from 0.1
+		let stabilityDecayRate = 0.2;
 		let chaosLevel = 1.0;
 		let lastUpdate = Date.now();
 		let adjustmentCount = 0;
+		let gameOver = false;
+
+		const defaultSettings = {
+			hourAdjust: 0,
+			minuteAdjust: 0,
+			smoothness: 1.0,
+			rhythm: 0.5,
+			wobble: 1.0,
+			phase: 0,
+			precision: 1.0,
+			harmony: 0.5,
+			momentum: 1.0,
+			stabilizer: 0,
+			sync: 1.0,
+		};
 
 		const settings = {
 			hourAdjust: 0,
 			minuteAdjust: 0,
-			smoothness: 0.1,
+			smoothness: 1.0,
 			rhythm: 0.5,
 			wobble: 1.0,
 			phase: 0,
-			precision:  0.7,
+			precision: 1.0,
 			harmony: 0.5,
-			momentum: 0.1,
-			stabilizer: 1,
-			sync: 1,
+			momentum: 1.0,
+			stabilizer: 0,
+			sync: 1.0,
 		};
-
 
 		function updateSetting(id) {
 			const elem = document.getElementById(id);
 			const display = document.getElementById(id + "Val");
 			elem.addEventListener("input", () => {
-				const oldValue = settings[id];
 				settings[id] = parseFloat(elem.value);
 				if (display) display.textContent = elem.value;
 
 				adjustmentCount++;
 
-				// First few adjustments to hour and minute actually work somewhat properly
 				if ((id === 'hourAdjust' || id === 'minuteAdjust') && adjustmentCount < 5) {
 					chaosLevel *= 1.01;
 				} else {
-					// Expert controls cause much more chaos
 					if (document.getElementById("expertControls").style.display !== "none" &&
 						["precision", "harmony", "momentum", "stabilizer", "sync"].includes(id)) {
-						chaosLevel *= 1.1; // Much bigger chaos increase
-						stability -= Math.random() * 0.05; // Larger stability hit
-
-						// Special effects for each expert control
+						chaosLevel *= 1.1;
+						stability -= Math.random() * 0.05;
 						if (id === "precision") {
-							// Makes hands jitter more
 							stabilityDecayRate *= 1.1;
 						} else if (id === "harmony") {
-							// Increases wobble amplitude
 							settings.wobble *= 0.5;
-						} else if (id === "momentum") {
-							// Adds spinning tendency
-							if (stability < 50) {
-								gsap.to(".hand", {
-									rotation: "+=360",
-									duration: 3 / settings.momentum,
-									ease: "none",
-									repeat: -1
-								});
-							}
 						} else if (id === "stabilizer") {
-							// Ironically destabilizes everything
 							chaosLevel *= 1.2;
 						} else if (id === "sync") {
-							// Makes hands move independently
 							settings.phase += Math.random() * 90;
 						}
 					} else {
@@ -298,7 +309,6 @@
 					}
 				}
 
-				// Reveal advanced controls after several adjustments
 				if (adjustmentCount > 8 && document.getElementById("advancedControls").style.display === "none") {
 					gsap.to("#advancedControls", {
 						duration: 0.5, display: "block", opacity: 1
@@ -306,7 +316,6 @@
 					showAlert("Advanced calibration controls unlocked!");
 				}
 
-				// Reveal expert controls when things are already going wrong
 				if (stability < 60 && document.getElementById("expertControls").style.display === "none") {
 					gsap.to("#expertControls", {
 						duration: 0.5, display: "block", opacity: 1
@@ -318,14 +327,12 @@
 			});
 		}
 
-		// Update the control initialization
 		["hourAdjust", "minuteAdjust", "smoothness", "rhythm", "wobble", "phase",
 			"precision", "harmony", "momentum", "stabilizer", "sync"].forEach(updateSetting);
 
 		function updateStabilityDisplay() {
 			const meter = document.getElementById("stabilityMeter");
-			stability = Math.max(0,
-				Math.min(100, stability));
+			stability = Math.max(0, Math.min(100, stability));
 			meter.textContent = `Stability: ${Math.round(stability)}%`;
 
 			if (stability > 75) meter.style.color = "#2c5282";
@@ -344,7 +351,6 @@
 			const clockFace = document.getElementById("clockFace");
 			clockFace.querySelectorAll(".clock-number").forEach(n => n.remove());
 			const radius = clockFace.offsetWidth / 2 - 20;
-
 			for (let i = 1; i <= 12; i++) {
 				const num = document.createElement("div");
 				num.className = "clock-number";
@@ -359,81 +365,81 @@
 		}
 
 		function animateHands() {
+			if (gameOver) return;
 			const now = Date.now();
 			const timeDiff = now - lastUpdate;
 			lastUpdate = now;
 
-			// Much slower stability decay
 			if (adjustmentCount > 5) {
 				stability -= stabilityDecayRate * (timeDiff / 1000);
 			}
 			updateStabilityDisplay();
 
-			// Calculate base positions from hour and minute adjustments
+			if (stability <= 0 && !gameOver) {
+				gameOver = true;
+				gsap.to(["#hourHand", "#minuteHand", "#secondHand"], {
+					duration: 1,
+					y: 500,
+					opacity: 0,
+					rotation: "+=90",
+					ease: "bounce.out"
+				});
+				document.getElementById("resetButton").style.display = "block";
+				return;
+			}
+
 			const hourBase = (settings.hourAdjust * 30) % 360;
 			const minuteBase = (settings.minuteAdjust * 6) % 360;
-
-			// Early adjustments work more predictably
 			const earlyStage = adjustmentCount < 5;
-			const effectiveChaos = earlyStage ?
-			Math.min(1.1, chaosLevel):
-			(chaosLevel * settings.smoothness * settings.rhythm * settings.wobble);
+			let effectiveChaos = earlyStage ? Math.min(1.1, chaosLevel) :
+				chaosLevel * settings.smoothness * settings.rhythm * settings.wobble * settings.precision * settings.harmony * settings.momentum * Math.abs(settings.stabilizer + 1) * settings.sync;
 
-			// Subtle initial wobble that grows with chaos
-			const wobble = Math.sin(now / 1000) * (effectiveChaos - 1) * 5;
-			const randomOffset = (Math.random() - 0.5) * (effectiveChaos - 1) * 10;
+			["hour", "minute", "second"].forEach(hand => {
+				const elem = document.getElementById(hand + "Hand");
+				let baseRotation;
+				if (hand === "hour") {
+					baseRotation = hourBase;
+				} else if (hand === "minute") {
+					baseRotation = minuteBase;
+				} else {
+					baseRotation = ((now / 1000) % 60) * 6;
+				}
 
-			// Hand movements
-			["hour",
-				"minute",
-				"second"].forEach(hand => {
-					const elem = document.getElementById(hand + "Hand");
-					const baseRotation = hand === "hour" ? hourBase:
-					hand === "minute" ? minuteBase:
-					((now / 1000) % 60) * 6;
+				let rotation = baseRotation;
+				if (earlyStage) {
+					rotation += Math.sin(now / 1000) * (effectiveChaos - 1) * 5;
+				} else {
+					let chaosAdjustment = Math.sin(now / 1000) * (effectiveChaos - 1) * 5 +
+						(Math.random() - 0.5) * (effectiveChaos - 1) * 10 + settings.phase;
+					if (settings.precision > 2) {
+						chaosAdjustment += Math.sin(now / 100) * settings.precision * 2;
+					}
+					if (settings.harmony > 1.5) {
+						chaosAdjustment += Math.sin(now / 500) * settings.harmony * 3;
+					}
+					if (Math.abs(settings.stabilizer) > 1) {
+						chaosAdjustment += Math.sin(now / 300) * settings.stabilizer * 10;
+					}
+					if (settings.sync > 3) {
+						if (hand === "minute") {
+							chaosAdjustment += Math.sin(now / 400) * 20;
+						}
+						if (hand === "hour") {
+							chaosAdjustment += Math.cos(now / 600) * 15;
+						}
+					}
+					rotation += chaosAdjustment;
+				}
 
-					// Early adjustments are more stable
-					const rotation = earlyStage ?
-					baseRotation + wobble:
-					baseRotation + wobble + randomOffset + settings.phase;
+				let skew = earlyStage ? 0 : Math.sin(now / 2000) * (effectiveChaos - 1) * 3;
 
-					const effectiveChaos = earlyStage ?
-					Math.min(1.1, chaosLevel):
-					(chaosLevel * settings.smoothness * settings.rhythm * settings.wobble *
-						settings.precision * settings.harmony * settings.momentum *
-						Math.abs(settings.stabilizer + 1) * settings.sync);
-
-					// Skew only appears in later stages
-					const skew = earlyStage ? 0: Math.sin(now / 2000) * (effectiveChaos - 1) * 3;
-
-					gsap.to(elem, {
-						duration: 0.1,
-						rotation: rotation,
-						skewX: skew,
-						ease: "none"
-					});
+				gsap.to(elem, {
+					duration: 0.1,
+					rotation: rotation,
+					skewX: skew,
+					ease: "none"
 				});
-			if (settings.precision > 2) {
-				// Add micro-jitters
-				randomOffset += Math.sin(now / 100) * settings.precision * 2;
-			}
-
-			if (settings.harmony > 1.5) {
-				// Add wave-like motion
-				wobble += Math.sin(now / 500) * settings.harmony * 3;
-			}
-
-			if (Math.abs(settings.stabilizer) > 1) {
-				// Add spiral effect
-				rotation += Math.sin(now / 300) * settings.stabilizer * 10;
-			}
-
-			if (settings.sync > 3) {
-				// Make hands move independently
-				if (hand === "minute") rotation += Math.sin(now / 400) * 20;
-				if (hand === "hour") rotation += Math.cos(now / 600) * 15;
-			}
-			// Clock face shaking only at very low stability
+			});
 			if (stability < 30) {
 				const amplitude = (30 - stability) / 3;
 				gsap.to(".clock-container", {
@@ -447,12 +453,46 @@
 			requestAnimationFrame(animateHands);
 		}
 
-		// Initialize
+		function resetGame() {
+			stability = 100;
+			chaosLevel = 1.0;
+			adjustmentCount = 0;
+			gameOver = false;
+			lastUpdate = Date.now();
+			stabilityDecayRate = 0.2; // Reset decay rate
+
+			["#hourHand", "#minuteHand", "#secondHand"].forEach(selector => {
+				gsap.set(selector, {y: 0, opacity: 1, rotation: 0, skewX: 0});
+			});
+
+			const sliderIds = ["hourAdjust", "minuteAdjust", "smoothness", "rhythm", "wobble", "phase", "precision", "harmony", "momentum", "stabilizer", "sync"];
+			sliderIds.forEach(id => {
+				const elem = document.getElementById(id);
+				elem.value = defaultSettings[id];
+				const display = document.getElementById(id + "Val");
+				if (display) display.textContent = defaultSettings[id];
+				settings[id] = defaultSettings[id];
+			});
+
+			// Re-hide expert and advanced controls
+			const expert = document.getElementById("expertControls");
+			expert.style.display = "none";
+			expert.style.opacity = "0";
+			const advanced = document.getElementById("advancedControls");
+			advanced.style.display = "none";
+			advanced.style.opacity = "0";
+
+			document.getElementById("resetButton").style.display = "none";
+			updateStabilityDisplay();
+			animateHands();
+		}
+
 		window.addEventListener("load", () => {
 			addClockNumbers();
 			animateHands();
 		});
 		window.addEventListener("resize", addClockNumbers);
+		document.getElementById("resetButton").addEventListener("click", resetGame);
 	</script>
 </body>
-  </html>
+</html>
