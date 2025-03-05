@@ -1,613 +1,615 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Image Threshold Tool</title>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            background: #f8f9fa;
-            margin: 0;
-            color: #333;
-        }
-        
-        .tips-section {
-            background: #fff;
-            padding: 5px;
-            border-radius: 8px;
-            margin: 5px 0;
-            max-width: 600px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .tip {
-            margin: 10px 0;
-            padding: 10px;
-            border-left: 3px solid #4675fc;
-            background: #f8f9fa;
-        }
-        
-        .workflow {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-        
-        .canvas-container {
-            position: relative;
-            margin: 20px 0;
-        }
-        
-        #canvas {
-            border: 2px solid #ddd;
-            max-width: 90vw;
-            max-height: 60vh;
-            background: #fff;
-            border-radius: 4px;
-        }
-        
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 5px;
-            max-width: 800px;
-            width: 100%;
-            padding: 5px;
-        }
-        
-        .control-group {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        .control-group .description {
-            font-size: 0.6em;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            margin: 10px 0;
-        }
-        
-        .value-display {
-            font-size: 0.6em;
-            color: #666;
-            text-align: right;
-        }
-        
-        .mode-toggle {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            display: flex;
-            gap: 20px;
-        }
-        
-        button, input[type="file"] {
-            background: #4675fc;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.2s ease;
-        }
-        
-        button:hover {
-            background: #3461d6;
-        }
-        
-        #resetBtn {
-            background: #dc3545;
-        }
-        
-        #resetBtn:hover {
-            background: #c82333;
-        }
-        
-        .performance-indicator {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            border-radius: 5px;
-            font-size: 0.6em;
-        }
-        guidance-section {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .scenario {
-            border-left: 4px solid #4675fc;
-            margin: 15px 0;
-            padding: 15px;
-            background: #f8f9fa;
-        }
-
-        .scenario h4 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-        }
-
-        .workflow-steps {
-            margin-left: 20px;
-            color: #555;
-        }
-
-        .tool-explanation {
-            background: #e3f2fd;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 4px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Thresholding Tool</title>
+  <!-- External libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+  <script src="https://unpkg.com/jsfeat@0.0.8/build/jsfeat-min.js"></script>
+  <style>
+    /* Basic resets and flex layout for full viewport use */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      font-size: 8px;
+    }
+    header, footer {
+      flex: 0 0 auto;
+      text-align: center;
+      padding: 2px;
+      background: #2c3e50;
+      color: #fff;
+    }
+    header h1 { font-size: 10px; }
+    footer { font-size: 6px; background: #eee; color: #777; }
+    /* Main container fills the remaining space */
+    main.main-container {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* Preview container takes all available space above toolbar */
+    .preview-container {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Ensure canvas is centered and not stretched */
+    #o {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+    /* Controls container: ultra–compact toolbar */
+    .controls {
+      flex: 0 0 auto;
+      background: #fff;
+      padding: 2px;
+      border-top: 1px solid #aaa;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+      gap: 1px;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .control-group label { font-size: 6px; margin-bottom: 1px; }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+    }
+    .slider-container input[type="range"] { width: 100%; height: 6px; }
+    .slider-value { font-size: 6px; width: 16px; text-align: right; }
+    select, input[type="range"], input[type="file"] { font-size: 6px; padding: 1px; }
+    button { font-size: 6px; padding: 1px 3px; }
+    .advanced-controls {
+      display: none;
+      grid-column: span 2;
+      gap: 1px;
+    }
+    .advanced-controls.show {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    }
+    .btn-group {
+      grid-column: span 2;
+      display: flex;
+      gap: 1px;
+      justify-content: center;
+    }
+    .zoom-controls {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      display: flex;
+      gap: 1px;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-size: 6px;
+      display: none;
+    }
+    /* Guide section below toolbar */
+    .guide {
+      background: #fff;
+      padding: 2px;
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      font-size: 6px;
+      margin: 2px;
+      display: none;
+    }
+    .guide.show { display: block; }
+    .guide-toggle-container {
+      text-align: center;
+      padding: 1px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Who Cares Threshold</h1>
-    
-    
-
-    <div class="mode-toggle">
-        <label><input type="checkbox" id="fineTuneMode"> Fine-Tune Mode</label>
-        <label><input type="checkbox" id="performanceMode" checked> Performance Mode</label>
+  <header>
+    <h1>Image Thresholding Tool</h1>
+  </header>
+  <main class="main-container">
+    <!-- Preview container: occupies most vertical space -->
+    <div class="preview-container" id="p">
+      <canvas id="o"></canvas>
+      <div class="loading" id="l">Processing...</div>
+      <div class="zoom-controls">
+        <button id="zi">+</button>
+        <button id="zo">–</button>
+        <button id="zr">↺</button>
+      </div>
     </div>
-
-    <input type="file" id="imageInput" accept="image/*">
-    <button id="resetBtn">Reset</button>
-
-    <div class="canvas-container">
-        <canvas id="canvas"></canvas>
-        <div id="loading" class="loading">Processing...</div>
-    </div>
-
-   
+    <!-- Controls toolbar -->
     <div class="controls">
-        <div class="control-group">
-            <label>Threshold Method</label>
-            <div class="description">Choose how the image is converted to black and white</div>
-            <select id="thresholdMethod">
-                <option value="binary">Regular</option>
-                <option value="adaptive">Adaptive</option>
-            </select>
+      <!-- Row 1: File Upload and Method -->
+      <div class="control-group">
+        <label for="i">Upload</label>
+        <input type="file" id="i" accept="image/*">
+      </div>
+      <div class="control-group">
+        <label for="tm">Method</label>
+        <select id="tm">
+          <option value="binary">Binary</option>
+          <option value="otsu">Otsu</option>
+          <option value="multi">Multi</option>
+          <option value="local">Local</option>
+          <option value="adaptive">Adaptive</option>
+        </select>
+      </div>
+      <!-- Row 2: Conditional sliders -->
+      <div class="control-group" id="threshold-slider-container">
+        <label for="tv">Threshold</label>
+        <div class="slider-container">
+          <input type="range" id="tv" min="0" max="255" value="128">
+          <span class="slider-value" id="tvd">128</span>
         </div>
-
-        <div class="control-group">
-            <label>Threshold Level</label>
-            <div class="description">Adjusts the cutoff point between black and white</div>
-            <input type="range" id="thresholdIntensity" min="0" max="255" value="127" step="8">
-            <span class="value-display">127</span>
+      </div>
+      <div class="control-group" id="blocksize-slider-container" style="display:none;">
+        <label for="bs">Block Size</label>
+        <div class="slider-container">
+          <input type="range" id="bs" min="3" max="99" step="2" value="3">
+          <span class="slider-value" id="bsd">3</span>
         </div>
-
-        <div class="control-group">
-            <label>Adaptive Sensitivity (C)</label>
-            <div class="description">Fine-tunes how adaptive threshold responds to local contrast</div>
-            <input type="range" id="adaptiveC" min="-10" max="10" value="2" step="2">
-            <span class="value-display">2</span>
+      </div>
+      <!-- Row 3: Brightness & Contrast -->
+      <div class="control-group">
+        <label for="bv">Bright</label>
+        <div class="slider-container">
+          <input type="range" id="bv" min="-100" max="100" value="0">
+          <span class="slider-value" id="bvd">0</span>
         </div>
-
-        <div class="control-group">
-            <label>Brightness</label>
-            <div class="description">Adjusts overall image brightness before thresholding</div>
-            <input type="range" id="brightness" min="-100" max="100" value="0" step="10">
-            <span class="value-display">0</span>
+      </div>
+      <div class="control-group">
+        <label for="cv">Contrast</label>
+        <div class="slider-container">
+          <input type="range" id="cv" min="-100" max="100" value="0">
+          <span class="slider-value" id="cvd">0</span>
         </div>
-
-        <div class="control-group">
-            <label>Contrast</label>
-            <div class="description">Adjusts image contrast before thresholding</div>
-            <input type="range" id="contrast" min="-100" max="100" value="0" step="10">
-            <span class="value-display">0</span>
+      </div>
+      <!-- Row 4: Smoothing & Edge -->
+      <div class="control-group">
+        <label for="sr">Smooth</label>
+        <div class="slider-container">
+          <input type="range" id="sr" min="1" max="10" value="1">
+          <span class="slider-value" id="srd">1</span>
         </div>
-
+      </div>
+      <div class="control-group">
+        <label for="ed">Edge</label>
+        <select id="ed">
+          <option value="none">None</option>
+          <option value="sobel">Sobel</option>
+          <option value="canny">Canny</option>
+        </select>
+      </div>
+      <!-- Row 5: Invert & Advanced toggle -->
+      <div class="control-group">
+        <label for="inv">Invert</label>
+        <input type="checkbox" id="inv">
+      </div>
+      <div class="control-group">
+        <button id="at">Adv ↓</button>
+      </div>
+      <!-- Advanced controls -->
+      <div class="advanced-controls" id="ac">
         <div class="control-group">
-            <label>Edge Enhancement</label>
-            <div class="description">Emphasizes edges in the image</div>
-            <input type="range" id="edgeEnhancement" min="0" max="100" value="0" step="10">
-            <span class="value-display">0</span>
+          <label for="gm">Gray</label>
+          <select id="gm">
+            <option value="average">Avg</option>
+            <option value="luminance">Luma</option>
+          </select>
         </div>
-
         <div class="control-group">
-            <label>Invert</label>
-            <div class="description">Switches black and white</div>
-            <input type="checkbox" id="invertColors">
+          <label for="st">Smooth Type</label>
+          <select id="st">
+            <option value="gaussian">Gauss</option>
+            <option value="median">Median</option>
+          </select>
         </div>
+      </div>
+      <!-- Buttons row -->
+      <div class="btn-group">
+        <button id="rp">Reset</button>
+        <button id="s">Save</button>
+      </div>
     </div>
+    <!-- Guide area -->
+    <div class="guide" id="guide">
+      <h4>Guide</h4>
+      <ul>
+        <li><strong>Upload:</strong> Select an image file.</li>
+        <li><strong>Method:</strong>
+          <em>Binary:</em> Fixed threshold (adjust slider below).<br>
+          <em>Otsu:</em> Automatic threshold.<br>
+          <em>Multi:</em> Multi-level segmentation.<br>
+          <em>Local/Adaptive:</em> Threshold computed on local neighborhood.
+        </li>
+        <li><strong>Bright/Contrast:</strong> Pre-adjust image intensity.</li>
+        <li><strong>Smooth:</strong> Increase to reduce noise.</li>
+        <li><strong>Edge:</strong> Apply edge detection (Sobel or Canny).</li>
+        <li><strong>Invert:</strong> Toggle to invert the output.</li>
+        <li><strong>Advanced:</strong> Extra options for grayscale conversion and smoothing type.</li>
+        <li>Use zoom/pan (buttons or touch gestures) for closer inspection.</li>
+      </ul>
+    </div>
+    <div class="guide-toggle-container">
+      <button id="toggleGuide">Show Guide</button>
+    </div>
+  </main>
+  <footer>
+    Image Thresholding Tool | Local Processing (Preview Mode)
+  </footer>
+  
+  <script>
+    // This implementation uses jsfeat for fast, live processing on a scaled preview.
+    // The image is scaled to fit within the preview container (which fills available space).
+    function run(){
+      let preview_imgData = null;
+      let preview_width = 0, preview_height = 0;
+      let il = false; // image loaded flag
 
-    <script>
-        let isOpenCvReady = false;
-        let srcImage = null;
-        let displayImage = null;
-        let isProcessing = false;
-        let processingTimeout = null;
-        let grayImage = null;
-        let tempImage = null;
-        let processingDelay = 100;
+      const maxPreviewWidth = 720; // Maximum width for scaling, but we'll compute available size
+      const i = document.getElementById('i'),
+            o = document.getElementById('o'),
+            p = document.getElementById('p'),
+            l = document.getElementById('l'),
+            tm = document.getElementById('tm'),
+            tv = document.getElementById('tv'),
+            tvd = document.getElementById('tvd'),
+            bv = document.getElementById('bv'),
+            bvd = document.getElementById('bvd'),
+            cv = document.getElementById('cv'),
+            cvd = document.getElementById('cvd'),
+            sr = document.getElementById('sr'),
+            srd = document.getElementById('srd'),
+            bs = document.getElementById('bs'),
+            bsd = document.getElementById('bsd'),
+            ed = document.getElementById('ed'),
+            gm = document.getElementById('gm'),
+            st = document.getElementById('st'),
+            inv = document.getElementById('inv'),
+            at = document.getElementById('at'),
+            ac = document.getElementById('ac'),
+            rp = document.getElementById('rp'),
+            s = document.getElementById('s'),
+            zi = document.getElementById('zi'),
+            zo = document.getElementById('zo'),
+            zr = document.getElementById('zr'),
+            thresholdContainer = document.getElementById('threshold-slider-container'),
+            blocksizeContainer = document.getElementById('blocksize-slider-container'),
+            guide = document.getElementById('guide'),
+            toggleGuide = document.getElementById('toggleGuide');
 
-        function onOpenCvReady() {
-            isOpenCvReady = true;
-            showStatus("Ready", "success");
+      function updateInputs(){
+        tvd.textContent = tv.value;
+        bvd.textContent = bv.value;
+        cvd.textContent = cv.value;
+        srd.textContent = sr.value;
+        bsd.textContent = bs.value;
+      }
+      
+      function adjustControlVisibility(){
+        const method = tm.value;
+        if(method === 'binary'){
+          thresholdContainer.style.display = 'flex';
+          blocksizeContainer.style.display = 'none';
+        } else if(method === 'local' || method === 'adaptive'){
+          thresholdContainer.style.display = 'none';
+          blocksizeContainer.style.display = 'flex';
+        } else {
+          thresholdContainer.style.display = 'none';
+          blocksizeContainer.style.display = 'none';
         }
-
-        function showStatus(message, type) {
-            const status = document.createElement('div');
-            status.style.position = 'fixed';
-            status.style.top = '20px';
-            status.style.right = '20px';
-            status.style.padding = '10px';
-            status.style.borderRadius = '5px';
-            status.style.backgroundColor = type === 'success' ? '#4CAF50' : '#f44336';
-            status.style.color = 'white';
-            status.textContent = message;
-            document.body.appendChild(status);
-            setTimeout(() => status.remove(), 2000);
+      }
+      
+      let processingRequested = false;
+      function requestProcessImage(){
+        if(!processingRequested){
+          processingRequested = true;
+          requestAnimationFrame(() => {
+            processImage();
+            processingRequested = false;
+          });
         }
-
-        function updateValueDisplay(input) {
-            const display = input.parentElement.querySelector('.value-display');
-            if (display) {
-                display.textContent = input.value;
-            }
-        }
-
-        function scheduleProcessing() {
-            if (processingTimeout) clearTimeout(processingTimeout);
-            processingTimeout = setTimeout(processImage, processingDelay);
-        }
-
-        function cleanupImages() {
-            [srcImage, displayImage, grayImage, tempImage].forEach(img => {
-                if (img) img.delete();
-            });
-        }
-
-        function processImage() {
-            if (!displayImage || isProcessing) return;
-            isProcessing = true;
-            
-            const startTime = performance.now();
-            
-            try {
-                const params = {
-                    threshold: parseInt(document.getElementById('thresholdIntensity').value),
-                    brightness: parseInt(document.getElementById('brightness').value),
-                    contrast: parseInt(document.getElementById('contrast').value),
-                    edgeEnhancement: parseInt(document.getElementById('edgeEnhancement').value),
-                    thresholdMethod: document.getElementById('thresholdMethod').value,
-                    adaptiveC: parseInt(document.getElementById('adaptiveC').value),
-                    invert: document.getElementById('invertColors').checked
-                };
-
-                const processed = new cv.Mat();
-                const gray = new cv.Mat();
-
-                srcImage.copyTo(processed);
-
-                // Apply brightness and contrast
-                if (params.brightness !== 0 || params.contrast !== 0) {
-                    const alpha = 1 + params.contrast / 100;
-                    processed.convertTo(processed, -1, alpha, params.brightness);
-                }
-
-                // Convert to grayscale
-                cv.cvtColor(processed, gray, cv.COLOR_RGBA2GRAY);
-
-                // Apply edge enhancement if needed
-                if (params.edgeEnhancement > 0) {
-                    const edges = new cv.Mat();
-                    cv.Canny(gray, edges, params.edgeEnhancement, params.edgeEnhancement * 2, 3, false);
-                    cv.addWeighted(gray, 1, edges, 0.5, 0, gray);
-                    edges.delete();
-                }
-
-                // Apply threshold
-                if (params.thresholdMethod === 'adaptive') {
-                    cv.adaptiveThreshold(
-                        gray,
-                        processed,
-                        255,
-                        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-                        cv.THRESH_BINARY,
-                        11,
-                        params.adaptiveC
-                    );
-                } else {
-                    cv.threshold(gray, processed, params.threshold, 255, cv.THRESH_BINARY);
-                }
-
-                // Invert if needed
-                if (params.invert) {
-                    cv.bitwise_not(processed, processed);
-                }
-
-                cv.imshow('canvas', processed);
-                
-                processed.delete();
-                gray.delete();
-
-                // Update performance indicator
-                const processTime = performance.now() - startTime;
-                const performanceLevel = processTime < 50 ? 'Excellent' : 
-                                      processTime < 100 ? 'Good' : 
-                                      processTime < 200 ? 'Fair' : 'Poor';
-                const performanceColor = processTime < 50 ? '#4CAF50' : 
-                                      processTime < 100 ? '#2196F3' : 
-                                      processTime < 200 ? '#FFC107' : '#F44336';
-                
-                document.getElementById('performanceIndicator').innerHTML = 
-                    `Processing Time: ${Math.round(processTime)}ms<br>` +
-                    `Performance: <span style="color:${performanceColor}">${performanceLevel}</span>`;
-                
-            } catch (error) {
-                console.error(error);
-                showStatus("Processing error", "error");
-            } finally {
-                isProcessing = false;
-            }
-        }
-
-        // Event Listeners
-        document.querySelectorAll('input[type="range"]').forEach(input => {
-            const display = input.parentElement.querySelector('.value-display');
-            input.addEventListener('input', e => {
-                display.textContent = e.target.value;
-                scheduleProcessing();
-            });
+      }
+      
+      function bindEvents(){
+        i.addEventListener('change', e => loadImg(e.target.files[0]));
+        tm.addEventListener('change', () => { adjustControlVisibility(); requestProcessImage(); });
+        [tv, bv, cv, sr, bs, ed, gm, st].forEach(el => {
+          el.addEventListener('input', () => { updateInputs(); if(il) requestProcessImage(); });
         });
-
-        document.getElementById('fineTuneMode').addEventListener('change', e => {
-            const isFineMode = e.target.checked;
-            const ranges = {
-                thresholdIntensity: isFineMode ? 1 : 5,
-                adaptiveC: isFineMode ? 0.5 : 1,
-                brightness: isFineMode ? 1 : 5,
-                contrast: isFineMode ? 1 : 5
-            };
-            
-            Object.entries(ranges).forEach(([id, step]) => {
-                const input = document.getElementById(id);
-                if (input) input.step = step;
-            });
-            
-            scheduleProcessing();
+        inv.addEventListener('change', () => { if(il) requestProcessImage(); });
+        at.addEventListener('click', () => {
+          ac.classList.toggle('show');
+          at.textContent = ac.classList.contains('show') ? 'Advanced ↑' : 'Advanced ↓';
         });
-
-        document.getElementById('performanceMode').addEventListener('change', e => {
-            processingDelay = e.target.checked ? 100 : 50;
-            scheduleProcessing();
+        rp.addEventListener('click', reset);
+        s.addEventListener('click', save);
+        toggleGuide.addEventListener('click', () => {
+          guide.classList.toggle('show');
+          toggleGuide.textContent = guide.classList.contains('show') ? 'Hide Guide' : 'Show Guide';
         });
-
-        document.getElementById('resetBtn').addEventListener('click', () => {
-            document.querySelectorAll('input[type="range"]').forEach(input => {
-                input.value = input.defaultValue;
-                updateValueDisplay(input);
-            });
-            document.getElementById('invertColors').checked = false;
-            scheduleProcessing();
-        });
-
-        document.getElementById('invertColors').addEventListener('change', scheduleProcessing);
-        document.getElementById('thresholdMethod').addEventListener('change', scheduleProcessing);
-
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            if (!isOpenCvReady) {
-                showStatus("OpenCV.js not ready", "error");
-                return;
-            }
-
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.getElementById('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    const maxDim = Math.max(img.width, img.height);
-                    const scale = maxDim > 1000 ? 1000 / maxDim : 1;
-                    
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
-                    
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                    try {
-                        cleanupImages();
-                        srcImage = cv.imread(canvas);
-                        displayImage = srcImage.clone();
-                        grayImage = new cv.Mat();
-                        tempImage = new cv.Mat();
-                        scheduleProcessing();
-                    } catch (error) {
-                        showStatus("Error loading image", "error");
-                        console.error(error);
-                    }
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', e => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z') {
-                    document.getElementById('resetBtn').click();
-                    e.preventDefault();
-                } else if (e.key === 'f') {
-                    const fineTuneMode = document.getElementById('fineTuneMode');
-                    fineTuneMode.checked = !fineTuneMode.checked;
-                    fineTuneMode.dispatchEvent(new Event('change'));
-                    e.preventDefault();
-                } else if (e.key === 'p') {
-                    const performanceMode = document.getElementById('performanceMode');
-                    performanceMode.checked = !performanceMode.checked;
-                    performanceMode.dispatchEvent(new Event('change'));
-                    e.preventDefault();
-                }
-            }
-        });
-
-        // Performance check on startup
-        (function checkPerformance() {
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            const imageData = ctx.createImageData(100, 100);
-            
-            const startTime = performance.now();
-            for (let i = 0; i < 1000; i++) {
-                ctx.putImageData(imageData, 0, 0);
-            }
-            const endTime = performance.now();
-            
-            if (endTime - startTime > 100) {
-                document.getElementById('performanceMode').checked = true;
-                document.getElementById('fineTuneMode').checked = false;
-                processingDelay = 150;
-                showStatus("Performance mode enabled", "success");
-            }
-        })();
-
-        // Settings persistence
-        const settings = {
-            save: () => {
-                const currentSettings = {
-                    thresholdIntensity: document.getElementById('thresholdIntensity').value,
-                    adaptiveC: document.getElementById('adaptiveC').value,
-                    brightness: document.getElementById('brightness').value,
-                    contrast: document.getElementById('contrast').value,
-                    edgeEnhancement: document.getElementById('edgeEnhancement').value,
-                    invertColors: document.getElementById('invertColors').checked,
-                    fineTuneMode: document.getElementById('fineTuneMode').checked,
-                    performanceMode: document.getElementById('performanceMode').checked,
-                    thresholdMethod: document.getElementById('thresholdMethod').value
-                };
-                
-                localStorage.setItem('imageThresholdSettings', JSON.stringify(currentSettings));
-                showStatus("Settings saved", "success");
-            },
-            
-            load: () => {
-                try {
-                    const savedSettings = JSON.parse(localStorage.getItem('imageThresholdSettings'));
-                    if (savedSettings) {
-                        Object.entries(savedSettings).forEach(([id, value]) => {
-                            const element = document.getElementById(id);
-                            if (element) {
-                                if (element.type === 'checkbox') {
-                                    element.checked = value;
-                                } else {
-                                    element.value = value;
-                                    updateValueDisplay(element);
-                                }
-                                element.dispatchEvent(new Event('change'));
-                            }
-                        });
-                        scheduleProcessing();
-                        showStatus("Settings loaded", "success");
-                    }
-                } catch (error) {
-                    console.error("Error loading settings:", error);
-                    showStatus("Error loading settings", "error");
-                }
-            }
-        };
-
-        // Add settings buttons
-        const settingsGroup = document.createElement('div');
-        settingsGroup.className = 'control-group';
-        settingsGroup.innerHTML = `
-            <button onclick="settings.save()">Save Settings</button>
-            <button onclick="settings.load()">Load Settings</button>
-        `;
-        document.querySelector('.controls').appendChild(settingsGroup);
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', cleanupImages);
-
-        // Expose settings to window for button onclick handlers
-        window.settings = settings;
-    </script>
-<div class="guidance-section">
-        <h2>Image Processing Guide</h2>
         
-        <div class="scenario">
-            <h4>Document / Text Processing</h4>
-            <div class="workflow-steps">
-                1. Start with Adaptive Threshold method
-                2. Adjust brightness if the text is too light/dark (+20 to +40 for dark images)
-                3. Fine-tune Adaptive Sensitivity: 
-                   - Increase (2-6) for bold text
-                   - Decrease (-2 to -6) for thin text
-                4. Add slight Edge Enhancement (10-20) if text edges are fuzzy
-            </div>
-        </div>
-
-        <div class="scenario">
-            <h4>Technical Drawings / Blueprints</h4>
-            <div class="workflow-steps">
-                1. Use Regular Threshold method
-                2. Start with high contrast (+30 to +50)
-                3. Adjust Threshold Level to capture lines (around 127)
-                4. Apply Edge Enhancement (20-40) to sharpen lines
-                5. Invert if needed (usually for blueprints)
-            </div>
-        </div>
-
-        <div class="scenario">
-            <h4>Handwritten Notes</h4>
-            <div class="workflow-steps">
-                1. Use Adaptive Threshold method
-                2. Increase brightness slightly (+10 to +30)
-                3. Set Adaptive Sensitivity low (-4 to 0)
-                4. Add minimal Edge Enhancement (5-15)
-                5. Adjust contrast if needed (+20 to +40)
-            </div>
-        </div>
-
-        <div class="tool-explanation">
-            <h3>Understanding the Tools</h3>
-            <p><strong>Regular vs Adaptive Threshold:</strong> Regular works best with high-contrast images and consistent lighting. Adaptive excels with varying lighting conditions and subtle details.</p>
-            <p><strong>Brightness/Contrast:</strong> Use brightness first to make the important details visible, then contrast to increase separation between light and dark areas.</p>
-            <p><strong>Edge Enhancement:</strong> Helps clarify boundaries between objects. Use sparingly (10-30) for most cases, higher (40-70) for technical drawings.</p>
-            <p><strong>Adaptive Sensitivity:</strong> Higher values (+) make the threshold more aggressive, lower values (-) are more forgiving. Start at 2 and adjust based on results.</p>
-        </div>
-    </div>
-
-    <!-- Previous script section remains the same -->
-    <script>
-        // Previous JavaScript remains the same
-    
-    <div id="status"></div>
-    <div id="performanceIndicator" class="performance-indicator"></div>
+        // Zoom and pan controls using Hammer.js
+        let z = 1, x = 0, y = 0;
+        function upTrans(){ o.style.transform = `translate(${x}px,${y}px) scale(${z})`; }
+        zi.addEventListener('click', () => {
+          const oz = z;
+          z = Math.min(5, z + 0.5);
+          const cw = p.clientWidth, ch = p.clientHeight;
+          x = cw/2/oz - cw/2/z;
+          y = ch/2/oz - ch/2/z;
+          upTrans();
+        });
+        zo.addEventListener('click', () => {
+          const oz = z;
+          z = Math.max(0.5, z - 0.5);
+          const cw = p.clientWidth, ch = p.clientHeight;
+          x = cw/2/oz - cw/2/z;
+          y = ch/2/oz - ch/2/z;
+          upTrans();
+        });
+        zr.addEventListener('click', () => { z = 1; x = 0; y = 0; upTrans(); });
+        const h = new Hammer(p);
+        h.get('pinch').set({enable: true});
+        h.get('pan').set({direction: Hammer.DIRECTION_ALL});
+        h.on('pinch', e => {
+          if(!il)return;
+          const oz = z;
+          z = Math.max(0.5, Math.min(5, oz * e.scale));
+          const r = p.getBoundingClientRect();
+          const cx = (e.center.x - r.left) / oz;
+          const cy = (e.center.y - r.top) / oz;
+          x = cx - (cx - x) * (z/oz);
+          y = cy - (cy - y) * (z/oz);
+          upTrans();
+        });
+        h.on('pan', e => {
+          if(!il || e.pointerType==='mouse') return;
+          x += e.deltaX / z;
+          y += e.deltaY / z;
+          upTrans();
+          e.preventDefault();
+        });
+        h.on('doubletap', e => {
+          if(!il)return;
+          if(z > 1){ z = 1; x = 0; y = 0; upTrans(); }
+          else {
+            const r = p.getBoundingClientRect();
+            const tx = e.center.x - r.left, ty = e.center.y - r.top;
+            const f = 2;
+            x = tx / z - tx / (z*f);
+            y = ty / z - ty / (z*f);
+            z = 2;
+            upTrans();
+          }
+        });
+      }
+      
+      // When an image is loaded, scale it to fit the preview container.
+      function loadImg(file){
+        if(!file)return;
+        l.style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            // Determine available size in the preview container
+            const containerWidth = p.clientWidth;
+            const containerHeight = p.clientHeight;
+            // Compute scale factor to fit within container while preserving aspect ratio.
+            let scale = Math.min(containerWidth / img.width, containerHeight / img.height, 1);
+            preview_width = Math.round(img.width * scale);
+            preview_height = Math.round(img.height * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = preview_width;
+            canvas.height = preview_height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, preview_width, preview_height);
+            preview_imgData = ctx.getImageData(0, 0, preview_width, preview_height);
+            // Set canvas element dimensions accordingly.
+            o.width = preview_width;
+            o.height = preview_height;
+            il = true;
+            adjustControlVisibility();
+            requestProcessImage();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+      
+      function applyBrightnessContrast(data, brightness, contrast) {
+        const factor = 1 + contrast/100;
+        for(let i = 0; i < data.length; i++){
+          let val = data[i] * factor + brightness;
+          data[i] = val < 0 ? 0 : (val > 255 ? 255 : val);
+        }
+      }
+      
+      function computeIntegral(gray, width, height) {
+        let integral = new Float32Array((width+1)*(height+1));
+        for(let y = 0; y <= height; y++) { integral[y*(width+1)] = 0; }
+        for(let x = 0; x <= width; x++) { integral[x] = 0; }
+        for(let y = 0; y < height; y++){
+          let sum = 0;
+          for(let x = 0; x < width; x++){
+            sum += gray[y*width+x];
+            integral[(y+1)*(width+1) + (x+1)] = integral[y*(width+1) + (x+1)] + sum;
+          }
+        }
+        return integral;
+      }
+      function getIntegralValue(integral, x, y, width) {
+        return integral[y*(width+1) + x];
+      }
+      
+      function applyBinaryThreshold(data, threshold){
+        const out = new Uint8ClampedArray(data.length);
+        for(let i = 0; i < data.length; i++){
+          out[i] = data[i] > threshold ? 255 : 0;
+        }
+        return out;
+      }
+      function applyOtsuThreshold(data){
+        const hist = new Array(256).fill(0);
+        for(let i = 0; i < data.length; i++){ hist[data[i]]++; }
+        const total = data.length;
+        let sum = 0;
+        for(let t = 0; t < 256; t++) sum += t * hist[t];
+        let sumB = 0, wB = 0, wF = 0, mB, mF, maxVar = 0, threshold = 0;
+        for(let t = 0; t < 256; t++){
+          wB += hist[t]; if(wB === 0) continue;
+          wF = total - wB; if(wF === 0) break;
+          sumB += t * hist[t];
+          mB = sumB / wB;
+          mF = (sum - sumB) / wF;
+          const varBetween = wB * wF * Math.pow(mB - mF, 2);
+          if(varBetween > maxVar){ maxVar = varBetween; threshold = t; }
+        }
+        return applyBinaryThreshold(data, threshold);
+      }
+      function applyMultiThreshold(data, levels){
+        const step = 255 / levels;
+        const out = new Uint8ClampedArray(data.length);
+        for(let i = 0; i < data.length; i++){
+          let lvl = Math.floor(data[i] / step);
+          if(lvl >= levels) lvl = levels - 1;
+          out[i] = Math.round(lvl * step);
+        }
+        return out;
+      }
+      function applyLocalThreshold(data, width, height, blockSize, factor){
+        const integral = computeIntegral(data, width, height);
+        const out = new Uint8ClampedArray(data.length);
+        const half = Math.floor(blockSize / 2);
+        for(let y = 0; y < height; y++){
+          for(let x = 0; x < width; x++){
+            const x1 = Math.max(x-half, 0),
+                  y1 = Math.max(y-half, 0),
+                  x2 = Math.min(x+half, width-1),
+                  y2 = Math.min(y+half, height-1);
+            const count = (x2-x1+1)*(y2-y1+1);
+            const sum = getIntegralValue(integral, x2+1, y2+1, width) -
+                        getIntegralValue(integral, x1, y2+1, width) -
+                        getIntegralValue(integral, x2+1, y1, width) +
+                        getIntegralValue(integral, x1, y1, width);
+            const avg = sum/count;
+            out[y*width+x] = data[y*width+x] > avg*factor ? 255 : 0;
+          }
+        }
+        return out;
+      }
+      
+      function processImage(){
+        if(!il)return;
+        l.style.display = 'block';
+        try {
+          const gray = new jsfeat.matrix_t(preview_width, preview_height, jsfeat.U8_t | jsfeat.C1_t);
+          if(gm.value === 'luminance'){
+            jsfeat.imgproc.grayscale(preview_imgData.data, preview_width, preview_height, gray.data);
+          } else {
+            for(let i = 0, j = 0; i < preview_imgData.data.length; i += 4, j++){
+              gray.data[j] = ((preview_imgData.data[i] + preview_imgData.data[i+1] + preview_imgData.data[i+2]) / 3)|0;
+            }
+          }
+          applyBrightnessContrast(gray.data, parseInt(bv.value), parseInt(cv.value));
+          const smoothVal = parseInt(sr.value);
+          if(smoothVal > 1){
+            const temp = new jsfeat.matrix_t(preview_width, preview_height, jsfeat.U8_t | jsfeat.C1_t);
+            jsfeat.imgproc.gaussian_blur(gray, temp, smoothVal*2+1, 0);
+            gray.data.set(temp.data);
+          }
+          if(ed.value === 'sobel'){
+            const gx = new jsfeat.matrix_t(preview_width, preview_height, jsfeat.S32_t | jsfeat.C1_t);
+            const gy = new jsfeat.matrix_t(preview_width, preview_height, jsfeat.S32_t | jsfeat.C1_t);
+            jsfeat.imgproc.sobel_derivatives(gray, gx, gy);
+            for(let i = 0; i < gray.data.length; i++){
+              let val = Math.abs(gx.data[i]) + Math.abs(gy.data[i]);
+              gray.data[i] = val > 255 ? 255 : val;
+            }
+          } else if(ed.value === 'canny'){
+            jsfeat.imgproc.canny(gray, gray, parseInt(tv.value)/2, parseInt(tv.value));
+          }
+          let result;
+          const method = tm.value;
+          const thresholdValue = parseInt(tv.value);
+          const blockSize = parseInt(bs.value);
+          switch(method){
+            case 'binary': result = applyBinaryThreshold(gray.data, thresholdValue); break;
+            case 'otsu': result = applyOtsuThreshold(gray.data); break;
+            case 'multi': result = applyMultiThreshold(gray.data, 4); break;
+            case 'local': result = applyLocalThreshold(gray.data, preview_width, preview_height, blockSize, 0.9); break;
+            case 'adaptive': result = applyLocalThreshold(gray.data, preview_width, preview_height, blockSize, 0.9); break;
+            default: result = gray.data; break;
+          }
+          if(inv.checked){
+            for(let i = 0; i < result.length; i++){
+              result[i] = 255 - result[i];
+            }
+          }
+          const outputImageData = new ImageData(preview_width, preview_height);
+          for(let i = 0, j = 0; i < result.length; i++, j += 4){
+            outputImageData.data[j] = result[i];
+            outputImageData.data[j+1] = result[i];
+            outputImageData.data[j+2] = result[i];
+            outputImageData.data[j+3] = 255;
+          }
+          const ctx = o.getContext('2d');
+          ctx.putImageData(outputImageData, 0, 0);
+          l.style.display = 'none';
+        } catch(err){
+          console.error('Error:', err);
+          l.style.display = 'none';
+        }
+      }
+      
+      function reset(){
+        tv.value = 128; bv.value = 0; cv.value = 0; sr.value = 1; bs.value = 3;
+        tm.selectedIndex = 0; ed.selectedIndex = 0; gm.selectedIndex = 0; st.selectedIndex = 0;
+        inv.checked = false;
+        updateInputs();
+        if(il) requestProcessImage();
+      }
+      
+      function save(){
+        if(!il)return;
+        const a = document.createElement('a');
+        a.download = 'thresholded.png';
+        a.href = o.toDataURL('image/png');
+        a.click();
+      }
+      
+      updateInputs();
+      bindEvents();
+    }
+    document.addEventListener('DOMContentLoaded', run);
+  </script>
 </body>
 </html>
-
-
-
