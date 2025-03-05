@@ -15,6 +15,7 @@
     }
     body {
       overflow: hidden;
+      /* Use full viewport so centering works on all screens */
       width: 100vw;
       height: 100vh;
       background: #f4f4f4;
@@ -31,7 +32,7 @@
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-      z-index: -2; /* Under the simulation balls */
+      z-index: -2; /* Under the bees so they fly over it */
     }
     .shipping-container h3 {
       font-size: 18px;
@@ -74,17 +75,19 @@
     }
     
     .circle {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z' fill='%23F7DC6F'/%3E%3Cpath d='M12 12l.01 0' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 12l-4-4 4-4 4 4-4 4z' fill='%23fff'/%3E%3Cpath d='M10 15l-2 2 2 2 2-2-2-2z' fill='%23F7DC6F'/%3E%3Cpath d='M14 15l2 2-2 2-2-2 2-2z' fill='%2300C6F'/%3E%3C/svg%3E");
-  background-size: cover;
-}
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z' fill='%23F7DC6F'/%3E%3Cpath d='M12 12l.01 0' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 12l-4-4 4-4 4 4-4 4z' fill='%23fff'/%3E%3Cpath d='M10 15l-2 2 2 2 2-2-2-2z' fill='%23F7DC6F'/%3E%3Cpath d='M14 15l2 2-2 2-2-2 2-2z' fill='%2300C6F'/%3E%3C/svg%3E");
+      background-size: cover;
+      z-index: 1; /* Bees (circles) will appear above the form */
+    }
     
     /* Control Panel (Simulation Parameters) */
     .control-panel {
-      display: hidden;
+      display: none;
+      position: absolute;
       top: 1px;
       right: 0px;
       background: rgba(255, 255, 255, 0.9);
@@ -96,26 +99,14 @@
       z-index: -1;
     }
     .control-panel label {
-      display: hidden;
+      display: none;
       margin-bottom: 2px;
     }
     .control-panel input[type=range] {
       width: 100%;
-function create() {
-  const beeImageUrl = "https://files.catbox.moe/pm5qsa.png"; // replace with your bee image URL
-  const colorStr = "url(" + beeImageUrl + ")";
-  const particle = new Particle(colorStr, centerVec.x, centerVec.y, friction);
-  particle.velocity.x = Math.random() * initialForce - initialForce * 0.3;
-  particle.velocity.y = Math.random() * initialForce - initialForce * 0.5;
-  particles.push(particle);
-  count = particles.length;
-}
-
       margin-bottom: 5px;
     }
     .control-panel button {
-      
-
       width: 100%;
       padding: 3px;
       font-size: 3px;
@@ -132,6 +123,7 @@ function create() {
   <!-- Shipping Form -->
   <div class="shipping-container">
     <h3>Shipping Order Form But BEES In The Way</h3>
+<p>Carefully, tap or swipe the bees away to continue</p>
     <div class="form-group">
       <label for="recipient">Recipient Name</label>
       <input type="text" id="recipient" placeholder="John Doe">
@@ -230,7 +222,7 @@ function create() {
     let count = 0;
     let particles = [];
     
-    // New global to trigger extra obstruction behavior
+    // Global flag for extra obstruction behavior
     let frustrationMode = false;
     
     /* --- Vector Class --- */
@@ -304,11 +296,12 @@ function create() {
         document.body.appendChild(this.el);
         this.el.className = "circle";
         this.el.style.background = color;
+        this.el.style.zIndex = 1; // Ensure bees appear above the shipping form
         this.size = this.el.offsetWidth;
         this.sizeHalf = this.size / 2;
         this.update();
     
-        // Click-to-repel: Clicking the ball pushes it away
+        // Click-to-repel: Clicking the bee pushes it away
         this.el.addEventListener("mousedown", (e) => {
           let rect = this.el.getBoundingClientRect();
           let ballCenterX = rect.left + rect.width / 2;
@@ -327,11 +320,24 @@ function create() {
         this.velocity.mult(this.friction);
         this.position.add(this.velocity);
         this.acceleration.mult(0);
-        this.el.style.transform = `translate(${this.position.x - this.sizeHalf}px, ${this.position.y - this.sizeHalf}px)`;
+        
+        // Boundary checking to keep bees within the viewport
+        let boundX = window.innerWidth - this.size;
+        let boundY = window.innerHeight - this.size;
+        if (this.position.x < 0 || this.position.x > boundX) {
+          this.velocity.x *= -1;
+          this.position.x = Math.max(0, Math.min(boundX, this.position.x));
+        }
+        if (this.position.y < 0 || this.position.y > boundY) {
+          this.velocity.y *= -1;
+          this.position.y = Math.max(0, Math.min(boundY, this.position.y));
+        }
+    
+        this.el.style.transform = `translate(${this.position.x}px, ${this.position.y}px)`;
       }
     }
     
-    /* --- New Function: Attract particles toward the shipping form --- */
+    /* --- Function: Attract bees toward the shipping form --- */
     function attactToForm(particle) {
       const container = document.querySelector('.shipping-container');
       if (!container) return;
@@ -342,14 +348,15 @@ function create() {
       let dist = force.mag();
       if (dist > 10) {
         force.normalize();
-        // More aggressive attraction
+        // More aggressive attraction based on distance
         force.mult(0.5 * (dist / 100));
         particle.velocity.add(force);
       }
     }
+    
     /* --- Initialization and Event Listeners --- */
     function init() {
-      // Reduce total particles for mobile devices for performance
+      // Reduce total bees for smaller screens for performance
       if (window.innerWidth < 600) {
         total = 40;
         document.getElementById('slider-total').value = 80;
@@ -378,40 +385,40 @@ function create() {
     }
     
     function resize() {
+      centerElements();
       centerVec.x = window.innerWidth / 2;
       centerVec.y = window.innerHeight / 2;
     }
     
     function create() {
-  const beeImageUrl = "https://files.catbox.moe/pm5qsa.png"; // replace with your bee image URL
-  const colorStr = "url(" + beeImageUrl + ")";
-  const particle = new Particle(colorStr, centerVec.x, centerVec.y, friction);
-  particle.velocity.x = Math.random() * initialForce - initialForce * 0.3;
-  particle.velocity.y = Math.random() * initialForce - initialForce * 0.5;
-  particles.push(particle);
-  count = particles.length;
-}
-
-
+      const beeImageUrl = "https://files.catbox.moe/pm5qsa.png"; // Replace with your bee image URL
+      const colorStr = "url(" + beeImageUrl + ")";
+      const particle = new Particle(colorStr, centerVec.x, centerVec.y, friction);
+      particle.velocity.x = Math.random() * initialForce - initialForce * 0.3;
+      particle.velocity.y = Math.random() * initialForce - initialForce * 0.5;
+      particles.push(particle);
+      count = particles.length;
+    }
     
     function update() {
       requestAnimationFrame(update);
       if (count < total) create();
     
       for (let i = 0; i < count; i++) {
-        // Live-update friction on each particle
+        // Live-update friction on each bee
         particles[i].friction = friction;
         particles[i].update();
         repelToMouse(particles[i]);
         if (count === total) {
           attactToCenter(particles[i]);
         }
-        // If frustration mode is active, attract particles toward the form
+        // If frustration mode is active, attract bees toward the shipping form
         if (frustrationMode) {
           attactToForm(particles[i]);
         }
       }
     
+      // Repel bees from each other for a more lively simulation
       for (let i = 0; i < count; i++) {
         const particleA = particles[i];
         for (let j = 0; j < count; j++) {
@@ -500,7 +507,7 @@ function create() {
       count = 0;
     }
     
-    // Set up event listeners on form elements to trigger frustration mode
+    // Set up event listeners on form elements to trigger frustration mode (bees are attracted toward the form)
     document.querySelectorAll('.shipping-container input, .shipping-container textarea, .shipping-container select, .shipping-container button').forEach(el => {
       el.addEventListener('focus', () => {
         frustrationMode = true;
@@ -510,8 +517,26 @@ function create() {
       });
     });
     
+    /* --- Center the Shipping Form and Update the Center Vector --- */
+    function centerElements() {
+      let form = document.querySelector(".shipping-container");
+      let bodyWidth = window.innerWidth;
+      let bodyHeight = window.innerHeight;
+    
+      form.style.left = `${(bodyWidth - form.offsetWidth) / 2}px`;
+      form.style.top = `10%`; // Keeps the form near the top
+    
+      centerVec = new Vector(bodyWidth / 2, bodyHeight / 2);
+    }
+    
     setupControls();
-    init();
+    
+    function onLoadHandler() {
+      centerElements();
+      init();
+    }
+    
+    window.onload = onLoadHandler;
   </script>
 </body>
 </html>
