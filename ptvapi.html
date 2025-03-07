@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modern PTV API Explorer</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <!-- Highlight.js CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+  <style>
+    :root {
+      --primary-color: #0057B8;
+      --primary-dark: #003d82;
+      --accent-color: #f39c12;
+      --bg-color: #f5f5f5;
+      --container-bg: #ffffff;
+      --border-color: #000;
+      --shadow-color: rgba(0, 0, 0, 0.2);
+      --font-family: 'Roboto', sans-serif;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: var(--font-family);
+      font-size: 11px;
+      background: var(--bg-color);
+      padding: 5px;
+      text-align: center;
+      color: var(--border-color);
+    }
+
+    
+    /* Container for each section */
+    .container {
+      width: 98%;
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 20px;
+      background-image: linear-gradient( 135deg, #FFF6B7 1%, #F6416C 50%);
+
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: 0 2px 3px var(--shadow-color);
+      text-align: left;
+
+    }
+    
+    h1, h2, h3 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: var(--primary-color);
+    }
+    
+    /* Form Elements */
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      margin: 8px 0;
+      font-size: 1rem;
+    }
+    
+    input[type="checkbox"] {
+      transform: scale(1.2);
+      margin-right: 5px;
+    }
+    
+    .endpoint-selector select {
+      margin-bottom: 15px;
+    }
+    
+    .params-container, .advanced-params {
+      margin-bottom: 20px;
+    }
+    
+    .param-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 8px;
+      border-bottom: 1px solid #ccc;
+    }
+    
+    .param-label {
+      width: 40%;
+      font-weight: 500;
+      padding-right: 10px;
+    }
+    
+    .param-input {
+      width: 60%;
+    }
+    
+    /* Buttons */
+    .button {
+      background: linear-gradient(45deg, var(--primary-color), var(--primary-dark));
+      color: #fff;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.6rem;
+      width: 100%;
+      margin-top: 10px;
+      box-shadow: 0 2px 4px var(--shadow-color);
+      transition: transform 0.2s, background 0.2s;
+    }
+    
+    .button:hover {
+      transform: scale(1.02);
+      background: linear-gradient(45deg, var(--primary-dark), var(--primary-color));
+    }
+    
+    .toggle-advanced {
+      display: inline-block;
+      margin: 10px 0;
+      color: var(--primary-color);
+      text-decoration: underline;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    
+    /* Output Areas */
+    .result, .tableView {
+      margin-top: 20px;
+      border: 1px solid var(--border-color);
+      padding: 15px;
+      background-color: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px var(--shadow-color);
+      overflow-y: auto;
+      max-height: 500px;
+flex-wrap: wrap;
+    }
+    
+    .api-url, .debug-info {
+      margin-top: 20px;
+      border: 2px solid var(--border-color);
+      padding: 10px;
+      background-color: #e0e0e0;
+      border-radius: 4px;
+      text-align: left;
+      font-size: 0.6rem;
+
+
+    }
+    
+    /* JSON Table Styles */
+    table.json-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    
+    table.json-table th,
+    table.json-table td {
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      text-align: left;
+    }
+    
+    table.json-table th {
+      background-color: #ddd;
+    }
+    
+    /* Loader */
+    .loader {
+      display: none;
+      margin: 20px auto;
+      border: 5px solid #ccc;
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Map Section */
+    .map-container {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    
+    .map-container .left {
+      width: 50%;
+      padding: 10px;
+    }
+    
+    #map {
+      width: 50%;
+      height: 600px;
+    }
+    
+    /* Mobile Portrait Styles */
+    @media only screen and (max-width: 600px) {
+      .container { width: 100%; padding: 10px; }
+      .map-container { flex-direction: column; }
+      .map-container .left, #map { width: 100%; }
+      #map { height: 500px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Explorer Section -->
+  <div class="container">
+    <h1>Melbourne PTV API Explorer</h1>
+    <div class="test-example">
+      <h3>Test with Working Example</h3>
+      <span>Try the known working example:
+      <h5>/v3/fare_estimate/min_zone/1/max_zone/6?devid=3003121&amp;signature=74E0DBBCCA0F39BA4B63BA8B6988E161C0A4BE33<h5></span>
+      <button id="test-example-btn" class="button example-btn">Run Example Query</button>
+    </div>
+</div>
+<div class="container">
+    <div class="endpoint-selector">
+      <select id="endpoint-select">
+        <option value="">Loading endpoints...</option>
+      </select>
+    </div>
+    <div id="endpoint-info" class="endpoint-info"></div>
+    <div id="params-container" class="params-container"></div>
+    <span id="toggle-advanced" class="toggle-advanced">Show Advanced Parameters</span>
+    <div id="advanced-params" class="advanced-params"></div>
+    <button id="execute-btn" class="button">Execute Request</button>
+    <div id="api-url" class="api-url"></div>
+    <div id="debug-info" class="debug-info"></div>
+    <div id="loader" class="loader"></div>
+    <!-- Raw JSON output -->
+    <div id="result" class="result">Results will appear here...</div>
+    <!-- Table view of JSON output -->
+    <div id="tableView" class="result">Table view will appear here...</div>
+    <p style="margin-top:20px; text-align:center;">
+      For full API documentation, see the 
+      <a href="https://timetableapi.ptv.vic.gov.au/swagger/docs/v3" target="_blank">Swagger Documentation</a>.
+    </p>
+  </div>
+</div>
+  
+  <!-- Map Functionality Section -->
+  <div class="container">
+    <h2>PTV Stops Map</h2>
+    <form id="route-form">
+      <label for="routes">Select a Route:</label>
+      <select id="routes" name="routes">
+        <option value="">Select a route</option>
+        <option value="721">1 East Coburg - South Melbourne Beach</option>
+        <option value="15833">3 Melbourne University - East Malvern</option>
+        <option value="1083">5 Melbourne University - Malvern</option>
+        <option value="11544">6 Moreland - Glen Iris</option>
+        <option value="3343">11 West Preston - Victoria Harbour Docklands</option>
+        <option value="8314">12 Victoria Gardens - St Kilda</option>
+        <option value="724">16 Melbourne University - Kew via St Kilda Beach</option>
+        <option value="725">19 North Coburg - Flinders Street Station &amp; City</option>
+        <option value="1880">30 St Vincents Plaza - Central Pier Docklands via La Trobe St</option>
+        <option value="15834">35 City Circle (Free Tourist Tram)</option>
+        <option value="2903">48 North Balwyn - Victoria Harbour Docklands</option>
+        <option value="887">57 West Maribyrnong - Flinders Street Station &amp; City</option>
+        <option value="11529">58 West Coburg - Toorak</option>
+        <option value="897">59 Airport West - Flinders Street Station &amp; City</option>
+        <option value="909">64 Melbourne University - East Brighton</option>
+        <option value="913">67 Melbourne University - Carnegie</option>
+        <option value="940">70 Waterfront City Docklands -  Wattle Park</option>
+        <option value="947">72 Melbourne University - Camberwell</option>
+        <option value="958">75 Vermont South - Central Pier Docklands</option>
+        <option value="976">78 North Richmond - Balaclava via Prahran</option>
+        <option value="1002">82 Moonee Ponds - Footscray</option>
+        <option value="1881">86 Bundoora RMIT - Waterfront City Docklands</option>
+        <option value="1041">96 East Brunswick - St Kilda Beach</option>
+        <option value="722">109 Box Hill - Port Melbourne</option>
+      </select>
+      <br /><br />
+      <button type="submit" class="button">Go</button>
+    </form>
+    <div class="map-container">
+      <div class="left">
+        <h3>Stop Information</h3>
+        <table id="stopTable">
+          <thead>
+            <tr>
+              <th>Stop ID</th>
+              <th>Stop Name</th>
+              <th>Zone</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Stop rows will be inserted here dynamically -->
+          </tbody>
+        </table>
+        <h3>Departure Information</h3>
+        <table id="departureTable">
+          <thead>
+            <tr>
+              <th>Route Number</th>
+              <th>Route Name</th>
+              <th>Direction</th>
+              <th>Departure Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Departure rows will be inserted here dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+  
+  <!-- Scripts: CryptoJS, Leaflet, Highlight.js, and Main Script -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <script>
+    // === Global Configuration ===
+    const API_BASE = "https://timetableapi.ptv.vic.gov.au";
+    const DEV_ID = "3003121";
+    const API_KEY = "2074e341-99e5-4542-87f9-292710a06bfb";
+    
+    // === Dynamic Endpoints (Explorer) ===
+    let dynamicEndpoints = {};
+    
+    async function loadSwagger() {
+      try {
+        let response = await fetch("https://timetableapi.ptv.vic.gov.au/swagger/docs/v3");
+        let swaggerDoc = await response.json();
+        let paths = swaggerDoc.paths;
+        dynamicEndpoints = {};
+        for (let path in paths) {
+          let op = paths[path].get;
+          if (op) {
+            dynamicEndpoints[path] = {
+              description: op.summary || path,
+              params: op.parameters ? op.parameters.map(p => {
+                return {
+                  name: p.name,
+                  type: (p.type === "boolean") ? "checkbox" : (p.type || "text"),
+                  default: p.default || "",
+                  description: p.description || "",
+                  isQueryParam: (p.in === "query"),
+                  isAdvanced: false
+                };
+              }) : []
+            };
+          }
+        }
+        populateEndpointDropdown(dynamicEndpoints);
+      } catch (err) {
+        console.error("Error loading Swagger doc:", err);
+      }
+    }
+    
+    function populateEndpointDropdown(endpoints) {
+      let endpointSelect = document.getElementById("endpoint-select");
+      endpointSelect.innerHTML = "";
+      let defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "Select an API endpoint";
+      endpointSelect.appendChild(defaultOption);
+      for (let endpoint in endpoints) {
+        let option = document.createElement("option");
+        option.value = endpoint;
+        option.textContent = endpoints[endpoint].description + " (" + endpoint + ")";
+        endpointSelect.appendChild(option);
+      }
+    }
+    
+    // === Explorer Functions ===
+    function generateParamFields() {
+      const paramsContainer = document.getElementById("params-container");
+      const advancedParamsContainer = document.getElementById("advanced-params");
+      paramsContainer.innerHTML = "";
+      advancedParamsContainer.innerHTML = "";
+      let selectedEndpoint = document.getElementById("endpoint-select").value;
+      if (!selectedEndpoint || !dynamicEndpoints[selectedEndpoint]) {
+        document.getElementById("endpoint-info").textContent = "";
+        return;
+      }
+      document.getElementById("endpoint-info").textContent = dynamicEndpoints[selectedEndpoint].description;
+      dynamicEndpoints[selectedEndpoint].params.forEach(param => {
+        const row = document.createElement("div");
+        row.className = "param-row";
+        const label = document.createElement("div");
+        label.className = "param-label";
+        label.textContent = `${param.description} ${param.isQueryParam ? "(query)" : "(path)"}:`;
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "param-input";
+        let input;
+        if (param.type === "checkbox") {
+          input = document.createElement("input");
+          input.type = "checkbox";
+          input.id = `param-${param.name}`;
+          input.checked = param.default === "true";
+        } else {
+          input = document.createElement("input");
+          input.type = param.type;
+          input.id = `param-${param.name}`;
+          input.value = param.default || "";
+          input.placeholder = param.name;
+        }
+        inputContainer.appendChild(input);
+        row.appendChild(label);
+        row.appendChild(inputContainer);
+        if (param.isAdvanced) {
+          advancedParamsContainer.appendChild(row);
+        } else {
+          paramsContainer.appendChild(row);
+        }
+      });
+    }
+    
+    function buildRequestPath(selectedEndpoint) {
+      let endpointDef = dynamicEndpoints[selectedEndpoint];
+      let path = selectedEndpoint;
+      endpointDef.params.forEach(param => {
+        if (!param.isQueryParam) {
+          const inputElement = document.getElementById(`param-${param.name}`);
+          const value = inputElement ? (param.type === "checkbox" ? inputElement.checked : inputElement.value) : param.default || "";
+          path = path.replace(`{${param.name}}`, encodeURIComponent(value));
+        }
+      });
+      let queryParams = [`devid=${DEV_ID}`];
+      endpointDef.params.forEach(param => {
+        if (param.isQueryParam) {
+          const inputElement = document.getElementById(`param-${param.name}`);
+          if (!inputElement) return;
+          let value = param.type === "checkbox" ? inputElement.checked.toString() : inputElement.value;
+          if (value && value !== "") {
+            queryParams.push(`${param.name}=${encodeURIComponent(value)}`);
+          }
+        }
+      });
+      return path + "?" + queryParams.join("&");
+    }
+    
+    function calculateSignature(requestPath) {
+      const hmacDigest = CryptoJS.HmacSHA1(requestPath, API_KEY);
+      return hmacDigest.toString(CryptoJS.enc.Hex).toUpperCase();
+    }
+    
+    // Converts JSON to an HTML table for a more human-readable view
+    function jsonToTable(data) {
+      if (Array.isArray(data)) {
+        if (data.length === 0) return "<p>No data available.</p>";
+        let keys = Object.keys(data[0]);
+        let table = "<table class='json-table'><thead><tr>";
+        keys.forEach(key => { table += "<th>" + key + "</th>"; });
+        table += "</tr></thead><tbody>";
+        data.forEach(item => {
+          table += "<tr>";
+          keys.forEach(key => {
+            table += "<td>" + formatValue(item[key]) + "</td>";
+          });
+          table += "</tr>";
+        });
+        table += "</tbody></table>";
+        return table;
+      } else if (typeof data === "object") {
+        let table = "<table class='json-table'><tbody>";
+        for (let key in data) {
+          table += "<tr><th>" + key + "</th><td>" + formatValue(data[key]) + "</td></tr>";
+        }
+        table += "</tbody></table>";
+        return table;
+      } else {
+        return "<p>" + data + "</p>";
+      }
+    }
+    
+    function formatValue(val) {
+      if (typeof val === "object" && val !== null) {
+        return jsonToTable(val);
+      } else {
+        return val;
+      }
+    }
+    
+    function prettyPrintJSON(data) {
+      return '<pre><code class="json">' + JSON.stringify(data, null, 2) + "</code></pre>";
+    }
+    
+    function runExampleRequest() {
+      const exampleUrl = `${API_BASE}/v3/fare_estimate/min_zone/1/max_zone/6?devid=${DEV_ID}&signature=74E0DBBCCA0F39BA4B63BA8B6988E161C0A4BE33`;
+      document.getElementById("api-url").textContent = exampleUrl;
+      document.getElementById("result").innerHTML = "Loading example...";
+      loader.style.display = "block";
+      verifySignatureWithExample();
+      fetch(exampleUrl)
+        .then(response => {
+          if (!response.ok) { throw new Error(`Error: ${response.status} ${response.statusText}`); }
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById("result").innerHTML = prettyPrintJSON(data);
+          document.getElementById("tableView").innerHTML = jsonToTable(data);
+          hljs.highlightAll();
+        })
+        .catch(error => { document.getElementById("result").textContent = `Error: ${error.message}`; })
+        .finally(() => { loader.style.display = "none"; });
+    }
+    
+    function executeRequest() {
+      const selectedEndpoint = document.getElementById("endpoint-select").value;
+      if (!selectedEndpoint) { document.getElementById("result").textContent = "Please select an endpoint"; return; }
+      const requestPath = buildRequestPath(selectedEndpoint);
+      const signature = calculateSignature(requestPath);
+      const finalUrl = `${API_BASE}${requestPath}&signature=${signature}`;
+      document.getElementById("api-url").textContent = finalUrl;
+      document.getElementById("debug-info").textContent = `Request path: ${requestPath}\nSignature: ${signature}`;
+      document.getElementById("result").innerHTML = "Loading...";
+      loader.style.display = "block";
+      fetch(finalUrl)
+        .then(response => {
+          if (!response.ok) { throw new Error(`Error: ${response.status} ${response.statusText}`); }
+          return response.json();
+        })
+        .then(data => {
+          document.getElementById("result").innerHTML = prettyPrintJSON(data);
+          document.getElementById("tableView").innerHTML = jsonToTable(data);
+          hljs.highlightAll();
+        })
+        .catch(error => { document.getElementById("result").textContent = `Error: ${error.message}`; })
+        .finally(() => { loader.style.display = "none"; });
+    }
+    
+    function verifySignatureWithExample() {
+      const exampleRequestPath = "/v3/fare_estimate/min_zone/1/max_zone/6?devid=" + DEV_ID;
+      const exampleSignature = "74E0DBBCCA0F39BA4B63BA8B6988E161C0A4BE33";
+      const calculatedSignature = calculateSignature(exampleRequestPath);
+      document.getElementById("debug-info").innerHTML = `
+        <strong>Verification:</strong><br>
+        Request path: ${exampleRequestPath}<br>
+        Expected signature: ${exampleSignature}<br>
+        Calculated signature: ${calculatedSignature}<br>
+        Match: ${calculatedSignature === exampleSignature ? "YES ✓" : "NO ✗"}<br><br>
+        <strong>API Key:</strong> ${API_KEY}
+      `;
+      return calculatedSignature === exampleSignature;
+    }
+    
+    document.getElementById("endpoint-select").addEventListener("change", generateParamFields);
+    document.getElementById("execute-btn").addEventListener("click", executeRequest);
+    document.getElementById("test-example-btn").addEventListener("click", runExampleRequest);
+    document.addEventListener("DOMContentLoaded", loadSwagger);
+    
+    // === Map Functionality ===
+    var map = L.map("map").setView([-37.82712, 144.95813], 16);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
+    
+    // Tram icon: a dot with a black border
+    const tramIcon = L.divIcon({
+      className: "custom-div-icon",
+      html: "<div style='background: red; border: 1px solid var(--border-color); border-radius:50%; width:12px; height:12px;'></div>",
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+    
+    function generateURLWithDevIDAndKey(apiEndpoint) {
+      apiEndpoint += (apiEndpoint.indexOf("?") !== -1 ? "&" : "?") + "devid=" + DEV_ID;
+      const signature = CryptoJS.HmacSHA1(apiEndpoint, API_KEY).toString(CryptoJS.enc.Hex).toUpperCase();
+      return API_BASE + apiEndpoint + "&signature=" + signature;
+    }
+    
+    async function fetchRouteDetails(routeId) {
+      const endpoint = `/v3/routes/${routeId}`;
+      const url = generateURLWithDevIDAndKey(endpoint);
+      const response = await fetch(url);
+      const data = await response.json();
+      return { routeNumber: data.route.route_number, routeName: data.route.route_name };
+    }
+    
+    async function fetchDirectionName(routeId, directionId) {
+      const endpoint = `/v3/directions/route/${routeId}`;
+      const url = generateURLWithDevIDAndKey(endpoint);
+      const response = await fetch(url);
+      const data = await response.json();
+      const direction = data.directions.find(d => d.direction_id === directionId);
+      return direction ? direction.direction_name : "Unknown Direction";
+    }
+    
+    async function fetchStopsOnRoute(routeId, routeType) {
+      const endpoint = `/v3/stops/route/${routeId}/route_type/${routeType}`;
+      const url = generateURLWithDevIDAndKey(endpoint);
+      const response = await fetch(url);
+      const data = await response.json();
+      return data.stops;
+    }
+    
+    async function fetchDeparturesForStop(stopId, routeType) {
+      const endpoint = `/v3/departures/route_type/${routeType}/stop/${stopId}`;
+      const url = generateURLWithDevIDAndKey(endpoint);
+      const response = await fetch(url);
+      const data = await response.json();
+      return data.departures;
+    }
+    
+    document.getElementById("route-form").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      const routeSelect = document.getElementById("routes");
+      const routeId = routeSelect.value;
+      if (!routeId) { alert("Please select a route."); return; }
+      
+      // Use route type 1 for trams
+      const DEFAULT_ROUTE_TYPE = 1;
+      
+      const stopTableBody = document.querySelector("#stopTable tbody");
+      const departureTableBody = document.querySelector("#departureTable tbody");
+      stopTableBody.innerHTML = "";
+      departureTableBody.innerHTML = "";
+      if (window.stopMarkers) { window.stopMarkers.forEach(marker => { map.removeLayer(marker); }); }
+      window.stopMarkers = [];
+      
+      try {
+        const stops = await fetchStopsOnRoute(routeId, DEFAULT_ROUTE_TYPE);
+        if (stops && stops.length > 0) {
+          stops.forEach(stop => {
+            let zone = "Unknown Zone";
+            if (stop.stop_ticket && stop.stop_ticket.ticket_zones) { zone = stop.stop_ticket.ticket_zones.join(", "); }
+            if (stop.stop_latitude && stop.stop_longitude) {
+              const marker = L.marker([stop.stop_latitude, stop.stop_longitude], { icon: tramIcon }).addTo(map);
+              marker.bindPopup(`<strong>${stop.stop_name}</strong><br>Zone: ${zone}`);
+              marker.on("click", async function() {
+                stopTableBody.innerHTML = "";
+                departureTableBody.innerHTML = "";
+                const stopRow = stopTableBody.insertRow();
+                stopRow.insertCell(0).innerHTML = stop.stop_id;
+                stopRow.insertCell(1).innerHTML = stop.stop_name;
+                stopRow.insertCell(2).innerHTML = zone;
+                try {
+                  const departureUrl = generateURLWithDevIDAndKey(`/v3/departures/route_type/${DEFAULT_ROUTE_TYPE}/stop/${stop.stop_id}`);
+                  const response = await fetch(departureUrl);
+                  const departureData = await response.json();
+                  if (departureData.departures) {
+                    const melbourneTimeZone = "Australia/Melbourne";
+                    const melbourneCurrentTime = new Date(new Date().toLocaleString("en-US", { timeZone: melbourneTimeZone }));
+                    const routeCount = {};
+                    // Show up to 20 upcoming departures per route
+                    for (const dep of departureData.departures) {
+                      const routeIdDep = dep.route_id;
+                      const directionId = dep.direction_id;
+                      const utcTime = new Date(dep.scheduled_departure_utc);
+                      const melbourneDepartureTime = new Date(utcTime.toLocaleString("en-US", { timeZone: melbourneTimeZone }));
+                      if (!routeCount[routeIdDep]) { routeCount[routeIdDep] = 0; }
+                      if (melbourneDepartureTime > melbourneCurrentTime && routeCount[routeIdDep] < 20) {
+                        const routeDetails = await fetchRouteDetails(routeIdDep);
+                        const directionName = await fetchDirectionName(routeIdDep, directionId);
+                        const depRow = departureTableBody.insertRow();
+                        depRow.insertCell(0).innerHTML = routeDetails.routeNumber;
+                        depRow.insertCell(1).innerHTML = routeDetails.routeName;
+                        depRow.insertCell(2).innerHTML = directionName;
+                        const melbourneTime = new Intl.DateTimeFormat("en-AU", {
+                          timeZone: melbourneTimeZone,
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: true,
+                        }).format(melbourneDepartureTime);
+                        depRow.insertCell(3).innerHTML = melbourneTime;
+                        routeCount[routeIdDep]++;
+                      }
+                    }
+                  }
+                } catch (error) {
+                  alert("Error fetching departures: " + error.message);
+                }
+              });
+              window.stopMarkers.push(marker);
+            }
+          });
+          // If route 12 (value "8314") is chosen, center map on City Rd/Clarendon St stop coordinates.
+          if (routeId === "8314") {
+            map.setView([-37.82712, 144.95813], 16);
+          } else if (window.stopMarkers.length > 0) {
+            const group = new L.featureGroup(window.stopMarkers);
+            map.fitBounds(group.getBounds().pad(0.2));
+          }
+        } else {
+          alert("No stops data available for this route.");
+        }
+      } catch (error) {
+        alert("Error fetching stops: " + error.message);
+      }
+    });
+  </script>
+</body>
+</html>
