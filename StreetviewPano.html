@@ -2,29 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <!-- Viewport meta tag for mobile devices -->
+    <!-- Ensure proper scaling on mobile devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Street View Panorama Stitcher</title>
+    <title>Google Street View Panorama Stitcher</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:400,700,300" rel="stylesheet">
     <style>
-      /* Basic CSS reset and styling */
+      /* Modern CSS reset and theme styling */
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
       body {
-        font: 12px/14px Roboto, tahoma, sans-serif;
-        padding: 10px;
-        color: #202020;
+        font: 14px/1.6 'Roboto', tahoma, sans-serif;
+        background-color: #f7f7f7;
+        padding: 20px;
+        color: #333;
       }
       section {
-        width: 800px;
+        max-width: 800px;
         margin: 0 auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       }
       h1, h2 {
         margin-bottom: 1em;
         text-align: center;
+        color: #444;
       }
       form {
         margin-bottom: 1em;
@@ -32,24 +38,39 @@
       }
       input[type="text"] {
         width: 80%;
-        padding: 5px;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
       }
       input[type="submit"] {
-        padding: 5px;
+        padding: 8px;
         width: 18%;
+        border: none;
+        background-color: #4285F4;
+        color: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      input[type="submit"]:hover {
+        background-color: #357ae8;
       }
       #progressDiv, #messageDiv, #errorDiv, #addressOutput {
         margin: 10px 0;
         text-align: center;
+        font-weight: bold;
+      }
+      #errorDiv {
+        color: #d32f2f;
       }
       #canvasContainer {
         margin-top: 20px;
         position: relative;
-        border: 1px solid #ccc;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: #eee;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
-      }
-      .inputGroup {
-        margin-bottom: 1em;
       }
       /* Control buttons container */
       #controlButtons, #navButtons {
@@ -58,14 +79,23 @@
       }
       #controlButtons button, #navButtons button {
         margin: 5px;
-        padding: 8px 12px;
+        padding: 10px 16px;
         font-size: 14px;
+        background-color: #4285F4;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
       }
-      /* Responsive styling for portrait mode / mobile */
+      #controlButtons button:hover, #navButtons button:hover {
+        background-color: #357ae8;
+      }
+      /* Responsive styling for mobile portrait devices */
       @media (max-width: 600px) {
         section {
           width: 100%;
-          padding: 5px;
+          padding: 10px;
         }
         input[type="text"] {
           width: 70%;
@@ -76,11 +106,10 @@
         #canvasContainer canvas {
           width: 100%;
           height: auto;
-          position: relative;
         }
         #controlButtons button, #navButtons button {
           font-size: 12px;
-          padding: 6px 10px;
+          padding: 8px 12px;
         }
       }
     </style>
@@ -98,7 +127,6 @@
             <input type="submit" value="Load URL">
           </form>
         </div>
-        
         <!-- Form to search for an address (with autocomplete) -->
         <div class="inputGroup">
           <h2>Or Search by Address</h2>
@@ -109,12 +137,16 @@
         </div>
       </div>
       
-      <!-- Containers for status messages, address output, rendered canvas, and control/navigation buttons -->
+      <!-- Status and address output -->
       <div id="progressDiv">Status messages will appear here.</div>
       <div id="messageDiv"></div>
       <div id="errorDiv"></div>
       <div id="addressOutput"></div>
+      
+      <!-- Container for rendered panorama -->
       <div id="canvasContainer"></div>
+      
+      <!-- Control and navigation buttons (always visible) -->
       <div id="controlButtons"></div>
       <div id="navButtons"></div>
     </section>
@@ -126,81 +158,59 @@
        * Global Variables and Initialization
        ****************************************************************/
       let currentPanoData = null;
+      // Persist current movement direction (in degrees)
+      let currentMovementDirection = null;
       const streetViewService = new google.maps.StreetViewService();
       const geocoder = new google.maps.Geocoder();
 
       /****************************************************************
        * Helper: Extract a panoId from a full Street View URL.
-       * If the URL contains the pattern "!3m3!1s<id>!" then that value is returned.
-       * Otherwise, the original input is assumed to be a direct panoId.
        ****************************************************************/
       function getIdFromURL(url) {
-        var match = url.match(/!3m3!1s([^!]+)/);
-        if (match && match[1]) {
-          return match[1];
-        }
-        return url;
+        const match = url.match(/!3m3!1s([^!]+)/);
+        return match && match[1] ? match[1] : url;
       }
 
       /****************************************************************
        * Class: GoogleStreetViewLoader
-       * Fetches and stitches Street View tiles into a full equirectangular panorama.
-       * The loader computes a tile grid based on the provided zoom level.
+       * Fetches and stitches Street View tiles into a full panorama.
        ****************************************************************/
       class GoogleStreetViewLoader {
         constructor() {
-          // Create a canvas element to hold the stitched panorama.
           this.canvas = document.createElement("canvas");
           this.ctx = this.canvas.getContext("2d");
           this.metadata = {};
           this.progressCallback = null;
         }
-
-        // Set a callback function to receive progress updates (percentage loaded).
         onProgress(callback) {
           this.progressCallback = callback;
         }
-
-        // Load a single tile image given panoId, zoom, and tile coordinates.
         loadTile(panoId, zoom, x, y, tileSize) {
           return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = "Anonymous";
-            img.onload = () => {
-              resolve({ img, x, y });
-            };
-            img.onerror = () => {
-              reject(new Error("Failed to load tile at x:" + x + " y:" + y));
-            };
-            // Randomize subdomain between cbk0 ... cbk3
-            let subdomain = "cbk" + Math.floor(Math.random() * 4);
+            img.onload = () => resolve({ img, x, y });
+            img.onerror = () => reject(new Error("Failed to load tile at x:" + x + " y:" + y));
+            const subdomain = "cbk" + Math.floor(Math.random() * 4);
             img.src = "https://" + subdomain + ".google.com/cbk?output=tile&panoid=" + panoId +
                       "&zoom=" + zoom +
                       "&x=" + x +
                       "&y=" + y;
           });
         }
-
-        // Main load function: fetch and stitch all tiles for the given panoId and zoom level.
         async load(panoId, zoom) {
           const TILE_SIZE = 512;
-          // Calculate the grid dimensions for a full equirectangular panorama.
-          const tilesX = Math.pow(2, zoom);       // horizontal tile count
-          const tilesY = Math.pow(2, zoom - 1);     // vertical tile count
+          const tilesX = Math.pow(2, zoom);
+          const tilesY = Math.pow(2, zoom - 1);
           const totalTiles = tilesX * tilesY;
           let loadedTiles = 0;
-
-          // Set canvas dimensions.
           this.canvas.width = tilesX * TILE_SIZE;
           this.canvas.height = tilesY * TILE_SIZE;
-
-          let tilePromises = [];
-          // Loop over the grid and load each tile.
+          const tilePromises = [];
           for (let y = 0; y < tilesY; y++) {
             for (let x = 0; x < tilesX; x++) {
               let promise = this.loadTile(panoId, zoom, x, y, TILE_SIZE)
                 .then(tile => {
-                  // Draw the loaded tile in its proper position.
                   this.ctx.drawImage(tile.img, tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                   loadedTiles++;
                   if (this.progressCallback) {
@@ -211,12 +221,8 @@
               tilePromises.push(promise);
             }
           }
-          // Wait for all tiles to load.
           await Promise.all(tilePromises);
-          // Simulate metadata assignment.
-          this.metadata = {
-            copyright: "© Google"
-          };
+          this.metadata = { copyright: "© Google" };
         }
       }
 
@@ -238,10 +244,6 @@
       function updateAddressOutput(address) {
         document.getElementById("addressOutput").innerText = "Current location: " + address;
       }
-
-      /****************************************************************
-       * Reverse Geocode: Get the address from a LatLng object.
-       ****************************************************************/
       function displayAddress(latlng) {
         geocoder.geocode({ location: latlng }, function(results, status) {
           if (status === "OK" && results[0]) {
@@ -253,28 +255,40 @@
       }
 
       /****************************************************************
-       * Movement Functions: Move Forward and Backward
+       * Movement Functions: Step Forward, Step Backward, and Next Street
+       * A persistent global (currentMovementDirection) is maintained.
        ****************************************************************/
+      function initMovementDirection() {
+        if (currentPanoData) {
+          if (currentPanoData.pov && typeof currentPanoData.pov.heading === "number") {
+            currentMovementDirection = currentPanoData.pov.heading;
+          } else if (currentPanoData.links && currentPanoData.links.length > 0) {
+            currentMovementDirection = currentPanoData.links[0].heading;
+          } else {
+            currentMovementDirection = 0;
+          }
+        }
+      }
+
       function moveForward() {
         if (!currentPanoData) return;
-        let currentHeading = currentPanoData.pov ? currentPanoData.pov.heading : null;
-        let forwardLink = null;
-        if (currentHeading !== null && currentPanoData.links && currentPanoData.links.length > 0) {
-          let minDiff = 360;
-          // Choose the link whose heading is closest to the current heading
-          currentPanoData.links.forEach(link => {
-            let diff = Math.abs(currentHeading - link.heading);
-            diff = diff > 180 ? 360 - diff : diff;
-            if (diff < minDiff) {
-              minDiff = diff;
-              forwardLink = link;
-            }
-          });
-        } else if (currentPanoData.links && currentPanoData.links.length > 0) {
-          forwardLink = currentPanoData.links[0];
+        if (currentMovementDirection === null) {
+          initMovementDirection();
         }
-        if (forwardLink) {
-          updatePanoramaById(forwardLink.pano, 3);
+        const target = currentMovementDirection;
+        let bestLink = null;
+        let bestDiff = Infinity;
+        currentPanoData.links.forEach(link => {
+          let diff = Math.abs(target - link.heading);
+          diff = diff > 180 ? 360 - diff : diff;
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestLink = link;
+          }
+        });
+        if (bestLink) {
+          currentMovementDirection = bestLink.heading;
+          updatePanoramaById(bestLink.pano, 3, () => loadNearby());
         } else {
           showError("No forward movement available.");
         }
@@ -282,31 +296,54 @@
 
       function moveBackward() {
         if (!currentPanoData) return;
-        let currentHeading = currentPanoData.pov ? currentPanoData.pov.heading : null;
-        let backwardLink = null;
-        if (currentHeading !== null && currentPanoData.links && currentPanoData.links.length > 0) {
-          let maxDiff = 0;
-          // Choose the link with the heading most opposite to the current heading (approx. 180° difference)
-          currentPanoData.links.forEach(link => {
-            let diff = Math.abs(currentHeading - link.heading);
-            diff = diff > 180 ? 360 - diff : diff;
-            if (diff > maxDiff) {
-              maxDiff = diff;
-              backwardLink = link;
-            }
-          });
-        } else if (currentPanoData.links && currentPanoData.links.length > 0) {
-          backwardLink = currentPanoData.links[currentPanoData.links.length - 1];
+        if (currentMovementDirection === null) {
+          initMovementDirection();
         }
-        if (backwardLink) {
-          updatePanoramaById(backwardLink.pano, 3);
+        // Reverse the current movement direction (add 180°)
+        const target = (currentMovementDirection + 180) % 360;
+        let bestLink = null;
+        let bestDiff = Infinity;
+        currentPanoData.links.forEach(link => {
+          let diff = Math.abs(target - link.heading);
+          diff = diff > 180 ? 360 - diff : diff;
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestLink = link;
+          }
+        });
+        if (bestLink) {
+          currentMovementDirection = bestLink.heading;
+          updatePanoramaById(bestLink.pano, 3, () => loadNearby());
         } else {
           showError("No backward movement available.");
         }
       }
 
+      function nextStreet() {
+        if (!currentPanoData) return;
+        if (currentMovementDirection === null) {
+          initMovementDirection();
+        }
+        // Choose a link that deviates significantly (e.g., >45°) from currentMovementDirection
+        let candidate = null;
+        currentPanoData.links.forEach(link => {
+          let diff = Math.abs(currentMovementDirection - link.heading);
+          diff = diff > 180 ? 360 - diff : diff;
+          if (diff > 45) {
+            candidate = link;
+          }
+        });
+        if (candidate) {
+          currentMovementDirection = candidate.heading;
+          updatePanoramaById(candidate.pano, 3, () => loadNearby());
+        } else {
+          showError("No next street available.");
+        }
+      }
+
       /****************************************************************
-       * Create Control Buttons (Download, Forward, Backward, Random Melbourne, Random Global)
+       * Create Control Buttons: Download, Step Forward, Step Backward,
+       * Next Street, Random Melbourne, and Random Global.
        ****************************************************************/
       function createControlButtons() {
         let controlDiv = document.getElementById("controlButtons");
@@ -316,54 +353,46 @@
           document.getElementById("canvasContainer").appendChild(controlDiv);
         }
         controlDiv.innerHTML = "";
-
         // Download Button
         let downloadButton = document.createElement("button");
         downloadButton.innerText = "Download Image";
         downloadButton.addEventListener("click", function() {
           let canvas = document.querySelector("#canvasContainer canvas");
           if (canvas) {
-            let dataURL = canvas.toDataURL("image/png");
+            let dataURL = canvas.toDataURL("image/jpeg", 0.8);
             let a = document.createElement("a");
             a.href = dataURL;
-            a.download = "panorama.png";
+            a.download = "panorama.jpg";
             a.click();
           }
         });
         controlDiv.appendChild(downloadButton);
-
-        // Forward Button
+        // Movement Buttons
         let forwardButton = document.createElement("button");
-        forwardButton.innerText = "Forward";
+        forwardButton.innerText = "Step Forward";
         forwardButton.addEventListener("click", moveForward);
         controlDiv.appendChild(forwardButton);
-
-        // Backward Button
         let backwardButton = document.createElement("button");
-        backwardButton.innerText = "Backward";
+        backwardButton.innerText = "Step Backward";
         backwardButton.addEventListener("click", moveBackward);
         controlDiv.appendChild(backwardButton);
-
-        // Random Melbourne Location Button
+        let nextStreetButton = document.createElement("button");
+        nextStreetButton.innerText = "Next Street";
+        nextStreetButton.addEventListener("click", nextStreet);
+        controlDiv.appendChild(nextStreetButton);
+        // Random Location Buttons
         let randomMelbourneButton = document.createElement("button");
         randomMelbourneButton.innerText = "Random Melbourne Location";
-        randomMelbourneButton.addEventListener("click", function() {
-          loadRandomMelbourne();
-        });
+        randomMelbourneButton.addEventListener("click", loadRandomMelbourne);
         controlDiv.appendChild(randomMelbourneButton);
-
-        // Random Global Location Button
         let randomGlobalButton = document.createElement("button");
         randomGlobalButton.innerText = "Random Global Location";
-        randomGlobalButton.addEventListener("click", function() {
-          loadRandomGlobal();
-        });
+        randomGlobalButton.addEventListener("click", loadRandomGlobal);
         controlDiv.appendChild(randomGlobalButton);
       }
 
       /****************************************************************
-       * Create Navigation Buttons (Persistent Forward & Backward)
-       * (Alternate UI: you can comment this out if you use the above control buttons.)
+       * Create Navigation Buttons (Alternate UI: persistent forward/backward)
        ****************************************************************/
       function createNavigationButtons() {
         let navContainer = document.getElementById("navButtons");
@@ -373,22 +402,35 @@
           document.getElementById("canvasContainer").appendChild(navContainer);
         }
         navContainer.innerHTML = "";
-
         let forwardBtn = document.createElement("button");
-        forwardBtn.innerText = "Forward";
+        forwardBtn.innerText = "Step Forward";
         forwardBtn.addEventListener("click", moveForward);
         navContainer.appendChild(forwardBtn);
-
         let backwardBtn = document.createElement("button");
-        backwardBtn.innerText = "Backward";
+        backwardBtn.innerText = "Step Backward";
         backwardBtn.addEventListener("click", moveBackward);
         navContainer.appendChild(backwardBtn);
       }
 
       /****************************************************************
-       * Load Panorama by panoId and render the stitched image.
+       * Helper: Get a nearby LatLng (small random offset) from an existing one.
        ****************************************************************/
-      async function loadPanoramaById(panoId, zoom = 3) {
+      function getNearbyLatLng(latlng) {
+        const offsetLat = (Math.random() - 0.5) * 0.002;
+        const offsetLng = (Math.random() - 0.5) * 0.002;
+        return { lat: latlng.lat + offsetLat, lng: latlng.lng + offsetLng };
+      }
+      function loadNearby() {
+        if (currentPanoData && currentPanoData.location && currentPanoData.location.latLng) {
+          const nearby = getNearbyLatLng(currentPanoData.location.latLng);
+          loadPanoramaAtLatLng(nearby, 3, loadNearby);
+        }
+      }
+
+      /****************************************************************
+       * Load Panorama by panoId with an optional retry callback.
+       ****************************************************************/
+      async function loadPanoramaById(panoId, zoom = 3, retryCallback) {
         showProgress("Loading panorama for panoId: " + panoId);
         const loader = new GoogleStreetViewLoader();
         loader.onProgress((p) => {
@@ -400,45 +442,58 @@
           clearCanvas();
           document.getElementById("canvasContainer").appendChild(loader.canvas);
           showMessage("Panorama loaded. " + loader.metadata.copyright);
+          // Initialize movement direction if not set
+          if (currentMovementDirection === null) {
+            initMovementDirection();
+          }
           createControlButtons();
           createNavigationButtons();
         } catch (e) {
           showError(e.message);
+          if (typeof retryCallback === "function") {
+            showMessage("Retrying with a nearby location...");
+            retryCallback();
+          }
         }
       }
 
       /****************************************************************
-       * Update Panorama by fetching panorama data (including links and pov)
-       * using a given panoId, then load and display it.
+       * Update Panorama by fetching panorama data and then loading it.
+       * Accepts an optional retry callback.
        ****************************************************************/
-      function updatePanoramaById(panoId, zoom = 3) {
+      function updatePanoramaById(panoId, zoom = 3, retryCallback) {
         showProgress("Fetching panorama data for panoId: " + panoId);
         streetViewService.getPanorama({ pano: panoId }, function(data, status) {
           if (status === "OK" && data && data.location && data.location.pano) {
             currentPanoData = data;
-            loadPanoramaById(data.location.pano, zoom);
-            // Update navigation using persistent buttons.
+            // Set persistent movement direction if not already set
+            if (currentMovementDirection === null) {
+              initMovementDirection();
+            }
+            loadPanoramaById(data.location.pano, zoom, retryCallback);
             createNavigationButtons();
             displayAddress(data.location.latLng);
           } else {
             showError("Could not fetch panorama data for panoId: " + panoId);
+            if (typeof retryCallback === "function") {
+              retryCallback();
+            }
           }
         });
       }
 
       /****************************************************************
-       * Load panorama at given LatLng coordinates.
+       * Load panorama at a given LatLng with an optional retry callback.
        ****************************************************************/
       function loadPanoramaAtLatLng(latlng, zoom = 3, retryCallback) {
-        showProgress("Loading panorama at your location...");
+        showProgress("Loading panorama at location...");
         streetViewService.getPanorama({ location: latlng, radius: 50 }, function(data, status) {
           if (status === "OK" && data && data.location && data.location.pano) {
             currentPanoData = data;
-            updatePanoramaById(data.location.pano, zoom);
+            updatePanoramaById(data.location.pano, zoom, retryCallback);
             createNavigationButtons();
             displayAddress(data.location.latLng);
           } else {
-            // If no panorama is found, automatically try again using the provided callback
             if (typeof retryCallback === "function") {
               showMessage("No Street View found. Trying another location...");
               retryCallback();
@@ -450,10 +505,9 @@
       }
 
       /****************************************************************
-       * Generate a random LatLng within Melbourne CBD bounds.
-       * Approximate bounds:
-       *   Lat: between -37.835 and -37.795
-       *   Lng: between 144.942 and 144.988
+       * Random Location Functions:
+       * - getRandomMelbourneLatLng() for Melbourne CBD.
+       * - getRandomGlobalLatLng() for one of the top 10 global cities.
        ****************************************************************/
       function getRandomMelbourneLatLng() {
         const minLat = -37.835, maxLat = -37.795;
@@ -462,111 +516,35 @@
         const lng = minLng + Math.random() * (maxLng - minLng);
         return { lat, lng };
       }
-
-      /****************************************************************
-       * Generate a random LatLng from top 10 global cities' CBDs.
-       * These cities are known to have good Street View coverage.
-       ****************************************************************/
       function getRandomGlobalLatLng() {
         const globalCities = [
-          {
-            name: "New York City, USA",
-            minLat: 40.70,
-            maxLat: 40.87,
-            minLng: -74.02,
-            maxLng: -73.93
-          },
-          {
-            name: "London, UK",
-            minLat: 51.50,
-            maxLat: 51.52,
-            minLng: -0.15,
-            maxLng: -0.10
-          },
-          {
-            name: "Tokyo, Japan",
-            minLat: 35.68,
-            maxLat: 35.70,
-            minLng: 139.75,
-            maxLng: 139.77
-          },
-          {
-            name: "Paris, France",
-            minLat: 48.85,
-            maxLat: 48.87,
-            minLng: 2.33,
-            maxLng: 2.35
-          },
-          {
-            name: "Hong Kong, China",
-            minLat: 22.28,
-            maxLat: 22.31,
-            minLng: 114.15,
-            maxLng: 114.18
-          },
-          {
-            name: "Singapore",
-            minLat: 1.28,
-            maxLat: 1.30,
-            minLng: 103.84,
-            maxLng: 103.86
-          },
-          {
-            name: "Sydney, Australia",
-            minLat: -33.87,
-            maxLat: -33.85,
-            minLng: 151.20,
-            maxLng: 151.22
-          },
-          {
-            name: "Dubai, UAE",
-            minLat: 25.20,
-            maxLat: 25.22,
-            minLng: 55.27,
-            maxLng: 55.29
-          },
-          {
-            name: "Berlin, Germany",
-            minLat: 52.51,
-            maxLat: 52.53,
-            minLng: 13.37,
-            maxLng: 13.40
-          },
-          {
-            name: "Shanghai, China",
-            minLat: 31.22,
-            maxLat: 31.24,
-            minLng: 121.45,
-            maxLng: 121.47
-          }
+          { name: "New York City, USA", minLat: 40.70, maxLat: 40.87, minLng: -74.02, maxLng: -73.93 },
+          { name: "London, UK", minLat: 51.50, maxLat: 51.52, minLng: -0.15, maxLng: -0.10 },
+          { name: "Tokyo, Japan", minLat: 35.68, maxLat: 35.70, minLng: 139.75, maxLng: 139.77 },
+          { name: "Paris, France", minLat: 48.85, maxLat: 48.87, minLng: 2.33, maxLng: 2.35 },
+          { name: "Hong Kong, China", minLat: 22.28, maxLat: 22.31, minLng: 114.15, maxLng: 114.18 },
+          { name: "Singapore", minLat: 1.28, maxLat: 1.30, minLng: 103.84, maxLng: 103.86 },
+          { name: "Sydney, Australia", minLat: -33.87, maxLat: -33.85, minLng: 151.20, maxLng: 151.22 },
+          { name: "Dubai, UAE", minLat: 25.20, maxLat: 25.22, minLng: 55.27, maxLng: 55.29 },
+          { name: "Berlin, Germany", minLat: 52.51, maxLat: 52.53, minLng: 13.37, maxLng: 13.40 },
+          { name: "Shanghai, China", minLat: 31.22, maxLat: 31.24, minLng: 121.45, maxLng: 121.47 }
         ];
         const city = globalCities[Math.floor(Math.random() * globalCities.length)];
         const lat = city.minLat + Math.random() * (city.maxLat - city.minLat);
         const lng = city.minLng + Math.random() * (city.maxLng - city.minLng);
         return { lat, lng };
       }
-
-      /****************************************************************
-       * Load a random location within Melbourne CBD.
-       * Automatically retry if no panorama is found.
-       ****************************************************************/
       function loadRandomMelbourne() {
         const randomLatLng = getRandomMelbourneLatLng();
         loadPanoramaAtLatLng(randomLatLng, 3, loadRandomMelbourne);
       }
-
-      /****************************************************************
-       * Load a random global location from the predefined top cities.
-       * Automatically retry if no panorama is found.
-       ****************************************************************/
       function loadRandomGlobal() {
         const randomLatLng = getRandomGlobalLatLng();
         loadPanoramaAtLatLng(randomLatLng, 3, loadRandomGlobal);
       }
 
       /****************************************************************
-       * Search for a nearby Street View panorama by address.
-       * Uses Google Maps Geocoder and StreetViewService.
+       * Search for Panorama by Address.
        ****************************************************************/
       function searchPanoramaByLocation(address) {
         showProgress("Searching for panorama at location: " + address);
@@ -581,21 +559,18 @@
       }
 
       /****************************************************************
-       * Event Listeners for the forms.
+       * Event Listeners for Forms.
        ****************************************************************/
-      // For URL/panoId input.
       document.getElementById("URLForm").addEventListener("submit", function (e) {
         e.preventDefault();
         const url = document.getElementById("URLInput").value.trim();
         if (url) {
           const panoId = getIdFromURL(url);
-          updatePanoramaById(panoId, 3);
+          updatePanoramaById(panoId, 3, loadNearby);
         } else {
           showError("Please enter a Street View URL or panoId.");
         }
       });
-
-      // For address search input.
       document.getElementById("addressForm").addEventListener("submit", function (e) {
         e.preventDefault();
         const address = document.getElementById("addressInput").value.trim();
@@ -605,26 +580,21 @@
           showError("Please enter an address.");
         }
       });
-
-      // Initialize Google Places Autocomplete on the address input.
       const addressInput = document.getElementById("addressInput");
       const autocomplete = new google.maps.places.Autocomplete(addressInput);
 
       /****************************************************************
-       * On Page Load: Try to get the user's current location.
-       * If successful, load the panorama at that location.
-       * If not, default to a random Melbourne location and display a message.
+       * On Page Load: Immediately show progress and attempt to get geolocation.
+       * Always ensure control buttons are visible.
        ****************************************************************/
       window.addEventListener("load", function() {
         showProgress("Getting your current location...");
+        createControlButtons(); // Always display control buttons
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             function(position) {
-              const latlng = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-              };
-              loadPanoramaAtLatLng(latlng, 3);
+              const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
+              loadPanoramaAtLatLng(latlng, 3, loadNearby);
             },
             function(error) {
               showError("Could not determine your location. Please enter your start address. Defaulting to a random location in Melbourne CBD.");
