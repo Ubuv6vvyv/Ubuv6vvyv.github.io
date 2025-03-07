@@ -229,43 +229,74 @@
         
         
         
-        // Enhanced minification function
-        function minifyCode() {
-            const textarea = document.getElementById('code-textarea');
-            let code = textarea.value;
-            
-            // Remove HTML comments
-            code = code.replace(/<!--[\s\S]*?-->/g, '');
-            
-            // Remove JS comments (both line and block)
-            code = code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-            
-            // Remove CSS comments
-            code = code.replace(/\/\*[\s\S]*?\*\//g, '');
-            
-            // Minimize HTML
-            code = code.replace(/>\s+</g, '><');
-            
-            // Minimize CSS
-            code = code.replace(/\s*{\s*/g, '{')
-                     .replace(/\s*}\s*/g, '}')
-                     .replace(/\s*:\s*/g, ':')
-                     .replace(/\s*;\s*/g, ';')
-                     .replace(/\s*,\s*/g, ',');
-            
-            // Minimize JavaScript
-            code = code.replace(/\s*=\s*/g, '=')
-                     .replace(/\s*([\+\-\*\/=<>])\s*/g, '$1')
-                     .replace(/\s*,\s*/g, ',')
-                     .replace(/\s*{\s*/g, '{')
-                     .replace(/\s*}\s*/g, '}')
-                     .replace(/\s*\(\s*/g, '(')
-                     .replace(/\s*\)\s*/g, ')')
-                     .replace(/\s+/g, ' ')
-                     .trim();
-            
-            textarea.value = code;
+// Improved minifyCode: uses a DOMParser to split HTML from inline JS/CSS
+function minifyCode() {
+    const textarea = document.getElementById('code-textarea');
+    if (!textarea) return;
+    let code = textarea.value;
+
+    // Parse the code as HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(code, 'text/html');
+
+    // Recursively remove all HTML comment nodes
+    function removeComments(node) {
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+            let child = node.childNodes[i];
+            if (child.nodeType === Node.COMMENT_NODE) {
+                node.removeChild(child);
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                removeComments(child);
+            }
         }
+    }
+    removeComments(doc);
+
+    // Define a naive JavaScript minifier.
+    // WARNING: This approach is still very basic.
+    // For robust minification, use a dedicated library.
+    function minifyJS(jsCode) {
+        return jsCode
+            .replace(/\/\*[\s\S]*?\*\//g, '')     // Remove block comments
+            .replace(/\/\/[^\n\r]*/g, '')           // Remove line comments
+            .replace(/\s+/g, ' ')                   // Collapse whitespace
+            .replace(/\s*([=+\-*/%<>!&|^?:,;{}()[\]])\s*/g, '$1')
+            .trim();
+    }
+
+    // Define a naive CSS minifier.
+    // For production, consider a well‐tested CSS minifier.
+    function minifyCSS(cssCode) {
+        return cssCode
+            .replace(/\/\*[\s\S]*?\*\//g, '')      // Remove CSS comments
+            .replace(/\s+/g, ' ')                   // Collapse whitespace
+            .replace(/\s*([{}:;,])\s*/g, '$1')
+            .trim();
+    }
+
+    // Process all <script> tags – minify their content if any.
+    const scripts = doc.querySelectorAll('script');
+    scripts.forEach(script => {
+        if (script.textContent) {
+            script.textContent = minifyJS(script.textContent);
+        }
+    });
+
+    // Process all <style> tags – minify their content if any.
+    const styles = doc.querySelectorAll('style');
+    styles.forEach(style => {
+        if (style.textContent) {
+            style.textContent = minifyCSS(style.textContent);
+        }
+    });
+
+    // Serialize the updated document.
+    // Collapse any extra whitespace between tags.
+    let serialized = doc.documentElement.outerHTML;
+    serialized = serialized.replace(/>\s+</g, '><');
+    textarea.value = serialized.trim();
+}
+
 
         // File to button functionality
         function handleMultipleFiles() {
@@ -349,43 +380,76 @@
             window.open(url, '_blank');
         }
 
-        function beautifyCode() {
-            const textarea = document.getElementById('code-textarea');
-            let code = textarea.value;
-            const INDENT = '    ';
-            let level = 0;
-            let output = '';
-            let inScript = false;
-            let inStyle = false;
+        // Improved beautifyCode: parses the HTML to work on the DOM structure
+function beautifyCode() {
+    const textarea = document.getElementById('code-textarea');
+    if (!textarea) return;
+    const code = textarea.value;
 
-            // Split code into lines
-            const lines = code.split(/(<[^>]+>)/g);
-            
-            lines.forEach(line => {
-                line = line.trim();
-                if (!line) return;
+    // Parse the code as HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(code, 'text/html');
 
-                // Handle script and style tags
-                if (line.match(/<script[^>]*>/)) inScript = true;
-                if (line.match(/<style[^>]*>/)) inStyle = true;
-                if (line.match(/<\/script>/)) inScript = false;
-                if (line.match(/<\/style>/)) inStyle = false;
+    // A set of void (self-closing) HTML elements
+    const voidElements = new Set([
+        'area', 'base', 'br', 'col', 'embed', 'hr',
+        'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'
+    ]);
 
-                // Decrease indent for closing tags and braces
-                if (line.match(/^<\/[^>]+>/) || line.match(/^}/) || line.match(/^]/)) level--;
+    // Recursive function to format a node with proper indentation.
+    function beautifyNode(node, indentLevel) {
+        const INDENT = '    ';
+        let formatted = '';
 
-                // Add indentation
-                output += INDENT.repeat(Math.max(0, level)) + line + '\n';
+        if (node.nodeType === Node.TEXT_NODE) {
+            // Add text nodes if they contain non-whitespace characters.
+            const text = node.textContent.trim();
+            if (text) {
+                formatted += INDENT.repeat(indentLevel) + text + '\n';
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            let openingTag = INDENT.repeat(indentLevel) + `<${tagName}`;
 
-                // Increase indent for opening tags and braces
-                if (line.match(/<[^\/][^>]*>$/) || line.match(/{$/) || line.match(/\[$/) || 
-                    (inScript && line.match(/\{$/)) || (inStyle && line.match(/\{$/))) {
-                    level++;
-                }
-            });
+            // Append attributes to the opening tag.
+            for (let attr of node.attributes) {
+                openingTag += ` ${attr.name}="${attr.value}"`;
+            }
+            openingTag += '>';
+            formatted += openingTag + '\n';
 
-            textarea.value = output.trim();
+            // If the node is a <script> or <style> tag, you might consider
+            // processing its content with a dedicated beautifier.
+            // Here we simply indent its text content.
+            if ((tagName === 'script' || tagName === 'style') && node.textContent.trim()) {
+                let contentLines = node.textContent.trim().split('\n');
+                contentLines = contentLines.map(line => INDENT.repeat(indentLevel + 1) + line.trim());
+                formatted += contentLines.join('\n') + '\n';
+            } else {
+                // Recursively beautify child nodes.
+                node.childNodes.forEach(child => {
+                    formatted += beautifyNode(child, indentLevel + 1);
+                });
+            }
+
+            // Append a closing tag unless the element is self-closing.
+            if (!voidElements.has(tagName)) {
+                formatted += INDENT.repeat(indentLevel) + `</${tagName}>` + '\n';
+            }
         }
+        return formatted;
+    }
+
+    let beautified = '';
+    // Process each child of the <body> element.
+    // (Alternatively, you could process doc.documentElement for full HTML.)
+    doc.body.childNodes.forEach(child => {
+        beautified += beautifyNode(child, 0);
+    });
+
+    textarea.value = beautified.trim();
+}
+
 
         function copyToClipboard() {
             codeTextarea.select();
