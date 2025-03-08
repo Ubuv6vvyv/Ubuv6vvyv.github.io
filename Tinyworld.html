@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tiny Planet Creator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 2px;
+      background: #f5f5f5;
+      color: #333;
+      font-size: 0.75em;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+      padding: 2px;
+    }
+    
+    h1 {
+      text-align: center;
+      margin: 0;
+      padding: 2px;
+      font-size: 1.1em;
+    }
+    
+    .preview-container {
+      position: relative;
+      width: 100%;
+      margin: 2px 0;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+      aspect-ratio: 1;
+    }
+    
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #ddd;
+    }
+    
+    .resolution-control {
+      margin: 2px 0;
+      text-align: center;
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 2px;
+    }
+    
+    .control-group {
+      margin-bottom: 2px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 1px;
+      font-weight: bold;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+    }
+    
+    input[type="range"] {
+      flex: 1;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .value-display {
+      width: 28px;
+      text-align: right;
+      margin-left: 2px;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 2px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 4px 6px;
+      background: #2962ff;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: bold;
+      flex: 1;
+      min-width: 70px;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #0039cb;
+    }
+    
+    button.secondary {
+      background: #f44336;
+    }
+    
+    button.secondary:hover {
+      background: #ba000d;
+    }
+    
+    .file-input {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      flex: 1;
+    }
+    
+    .file-input input[type=file] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    
+    .loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-weight: bold;
+      z-index: 10;
+      display: none;
+    }
+    
+    .upload-hint {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #666;
+      font-size: 0.75em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tiny Planet Creator</h1>
+    
+    <div class="preview-container">
+      <canvas id="canvas"></canvas>
+      <div class="upload-hint" id="uploadHint">
+        <p>Upload a panoramic image to start</p>
+        <p>(Recommended: 360° panorama or wide landscape)</p>
+      </div>
+      <div class="loading" id="loading">Processing...</div>
+    </div>
+    
+    <div class="resolution-control">
+      <label for="resolution">Output Quality:</label>
+      <select id="resolution">
+        <option value="512">Low</option>
+        <option value="1024">Med</option>
+        <option value="2048">High</option>
+      </select>
+    </div>
+    
+    <div class="controls">
+      <!-- Most frequently used adjustments first -->
+      <div class="control-group">
+        <label for="scale">Zoom <span class="value-display" id="scaleValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="scale" min="0.5" max="5" step="0.1" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="offset">Planet Radius <span class="value-display" id="offsetValue">0.5</span></label>
+        <div class="slider-container">
+          <input type="range" id="offset" min="0.1" max="1" step="0.05" value="0.5">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="projectionScale">Projection Scale <span class="value-display" id="projectionScaleValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="projectionScale" min="0.5" max="2" step="0.1" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="bulge">Bulge <span class="value-display" id="bulgeValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="bulge" min="0.5" max="1.5" step="0.05" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="squeeze">Squeeze <span class="value-display" id="squeezeValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="squeeze" min="0.5" max="2" step="0.1" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="xStretch">Horiz. Stretch <span class="value-display" id="xStretchValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="xStretch" min="0.5" max="2" step="0.1" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="yStretch">Vert. Stretch <span class="value-display" id="yStretchValue">1.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="yStretch" min="0.5" max="2" step="0.1" value="1.0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="rotation">Rotation <span class="value-display" id="rotationValue">0°</span></label>
+        <div class="slider-container">
+          <input type="range" id="rotation" min="0" max="360" step="1" value="0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="tilt">Tilt <span class="value-display" id="tiltValue">0.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="tilt" min="-1" max="1" step="0.1" value="0">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="spiral">Spiral <span class="value-display" id="spiralValue">0.0</span></label>
+        <div class="slider-container">
+          <input type="range" id="spiral" min="-0.5" max="0.5" step="0.05" value="0">
+        </div>
+      </div>
+      
+      <!-- Less frequently adjusted controls -->
+      <div class="control-group">
+        <label for="reflect">Reflection Mode</label>
+        <div class="slider-container">
+          <select id="reflect">
+            <option value="none">None</option>
+            <option value="horizontal">Horiz.</option>
+            <option value="vertical">Vert.</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="invert">Invert</label>
+        <div class="slider-container">
+          <input type="checkbox" id="invert">
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label for="autoFit">Auto Fit</label>
+        <div class="slider-container">
+          <input type="checkbox" id="autoFit">
+        </div>
+      </div>
+    </div>
+    
+    <div class="buttons">
+      <div class="file-input">
+        <button>Upload Image</button>
+        <input type="file" id="imageInput" accept="image/*">
+      </div>
+      <button id="downloadBtn">Download</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+    </div>
+  </div>
+  
+  <script>
+    // Elements
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const imageInput = document.getElementById('imageInput');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const uploadHint = document.getElementById('uploadHint');
+    const loading = document.getElementById('loading');
+    const resolutionSelect = document.getElementById('resolution');
+    const autoFitCheckbox = document.getElementById('autoFit');
+    
+    // Sliders and controls
+    const scaleSlider = document.getElementById('scale');
+    const offsetSlider = document.getElementById('offset');
+    const projectionScaleSlider = document.getElementById('projectionScale');
+    const bulgeSlider = document.getElementById('bulge');
+    const squeezeSlider = document.getElementById('squeeze');
+    const xStretchSlider = document.getElementById('xStretch');
+    const yStretchSlider = document.getElementById('yStretch');
+    const rotationSlider = document.getElementById('rotation');
+    const tiltSlider = document.getElementById('tilt');
+    const spiralSlider = document.getElementById('spiral');
+    const reflectSelect = document.getElementById('reflect');
+    const invertCheckbox = document.getElementById('invert');
+    
+    // Value displays
+    const scaleValue = document.getElementById('scaleValue');
+    const offsetValue = document.getElementById('offsetValue');
+    const projectionScaleValue = document.getElementById('projectionScaleValue');
+    const bulgeValue = document.getElementById('bulgeValue');
+    const squeezeValue = document.getElementById('squeezeValue');
+    const xStretchValue = document.getElementById('xStretchValue');
+    const yStretchValue = document.getElementById('yStretchValue');
+    const rotationValue = document.getElementById('rotationValue');
+    const tiltValue = document.getElementById('tiltValue');
+    const spiralValue = document.getElementById('spiralValue');
+    
+    // Variables and mirror cache
+    let originalImage = null;
+    let cachedReflected = null;
+    let lastReflectMode = null;
+    let params = {
+      scale: 1.0,
+      offset: 0.5,
+      projectionScale: 1.0,
+      bulge: 1.0,
+      squeeze: 1.0,
+      xStretch: 1.0,
+      yStretch: 1.0,
+      rotation: 0,
+      tilt: 0.0,
+      spiral: 0.0,
+      reflect: 'none',
+      invert: false
+    };
+    
+    // Initialize canvas size
+    function initCanvas() {
+      const container = canvas.parentElement;
+      const displaySize = container.clientWidth;
+      canvas.style.width = displaySize + 'px';
+      canvas.style.height = displaySize + 'px';
+      const resolution = parseInt(resolutionSelect.value);
+      canvas.width = resolution;
+      canvas.height = resolution;
+    }
+    
+    // Handle image upload
+    imageInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+            originalImage = img;
+            cachedReflected = null;
+            lastReflectMode = null;
+            processImage();
+            uploadHint.style.display = 'none';
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+      }
+    });
+    
+    // Process and render the tiny planet
+    function processImage() {
+      if (!originalImage) return;
+      loading.style.display = 'flex';
+      setTimeout(() => {
+        const size = canvas.width;
+        const centerX = size / 2;
+        const centerY = size / 2;
+        const radius = size * params.offset;
+        const scale = params.scale;
+        const rotation = params.rotation * Math.PI / 180;
+        
+        // Mirror processing with caching for performance
+        let srcImg = originalImage;
+        if (params.reflect !== 'none') {
+          if (cachedReflected && lastReflectMode === params.reflect) {
+            srcImg = cachedReflected;
+          } else {
+            let tempCanvas = document.createElement('canvas');
+            tempCanvas.width = originalImage.width;
+            tempCanvas.height = originalImage.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.save();
+            if (params.reflect === 'horizontal') {
+              tempCtx.translate(tempCanvas.width, 0);
+              tempCtx.scale(-1, 1);
+            } else if (params.reflect === 'vertical') {
+              tempCtx.translate(0, tempCanvas.height);
+              tempCtx.scale(1, -1);
+            } else if (params.reflect === 'both') {
+              tempCtx.translate(tempCanvas.width, tempCanvas.height);
+              tempCtx.scale(-1, -1);
+            }
+            tempCtx.drawImage(originalImage, 0, 0);
+            tempCtx.restore();
+            let tempImg = new Image();
+            tempImg.src = tempCanvas.toDataURL();
+            srcImg = tempImg;
+            cachedReflected = tempImg;
+            lastReflectMode = params.reflect;
+          }
+        }
+        
+        ctx.clearRect(0, 0, size, size);
+        const imageData = ctx.createImageData(size, size);
+        const sourceCanvas = document.createElement('canvas');
+        sourceCanvas.width = srcImg.width;
+        sourceCanvas.height = srcImg.height;
+        const sourceCtx = sourceCanvas.getContext('2d');
+        sourceCtx.drawImage(srcImg, 0, 0);
+        const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+        const sourceData = sourceImageData.data;
+        const sourceWidth = sourceImageData.width;
+        const sourceHeight = sourceImageData.height;
+        
+        const chunkSize = 50;
+        let currentRow = 0;
+        
+        function processChunk() {
+          if (currentRow >= size) {
+            if (autoFitCheckbox.checked) {
+              let offscreen = document.createElement('canvas');
+              offscreen.width = size;
+              offscreen.height = size;
+              let offCtx = offscreen.getContext('2d');
+              offCtx.putImageData(imageData, 0, 0);
+              let minX = size, minY = size, maxX = 0, maxY = 0;
+              for (let i = 0; i < imageData.data.length; i += 4) {
+                let alpha = imageData.data[i + 3];
+                if (alpha > 0) {
+                  let pixelIndex = i / 4;
+                  let x = pixelIndex % size;
+                  let y = Math.floor(pixelIndex / size);
+                  if (x < minX) minX = x;
+                  if (x > maxX) maxX = x;
+                  if (y < minY) minY = y;
+                  if (y > maxY) maxY = y;
+                }
+              }
+              if (minX > maxX || minY > maxY) {
+                minX = 0; minY = 0; maxX = size; maxY = size;
+              }
+              let bbWidth = maxX - minX + 1;
+              let bbHeight = maxY - minY + 1;
+              let scaleFactor = Math.min(size / bbWidth, size / bbHeight);
+              let dw = bbWidth * scaleFactor;
+              let dh = bbHeight * scaleFactor;
+              let dx = (size - dw) / 2;
+              let dy = (size - dh) / 2;
+              ctx.clearRect(0, 0, size, size);
+              ctx.drawImage(offscreen, minX, minY, bbWidth, bbHeight, dx, dy, dw, dh);
+            } else {
+              ctx.putImageData(imageData, 0, 0);
+            }
+            loading.style.display = 'none';
+            return;
+          }
+          const endRow = Math.min(currentRow + chunkSize, size);
+          for (let y = currentRow; y < endRow; y++) {
+            for (let x = 0; x < size; x++) {
+              const dx = x - centerX;
+              const dy = y - centerY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              let r = (dist / scale) * params.projectionScale;
+              r = Math.pow(r, params.bulge);
+              if (params.invert) {
+                r = radius - r;
+              }
+              if (r >= 0 && r <= radius) {
+                let effectiveDy = dy * (1 + params.tilt);
+                let theta = Math.atan2(effectiveDy, dx) + rotation;
+                theta = theta * params.squeeze;
+                theta += params.spiral * (r / radius) * (2 * Math.PI);
+                while (theta < 0) theta += 2 * Math.PI;
+                while (theta >= 2 * Math.PI) theta -= 2 * Math.PI;
+                let rawX = (theta / (2 * Math.PI)) * sourceWidth * params.xStretch;
+                let rawY = (r / radius) * sourceHeight * params.yStretch;
+                let sourceX = Math.min(Math.max(rawX, 0), sourceWidth - 1);
+                let sourceY = Math.min(Math.max(rawY, 0), sourceHeight - 1);
+                const x0 = Math.floor(sourceX);
+                const y0 = Math.floor(sourceY);
+                const x1 = Math.min(x0 + 1, sourceWidth - 1);
+                const y1 = Math.min(y0 + 1, sourceHeight - 1);
+                const wx = sourceX - x0;
+                const wy = sourceY - y0;
+                const idx00 = (y0 * sourceWidth + x0) * 4;
+                const idx01 = (y0 * sourceWidth + x1) * 4;
+                const idx10 = (y1 * sourceWidth + x0) * 4;
+                const idx11 = (y1 * sourceWidth + x1) * 4;
+                const destIdx = (y * size + x) * 4;
+                for (let c = 0; c < 4; c++) {
+                  const top = sourceData[idx00 + c] * (1 - wx) + sourceData[idx01 + c] * wx;
+                  const bottom = sourceData[idx10 + c] * (1 - wx) + sourceData[idx11 + c] * wx;
+                  imageData.data[destIdx + c] = Math.round(top * (1 - wy) + bottom * wy);
+                }
+              }
+            }
+          }
+          currentRow = endRow;
+          setTimeout(processChunk, 0);
+        }
+        processChunk();
+      }, 10);
+    }
+    
+    function updateDisplays() {
+      scaleValue.textContent = params.scale.toFixed(1);
+      offsetValue.textContent = params.offset.toFixed(2);
+      projectionScaleValue.textContent = params.projectionScale.toFixed(1);
+      bulgeValue.textContent = params.bulge.toFixed(2);
+      squeezeValue.textContent = params.squeeze.toFixed(1);
+      xStretchValue.textContent = params.xStretch.toFixed(1);
+      yStretchValue.textContent = params.yStretch.toFixed(1);
+      rotationValue.textContent = `${params.rotation}°`;
+      tiltValue.textContent = params.tilt.toFixed(1);
+      spiralValue.textContent = params.spiral.toFixed(2);
+    }
+    
+    downloadBtn.addEventListener('click', function() {
+      if (!originalImage) return;
+      const link = document.createElement('a');
+      link.download = 'tiny-planet.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+    
+    resetBtn.addEventListener('click', function() {
+      params = {
+        scale: 1.0,
+        offset: 0.5,
+        projectionScale: 1.0,
+        bulge: 1.0,
+        squeeze: 1.0,
+        xStretch: 1.0,
+        yStretch: 1.0,
+        rotation: 0,
+        tilt: 0.0,
+        spiral: 0.0,
+        reflect: 'none',
+        invert: false
+      };
+      scaleSlider.value = params.scale;
+      offsetSlider.value = params.offset;
+      projectionScaleSlider.value = params.projectionScale;
+      bulgeSlider.value = params.bulge;
+      squeezeSlider.value = params.squeeze;
+      xStretchSlider.value = params.xStretch;
+      yStretchSlider.value = params.yStretch;
+      rotationSlider.value = params.rotation;
+      tiltSlider.value = params.tilt;
+      spiralSlider.value = params.spiral;
+      reflectSelect.value = params.reflect;
+      invertCheckbox.checked = params.invert;
+      autoFitCheckbox.checked = false;
+      updateDisplays();
+      processImage();
+    });
+    
+    scaleSlider.addEventListener('input', function() {
+      params.scale = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    offsetSlider.addEventListener('input', function() {
+      params.offset = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    projectionScaleSlider.addEventListener('input', function() {
+      params.projectionScale = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    bulgeSlider.addEventListener('input', function() {
+      params.bulge = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    squeezeSlider.addEventListener('input', function() {
+      params.squeeze = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    xStretchSlider.addEventListener('input', function() {
+      params.xStretch = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    yStretchSlider.addEventListener('input', function() {
+      params.yStretch = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    rotationSlider.addEventListener('input', function() {
+      params.rotation = parseInt(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    tiltSlider.addEventListener('input', function() {
+      params.tilt = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    spiralSlider.addEventListener('input', function() {
+      params.spiral = parseFloat(this.value);
+      updateDisplays();
+      processImage();
+    });
+    
+    reflectSelect.addEventListener('change', function() {
+      params.reflect = this.value;
+      processImage();
+    });
+    
+    invertCheckbox.addEventListener('change', function() {
+      params.invert = this.checked;
+      processImage();
+    });
+    
+    resolutionSelect.addEventListener('change', function() {
+      canvas.width = parseInt(this.value);
+      canvas.height = parseInt(this.value);
+      processImage();
+    });
+    
+    window.addEventListener('resize', function() {
+      const container = canvas.parentElement;
+      canvas.style.width = container.clientWidth + 'px';
+      canvas.style.height = container.clientWidth + 'px';
+    });
+    
+    initCanvas();
+    updateDisplays();
+  </script>
+</body>
+</html>
