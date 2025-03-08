@@ -1,653 +1,702 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Code Editor</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 15px;
-            background-color: #f5f5f5;
-            color: #000;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .section {
-            background-color: #ffffff;
-            border: 1px solid #000;
-            padding: 20px;
-            margin: 5px 0;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-        .section-title {
-            margin-top: 0;
-            color: #333;
-            font-size: 1.4em;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        textarea {
-            width: 95%;
-            height: 350px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 10px;
-            line-height: 1.4;
-            padding: 15px;
-            border: 2px solid #000;
-            border-radius: 6px;
-            background-color: #2b2b2b;
-            color: #f8f8f8;
-            transition: all 0.3s ease;
-            tab-size: 4;
-            margin-bottom: 1px;
-        }
-        textarea:focus {
-            border-color: #4CAF50;
-            outline: none;
-            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
-        }
-        .button-group {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 2fr));
-            gap: 8px;
-            margin-top: 1px;
-        }
-        button {
-            padding: 8px 12px;
-            font-size: 10px;
-            font-weight: 500;
-            border: none;
-            border-radius: 5px;
-            background-color: #050545;
-            color: #fff;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        button:hover {
-            background-color: #3461c4;
-            transform: translateY(-1px);
-        }
-        button:active {
-            transform: translateY(0);
-        }
-
-        /* Text Tools Styles */
-        .text-tools-section {
-            background-color: #ffffff;
-            border: 1px solid #000;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .text-tools-search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .text-tools-search-box input,
-        .text-tools-search-box select {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            flex: 1;
-            min-width: 200px;
-        }
-        .match-count {
-            color: #666;
-            font-size: 0.9em;
-        }
-        
-        /* Diff Checker Styles */
-        .diff-section {
-            margin-top: 20px;
-        }
-        .diff-container {
-            display: grid;
-            grid-template-rows: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 15px;
-        }
-        .diff-output {
-            margin-top: 15px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        .diff-line {
-            padding: 2px 4px;
-            margin: 1px 0;
-        }
-        .diff-added {
-            background-color: #e6ffe6;
-            color: #0a3d0a;
-        }
-        .diff-removed {
-            background-color: #ffe6e6;
-            color: #3d0a0a;
-        }
-        #file-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 15px;
-        }
-        #file-buttons button {
-            background-color: #28a745;
-        }
-        #file-buttons button:hover {
-            background-color: #218838;
-        }
-        .regex-templates {
-            margin-bottom: 10px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enhanced Code Editor</title>
+  
+  <!-- Import js-beautify for beautification -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
+  
+  <style>
+    /* Base styles */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 15px;
+      background-color: #f5f5f5;
+      color: #000;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section {
+      background-color: #ffffff;
+      border: 1px solid #000;
+      padding: 20px;
+      margin: 5px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    .section-title {
+      margin-top: 0;
+      color: #333;
+      font-size: 1.4em;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    textarea {
+      width: 95%;
+      height: 350px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 10px;
+      line-height: 1.4;
+      padding: 15px;
+      border: 2px solid #000;
+      border-radius: 6px;
+      background-color: #2b2b2b;
+      color: #f8f8f8;
+      transition: all 0.3s ease;
+      tab-size: 4;
+      margin-bottom: 1px;
+    }
+    textarea:focus {
+      border-color: #4CAF50;
+      outline: none;
+      box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    }
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 2fr));
+      gap: 8px;
+      margin-top: 1px;
+    }
+    button {
+      padding: 8px 12px;
+      font-size: 10px;
+      font-weight: 500;
+      border: none;
+      border-radius: 5px;
+      background-color: #050545;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background-color: #3461c4;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    /* Text Tools Styles */
+    .text-tools-section {
+      background-color: #ffffff;
+      border: 1px solid #000;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+    .text-tools-search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .text-tools-search-box input,
+    .text-tools-search-box select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      flex: 1;
+      min-width: 200px;
+    }
+    .match-count {
+      color: #666;
+      font-size: 0.9em;
+    }
+    /* Diff Checker Styles */
+    .diff-section {
+      margin-top: 20px;
+    }
+    .diff-container {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .diff-output {
+      margin-top: 15px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 6px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    .diff-line {
+      padding: 2px 4px;
+      margin: 1px 0;
+    }
+    .diff-added {
+      background-color: #e6ffe6;
+      color: #0a3d0a;
+    }
+    .diff-removed {
+      background-color: #ffe6e6;
+      color: #3d0a0a;
+    }
+    #file-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 15px;
+    }
+    #file-buttons button {
+      background-color: #28a745;
+    }
+    #file-buttons button:hover {
+      background-color: #218838;
+    }
+    .regex-templates {
+      margin-bottom: 10px;
+    }
+    /* Foldable view styles */
+    #foldable-view {
+      width: 95%;
+      max-height: 350px;
+      overflow: auto;
+      background-color: #2b2b2b;
+      color: #f8f8f8;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 10px;
+      padding: 15px;
+      border: 2px solid #000;
+      border-radius: 6px;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .foldable-node {
+      margin-left: 20px;
+      border-left: 1px dotted #ccc;
+      padding-left: 5px;
+    }
+    .fold-toggle {
+      cursor: pointer;
+      color: #00f;
+      user-select: none;
+      margin-right: 5px;
+    }
+    .foldable-text {
+      margin-left: 20px;
+    }
+    .foldable-comment {
+      margin-left: 20px;
+      font-style: italic;
+      color: #888;
+    }
+  </style>
 </head>
 <body>
-    <div class="section">
-        <h2 class="section-title">Code</h2>
-        <div class="file-input-wrapper">
-            <button onclick="handleMultipleFiles()">Select Files</button>
-            <div id="file-buttons"></div>
-        </div>
-        <textarea id="code-textarea" placeholder="Enter or paste code here..."></textarea>
-        <div class="button-group">
-            <button onclick="undoChange()">Undo</button>
-            <button onclick="openInNewTab()">Execute in New Tab</button>
-            <button onclick="copyToClipboard()">Copy</button>
-            <button onclick="clearEditor()">Clear</button>
-            <button onclick="handleFileOpen()">Open File</button>
-            <button onclick="saveFile()">Save File</button>
-            <button onclick="minifyCode()">Minify</button>
-            <button onclick="beautifyCode()">Beautify</button>
-        </div>
+  <div class="section">
+    <h2 class="section-title">Code</h2>
+    <div class="file-input-wrapper">
+      <button onclick="handleMultipleFiles()">Select Files</button>
+      <div id="file-buttons"></div>
     </div>
-
-    <!-- Text Tools Section -->
-    <div class="text-tools-section">
-        <h2 class="section-title">Text Tools</h2>
-        
-        <!-- Find and Replace -->
-        <div class="text-tools-search-box">
-            <input type="text" id="find-input" placeholder="Find text">
-            <input type="text" id="replace-input" placeholder="Replace with">
-            <button onclick="findAndReplace()">Replace All</button>
-            <span class="match-count" id="match-count"></span>
-        </div>
-
-        <!-- Regex Tools -->
-        <div class="regex-templates">
-            <select id="regex-template" onchange="applyRegexTemplate()">
-                <option value="">Select Regex Template...</option>
-                <option value="email">Email Addresses</option>
-                <option value="url">URLs</option>
-                <option value="phone">Phone Numbers</option>
-                <option value="date">Dates</option>
-                <option value="name">Names</option>
-                <option value="ipv4">IPv4 Addresses</option>
-            </select>
-        </div>
-        <div class="text-tools-search-box">
-            <input type="text" id="regex-input" placeholder="Enter regex pattern">
-            <select id="regex-action">
-                <option value="highlight">Highlight Matches</option>
-                <option value="extract">Extract Matches</option>
-                <option value="remove">Remove Matches</option>
-            </select>
-            <button onclick="applyRegex()">Apply Regex</button>
-        </div>
-
-        <!-- Text Operations -->
-        <div class="button-group">
-            <button onclick="filterLines()">Filter Lines</button>
-            <button onclick="removeEmptyLines()">Remove Empty Lines</button>
-            <button onclick="removeDuplicateLines()">Remove Duplicate Lines</button>
-        </div>
+    <textarea id="code-textarea" placeholder="Enter or paste code here..."></textarea>
+    <div id="foldable-view"></div>
+    <div class="button-group">
+      <button onclick="undoChange()">Undo</button>
+      <button onclick="openInNewTab()">Execute in New Tab</button>
+      <button onclick="copyToClipboard()">Copy</button>
+      <button onclick="clearEditor()">Clear</button>
+      <button onclick="handleFileOpen()">Open File</button>
+      <button onclick="saveFile()">Save File</button>
+      <button onclick="minifyCode()">Minify</button>
+      <button onclick="beautifyCode()">Beautify</button>
+      <button onclick="toggleFoldView()">Toggle Collapse</button>
     </div>
+  </div>
 
-    <!-- Diff Checker Section -->
-    <div class="section diff-section">
-        <h2 class="section-title">Diff Checker</h2>
-        <div class="diff-container">
-            <textarea id="original-code" placeholder="Original code"></textarea>
-            <textarea id="new-code" placeholder="Modified code"></textarea>
-        </div>
-        <button onclick="checkDiff()">Compare Changes</button>
-        <div id="diff-output" class="diff-output"></div>
+  <!-- Text Tools Section -->
+  <div class="text-tools-section">
+    <h2 class="section-title">Text Tools</h2>
+    <div class="text-tools-search-box">
+      <input type="text" id="find-input" placeholder="Find text" />
+      <input type="text" id="replace-input" placeholder="Replace with" />
+      <button onclick="findAndReplace()">Replace All</button>
+      <span class="match-count" id="match-count"></span>
     </div>
+    <div class="regex-templates">
+      <select id="regex-template" onchange="applyRegexTemplate()">
+        <option value="">Select Regex Template...</option>
+        <option value="email">Email Addresses</option>
+        <option value="url">URLs</option>
+        <option value="phone">Phone Numbers</option>
+        <option value="date">Dates</option>
+        <option value="name">Names</option>
+        <option value="ipv4">IPv4 Addresses</option>
+        <option value="hexcolor">Hex Color Codes</option>
+        <option value="twitter">Twitter Handles</option>
+        <option value="htmltag">HTML Tags</option>
+      </select>
+    </div>
+    <div class="text-tools-search-box">
+      <input type="text" id="regex-input" placeholder="Enter regex pattern" />
+      <select id="regex-action">
+        <option value="highlight">Highlight Matches</option>
+        <option value="extract">Extract Matches</option>
+        <option value="remove">Remove Matches</option>
+      </select>
+      <button onclick="applyRegex()">Apply Regex</button>
+    </div>
+    <div class="button-group">
+      <button onclick="filterLines()">Filter Lines</button>
+      <button onclick="removeEmptyLines()">Remove Empty Lines</button>
+      <button onclick="removeDuplicateLines()">Remove Duplicate Lines</button>
+    </div>
+  </div>
 
-    <script>
-        // Store file contents
-        let fileContents = new Map();
-        
-        
-        
-// Improved minifyCode: uses a DOMParser to split HTML from inline JS/CSS
-function minifyCode() {
-    const textarea = document.getElementById('code-textarea');
-    if (!textarea) return;
-    let code = textarea.value;
+  <!-- Diff Checker Section -->
+  <div class="section diff-section">
+    <h2 class="section-title">Diff Checker</h2>
+    <div class="diff-container">
+      <textarea id="original-code" placeholder="Original code"></textarea>
+      <textarea id="new-code" placeholder="Modified code"></textarea>
+    </div>
+    <button onclick="checkDiff()">Compare Changes</button>
+    <div id="diff-output" class="diff-output"></div>
+  </div>
 
-    // Parse the code as HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(code, 'text/html');
-
-    // Recursively remove all HTML comment nodes
-    function removeComments(node) {
-        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+  <script>
+    /* ===============================
+       CUSTOM MINIFICATION FUNCTIONS
+       =============================== */
+    function minifyJS(code) {
+      // Simple JS minifier: remove block and line comments and extra whitespace.
+      return code
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n\r]*/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    function minifyCSS(code) {
+      // Simple CSS minifier: remove comments and collapse whitespace.
+      return code
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    function customMinifyHTML(code) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(code, "text/html");
+        // Remove HTML comments recursively.
+        function removeComments(node) {
+          for (let i = node.childNodes.length - 1; i >= 0; i--) {
             let child = node.childNodes[i];
             if (child.nodeType === Node.COMMENT_NODE) {
-                node.removeChild(child);
+              node.removeChild(child);
             } else if (child.nodeType === Node.ELEMENT_NODE) {
-                removeComments(child);
+              removeComments(child);
             }
+          }
         }
-    }
-    removeComments(doc);
-
-    // Define a naive JavaScript minifier.
-    // WARNING: This approach is still very basic.
-    // For robust minification, use a dedicated library.
-    function minifyJS(jsCode) {
-        return jsCode
-            .replace(/\/\*[\s\S]*?\*\//g, '')     // Remove block comments
-            .replace(/\/\/[^\n\r]*/g, '')           // Remove line comments
-            .replace(/\s+/g, ' ')                   // Collapse whitespace
-            .replace(/\s*([=+\-*/%<>!&|^?:,;{}()[\]])\s*/g, '$1')
-            .trim();
-    }
-
-    // Define a naive CSS minifier.
-    // For production, consider a well‐tested CSS minifier.
-    function minifyCSS(cssCode) {
-        return cssCode
-            .replace(/\/\*[\s\S]*?\*\//g, '')      // Remove CSS comments
-            .replace(/\s+/g, ' ')                   // Collapse whitespace
-            .replace(/\s*([{}:;,])\s*/g, '$1')
-            .trim();
-    }
-
-    // Process all <script> tags – minify their content if any.
-    const scripts = doc.querySelectorAll('script');
-    scripts.forEach(script => {
-        if (script.textContent) {
+        removeComments(doc);
+        // Minify inline JS and CSS.
+        doc.querySelectorAll("script").forEach(script => {
+          if (script.textContent) {
             script.textContent = minifyJS(script.textContent);
-        }
-    });
-
-    // Process all <style> tags – minify their content if any.
-    const styles = doc.querySelectorAll('style');
-    styles.forEach(style => {
-        if (style.textContent) {
-            style.textContent = minifyCSS(style.textContent);
-        }
-    });
-
-    // Serialize the updated document.
-    // Collapse any extra whitespace between tags.
-    let serialized = doc.documentElement.outerHTML;
-    serialized = serialized.replace(/>\s+</g, '><');
-    textarea.value = serialized.trim();
-}
-
-
-        // File to button functionality
-        function handleMultipleFiles() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.multiple = true;
-            input.accept = '.html,.js,.css,.txt';
-            
-            input.onchange = e => {
-                const files = Array.from(e.target.files);
-                const buttonContainer = document.getElementById('file-buttons');
-                buttonContainer.innerHTML = '';
-                
-                files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = e => {
-                        const content = e.target.result;
-                        fileContents.set(file.name, content);
-                        
-                        const button = document.createElement('button');
-                        button.textContent = file.name;
-                        button.onclick = () => executeCode(content);
-                        buttonContainer.appendChild(button);
-                    };
-                    reader.readAsText(file);
-                });
-            };
-            
-            input.click();
-        }
-
-        function executeCode(content) {
-            const blob = new Blob([content], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-        }
-
-        // Existing functionality with improvements
-        let undoHistory = [];
-        const codeTextarea = document.getElementById("code-textarea");
-
-        codeTextarea.addEventListener("input", () => {
-            if (undoHistory.length === 0 || undoHistory[undoHistory.length - 1] !== codeTextarea.value) {
-                undoHistory.push(codeTextarea.value);
-            }
+          }
         });
-
-        function undoChange() {
-            if (undoHistory.length > 1) {
-                undoHistory.pop();
-                codeTextarea.value = undoHistory[undoHistory.length - 1];
-            }
-        }
-
-        function handleFileOpen() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.html,.js,.css,.txt';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = e => codeTextarea.value = e.target.result;
-                reader.readAsText(file);
-            };
-            input.click();
-        }
-
-        function saveFile() {
-            const code = codeTextarea.value;
-            const blob = new Blob([code], { type: 'text/plain' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'code.txt';
-            a.click();
-        }
-
-        function openInNewTab() {
-            const code = codeTextarea.value;
-            const blob = new Blob([code], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-        }
-
-        // Improved beautifyCode: parses the HTML to work on the DOM structure
-function beautifyCode() {
-    const textarea = document.getElementById('code-textarea');
-    if (!textarea) return;
-    const code = textarea.value;
-
-    // Parse the code as HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(code, 'text/html');
-
-    // A set of void (self-closing) HTML elements
-    const voidElements = new Set([
-        'area', 'base', 'br', 'col', 'embed', 'hr',
-        'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'
-    ]);
-
-    // Recursive function to format a node with proper indentation.
-    function beautifyNode(node, indentLevel) {
-        const INDENT = '    ';
-        let formatted = '';
-
-        if (node.nodeType === Node.TEXT_NODE) {
-            // Add text nodes if they contain non-whitespace characters.
-            const text = node.textContent.trim();
-            if (text) {
-                formatted += INDENT.repeat(indentLevel) + text + '\n';
-            }
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const tagName = node.tagName.toLowerCase();
-            let openingTag = INDENT.repeat(indentLevel) + `<${tagName}`;
-
-            // Append attributes to the opening tag.
+        doc.querySelectorAll("style").forEach(style => {
+          if (style.textContent) {
+            style.textContent = minifyCSS(style.textContent);
+          }
+        });
+        const voidElements = new Set([
+          "area", "base", "br", "col", "embed", "hr", "img", "input",
+          "link", "meta", "param", "source", "track", "wbr"
+        ]);
+        function serializeMinified(node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent.trim();
+          }
+          if (node.nodeType === Node.COMMENT_NODE) {
+            return "";
+          }
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            let tagName = node.tagName.toLowerCase();
+            let str = "<" + tagName;
             for (let attr of node.attributes) {
-                openingTag += ` ${attr.name}="${attr.value}"`;
+              str += " " + attr.name + '="' + attr.value + '"';
             }
-            openingTag += '>';
-            formatted += openingTag + '\n';
-
-            // If the node is a <script> or <style> tag, you might consider
-            // processing its content with a dedicated beautifier.
-            // Here we simply indent its text content.
-            if ((tagName === 'script' || tagName === 'style') && node.textContent.trim()) {
-                let contentLines = node.textContent.trim().split('\n');
-                contentLines = contentLines.map(line => INDENT.repeat(indentLevel + 1) + line.trim());
-                formatted += contentLines.join('\n') + '\n';
-            } else {
-                // Recursively beautify child nodes.
-                node.childNodes.forEach(child => {
-                    formatted += beautifyNode(child, indentLevel + 1);
-                });
+            str += ">";
+            let children = "";
+            for (let child of node.childNodes) {
+              children += serializeMinified(child);
             }
-
-            // Append a closing tag unless the element is self-closing.
             if (!voidElements.has(tagName)) {
-                formatted += INDENT.repeat(indentLevel) + `</${tagName}>` + '\n';
+              str += children + "</" + tagName + ">";
             }
+            return str;
+          }
+          return "";
         }
-        return formatted;
+        let minified = "";
+        if (doc.doctype) {
+          minified += "<!DOCTYPE " + doc.doctype.name + ">";
+        }
+        minified += serializeMinified(doc.documentElement);
+        return minified;
+      } catch (e) {
+        console.error("Minification error:", e);
+        return code;
+      }
     }
-
-    let beautified = '';
-    // Process each child of the <body> element.
-    // (Alternatively, you could process doc.documentElement for full HTML.)
-    doc.body.childNodes.forEach(child => {
-        beautified += beautifyNode(child, 0);
+    function minifyCode() {
+      const textarea = document.getElementById("code-textarea");
+      if (!textarea) return;
+      let code = textarea.value;
+      code = customMinifyHTML(code);
+      textarea.value = code;
+    }
+    
+    /* ===============================
+       BEAUTIFICATION (using js-beautify)
+       =============================== */
+    function beautifyCode() {
+      const textarea = document.getElementById("code-textarea");
+      if (!textarea) return;
+      let code = textarea.value;
+      const options = {
+        indent_size: 4,
+        wrap_line_length: 0,
+        preserve_newlines: true,
+        unformatted: [] // format inline JS/CSS as well
+      };
+      code = html_beautify(code, options);
+      textarea.value = code;
+    }
+    
+    /* ===============================
+       FILE HANDLING & OTHER UTILITIES
+       =============================== */
+    let fileContents = new Map();
+    function handleMultipleFiles() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.multiple = true;
+      input.accept = ".html,.js,.css,.txt";
+      input.onchange = e => {
+        const files = Array.from(e.target.files);
+        const buttonContainer = document.getElementById("file-buttons");
+        buttonContainer.innerHTML = "";
+        files.forEach(file => {
+          const reader = new FileReader();
+          reader.onload = e => {
+            const content = e.target.result;
+            fileContents.set(file.name, content);
+            const button = document.createElement("button");
+            button.textContent = file.name;
+            button.onclick = () => executeCode(content);
+            buttonContainer.appendChild(button);
+          };
+          reader.readAsText(file);
+        });
+      };
+      input.click();
+    }
+    function executeCode(content) {
+      const blob = new Blob([content], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    }
+    let undoHistory = [];
+    const codeTextarea = document.getElementById("code-textarea");
+    codeTextarea.addEventListener("input", () => {
+      if (
+        undoHistory.length === 0 ||
+        undoHistory[undoHistory.length - 1] !== codeTextarea.value
+      ) {
+        undoHistory.push(codeTextarea.value);
+      }
     });
-
-    textarea.value = beautified.trim();
-}
-
-
-        function copyToClipboard() {
-            codeTextarea.select();
-            document.execCommand('copy');
+    function undoChange() {
+      if (undoHistory.length > 1) {
+        undoHistory.pop();
+        codeTextarea.value = undoHistory[undoHistory.length - 1];
+      }
+    }
+    function handleFileOpen() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".html,.js,.css,.txt";
+      input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = e => (codeTextarea.value = e.target.result);
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+    function saveFile() {
+      const code = codeTextarea.value;
+      const title = document.title || "code";
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = title.replace(/\s+/g, "_") + "_" + date + ".txt";
+      const blob = new Blob([code], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+    }
+    function openInNewTab() {
+      const code = codeTextarea.value;
+      const blob = new Blob([code], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    }
+    function copyToClipboard() {
+      codeTextarea.select();
+      document.execCommand("copy");
+    }
+    function clearEditor() {
+      codeTextarea.value = "";
+      undoHistory = [];
+    }
+    
+    /* ===============================
+       FOLD/UNFOLD (COLLAPSIBLE) VIEW
+       =============================== */
+    var foldViewActive = false;
+    function toggleFoldView() {
+      const textarea = document.getElementById("code-textarea");
+      const foldView = document.getElementById("foldable-view");
+      if (!foldView) return;
+      if (!foldViewActive) {
+        // Generate foldable view from the raw code.
+        let code = textarea.value;
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(code, "text/html");
+        foldView.innerHTML = "";
+        let rendered = renderFoldableNode(doc.documentElement);
+        foldView.appendChild(rendered);
+        textarea.style.display = "none";
+        foldView.style.display = "block";
+        foldViewActive = true;
+      } else {
+        // Switch back to raw view.
+        foldView.style.display = "none";
+        textarea.style.display = "block";
+        foldViewActive = false;
+      }
+    }
+    function renderFoldableNode(node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        let el = document.createElement("div");
+        el.className = "foldable-node";
+        let header = document.createElement("div");
+        let toggleSpan = document.createElement("span");
+        toggleSpan.className = "fold-toggle";
+        // If there are child nodes, show a toggle.
+        if (node.childNodes.length > 0) {
+          toggleSpan.textContent = "[-]";
+        } else {
+          toggleSpan.textContent = "   ";
         }
-
-        function clearEditor() {
-            codeTextarea.value = '';
-            undoHistory = [];
+        header.appendChild(toggleSpan);
+        let openingTag = document.createElement("span");
+        let tagText = "<" + node.tagName.toLowerCase();
+        for (let attr of node.attributes) {
+          tagText += " " + attr.name + '="' + attr.value + '"';
         }
-        
-        const regexTemplates = {
-            email: {
-                pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
-                description: 'Email addresses'
-            },
-            url: {
-                pattern: 'https?:\\/\\/[\\w\\-\\.]+\\.[a-zA-Z]{2,}[\\w\\-\\._~:\\/?#[\\]@!\\$&\'\\(\\)\\*\\+,;=]*',
-                description: 'URLs'
-            },
-            phone: {
-                pattern: '\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}',
-                description: 'Phone numbers'
-            },
-            date: {
-                pattern: '\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{2,4}',
-                description: 'Dates'
-            },
-            name: {
-                pattern: '\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+\\b',
-                description: 'Names (First Last)'
-            },
-            ipv4: {
-                pattern: '\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b',
-                description: 'IPv4 addresses'
-            }
+        tagText += ">";
+        openingTag.textContent = tagText;
+        header.appendChild(openingTag);
+        el.appendChild(header);
+        let childContainer = document.createElement("div");
+        childContainer.className = "foldable-children";
+        for (let child of node.childNodes) {
+          let childEl = renderFoldableNode(child);
+          if (childEl) {
+            childContainer.appendChild(childEl);
+          }
+        }
+        el.appendChild(childContainer);
+        const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+        if (!voidElements.has(node.tagName.toLowerCase())) {
+          let footer = document.createElement("div");
+          footer.style.marginLeft = "20px";
+          footer.textContent = "</" + node.tagName.toLowerCase() + ">";
+          el.appendChild(footer);
+        }
+        toggleSpan.onclick = function() {
+          if (childContainer.style.display === "none") {
+            childContainer.style.display = "block";
+            toggleSpan.textContent = "[-]";
+          } else {
+            childContainer.style.display = "none";
+            toggleSpan.textContent = "[+]";
+          }
         };
-
-        function applyRegexTemplate() {
-            const template = document.getElementById('regex-template').value;
-            if (template && regexTemplates[template]) {
-                document.getElementById('regex-input').value = regexTemplates[template].pattern;
-            }
+        return el;
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        let text = node.textContent.trim();
+        if (text) {
+          let span = document.createElement("div");
+          span.className = "foldable-text";
+          span.textContent = text;
+          return span;
         }
-
-        // Find and Replace
-        function findAndReplace() {
-            const textarea = document.getElementById('code-textarea');
-            const findText = document.getElementById('find-input').value;
-            const replaceText = document.getElementById('replace-input').value;
-            
-            if (!findText) return;
-            
-            try {
-                const regex = new RegExp(findText, 'g');
-                const matches = textarea.value.match(regex);
-                document.getElementById('match-count').textContent = 
-                    matches ? `${matches.length} matches found` : 'No matches found';
-                
-                textarea.value = textarea.value.replace(regex, replaceText);
-            } catch (e) {
-                alert('Invalid search pattern');
-            }
+        return null;
+      } else if (node.nodeType === Node.COMMENT_NODE) {
+        let comment = document.createElement("div");
+        comment.className = "foldable-comment";
+        comment.textContent = "<!-- " + node.textContent.trim() + " -->";
+        return comment;
+      }
+      return null;
+    }
+    
+    /* ===============================
+       REGEX & DIFF FUNCTIONS
+       =============================== */
+    const regexTemplates = {
+      email: {
+        pattern: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+        description: "Email addresses"
+      },
+      url: {
+        pattern: "https?:\\/\\/[\\w\\-\\.]+\\.[a-zA-Z]{2,}[\\w\\-\\._~:\\/?#[\\]@!\\$&'\\(\\)\\*\\+,;=]*",
+        description: "URLs"
+      },
+      phone: {
+        pattern: "\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}",
+        description: "Phone numbers"
+      },
+      date: {
+        pattern: "\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{2,4}",
+        description: "Dates"
+      },
+      name: {
+        pattern: "\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+\\b",
+        description: "Names (First Last)"
+      },
+      ipv4: {
+        pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b",
+        description: "IPv4 addresses"
+      },
+      hexcolor: {
+        pattern: "#(?:[0-9a-fA-F]{3}){1,2}\\b",
+        description: "Hex color codes"
+      },
+      twitter: {
+        pattern: "@[A-Za-z0-9_]+",
+        description: "Twitter handles"
+      },
+      htmltag: {
+        pattern: "</?[a-zA-Z]+[^>]*>",
+        description: "HTML tags"
+      }
+    };
+    function applyRegexTemplate() {
+      const template = document.getElementById("regex-template").value;
+      if (template && regexTemplates[template]) {
+        document.getElementById("regex-input").value = regexTemplates[template].pattern;
+      }
+    }
+    function findAndReplace() {
+      const textarea = document.getElementById("code-textarea");
+      const findText = document.getElementById("find-input").value;
+      const replaceText = document.getElementById("replace-input").value;
+      if (!findText) return;
+      try {
+        const regex = new RegExp(findText, "g");
+        const matches = textarea.value.match(regex);
+        document.getElementById("match-count").textContent =
+          matches ? `${matches.length} matches found` : "No matches found";
+        textarea.value = textarea.value.replace(regex, replaceText);
+      } catch (e) {
+        alert("Invalid search pattern");
+      }
+    }
+    function filterLines() {
+      const textarea = document.getElementById("code-textarea");
+      const filterText = document.getElementById("find-input").value;
+      if (!filterText) return;
+      const lines = textarea.value.split("\n");
+      const filteredLines = lines.filter(line => line.includes(filterText));
+      textarea.value = filteredLines.join("\n");
+    }
+    function removeEmptyLines() {
+      const textarea = document.getElementById("code-textarea");
+      const lines = textarea.value.split("\n");
+      const nonEmptyLines = lines.filter(line => line.trim());
+      textarea.value = nonEmptyLines.join("\n");
+    }
+    function removeDuplicateLines() {
+      const textarea = document.getElementById("code-textarea");
+      const lines = textarea.value.split("\n");
+      const uniqueLines = [...new Set(lines)];
+      textarea.value = uniqueLines.join("\n");
+    }
+    function applyRegex() {
+      const textarea = document.getElementById("code-textarea");
+      const pattern = document.getElementById("regex-input").value;
+      const action = document.getElementById("regex-action").value;
+      if (!pattern) return;
+      try {
+        const regex = new RegExp(pattern, "g");
+        const text = textarea.value;
+        switch (action) {
+          case "highlight":
+            const matches = text.match(regex);
+            document.getElementById("match-count").textContent =
+              matches ? `${matches.length} matches found` : "No matches found";
+            break;
+          case "extract":
+            const extracted = text.match(regex);
+            textarea.value = extracted ? extracted.join("\n") : "";
+            break;
+          case "remove":
+            textarea.value = text.replace(regex, "");
+            break;
         }
-
-        // Text Operations
-        function filterLines() {
-            const textarea = document.getElementById('code-textarea');
-            const filterText = document.getElementById('find-input').value;
-            
-            if (!filterText) return;
-            
-            const lines = textarea.value.split('\n');
-            const filteredLines = lines.filter(line => line.includes(filterText));
-            textarea.value = filteredLines.join('\n');
+      } catch (e) {
+        alert("Invalid regex pattern");
+      }
+    }
+    function checkDiff() {
+      const original = document.getElementById("original-code").value;
+      const modified = document.getElementById("new-code").value;
+      const originalLines = original.split("\n");
+      const modifiedLines = modified.split("\n");
+      const output = document.getElementById("diff-output");
+      output.innerHTML = "";
+      let i = 0;
+      let j = 0;
+      while (i < originalLines.length || j < modifiedLines.length) {
+        const originalLine = originalLines[i] || "";
+        const modifiedLine = modifiedLines[j] || "";
+        if (originalLine === modifiedLine) {
+          const line = document.createElement("div");
+          line.textContent = "  " + originalLine;
+          line.className = "diff-line";
+          output.appendChild(line);
+          i++;
+          j++;
+        } else {
+          if (i < originalLines.length) {
+            const removedLine = document.createElement("div");
+            removedLine.textContent = "- " + originalLines[i];
+            removedLine.className = "diff-line diff-removed";
+            output.appendChild(removedLine);
+            i++;
+          }
+          if (j < modifiedLines.length) {
+            const addedLine = document.createElement("div");
+            addedLine.textContent = "+ " + modifiedLines[j];
+            addedLine.className = "diff-line diff-added";
+            output.appendChild(addedLine);
+            j++;
+          }
         }
-
-        function removeEmptyLines() {
-            const textarea = document.getElementById('code-textarea');
-            const lines = textarea.value.split('\n');
-            const nonEmptyLines = lines.filter(line => line.trim());
-            textarea.value = nonEmptyLines.join('\n');
-        }
-
-        function removeDuplicateLines() {
-            const textarea = document.getElementById('code-textarea');
-            const lines = textarea.value.split('\n');
-            const uniqueLines = [...new Set(lines)];
-            textarea.value = uniqueLines.join('\n');
-        }
-
-        // Regex Operations
-        function applyRegex() {
-            const textarea = document.getElementById('code-textarea');
-            const pattern = document.getElementById('regex-input').value;
-            const action = document.getElementById('regex-action').value;
-            
-            if (!pattern) return;
-            
-            try {
-                const regex = new RegExp(pattern, 'g');
-                const text = textarea.value;
-                
-                switch (action) {
-                    case 'highlight':
-                        const matches = text.match(regex);
-                        document.getElementById('match-count').textContent = 
-                            matches ? `${matches.length} matches found` : 'No matches found';
-                        // You could implement actual highlighting here
-                        break;
-                    case 'extract':
-                        const extracted = text.match(regex);
-                        textarea.value = extracted ? extracted.join('\n') : '';
-                        break;
-                    case 'remove':
-                        textarea.value = text.replace(regex, '');
-                        break;
-                }
-            } catch (e) {
-                alert('Invalid regex pattern');
-            }
-        }
-
-        // Diff Checker
-        function checkDiff() {
-            const original = document.getElementById('original-code').value;
-            const modified = document.getElementById('new-code').value;
-            
-            const originalLines = original.split('\n');
-            const modifiedLines = modified.split('\n');
-            const output = document.getElementById('diff-output');
-            output.innerHTML = '';
-
-            // Simple diff algorithm
-            let i = 0;
-            let j = 0;
-            
-            while (i < originalLines.length || j < modifiedLines.length) {
-                const originalLine = originalLines[i] || '';
-                const modifiedLine = modifiedLines[j] || '';
-                
-                if (originalLine === modifiedLine) {
-                    // Lines are identical
-                    const line = document.createElement('div');
-                    line.textContent = '  ' + originalLine;
-                    line.className = 'diff-line';
-                    output.appendChild(line);
-                    i++;
-                    j++;
-                } else {
-                    // Lines are different
-                    if (i < originalLines.length) {
-                        const removedLine = document.createElement('div');
-                        removedLine.textContent = '- ' + originalLines[i];
-                        removedLine.className = 'diff-line diff-removed';
-                        output.appendChild(removedLine);
-                        i++;
-                    }
-                    
-                    if (j < modifiedLines.length) {
-                        const addedLine = document.createElement('div');
-                        addedLine.textContent = '+ ' + modifiedLines[j];
-                        addedLine.className = 'diff-line diff-added';
-                        output.appendChild(addedLine);
-                        j++;
-                    }
-                }
-            }
-        }
-    </script>
-</body>
-</html>
-
-
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Code Editor</title>
-    <style>
-        /* Previous styles remain the same */
-        
-    </style>
-</head>
-<body>
-    <!-- Main Editor Section -->
-   
-
-    <script>
-        // Previous functionality remains (file handling, minify, beautify, etc.)
-        // [Previous code remains the same up to the text tools section]
-
-        // Regex Templates
-        
-
-        // [Previous code for file handling, minify, beautify remains the same]
-    </script>
+      }
+    }
+  </script>
 </body>
 </html>
