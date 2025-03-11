@@ -17,7 +17,7 @@
       z-index: 0;
       background-color: #000;
     }
-    .intro { position: fixed; top: 0; right: 0; font-size: 14px; padding: 20px; color: #fff; text-transform: uppercase; text-shadow: 0 0 2px #000; z-index: 100; }
+    .intro { position: fixed; top: 0; right: 0; font-size: 8px; padding: 20px; color: #fff; text-transform: uppercase; text-shadow: 0 0 2px #000; z-index: 100; }
     #upload-container { position: fixed; top: 10px; left: 10px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
     #file-input { display: none; }
     .btn { background: #2196F3; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 5px; font-size: 14px; transition: background 0.3s; }
@@ -48,47 +48,51 @@
   </style>
 </head>
 <body>
-
+  <!-- Viewer container for Panolens -->
   <div id="viewer-container"></div>
-
+  
   <div class="intro">Right click or use download button to save image</div>
-
+  
   <div id="upload-container">
     <label for="file-input" class="btn">Upload Image</label>
     <input type="file" id="file-input" accept="image/*">
     <button id="download-btn" class="btn">Download</button>
     <div class="spinner" id="loading-spinner"></div>
   </div>
-
+  
   <div id="controls">
     <div class="ctrl-btn" id="zoom-in">+</div>
     <div class="ctrl-btn" id="zoom-out">-</div>
     <div class="ctrl-btn" id="reset-view">↻</div>
   </div>
-
+  
+  <!-- Drawer container for sample images thumbnails -->
   <div id="drawer-container">
     <div id="drawer"></div>
   </div>
-
+  
   <div id="drop-zone">
     <p>Drop image here</p>
   </div>
-
+  
   <div id="notification">Notification message</div>
-
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/105/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/panolens@0.11.0/build/panolens.min.js"></script>
   <script>
-
+    // Wait for libraries to load
     document.addEventListener('DOMContentLoaded', function() {
-
+      // Give a moment for scripts to initialize
       setTimeout(initApp, 100);
     });
-
+    
     function initApp() {
-
+      // Variables
       let littlePlanet, viewer, drawerElement, spinner, dropZone, notification;
-
+      // Variables for custom pinch-rotate gesture
+      let touchStartX = 0, touchStartY = 0, initialTouchDistance = 0, initialTouchAngle = 0, lastTouchAngle = 0, isPinching = false;
+      
+      // Sample images array with new links
       const sampleImages = [
         'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/field.jpg',
         'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/tent.jpg',
@@ -96,12 +100,14 @@
         'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/planet.jpg',
         'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/rock.jpg'
       ];
-
+      
+      // Elements
       drawerElement = document.querySelector('#drawer');
       spinner = document.getElementById('loading-spinner');
       dropZone = document.getElementById('drop-zone');
       notification = document.getElementById('notification');
-
+      
+      // Initialize viewer inside the dedicated viewer container
       try {
         viewer = new PANOLENS.Viewer({
           container: document.getElementById('viewer-container'),
@@ -111,25 +117,27 @@
           autoRotateSpeed: 0.5,
           output: 'console'
         });
-
+        // Note: No image is loaded by default so that file upload is the primary option.
       } catch(e) {
         console.error('Error initializing viewer:', e);
         showNotification('Error: ' + e.message);
         return;
       }
-
+      
+      // Populate sample images in the drawer
       sampleImages.forEach((url) => {
         const photo = document.createElement('div');
         photo.classList.add('photo');
         photo.style.backgroundImage = `url(${url})`;
-
+        
         photo.addEventListener('click', function() {
           spinner.style.display = 'block';
           showNotification('Loading image...');
-
+          
+          // Remove active class from all photos
           document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
           photo.classList.add('active');
-
+          
           try {
             if (littlePlanet) {
               viewer.remove(littlePlanet);
@@ -145,64 +153,71 @@
             spinner.style.display = 'none';
           }
         });
-
+        
         drawerElement.appendChild(photo);
       });
-
+      
+      // File input handler for uploading images
       document.getElementById('file-input').addEventListener('change', handleFileSelect);
-
+      
+      // Download button handler
       document.getElementById('download-btn').addEventListener('click', downloadImage);
-
+      
+      // Controls handlers for zoom and reset view
       document.getElementById('zoom-in').addEventListener('click', () => {
         viewer.camera.fov = Math.max(30, viewer.camera.fov - 10);
         viewer.camera.updateProjectionMatrix();
       });
-
+      
       document.getElementById('zoom-out').addEventListener('click', () => {
         viewer.camera.fov = Math.min(90, viewer.camera.fov + 10);
         viewer.camera.updateProjectionMatrix();
       });
-
+      
       document.getElementById('reset-view').addEventListener('click', () => {
         if (littlePlanet) {
-          littlePlanet.position.set(0, 0, 0);
+          // Reset any rotation applied via pinch-rotate
+          littlePlanet.rotation.set(0, 0, 0);
+          // Reset camera orientation and parameters
           viewer.OrbitControls.target.set(0, 0, 0);
           viewer.camera.position.set(0, 0, 1);
           viewer.camera.fov = 60;
           viewer.camera.updateProjectionMatrix();
         }
       });
-
+      
+      // Drag and drop functionality
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         document.body.addEventListener(eventName, preventDefaults, false);
       });
-
+      
       function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
       }
-
+      
       ['dragenter', 'dragover'].forEach(eventName => {
         document.body.addEventListener(eventName, () => {
           dropZone.classList.add('active');
         }, false);
       });
-
+      
       ['dragleave', 'drop'].forEach(eventName => {
         document.body.addEventListener(eventName, () => {
           dropZone.classList.remove('active');
         }, false);
       });
-
+      
       document.body.addEventListener('drop', handleDrop, false);
-
+      
+      // File processing functions
       function handleFileSelect(evt) {
         spinner.style.display = 'block';
         showNotification('Processing image...');
         const file = evt.target.files[0];
         processFile(file);
       }
-
+      
       function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
@@ -212,7 +227,7 @@
           processFile(files[0]);
         }
       }
-
+      
       function processFile(file) {
         if (!file || !file.type.match('image.*')) {
           alert('Please select an image file.');
@@ -220,18 +235,20 @@
           hideNotification();
           return;
         }
-
+        
         const reader = new FileReader();
         reader.onload = function(e) {
           const imageUrl = e.target.result;
-
+          
+          // Create new photo thumbnail for file upload
           const photo = document.createElement('div');
           photo.classList.add('photo');
           photo.style.backgroundImage = `url(${imageUrl})`;
-
+          
+          // Remove active class from all photos and mark new photo as active
           document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
           photo.classList.add('active');
-
+          
           try {
             if (littlePlanet) {
               viewer.remove(littlePlanet);
@@ -239,14 +256,15 @@
             }
             littlePlanet = new PANOLENS.ImageLittlePlanet(imageUrl);
             viewer.add(littlePlanet);
-
+            
+            // Add photo to drawer for future reference (if desired)
             photo.addEventListener('click', function() {
               spinner.style.display = 'block';
               showNotification('Loading image...');
-
+              
               document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
               photo.classList.add('active');
-
+              
               try {
                 if (littlePlanet) {
                   viewer.remove(littlePlanet);
@@ -273,32 +291,36 @@
         };
         reader.readAsDataURL(file);
       }
-
+      
       function downloadImage() {
         showNotification('Preparing download...');
         const renderer = viewer.renderer;
-
+        
+        // Temporarily hide UI elements
         const uploadContainer = document.getElementById('upload-container');
         const intro = document.querySelector('.intro');
         const drawerContainer = document.getElementById('drawer-container');
         const controls = document.getElementById('controls');
         const notif = document.getElementById('notification');
-
+        
         uploadContainer.style.display = 'none';
         intro.style.display = 'none';
         drawerContainer.style.display = 'none';
         controls.style.display = 'none';
         notif.style.display = 'none';
-
+        
+        // Render and capture image
         setTimeout(function() {
           viewer.render();
           const imgData = renderer.domElement.toDataURL('image/png');
-
+          
+          // Create download link and trigger download
           const link = document.createElement('a');
           link.download = 'tiny-planet-' + new Date().toISOString().slice(0,10) + '.png';
           link.href = imgData;
           link.click();
-
+          
+          // Restore UI elements
           setTimeout(function() {
             uploadContainer.style.display = 'flex';
             intro.style.display = 'block';
@@ -308,7 +330,7 @@
           }, 100);
         }, 100);
       }
-
+      
       function showNotification(message) {
         notification.textContent = message;
         notification.style.display = 'block';
@@ -318,36 +340,68 @@
           }
         }, 3000);
       }
-
+      
       function hideNotification() {
         notification.style.display = 'none';
       }
-
-      let touchStartX, touchStartY;
-
+      
+      // Add touch gestures for mobile responsiveness and custom pinch-rotate
       document.addEventListener('touchstart', function(e) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
+        if (e.touches.length === 2) {
+          isPinching = true;
+          initialTouchDistance = getDistance(e.touches[0], e.touches[1]);
+          initialTouchAngle = getAngle(e.touches[0], e.touches[1]);
+          lastTouchAngle = initialTouchAngle;
+        } else {
+          isPinching = false;
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
       }, false);
-
+      
       document.addEventListener('touchmove', function(e) {
-        if (!touchStartX || !touchStartY) return;
-
-        const touchEndX = e.touches[0].clientX;
-        const touchEndY = e.touches[0].clientY;
-
-        const diffX = touchStartX - touchEndX;
-        const diffY = touchStartY - touchEndY;
-
-        if (Math.abs(diffX) > Math.abs(diffY)) {
-          e.preventDefault();
+        if (isPinching && e.touches.length === 2) {
+          let currentAngle = getAngle(e.touches[0], e.touches[1]);
+          let deltaAngle = currentAngle - lastTouchAngle;
+          lastTouchAngle = currentAngle;
+          // Apply rotation to the littlePlanet object if available
+          if (littlePlanet) {
+            littlePlanet.rotation.z += deltaAngle;
+          }
+        } else {
+          if (!touchStartX || !touchStartY) return;
+          const touchEndX = e.touches[0].clientX;
+          const touchEndY = e.touches[0].clientY;
+          const diffX = touchStartX - touchEndX;
+          const diffY = touchStartY - touchEndY;
+          if (Math.abs(diffX) > Math.abs(diffY)) {
+            e.preventDefault();
+          }
         }
       }, { passive: false });
-
+      
+      document.addEventListener('touchend', function(e) {
+        if (e.touches.length < 2) {
+          isPinching = false;
+        }
+      }, false);
+      
+      // Helper functions for touch gestures
+      function getDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      
+      function getAngle(touch1, touch2) {
+        return Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX);
+      }
+      
+      // Handle window resize
       window.addEventListener('resize', function() {
         viewer.onWindowResize();
       }, false);
-
+      
       showNotification('Tiny Planet Generator loaded');
     }
   </script>
