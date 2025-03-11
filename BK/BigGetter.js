@@ -1,5 +1,308 @@
-//get images links secrets and more
-javascript:function downloadJSON(e,t){let l=JSON.stringify(t,null,2),n=new Blob([l],{type:"application/json"}),r=document.createElement("a");r.href=URL.createObjectURL(n),r.download=e,document.body.appendChild(r),r.click(),document.body.removeChild(r)}function getAllMedia(){let e=[];if(["img","video","audio","iframe","embed",'a[href$=".pdf"]','a[href$=".doc"]','a[href$=".docx"]','a[href$=".xls"]','a[href$=".xlsx"]'].forEach(t=>{document.querySelectorAll(t).forEach(t=>{let l=t.src||t.href||t.getAttribute("data-src");l&&!l.startsWith("javascript")&&e.push(l)})}),window.performance){let t=performance.getEntriesByType("resource");t.forEach(t=>{["img","video","audio","embed"].includes(t.initiatorType)&&e.push(t.name)})}return console.log("Collected Media:",e),[...new Set(e)]}function getAllText(){let e=[];return document.querySelectorAll("div, p").forEach(t=>{let l=t.innerText.trim().replace(/\n+/g," ");l&&e.push({element:t.tagName,content:l})}),console.log("Collected Text:",e),e}function getAllHrefs(){let e=[];return document.querySelectorAll("a[href]").forEach(t=>{let l=t.href.trim();l&&!l.startsWith("javascript")&&e.push(l)}),console.log("Collected Links:",e),[...new Set(e)]}function unhideElements(){document.querySelectorAll('[style*="display: none"]').forEach(e=>e.style.display=""),document.querySelectorAll("[hidden]").forEach(e=>e.hidden=!1)}function monitorButtonClicks(){let e=document.querySelectorAll("button");e.forEach(e=>{e.addEventListener("click",debounce(e=>{console.log("Button clicked:",e.target)},300))})}function getAllFormInputs(){let e=[];return document.querySelectorAll('input[type="text"], input[type="password"], input[type="hidden"], textarea, select').forEach(t=>{let l=t.name||"Unnamed",n=t.value||"No value";e.push({name:l,value:n})}),console.log("Collected Form Inputs:",e),e}function getAllScripts(){let e=[];return document.querySelectorAll("script").forEach(t=>{let l=t.src?t.src:%22Inline%20Script:%20%22+t.innerText.trim().slice(0,100)+%22...%22;e.push(l)}),console.log(%22Collected%20Scripts:%22,e),e}function%20getAllIframes(){let%20e=[];return%20document.querySelectorAll(%22iframe%22).forEach(t=%3E{let%20l=t.src||%22No%20src%22;e.push(l)}),console.log(%22Collected%20Iframes:%22,e),e}function%20getAllCSS(){let%20e=[];return%20document.querySelectorAll(%27link[rel=%22stylesheet%22]%27).forEach(t=%3Ee.push(t.href)),console.log(%22Collected%20CSS:%22,e),e}function%20getAllFonts(){let%20e=[];if(window.performance){let%20t=performance.getEntriesByType(%22resource%22);t.forEach(t=%3E{%22font%22===t.initiatorType&&e.push(t.name)})}return%20console.log(%22Collected%20Fonts:%22,e),e}function%20hideSpecificElements(){document.querySelectorAll(%22img,%20video,%20iframe%22).forEach(e=%3Ee.style.display=%22none%22)}function%20changeBackgroundColor(e=%22lightgrey%22){document.body.style.backgroundColor=e}function%20toggleVisibilityOfParagraphs(){document.querySelectorAll(%22p%22).forEach(e=%3Ee.style.display=%22none%22===e.style.display?%22%22:%22none%22)}function%20createScrapingButtons(){let%20e=document.createElement(%22div%22);Object.assign(e.style,{position:%22fixed%22,top:%2210px%22,right:%2210px%22,zIndex:%229999%22,backgroundColor:%22white%22,border:%221px%20solid%20black%22,padding:%2210px%22,fontSize:%2212px%22,boxShadow:%220%200%205px%20rgba(0,0,0,0.3)%22}),[{text:%22Get%20All%20Media%22,func:getAllMedia},{text:%22Get%20All%20Text%22,func:getAllText},{text:%22Get%20All%20Hrefs%22,func:getAllHrefs},{text:%22Unhide%20Elements%22,func:unhideElements},{text:%22Monitor%20Button%20Clicks%22,func:monitorButtonClicks},{text:%22Get%20Form%20Inputs%22,func:getAllFormInputs},{text:%22Get%20All%20Scripts%22,func:getAllScripts},{text:%22Get%20All%20Iframes%22,func:getAllIframes},{text:%22Get%20All%20CSS%22,func:getAllCSS},{text:%22Get%20All%20Fonts%22,func:getAllFonts},{text:%22Hide%20Specific%20Elements%22,func:hideSpecificElements},{text:%22Change%20Background%20Color%22,func:()=%3EchangeBackgroundColor(%22lightblue%22)},{text:%22Toggle%20Paragraph%20Visibility%22,func:toggleVisibilityOfParagraphs}].forEach(t=%3E{let%20l=document.createElement(%22button%22);l.innerText=t.text,l.style.display=%22block%22,l.style.margin=%225px%200%22,l.onclick=t.func,e.appendChild(l)});let%20t=document.createElement(%22button%22);t.innerText=%22Get%20All%20Data%22,t.style.display=%22block%22,t.style.margin=%225px%200%22,t.onclick=getAllData,e.prepend(t),document.body.appendChild(e)}function%20debounce(e,t){let%20l;return%20function(...n){clearTimeout(l),l=setTimeout(()=%3Ee.apply(this,n),t)}}function%20getAllData(){let%20e={media:getAllMedia(),text:getAllText(),hrefs:getAllHrefs(),formInputs:getAllFormInputs(),scripts:getAllScripts(),iframes:getAllIframes(),css:getAllCSS(),fonts:getAllFonts()};console.log(%22All%20collected%20data:%22,e),downloadJSON(%22all_data.json%22,e)}createScrapingButtons();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Crude Android Menu</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background: #999;
+  }
+  /* A simple top bar to mimic Android status bar */
+  .top-bar {
+    height: 24px;
+    background: #000;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+  /* A search bar area, just for demonstration */
+  .search-area {
+    background: #333;
+    color: #ccc;
+    padding: 10px;
+    font-size: 18px;
+  }
+  /* Container for the app icons in a grid */
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-gap: 15px;
+    padding: 15px;
+  }
+  .app-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+  }
+  .app-icon svg {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    background: #fff;
+  }
+  .app-name {
+    margin-top: 5px;
+    font-size: 14px;
+    color: #222;
+  }
+</style>
+</head>
+<body>
 
-javascript:(function(){const e={extractionHistory:[],settings:{theme:"light"}};const utils_createElement=(tag,props={},styles={})=>{const el=document.createElement(tag);Object.assign(el,props);Object.assign(el.style,styles);return el;};const logResults=(title,results)=>{const outputArea=document.getElementById("super-crawler-output");const section=utils_createElement("div",{innerHTML:`<strong>${title}</strong><br>`});results.forEach(result=>{const resultLine=utils_createElement("div",{innerHTML:result});section.appendChild(resultLine);});outputArea.appendChild(section);outputArea.scrollTop=outputArea.scrollHeight;};const clearOutputArea=()=>{const outputArea=document.getElementById("super-crawler-output");outputArea.innerHTML="";};const closeTool=()=>{const toolContainer=document.getElementById("super-crawler-tool");toolContainer.remove();};const findAndReplace=()=>{const search=prompt("Enter text to find:");const replace=prompt("Enter text to replace with:");if(search&&replace){document.body.innerHTML=document.body.innerHTML.replace(new RegExp(search,"g"),replace);logResults("Find and Replace",[`Replaced "${search}" with "${replace}"`]);}};const extractClasses=()=>{const allElements=Array.from(document.querySelectorAll("*"));const classes=allElements.flatMap(el=>Array.from(el.classList));logResults("Extracted Classes:",classes.length?[...new Set(classes)]:["No classes found."]);};const extractIDs=()=>{const allElements=Array.from(document.querySelectorAll("[id]"));const ids=allElements.map(el=>el.id);logResults("Extracted IDs:",ids.length?[...new Set(ids)]:["No IDs found."]);};const deleteElement=element=>{element.remove();logResults("Deleted Element",["An element has been deleted."]);};const unblurImages=()=>{const blurredImages=Array.from(document.querySelectorAll("img[style*='filter: blur']"));blurredImages.forEach(img=>img.style.filter="none");logResults("Unblurred Images:",blurredImages.length?["All blurred images have been unblurred."]:["No blurred images found."]);};const createClickableElements=()=>{const elements=Array.from(document.querySelectorAll("*"));elements.forEach(element=>{element.addEventListener("click",e=>{e.stopPropagation();deleteElement(element);});element.style.cursor="pointer";});logResults("Clickable Elements Created",["Click on any element to delete it."]);};const extractLinks=()=>{const links=Array.from(document.querySelectorAll("a[href]")).map(a=>`<a href="${a.href}" target="_blank">${a.href}</a>`);logResults("Extracted Links:",links.length?links:["No links found."]);};const extractMedia=()=>{const media=Array.from(document.querySelectorAll("img[src], video[src], audio[src]")).map(m=>`<a href="${m.src}" target="_blank">${m.src}</a>`);logResults("Extracted Media:",media.length?media:["No media found."]);};const extractJSFiles=()=>{const jsFiles=Array.from(document.querySelectorAll("script[src]")).map(s=>`<a href="${s.src}" target="_blank">${s.src}</a>`);logResults("Extracted JavaScript Files:",jsFiles.length?jsFiles:["No JavaScript files found."]);};const extractCSSFiles=()=>{const cssFiles=Array.from(document.querySelectorAll("link[rel='stylesheet']")).map(link=>`<a href="${link.href}" target="_blank">${link.href}</a>`);logResults("Extracted CSS Files:",cssFiles.length?cssFiles:["No CSS files found."]);};const extractFrames=()=>{const frames=Array.from(document.querySelectorAll("iframe[src]")).map(frame=>`<a href="${frame.src}" target="_blank">${frame.src}</a>`);logResults("Extracted Frames:",frames.length?frames:["No frames found."]);};const extractCookies=()=>{const cookies=document.cookie.split(";").map(cookie=>cookie.trim());logResults("Extracted Cookies:",cookies.length?cookies:["No cookies found."]);};const extractAllText=()=>{const textContent=document.body.innerText.trim();logResults("Extracted Text:",textContent?textContent.split("\n").map(line=>`<span>${line}</span>`).join("<br>"):["No text found."]);};const extractFormsData=()=>{const forms=Array.from(document.querySelectorAll("form"));const formData=forms.map(form=>{const inputs=Array.from(form.elements).map(input=>`${input.name||"Unnamed"}: ${input.value}`).join(", ");return`Form action: ${form.action}, Inputs: ${inputs||"No inputs"}`;});logResults("Extracted Forms Data:",formData.length?formData:["No forms found."]);};const extractButtonLogic=()=>{const buttons=Array.from(document.querySelectorAll("button, input[type='button']"));const buttonData=buttons.map(button=>{const data={text:button.innerText||button.value,onclick:button.onclick?button.onclick.toString():"No onclick function"};return`Button: ${data.text}, Click Logic: ${data.onclick}`;});logResults("Extracted Button Logic:",buttonData.length?buttonData:["No buttons found."]);};const findAPIs=()=>{const apiEndpoints=Array.from(document.querySelectorAll("script")).map(script=>script.src).filter(src=>src&&(src.includes("/api/")||src.includes("/v1/")||src.includes("/v2/")));logResults("Found API Endpoints:",apiEndpoints.length?apiEndpoints:["No APIs found."]);};const findDirectories=()=>{logResults("Directory Finder",["This feature is limited by browser security and cannot truly find directories."]);};const findSitemap=()=>{const sitemapURL=`${window.location.origin}/sitemap.xml`;fetch(sitemapURL).then(response=>response.text()).then(data=>{const parser=new DOMParser();const xml=parser.parseFromString(data,"text/xml");const urls=Array.from(xml.getElementsByTagName("loc")).map(loc=>loc.textContent);logResults("Sitemap URLs:",urls.length?urls:["No URLs found in sitemap."]);}).catch(()=>logResults("Sitemap Finder",["Sitemap not found or unable to fetch."]));};const injectCSS=()=>{const cssURL=prompt("Enter the CSS URL to inject:");if(cssURL){const link=document.createElement("link");link.rel="stylesheet";link.href=cssURL;document.head.appendChild(link);logResults("Injected CSS:",[`Injected CSS from ${cssURL}`]);}else{logResults("Inject CSS",["No URL provided."]);}};const findElementAttributes=()=>{const elements=Array.from(document.querySelectorAll("*"));const attributesData=elements.map(el=>{const attrs=Array.from(el.attributes).map(attr=>`${attr.name}="${attr.value}"`).join(", ");return`<div>${el.tagName}: [${attrs}]</div>`;});logResults("Element Attributes:",attributesData.length?attributesData:["No elements found."]);};const findJSPaths=()=>{const scripts=Array.from(document.querySelectorAll("script[src]")).map(s=>s.src);logResults("JavaScript Document Paths:",scripts.length?scripts:["No JavaScript paths found."]);};const urlDecoder=()=>{const urlToDecode=prompt("Enter the URL to decode:");if(urlToDecode){const decoded=decodeURIComponent(urlToDecode);logResults("Decoded URL:",[decoded]);}else{logResults("URL Decoder",["No URL provided."]);}};const extractMetaTags=()=>{const metaTags=Array.from(document.getElementsByTagName("meta")).map(meta=>`<meta name="${meta.name}" content="${meta.content}">`);logResults("Extracted Meta Tags:",metaTags.length?metaTags:["No meta tags found."]);};const extractHiddenElements=()=>{const hiddenElements=Array.from(document.querySelectorAll("[style*='display: none'],[hidden]"));logResults("Hidden Elements:",hiddenElements.length?hiddenElements.map(el=>el.outerHTML):["No hidden elements found."]);};const checkCORS=()=>{fetch(window.location.href,{method:"HEAD"}).then(response=>logResults("CORS Check",[`CORS is ${response.ok?"enabled":"not enabled"}`])).catch(err=>logResults("CORS Check",["CORS request failed."]));};const extractAllScripts=()=>{const scripts=Array.from(document.getElementsByTagName("script")).map(script=>script.src||"Inline script").filter(Boolean);logResults("All Scripts Found:",scripts.length?scripts:["No scripts found."]);};const extractLocalStorage=()=>{const localStorageData=Object.entries(localStorage).map(([key,value])=>`${key}: ${value}`);logResults("Local Storage Data:",localStorageData.length?localStorageData:["No local storage data found."]);};const extractSessionStorage=()=>{const sessionStorageData=Object.entries(sessionStorage).map(([key,value])=>`${key}: ${value}`);logResults("Session Storage Data:",sessionStorageData.length?sessionStorageData:["No session storage data found."]);};const findEventListeners=()=>{const allElements=Array.from(document.querySelectorAll("*"));const eventListeners=[];allElements.forEach(el=>{const clone=el.cloneNode();const eventNames=["click","mouseover","keyup"];eventNames.forEach(eventName=>{const hasListener=clone[`on${eventName}`]!==undefined;if(hasListener)eventListeners.push(`Event: ${eventName}, Element: ${el.tagName}`);});});logResults("Event Listeners Found:",eventListeners.length?eventListeners:["No event listeners found."]);};const createButtons=()=>{const buttonContainer=utils_createElement("div",{style:"padding:10px;background:#fff;"});const buttons=[{label:"Extract Links",action:extractLinks},{label:"Extract Media",action:extractMedia},{label:"Extract JS Files",action:extractJSFiles},{label:"Extract CSS Files",action:extractCSSFiles},{label:"Extract Frames",action:extractFrames},{label:"Extract Cookies",action:extractCookies},{label:"Extract All Text",action:extractAllText},{label:"Extract Forms Data",action:extractFormsData},{label:"Extract Button Logic",action:extractButtonLogic},{label:"Find APIs",action:findAPIs},{label:"Find Directories",action:findDirectories},{label:"Find Sitemap",action:findSitemap},{label:"Inject CSS",action:injectCSS},{label:"Find Element Attributes",action:findElementAttributes},{label:"Find JS Paths",action:findJSPaths},{label:"URL Decoder",action:urlDecoder},{label:"Extract Meta Tags",action:extractMetaTags},{label:"Extract Hidden Elements",action:extractHiddenElements},{label:"CORS Check",action:checkCORS},{label:"Extract All Scripts",action:extractAllScripts},{label:"Extract Local Storage",action:extractLocalStorage},{label:"Extract Session Storage",action:extractSessionStorage},{label:"Find Event Listeners",action:findEventListeners},{label:"Get Classes",action:extractClasses},{label:"Get IDs",action:extractIDs},{label:"Delete Element",action:createClickableElements},{label:"Unblur Images",action:unblurImages},{label:"Clear Output",action:clearOutputArea},{label:"Close Tool",action:closeTool},{label:"Find and Replace",action:findAndReplace}];buttons.forEach(({label,action})=>{const button=utils_createElement("button",{textContent:label},{margin:"5px",padding:"5px"});button.onclick=action;buttonContainer.appendChild(button);});return buttonContainer;};const createHeader=()=>{return utils_createElement("div",{textContent:"Super Crawler",style:"padding:10px;background:#f8f9fa;border-bottom:1px solid #ccc;font-weight:bold;"});};const createOutputArea=()=>{return utils_createElement("div",{id:"super-crawler-output"},{padding:"10px",maxHeight:"400px",overflowY:"auto",fontSize:"10px",background:"#fff"});};const createWindow=()=>{const toolContainer=utils_createElement("div",{id:"super-crawler-tool"},{position:"fixed",top:"20px",right:"20px",width:"400px",border:"1px solid #ccc",borderRadius:"5px",boxShadow:"0 2px 10px rgba(0, 0, 0, 0.1)",background:"#fff",zIndex:10000});toolContainer.append(createHeader(),createButtons(),createOutputArea());document.body.appendChild(toolContainer);};createWindow();})();
+<!-- Mimic the top bar -->
+<div class="top-bar">
+  <div>5:51</div>
+  <div>40%</div>
+</div>
 
+<!-- Mimic a search area -->
+<div class="search-area">
+  Search
+</div>
+
+<!-- The grid of icons -->
+<div class="app-grid">
+
+  <!-- 1. Docs -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Crude shape for "Docs" -->
+      <rect x="5" y="5" width="50" height="50" fill="#4285F4"/>
+      <text x="50%" y="50%" fill="#fff" font-size="12" text-anchor="middle" alignment-baseline="middle">Docs</text>
+    </svg>
+    <div class="app-name">Docs</div>
+  </div>
+
+  <!-- 2. Edge Beta -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Edge Beta" -->
+      <circle cx="30" cy="30" r="25" fill="#00A4EF"/>
+      <path d="M15 45 Q30 20, 45 45 Z" fill="#fff" opacity="0.3"/>
+      <text x="50%" y="54%" fill="#fff" font-size="8" text-anchor="middle" alignment-baseline="middle">Edge</text>
+    </svg>
+    <div class="app-name">Edge Beta</div>
+  </div>
+
+  <!-- 3. Facebook -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Very crude shape for "Facebook" -->
+      <rect x="10" y="10" width="40" height="40" fill="#3b5998"/>
+      <text x="50%" y="50%" fill="#fff" font-size="10" text-anchor="middle" alignment-baseline="middle">f</text>
+    </svg>
+    <div class="app-name">Facebook</div>
+  </div>
+
+  <!-- 4. FFShare -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "FFShare" -->
+      <rect x="5" y="5" width="50" height="50" fill="#444" />
+      <circle cx="20" cy="20" r="8" fill="#f00"/>
+      <circle cx="40" cy="40" r="8" fill="#0f0"/>
+      <text x="50%" y="90%" fill="#fff" font-size="8" text-anchor="middle">FFShare</text>
+    </svg>
+    <div class="app-name">FFShare</div>
+  </div>
+
+  <!-- 5. File Viewer -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "File Viewer" -->
+      <rect x="0" y="0" width="60" height="60" fill="#ffcc00"/>
+      <rect x="10" y="10" width="40" height="40" fill="#fff" stroke="#000" stroke-width="2"/>
+      <text x="50%" y="55%" fill="#000" font-size="8" text-anchor="middle">FileV</text>
+    </svg>
+    <div class="app-name">File Viewer</div>
+  </div>
+
+  <!-- 6. Files -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Files" -->
+      <circle cx="30" cy="30" r="28" fill="#ffa500"/>
+      <rect x="15" y="15" width="30" height="20" fill="#fff"/>
+      <text x="50%" y="80%" fill="#fff" font-size="10" text-anchor="middle">Files</text>
+    </svg>
+    <div class="app-name">Files</div>
+  </div>
+
+  <!-- 7. Find -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Find" -->
+      <circle cx="30" cy="30" r="25" fill="#9c27b0"/>
+      <!-- A small "magnifying glass" handle -->
+      <line x1="35" y1="35" x2="45" y2="45" stroke="#fff" stroke-width="4"/>
+      <text x="50%" y="50%" fill="#fff" font-size="10" text-anchor="middle" alignment-baseline="middle">Find</text>
+    </svg>
+    <div class="app-name">Find</div>
+  </div>
+
+  <!-- 8. FX -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "FX" -->
+      <rect x="5" y="5" width="50" height="50" fill="#1E88E5"/>
+      <text x="30" y="30" fill="#fff" font-size="16" text-anchor="middle" alignment-baseline="middle">FX</text>
+    </svg>
+    <div class="app-name">FX</div>
+  </div>
+
+  <!-- 9. Gallery -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Gallery" -->
+      <rect x="0" y="0" width="60" height="60" fill="#4caf50"/>
+      <polygon points="10,40 25,20 35,35 45,25 55,40" fill="#fff"/>
+      <text x="50%" y="90%" fill="#fff" font-size="10" text-anchor="middle">Gallery</text>
+    </svg>
+    <div class="app-name">Gallery</div>
+  </div>
+
+  <!-- 10. Gaming Hub -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Gaming Hub" -->
+      <rect x="10" y="10" width="40" height="40" fill="#9C27B0"/>
+      <circle cx="25" cy="25" r="5" fill="#fff"/>
+      <circle cx="35" cy="35" r="5" fill="#fff"/>
+      <text x="50%" y="90%" fill="#fff" font-size="8" text-anchor="middle">Gaming</text>
+    </svg>
+    <div class="app-name">Gaming Hub</div>
+  </div>
+
+  <!-- 11. Global Goals -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Global Goals" -->
+      <circle cx="30" cy="30" r="28" fill="#f44336"/>
+      <circle cx="30" cy="30" r="18" fill="#fff"/>
+      <text x="30" y="34" fill="#000" font-size="8" text-anchor="middle" alignment-baseline="middle">Goals</text>
+    </svg>
+    <div class="app-name">Global Goals</div>
+  </div>
+
+  <!-- 12. Google Earth -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Google Earth" -->
+      <circle cx="30" cy="30" r="28" fill="#2196F3"/>
+      <path d="M10 30 A20 20 0 0 1 50 30" fill="none" stroke="#fff" stroke-width="3"/>
+      <path d="M15 40 A15 15 0 0 1 45 40" fill="none" stroke="#fff" stroke-width="2"/>
+      <text x="30" y="55" fill="#fff" font-size="8" text-anchor="middle">Earth</text>
+    </svg>
+    <div class="app-name">Google Earth</div>
+  </div>
+
+  <!-- 13. Grammarly -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Grammarly" -->
+      <circle cx="30" cy="30" r="28" fill="#00c853"/>
+      <text x="30" y="34" fill="#fff" font-size="14" text-anchor="middle" alignment-baseline="middle">G</text>
+    </svg>
+    <div class="app-name">Grammarly</div>
+  </div>
+
+  <!-- 14. InShot -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "InShot" -->
+      <rect x="0" y="0" width="60" height="60" fill="#E91E63"/>
+      <rect x="10" y="10" width="40" height="40" fill="#fff" rx="5" ry="5"/>
+      <text x="30" y="35" fill="#E91E63" font-size="10" text-anchor="middle">InShot</text>
+    </svg>
+    <div class="app-name">InShot</div>
+  </div>
+
+  <!-- 15. Kiwi Browser -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Kiwi Browser" -->
+      <circle cx="30" cy="30" r="28" fill="#4CAF50"/>
+      <circle cx="30" cy="20" r="10" fill="#fff"/>
+      <path d="M20 30 C25 35, 35 35, 40 30" stroke="#fff" stroke-width="3" fill="none"/>
+      <text x="30" y="55" fill="#fff" font-size="8" text-anchor="middle">Kiwi</text>
+    </svg>
+    <div class="app-name">Kiwi Browser</div>
+  </div>
+
+  <!-- 16. Instagram (replaces Labourpower) -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Very rough shape for "Instagram" -->
+      <linearGradient id="instaGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f09433"/>
+        <stop offset="25%" stop-color="#e6683c"/>
+        <stop offset="50%" stop-color="#dc2743"/>
+        <stop offset="75%" stop-color="#cc2366"/>
+        <stop offset="100%" stop-color="#bc1888"/>
+      </linearGradient>
+      <rect x="0" y="0" width="60" height="60" fill="url(#instaGrad)"/>
+      <circle cx="30" cy="30" r="15" fill="#fff"/>
+      <circle cx="45" cy="15" r="5" fill="#fff"/>
+      <text x="30" y="33" fill="#000" font-size="8" text-anchor="middle" alignment-baseline="middle">Insta</text>
+    </svg>
+    <div class="app-name">Instagram</div>
+  </div>
+
+  <!-- 17. LetterHead Maker -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "LetterHead Maker" -->
+      <rect x="5" y="5" width="50" height="50" fill="#795548"/>
+      <text x="50%" y="50%" fill="#fff" font-size="8" text-anchor="middle" alignment-baseline="middle">Letter</text>
+    </svg>
+    <div class="app-name">LetterHead Maker</div>
+  </div>
+
+  <!-- 18. Lime -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Lime" -->
+      <circle cx="30" cy="30" r="28" fill="#CDDC39"/>
+      <text x="30" y="34" fill="#000" font-size="14" text-anchor="middle" alignment-baseline="middle">L</text>
+    </svg>
+    <div class="app-name">Lime</div>
+  </div>
+
+  <!-- 19. Members -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Members" -->
+      <circle cx="30" cy="30" r="28" fill="#673AB7"/>
+      <circle cx="25" cy="25" r="5" fill="#fff"/>
+      <circle cx="35" cy="25" r="5" fill="#fff"/>
+      <rect x="20" y="35" width="20" height="5" fill="#fff"/>
+      <text x="30" y="55" fill="#fff" font-size="8" text-anchor="middle">Members</text>
+    </svg>
+    <div class="app-name">Members</div>
+  </div>
+
+  <!-- 20. Messages -->
+  <div class="app-icon">
+    <svg viewBox="0 0 60 60">
+      <!-- Random shape for "Messages" -->
+      <rect x="0" y="0" width="60" height="60" fill="#2196F3"/>
+      <rect x="10" y="15" width="40" height="20" fill="#fff"/>
+      <polygon points="10,35 20,30 50,30 50,35" fill="#fff"/>
+      <text x="30" y="55" fill="#fff" font-size="8" text-anchor="middle">Msgs</text>
+    </svg>
+    <div class="app-name">Messages</div>
+  </div>
+
+</div>
+</body>
+</html>
