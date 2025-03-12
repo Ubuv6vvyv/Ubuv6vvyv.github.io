@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color Palette Tool</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      }
+
+      body {
+        background: #f5f5f5;
+        padding: 20px;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        transition: all 0.3s ease;
+      }
+
+      h1,
+      h3 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      textarea {
+        width: 100%;
+        height: 150px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        font-family: monospace;
+        resize: vertical;
+      }
+
+      button {
+        background: #586F88;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 700;
+        display: block;
+        width: 100%;
+        margin-bottom: 15px;
+        transition: background 0.3s ease;
+      }
+
+      button:hover {
+        background: #1C526D;
+      }
+
+      .output-container {
+        margin-top: 20px;
+      }
+
+      .gradient-preview {
+        height: 80px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        transition: all 0.5s ease;
+      }
+
+      .tab-container {
+        display: flex;
+        margin-bottom: 15px;
+      }
+
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+        background: #f1f1f1;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+      }
+
+      .tab.active {
+        border-bottom: 2px solid #BF227B;
+        font-weight: 700;
+      }
+
+      .tabs-content > div {
+        display: none;
+      }
+
+      .tabs-content > div.active {
+        display: block;
+      }
+
+      .color-box {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        margin-right: 5px;
+        border-radius: 3px;
+        vertical-align: middle;
+      }
+
+      .colors-list {
+        margin-bottom: 15px;
+      }
+
+      .colors-list div {
+        margin: 5px 0;
+      }
+
+      code {
+        display: block;
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 10px 0;
+        font-family: monospace;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .copy-btn {
+        background: #C8408D;
+        padding: 5px 10px;
+        font-size: 12px;
+        margin-top: 5px;
+      }
+
+      .preview-btn {
+        background: #BF227B;
+        padding: 5px 10px;
+        font-size: 12px;
+        margin-top: 5px;
+        margin-bottom: 15px;
+      }
+
+      .random-btn {
+        background: #BF227B;
+      }
+
+      .image-upload {
+        display: none;
+      }
+
+      .upload-label {
+        display: block;
+        text-align: center;
+        background: #1C526D;
+        color: white;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        cursor: pointer;
+      }
+
+      .file-name {
+        font-size: 12px;
+        text-align: center;
+        margin-bottom: 15px;
+        word-break: break-all;
+      }
+
+      .img-preview {
+        max-width: 100%;
+        max-height: 200px;
+        display: block;
+        margin: 0 auto 15px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .button-group button {
+        flex: 1;
+      }
+
+      .color-slider-container {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f1f1f1;
+        border-radius: 4px;
+position: sticky;
+top: 0;
+      }
+
+      .color-slider-container label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 700;
+      }
+
+      .color-slider-container input[type="range"] {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+
+      .color-slider-container .color-count {
+        text-align: center;
+        font-weight: 700;
+      }
+
+      @media (max-width: 600px) {
+        .container {
+          padding: 15px;
+          margin: 0;
+          width: 100%;
+        }
+
+        button {
+          padding: 12px 15px;
+        }
+      }
+
+      .animation-container {
+        height: 200px;
+        margin: 15px 0;
+        position: relative;
+        overflow: hidden;
+        border-radius: 4px;
+      }
+
+      .pulse {
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.6;
+        }
+
+        50% {
+          opacity: 1;
+        }
+
+        100% {
+          opacity: 0.6;
+        }
+      }
+
+      .rotate {
+        animation: rotate 8s linear infinite;
+      }
+
+      @keyframes rotate {
+        from {
+          background-position: 0% 0%;
+        }
+
+        to {
+          background-position: 200% 0%;
+        }
+      }
+
+      .wave {
+        position: absolute;
+        width: 200%;
+        height: 100%;
+        animation: wave 8s linear infinite;
+        background-size: 50% 100%;
+      }
+
+      @keyframes wave {
+        0% {
+          transform: translateX(0);
+        }
+
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Color Palette Tool</h1>
+      <label for="image-upload" class="upload-label">Upload Image</label>
+      <input
+        type="file"
+        id="image-upload"
+        class="image-upload"
+        accept="image/*"
+      />
+      <div id="file-name" class="file-name"></div>
+      <img id="img-preview" class="img-preview" style="display: none" />
+      <div class="color-slider-container">
+        <label for="color-slider">
+          Number of Colors to Extract: <span id="color-count">10</span>
+        </label>
+        <input type="range" id="color-slider" min="2" max="10" value="10" />
+      </div>
+      <textarea
+        id="input-text"
+        placeholder="Paste your color palette code here or upload an image..."
+      >
+
+
+/* CSS HEX */
+--red-violet: #BF227Bff;
+--mulberry: #C8408Dff;
+--paynes-gray: #586F88ff;
+--indigo-dye: #1C526Dff;</textarea
+      >
+      <button id="parse-btn">Parse Colors</button>
+      <button id="random-btn" class="random-btn">
+        Generate Random Boilerplate
+      </button>
+      <div class="tab-container">
+        <div class="tab active" data-tab="colors">Extracted Colors</div>
+        <div class="tab" data-tab="gradients">Gradients</div>
+        <div class="tab" data-tab="animations">Animations</div>
+        <div class="tab" data-tab="boilerplate">HTML Boilerplate</div>
+      </div>
+      <div class="tabs-content">
+        <div id="colors-tab" class="active">
+          <div class="colors-list" id="colors-list"></div>
+          <code id="colors-code"></code>
+          <button class="copy-btn" data-target="colors-code">Copy CSS</button>
+        </div>
+        <div id="gradients-tab">
+          <div id="gradients-list"></div>
+          <code id="gradients-code"></code>
+          <button class="copy-btn" data-target="gradients-code">
+            Copy CSS
+          </button>
+        </div>
+        <div id="animations-tab">
+          <div id="animations-list">
+            <h3>Animated Gradients</h3>
+            <div class="animation-container" id="pulse-animation"></div>
+            <div class="animation-container" id="rotate-animation"></div>
+            <div class="animation-container" id="wave-animation"></div>
+          </div>
+          <code id="animations-code"></code>
+          <button class="copy-btn" data-target="animations-code">
+            Copy CSS
+          </button>
+        </div>
+        <div id="boilerplate-tab">
+          <h3>HTML Boilerplate with Color Scheme</h3>
+          <code id="boilerplate-code"></code>
+          <div class="button-group">
+            <button class="copy-btn" data-target="boilerplate-code">
+              Copy HTML
+            </button>
+            <button id="preview-btn" class="preview-btn">
+              Open in New Tab
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+                  document.addEventListener('DOMContentLoaded', function() {
+                      const inputText = document.getElementById('input-text');
+                      const parseBtn = document.getElementById('parse-btn');
+                      const randomBtn = document.getElementById('random-btn');
+                      const tabs = document.querySelectorAll('.tab');
+                      const imageUpload = document.getElementById('image-upload');
+                      const fileName = document.getElementById('file-name');
+                      const imgPreview = document.getElementById('img-preview');
+                      const colorSlider = document.getElementById('color-slider');
+                      const colorCount = document.getElementById('color-count');
+                      const previewBtn = document.getElementById('preview-btn');
+                      let maxColors = parseInt(colorSlider.value);
+                      colorSlider.addEventListener('input', function() {
+                          maxColors = parseInt(this.value);
+                          colorCount.textContent = maxColors;
+                          if (inputText.value.trim()) {
+                              processInput()
+                          }
+                      });
+                      tabs.forEach(tab=>{
+                          tab.addEventListener('click', ()=>{
+                              tabs.forEach(t=>t.classList.remove('active'));
+                              tab.classList.add('active');
+                              const tabId = tab.getAttribute('data-tab');
+                              document.querySelectorAll('.tabs-content > div').forEach(content=>{
+                                  content.classList.remove('active')
+                              }
+                              );
+                              document.getElementById(tabId + '-tab').classList.add('active')
+                          }
+                          )
+                      }
+                      );
+                      document.querySelectorAll('.copy-btn').forEach(btn=>{
+                          btn.addEventListener('click', ()=>{
+                              const targetId = btn.getAttribute('data-target');
+                              const text = document.getElementById(targetId).textContent;
+                              navigator.clipboard.writeText(text).then(()=>{
+                                  const originalText = btn.textContent;
+                                  btn.textContent = 'Copied!';
+                                  setTimeout(()=>{
+                                      btn.textContent = originalText
+                                  }
+                                  , 1500)
+                              }
+                              )
+                          }
+                          )
+                      }
+                      );
+                      previewBtn.addEventListener('click', function() {
+                          const html = document.getElementById('boilerplate-code').textContent;
+                          const newTab = window.open();
+                          newTab.document.write(html);
+                          newTab.document.close()
+                      });
+                      parseBtn.addEventListener('click', processInput);
+                      randomBtn.addEventListener('click', generateRandomBoilerplate);
+                      imageUpload.addEventListener('change', function(e) {
+                          if (e.target.files.length > 0) {
+                              const file = e.target.files[0];
+                              fileName.textContent = file.name;
+                              const reader = new FileReader();
+                              reader.onload = function(e) {
+                                  imgPreview.src = e.target.result;
+                                  imgPreview.style.display = 'block';
+                                  extractColorsFromImage(imgPreview)
+                              }
+                              ;
+                              reader.readAsDataURL(file)
+                          }
+                      });
+                      if (inputText.value.trim()) {
+                          processInput()
+                      }
+                      function processInput() {
+                          const text = inputText.value;
+                          const colors = extractColors(text);
+                          if (colors.length === 0) {
+                              alert('No valid colors found in the input text.');
+                              return
+                          }
+                          const limitedColors = colors.slice(0, maxColors);
+                          displayColors(limitedColors);
+                          createGradients(limitedColors);
+                          createAnimations(limitedColors);
+                          generateBoilerplate(limitedColors)
+                      }
+                      function extractColorsFromImage(image) {
+                          image.onload = function() {
+                              const canvas = document.createElement('canvas');
+                              const ctx = canvas.getContext('2d');
+                              const maxSize = 500;
+                              let width = image.width;
+                              let height = image.height;
+                              if (width > height && width > maxSize) {
+                                  height *= maxSize / width;
+                                  width = maxSize
+                              } else if (height > maxSize) {
+                                  width *= maxSize / height;
+                                  height = maxSize
+                              }
+                              canvas.width = width;
+                              canvas.height = height;
+                              ctx.drawImage(image, 0, 0, width, height);
+                              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                              const pixels = imageData.data;
+                              const colorMap = {};
+                              const accuracy = 24;
+                              for (let i = 0; i < pixels.length; i += 4) {
+                                  const r = Math.floor(pixels[i] / accuracy) * accuracy;
+                                  const g = Math.floor(pixels[i + 1] / accuracy) * accuracy;
+                                  const b = Math.floor(pixels[i + 2] / accuracy) * accuracy;
+                                  const hex = rgbToHex(r, g, b);
+                                  if (colorMap[hex]) {
+                                      colorMap[hex]++
+                                  } else {
+                                      colorMap[hex] = 1
+                                  }
+                              }
+                              const sortedColors = Object.keys(colorMap).sort((a,b)=>colorMap[b] - colorMap[a]);
+                              const colors = sortedColors.slice(0, Math.min(maxColors, sortedColors.length));
+                              const filteredColors = [];
+                              for (let i = 0; i < colors.length; i++) {
+                                  const currentColor = hexToRgb(colors[i]);
+                                  let isUnique = true;
+                                  for (let j = 0; j < filteredColors.length; j++) {
+                                      const existingColor = hexToRgb(filteredColors[j]);
+                                      const distance = Math.sqrt(Math.pow(currentColor.r - existingColor.r, 2) + Math.pow(currentColor.g - existingColor.g, 2) + Math.pow(currentColor.b - existingColor.b, 2));
+                                      if (distance < 30) {
+                                          isUnique = false;
+                                          break
+                                      }
+                                  }
+                                  if (isUnique) {
+                                      filteredColors.push(colors[i])
+                                  }
+                              }
+                              if (filteredColors.length > 0) {
+                                  const cssOutput = filteredColors.map((color,index)=>`--color-${index + 1}: ${color};`).join('\n');
+                                  inputText.value = `/* Extracted Colors from Image */\n\n/* CSS HEX */\n ${cssOutput}`;
+                                  displayColors(filteredColors);
+                                  createGradients(filteredColors);
+                                  createAnimations(filteredColors);
+                                  generateBoilerplate(filteredColors)
+                              }
+                          }
+                      }
+                      function hexToRgb(hex) {
+                          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                          return result ? {
+                              r: parseInt(result[1], 16),
+                              g: parseInt(result[2], 16),
+                              b: parseInt(result[3], 16)
+                          } : {
+                              r: 0,
+                              g: 0,
+                              b: 0
+                          }
+                      }
+                      function rgbToHex(r, g, b) {
+                          return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+                      }
+                      function extractColors(text) {
+                          const colors = [];
+                          const hexRegex = /#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?/g;
+                          const rgbaRegex = /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)/g;
+                          const hslaRegex = /hsla?\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%(?:\s*,\s*[\d.]+)?\s*\)/g;
+                          let match;
+                          while ((match = hexRegex.exec(text)) !== null) {
+                              const color = match[0].substring(0, 7);
+                              if (!colors.includes(color)) {
+                                  colors.push(color)
+                              }
+                          }
+                          if (colors.length === 0) {
+                              while ((match = rgbaRegex.exec(text)) !== null) {
+                                  if (!colors.includes(match[0])) {
+                                      colors.push(match[0])
+                                  }
+                              }
+                          }
+                          if (colors.length === 0) {
+                              while ((match = hslaRegex.exec(text)) !== null) {
+                                  if (!colors.includes(match[0])) {
+                                      colors.push(match[0])
+                                  }
+                              }
+                          }
+                          return colors
+                      }
+                      function displayColors(colors) {
+                          const colorsList = document.getElementById('colors-list');
+                          const colorsCode = document.getElementById('colors-code');
+                          colorsList.innerHTML = '';
+                          let cssVars = ':root {\n';
+                          colors.forEach((color,index)=>{
+                              const colorName = `color-${index + 1}`;
+                              const div = document.createElement('div');
+                              div.innerHTML = `<span class="color-box" style="background-color: ${color}"></span> ${color} (--${colorName})`;
+                              colorsList.appendChild(div);
+                              cssVars += `  --${colorName}: ${color};\n`
+                          }
+                          );
+                          cssVars += '}';
+                          colorsCode.textContent = cssVars
+                      }
+                      function createGradients(colors) {
+                          const gradientsList = document.getElementById('gradients-list');
+                          const gradientsCode = document.getElementById('gradients-code');
+                          gradientsList.innerHTML = '';
+                          let css = '';
+                          const gradientTypes = [{
+                              name: 'Linear (to right)',
+                              value: `linear-gradient(to right, ${colors.join(', ')})`
+                          }, {
+                              name: 'Linear (to bottom)',
+                              value: `linear-gradient(to bottom, ${colors.join(', ')})`
+                          }, {
+                              name: 'Linear (45deg)',
+                              value: `linear-gradient(45deg, ${colors.join(', ')})`
+                          }, {
+                              name: 'Linear (135deg)',
+                              value: `linear-gradient(135deg, ${colors.join(', ')})`
+                          }, {
+                              name: 'Radial',
+                              value: `radial-gradient(circle, ${colors.join(', ')})`
+                          }, {
+                              name: 'Conic',
+                              value: `conic-gradient(${colors.join(', ')})`
+                          }];
+                          gradientTypes.forEach((gradient,index)=>{
+                              const div = document.createElement('div');
+                              div.innerHTML = `<h3>${gradient.name}</h3>`;
+                              const preview = document.createElement('div');
+                              preview.className = 'gradient-preview';
+                              preview.style.background = gradient.value;
+                              div.appendChild(preview);
+                              gradientsList.appendChild(div);
+                              css += `.gradient-${index + 1} {\n  background: ${gradient.value};\n}\n\n`
+                          }
+                          );
+                          gradientsCode.textContent = css
+                      }
+                      function createAnimations(colors) {
+                          const pulseEl = document.getElementById('pulse-animation');
+                          const rotateEl = document.getElementById('rotate-animation');
+                          const waveEl = document.getElementById('wave-animation');
+                          const animationsCode = document.getElementById('animations-code');
+                          pulseEl.style.background = `linear-gradient(45deg, ${colors.join(', ')})`;
+                          pulseEl.classList.add('pulse');
+                          rotateEl.style.background = `linear-gradient(90deg, ${colors.join(', ')}, ${colors.join(', ')})`;
+                          rotateEl.style.backgroundSize = '200% 100%';
+                          rotateEl.classList.add('rotate');
+                          waveEl.innerHTML = '';
+                          for (let i = 0; i < colors.length; i++) {
+                              const wave = document.createElement('div');
+                              wave.className = 'wave';
+                              wave.style.background = `linear-gradient(90deg, ${colors[i]} 50%, transparent 50%)`;
+                              wave.style.opacity = `${0.8 - (i * 0.2)}`;
+                              wave.style.top = `${i * 20}%`;
+                              wave.style.animationDelay = `${i * 0.5}s`;
+                              waveEl.appendChild(wave)
+                          }
+                          let css = `.pulse {\n  background: linear-gradient(45deg, ${colors.join(', ')});\n  animation: pulse 2s infinite;\n}\n\n`;
+                          css += `@keyframes pulse {\n  0% { opacity: 0.6; }\n  50% { opacity: 1; }\n  100% { opacity: 0.6; }\n}\n\n`;
+                          css += `.rotating-gradient {\n  background: linear-gradient(90deg, ${colors.join(', ')}, ${colors.join(', ')});\n  background-size: 200% 100%;\n  animation: rotate 8s linear infinite;\n}\n\n`;
+                          css += `@keyframes rotate {\n  from { background-position: 0% 0%; }\n  to { background-position: 200% 0%; }\n}\n\n`;
+                          css += `.wave-container {\n  position: relative;\n  height: 200px;\n  overflow: hidden;\n}\n\n`;
+                          css += `.wave {\n  position: absolute;\n  width: 200%;\n  height: 20%;\n  animation: wave 8s linear infinite;\n}\n\n`;
+                          css += `@keyframes wave {\n  0% { transform: translateX(0); }\n  100% { transform: translateX(-50%); }\n}`;
+                          animationsCode.textContent = css
+                      }
+                      function generateBoilerplate(colors) {
+                          const boilerplateCode = document.getElementById('boilerplate-code');
+                          const shuffle = arr=>[...arr].sort(()=>Math.random() - 0.5);
+                          const shuffledColors = shuffle(colors);
+                          const bgColor = shuffledColors[0];
+                          const textColor = getContrastColor(bgColor);
+                          const accentColor = shuffledColors[1] || shuffledColors[0];
+                          const buttonColor = shuffledColors[2] || shuffledColors[0];
+                          const buttonTextColor = getContrastColor(buttonColor);
+                          const html = `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Color Scheme Template</title>
+          <style>
+              :root {
+                  --bg-color: ${bgColor};
+                  --text-color: ${textColor};
+                  --accent-color: ${accentColor};
+                  --button-color: ${buttonColor};
+                  --button-text: ${buttonTextColor};
+                  ${colors.map((color,i)=>`--color-${i + 1}: ${color};`).join('\n            ')}
+              }
+
+              * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+              }
+
+              body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background-color: var(--bg-color);
+                  color: var(--text-color);
+                  line-height: 1.6;
+                  padding: 20px;
+                  max-width: 100%;
+                  overflow-x: hidden;
+              }
+
+              .container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  padding: 20px;
+              }
+
+              header {
+                  text-align: center;
+                  margin-bottom: 40px;
+                  padding-bottom: 20px;
+                  border-bottom: 2px solid var(--accent-color);
+              }
+
+              h1, h2, h3 {
+                  color: var(--accent-color);
+              }
+
+              .btn {
+                  display: inline-block;
+                  background-color: var(--button-color);
+                  color: var(--button-text);
+                  padding: 10px 20px;
+                  border: none;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  text-decoration: none;
+                  font-weight: bold;
+                  transition: opacity 0.3s;
+              }
+
+              .btn:hover {
+                  opacity: 0.9;
+              }
+
+              .card {
+                  background: linear-gradient(90deg, ${shuffledColors.join(', ')});
+                  padding: 20px;
+                  border-radius: 8px;
+                  margin-bottom: 20px;
+                  color: white;
+                  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              }
+
+              .features {
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                  gap: 20px;
+                  margin: 40px 0;
+              }
+
+              .feature-item {
+                  padding: 20px;
+                  border-radius: 8px;
+                  text-align: center;
+              }
+
+              .feature-item:nth-child(1) {
+                  background-color: ${shuffledColors[0] || colors[0]};
+                  color: ${getContrastColor(shuffledColors[0] || colors[0])};
+              }
+
+              .feature-item:nth-child(2) {
+                  background-color: ${shuffledColors[1] || colors[0]};
+                  color: ${getContrastColor(shuffledColors[1] || colors[0])};
+              }
+
+              .feature-item:nth-child(3) {
+                  background-color: ${shuffledColors[2] || colors[0]};
+                  color: ${getContrastColor(shuffledColors[2] || colors[0])};
+              }
+
+              footer {
+                  margin-top: 40px;
+                  text-align: center;
+                  padding-top: 20px;
+                  border-top: 2px solid var(--accent-color);
+              }
+
+              @media (max-width: 768px) {
+                  .features {
+                      grid-template-columns: 1fr;
+                  }
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <header>
+                  <h1>Color Scheme Template</h1>
+                  <p>A responsive template using your color palette</p>
+              </header>
+
+              <main>
+                  <div class="card">
+                      <h2>Welcome to Your Color Palette</h2>
+                      <p>This template showcases the beautiful colors you've selected in a responsive design.</p>
+                      <p style="margin-top: 15px;">
+                          <a href="#" class="btn">Learn More</a>
+                      </p>
+                  </div>
+
+                  <section>
+                      <h2>Features</h2>
+                      <div class="features">
+                          <div class="feature-item">
+                              <h3>Feature One</h3>
+                              <p>A description of your first amazing feature goes here.</p>
+                          </div>
+                          <div class="feature-item">
+                              <h3>Feature Two</h3>
+                              <p>A description of your second amazing feature goes here.</p>
+                          </div>
+                          <div class="feature-item">
+                              <h3>Feature Three</h3>
+                              <p>A description of your third amazing feature goes here.</p>
+                          </div>
+                      </div>
+                  </section>
+              </main>
+
+              <footer>
+                  <p>&copy; 2025 Your Company. All rights reserved.</p>
+                  <p>Created with the Color Palette Tool</p>
+              </footer>
+          </div>
+      </body>
+      </html>`;
+                          boilerplateCode.textContent = html
+                      }
+                      function generateRandomBoilerplate() {
+                          const colors = document.getElementById('colors-list').querySelectorAll('.color-box');
+                          if (colors.length === 0) {
+                              processInput();
+                              setTimeout(generateRandomBoilerplate, 100);
+                              return
+                          }
+                          const extractedColors = [];
+                          colors.forEach(color=>{
+                              extractedColors.push(color.style.backgroundColor)
+                          }
+                          );
+                          generateBoilerplate(extractedColors);
+                          tabs.forEach(t=>t.classList.remove('active'));
+                          document.querySelector('[data-tab="boilerplate"]').classList.add('active');
+                          document.querySelectorAll('.tabs-content > div').forEach(content=>{
+                              content.classList.remove('active')
+                          }
+                          );
+                          document.getElementById('boilerplate-tab').classList.add('active')
+                      }
+                      function getContrastColor(hexColor) {
+                          let r, g, b;
+                          if (hexColor.startsWith('#')) {
+                              const hex = hexColor.substring(1);
+                              r = parseInt(hex.substr(0, 2), 16);
+                              g = parseInt(hex.substr(2, 2), 16);
+                              b = parseInt(hex.substr(4, 2), 16)
+                          } else if (hexColor.startsWith('rgb')) {
+                              const matches = hexColor.match(/\d+/g);
+                              r = parseInt(matches[0]);
+                              g = parseInt(matches[1]);
+                              b = parseInt(matches[2])
+                          } else {
+                              return '#ffffff'
+                          }
+                          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                          return luminance > 0.5 ? '#000000' : '#ffffff'
+                      }
+                  });
+    </script>
+  </body>
+</html>
