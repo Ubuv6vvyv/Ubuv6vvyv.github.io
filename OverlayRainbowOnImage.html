@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simple Rainbow Image Tool</title>
+  <style>
+    * {box-sizing:border-box; margin:0; padding:0; font-family:sans-serif;}
+    body {background:#f0f2f5; color:#333; max-width:100vw; overflow-x:hidden;}
+    .container {max-width:900px; margin:0 auto; padding:15px;}
+    header {text-align:center; padding:10px; margin-bottom:20px; background:linear-gradient(90deg,red,orange,yellow,green,blue,indigo,violet); color:#fff; border-radius:10px;}
+    .tool-container {display:flex; flex-direction:column; gap:20px;}
+    .canvas-wrap {width:100%; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.1); position:relative;}
+    canvas {display:block; max-width:100%;}
+    .controls {background:#fff; padding:15px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.1);}
+    .control-group {margin-bottom:15px;}
+    .control-group h3 {margin-bottom:8px; font-size:16px;}
+    .slider-row {display:grid; grid-template-columns:70px 1fr 40px; align-items:center; gap:10px; margin:5px 0;}
+    input[type=range] {width:100%; height:8px; -webkit-appearance:none; background:#ddd; border-radius:5px;}
+    input[type=range]::-webkit-slider-thumb {-webkit-appearance:none; height:18px; width:18px; border-radius:50%; background:#4c00ff; cursor:pointer;}
+    .palette-choices {display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+    .palette {width:70px; height:35px; border-radius:5px; cursor:pointer; transition:transform 0.2s; box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .palette:hover {transform:scale(1.05);}
+    .palette.active {outline:3px solid #4c00ff;}
+    .rainbow {background:linear-gradient(90deg,red,orange,yellow,green,blue,indigo,violet);}
+    .pastel {background:linear-gradient(90deg,#ffb6c1,#ffdab9,#fffacd,#98fb98,#add8e6,plum,#e6e6fa);}
+    .neon {background:linear-gradient(90deg,#ff003f,#ff7f00,yellow,lime,cyan,#9d00ff,magenta);}
+    .btn-group {display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;}
+    .btn {padding:10px 15px; border:none; border-radius:5px; background:#4c00ff; color:#fff; font-weight:bold; cursor:pointer; flex:1;}
+    .btn:hover {background:#3a00c5;}
+    .tab-nav {display:flex; background:#f0f2f5; border-radius:5px; overflow:hidden; margin-bottom:15px;}
+    .tab-btn {flex:1; padding:10px; border:none; background:transparent; cursor:pointer; font-weight:500;}
+    .tab-btn.active {background:#4c00ff; color:#fff;}
+    .tab-content {display:none;}
+    .tab-content.active {display:block;}
+    .upload-wrap {position:relative; overflow:hidden;}
+    .upload-wrap input {position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;}
+    .loading {position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); display:flex; justify-content:center; align-items:center; z-index:1000; visibility:hidden; opacity:0; transition:opacity 0.3s;}
+    .loading.show {visibility:visible; opacity:1;}
+    .spinner {width:40px; height:40px; border:4px solid rgba(76,0,255,0.3); border-radius:50%; border-top-color:#4c00ff; animation:spin 1s infinite linear;}
+    @keyframes spin {to {transform:rotate(360deg);}}
+    .toast {position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:10px 15px; border-radius:5px; z-index:1001; visibility:hidden; opacity:0; transition:opacity 0.3s;}
+    .toast.show {visibility:visible; opacity:1;}
+    @media (min-width:768px) {
+      .tool-container {flex-direction:row;}
+      .canvas-wrap {flex:3;}
+      .controls {flex:2;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Simple Rainbow Image Tool</h1>
+    </header>
+    <div class="tool-container">
+      <div class="canvas-wrap">
+        <canvas id="c"></canvas>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <h3>Upload Image</h3>
+          <div class="btn-group">
+            <div class="btn upload-wrap">
+              Upload Image
+              <input id="imgUp" type="file" accept="image/*">
+            </div>
+            <button class="btn" id="rstBtn">Reset</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <h3>Rainbow Type</h3>
+          <div class="tab-nav">
+            <button class="tab-btn active" data-tab="ovr">Overlay</button>
+            <button class="tab-btn" data-tab="real">Realistic</button>
+          </div>
+        </div>
+        <div id="ovr-tab" class="tab-content active">
+          <div class="control-group">
+            <h3>Rainbow Palette</h3>
+            <div class="palette-choices">
+              <div class="palette rainbow active" data-palette="rainbow"></div>
+              <div class="palette pastel" data-palette="pastel"></div>
+              <div class="palette neon" data-palette="neon"></div>
+            </div>
+          </div>
+          <div class="control-group">
+            <h3>Settings</h3>
+            <div class="slider-row">
+              <span>Opacity</span>
+              <input id="opSl" type="range" min="0" max="100" value="50">
+              <span id="opVal">50%</span>
+            </div>
+            <div class="slider-row">
+              <span>Saturation</span>
+              <input id="satSl" type="range" min="0" max="200" value="100">
+              <span id="satVal">100%</span>
+            </div>
+            <div class="slider-row">
+              <span>Brightness</span>
+              <input id="briSl" type="range" min="0" max="200" value="100">
+              <span id="briVal">100%</span>
+            </div>
+            <div class="slider-row">
+              <span>Angle</span>
+              <input id="angSl" type="range" min="0" max="360" value="90">
+              <span id="angVal">90°</span>
+            </div>
+          </div>
+        </div>
+        <div id="real-tab" class="tab-content">
+          <div class="control-group">
+            <h3>Rainbow Type</h3>
+            <select id="rType">
+              <option value="single">Single Rainbow</option>
+              <option value="double">Double Rainbow</option>
+              <option value="circular">Circular Rainbow</option>
+              <option value="fogbow">Fogbow (White Rainbow)</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <h3>Position &amp; Size</h3>
+            <div class="slider-row">
+              <span>Pos X</span>
+              <input id="xSl" type="range" min="0" max="100" value="50">
+              <span id="xVal">50%</span>
+            </div>
+            <div class="slider-row">
+              <span>Pos Y</span>
+              <input id="ySl" type="range" min="0" max="150" value="50">
+              <span id="yVal">50%</span>
+            </div>
+            <div class="slider-row">
+              <span>Size</span>
+              <input id="szSl" type="range" min="10" max="120" value="60">
+              <span id="szVal">60%</span>
+            </div>
+            <div class="slider-row">
+              <span>Arc</span>
+              <input id="arcSl" type="range" min="0" max="180" value="180">
+              <span id="arcVal">180°</span>
+            </div>
+            <div class="slider-row">
+              <span>Rot</span>
+              <input id="rotSl" type="range" min="-180" max="180" value="0">
+              <span id="rotVal">0°</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <h3>Appearance</h3>
+            <div class="slider-row">
+              <span>Opacity</span>
+              <input id="ropSl" type="range" min="0" max="100" value="70">
+              <span id="ropVal">70%</span>
+            </div>
+            <div class="slider-row">
+              <span>Width</span>
+              <input id="wSl" type="range" min="1" max="20" value="10">
+              <span id="wVal">10%</span>
+            </div>
+            <div class="slider-row">
+              <span>Vibe</span>
+              <input id="vSl" type="range" min="0" max="200" value="100">
+              <span id="vVal">100%</span>
+            </div>
+            <div class="slider-row">
+              <span>Glow</span>
+              <input id="gSl" type="range" min="0" max="30" value="5">
+              <span id="gVal">5px</span>
+            </div>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn" id="dBtn">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="loading"><div class="spinner"></div></div>
+  <div class="toast" id="toast">Image saved to your device</div>
+
+  <script>
+    // Global variables (shortened)
+    let c, ctx, oImg = null, dImg = null;  // oImg: original, dImg: display image
+    let mode = 'ovr', pal = 'rainbow';
+    let scaleFactor = 1;  // if image is scaled down for performance
+
+    // For gesture handling in realistic mode
+    const ptrs = {}; 
+    let gestureInit = null, singleInit = null;
+
+    // Maximum display width (px)
+    const MAX_DISPLAY = 800;
+
+    // Palettes
+    const pals = {
+      rainbow: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#4B0082','#8F00FF'],
+      pastel: ['#FFB6C1','#FFDAB9','#FFFACD','#98FB98','#ADD8E6','#DDA0DD','#E6E6FA'],
+      neon: ['#FF003F','#FF7F00','#FFFF00','#00FF00','#00FFFF','#9D00FF','#FF00FF']
+    };
+
+    // Setup canvas and context
+    function setup() {
+      c = document.getElementById('c');
+      ctx = c.getContext('2d');
+      c.addEventListener('pointerdown', onPD);
+      c.addEventListener('pointermove', onPM);
+      c.addEventListener('pointerup', onPU);
+      c.addEventListener('pointercancel', onPU);
+    }
+
+    // Scale image if too large; return a canvas element with scaled image
+    function scaleImg(img) {
+      if (img.width > MAX_DISPLAY) {
+        scaleFactor = img.width / MAX_DISPLAY;
+        const sw = MAX_DISPLAY;
+        const sh = img.height / scaleFactor;
+        const off = document.createElement('canvas');
+        off.width = sw; off.height = sh;
+        off.getContext('2d').drawImage(img, 0, 0, sw, sh);
+        return off;
+      } else {
+        scaleFactor = 1;
+        return img;
+      }
+    }
+
+    // Upload image and set up canvases
+    function upload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      showLoad();
+      const fr = new FileReader();
+      fr.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          oImg = img;
+          dImg = scaleImg(img);
+          c.width = dImg.width;
+          c.height = dImg.height;
+          // Default realistic mode position to center
+          document.getElementById('xSl').value = 50;
+          document.getElementById('ySl').value = 50;
+          draw();
+          hideLoad();
+        }
+        img.src = evt.target.result;
+      }
+      fr.readAsDataURL(file);
+    }
+
+    // Render on a given context (ctx) with width W and height H using image (imgObj)
+    function render(ctx, W, H, imgObj) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(imgObj, 0, 0, W, H);
+      if (mode === 'ovr') drawOvr(ctx, W, H);
+      else if (mode === 'real') drawReal(ctx, W, H);
+    }
+
+    // Draw overlay rainbow (full-image gradient)
+    function drawOvr(ctx, W, H) {
+      const op = document.getElementById('opSl').value / 100;
+      const ang = document.getElementById('angSl').value;
+      const bri = document.getElementById('briSl').value;
+      const sat = document.getElementById('satSl').value;
+      const rad = ang * Math.PI / 180;
+      const halfDiag = Math.sqrt(W * W + H * H) / 2;
+      const cx = W / 2, cy = H / 2;
+      const x0 = cx - Math.cos(rad) * halfDiag;
+      const y0 = cy - Math.sin(rad) * halfDiag;
+      const x1 = cx + Math.cos(rad) * halfDiag;
+      const y1 = cy + Math.sin(rad) * halfDiag;
+      const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+      const cols = pals[pal];
+      cols.forEach((col, i) => {
+        grad.addColorStop(i / (cols.length - 1), col);
+      });
+      ctx.save();
+      ctx.filter = `brightness(${bri}%) saturate(${sat}%)`;
+      ctx.globalAlpha = op;
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw realistic rainbow as arc bands
+    function drawReal(ctx, W, H) {
+      const rType = document.getElementById('rType').value;
+      const posX = Number(document.getElementById('xSl').value);
+      const posY = Number(document.getElementById('ySl').value);
+      const sz = Number(document.getElementById('szSl').value);
+      const arcDeg = Number(document.getElementById('arcSl').value);
+      const rotDeg = Number(document.getElementById('rotSl').value);
+      const op = Number(document.getElementById('ropSl').value) / 100;
+      const wPerc = Number(document.getElementById('wSl').value);
+      const glow = parseInt(document.getElementById('gSl').value, 10);
+      
+      const cx = W * (posX / 100);
+      const cy = H * (posY / 100);
+      const outerR = W * (sz / 100);
+      const totTh = outerR * (wPerc / 100);
+      const bands = (rType === 'fogbow') ? 3 : 7;
+      const bandTh = totTh / bands;
+      
+      // Base angle is vertical (pi/2) plus rotation offset
+      const baseAng = (Math.PI / 2) + (rotDeg * Math.PI / 180);
+      const arcRad = arcDeg * Math.PI / 180;
+      const startAng = baseAng - arcRad / 2;
+      const endAng = baseAng + arcRad / 2;
+      
+      let cols;
+      if (rType === 'fogbow') {
+        cols = ['rgba(255,255,255,0.1)', `rgba(255,255,255,${0.7 * op})`, 'rgba(255,255,255,0.1)'];
+      } else {
+        cols = pals.rainbow.map(c => hex2rgba(c, op));
+      }
+      
+      for (let i = 0; i < bands; i++) {
+        const rOut = outerR - i * bandTh;
+        const rIn = rOut - bandTh;
+        ctx.save();
+        if (glow > 0) {
+          ctx.shadowBlur = glow;
+          ctx.shadowColor = cols[i] || cols[cols.length - 1];
+        }
+        ctx.fillStyle = cols[i] || cols[cols.length - 1];
+        ctx.beginPath();
+        ctx.arc(cx, cy, rOut, startAng, endAng, false);
+        ctx.arc(cx, cy, rIn, endAng, startAng, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      
+      if (rType === 'double') {
+        const secOp = op * 0.7;
+        const secCols = pals.rainbow.map(c => hex2rgba(c, secOp)).reverse();
+        const gap = bandTh * 0.5;
+        const secOut = outerR + gap;
+        for (let i = 0; i < bands; i++) {
+          const rOut = secOut - i * bandTh;
+          const rIn = rOut - bandTh;
+          ctx.save();
+          if (glow > 0) {
+            ctx.shadowBlur = glow;
+            ctx.shadowColor = secCols[i] || secCols[secCols.length - 1];
+          }
+          ctx.fillStyle = secCols[i] || secCols[secCols.length - 1];
+          ctx.beginPath();
+          ctx.arc(cx, cy, rOut, startAng, endAng, false);
+          ctx.arc(cx, cy, rIn, endAng, startAng, true);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    // Utility: convert hex to rgba string with alpha
+    function hex2rgba(hex, a) {
+      hex = hex.replace('#','');
+      if (hex.length === 3) hex = hex.split('').map(x => x+x).join('');
+      const bi = parseInt(hex, 16);
+      const r = (bi >> 16) & 255;
+      const g = (bi >> 8) & 255;
+      const b = bi & 255;
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    // Main draw function on display canvas
+    function draw() {
+      render(ctx, c.width, c.height, dImg);
+    }
+
+    // Download: redraw on an offscreen canvas at original resolution
+    function download() {
+      if (!oImg) { showToast('Please upload an image first'); return; }
+      showLoad();
+      const off = document.createElement('canvas');
+      off.width = oImg.width;
+      off.height = oImg.height;
+      const offCtx = off.getContext('2d');
+      // Render the original image onto offscreen canvas
+      offCtx.drawImage(oImg, 0, 0, off.width, off.height);
+      // Since parameters are in percentages, the same values work for full resolution
+      if (mode === 'ovr') {
+        const op = document.getElementById('opSl').value / 100;
+        const ang = document.getElementById('angSl').value;
+        const bri = document.getElementById('briSl').value;
+        const sat = document.getElementById('satSl').value;
+        const rad = ang * Math.PI / 180;
+        const halfDiag = Math.sqrt(off.width * off.width + off.height * off.height) / 2;
+        const cx = off.width / 2, cy = off.height / 2;
+        const x0 = cx - Math.cos(rad) * halfDiag;
+        const y0 = cy - Math.sin(rad) * halfDiag;
+        const x1 = cx + Math.cos(rad) * halfDiag;
+        const y1 = cy + Math.sin(rad) * halfDiag;
+        const grad = offCtx.createLinearGradient(x0, y0, x1, y1);
+        const cols = pals[pal];
+        cols.forEach((c, i) => { grad.addColorStop(i/(cols.length-1), c); });
+        offCtx.save();
+        offCtx.filter = `brightness(${bri}%) saturate(${sat}%)`;
+        offCtx.globalAlpha = op;
+        offCtx.fillStyle = grad;
+        offCtx.fillRect(0, 0, off.width, off.height);
+        offCtx.restore();
+        offCtx.globalAlpha = 1;
+      } else if (mode === 'real') {
+        const rType = document.getElementById('rType').value;
+        const posX = Number(document.getElementById('xSl').value);
+        const posY = Number(document.getElementById('ySl').value);
+        const sz = Number(document.getElementById('szSl').value);
+        const arcDeg = Number(document.getElementById('arcSl').value);
+        const rotDeg = Number(document.getElementById('rotSl').value);
+        const op = Number(document.getElementById('ropSl').value) / 100;
+        const wPerc = Number(document.getElementById('wSl').value);
+        const glow = parseInt(document.getElementById('gSl').value, 10);
+        const cx = off.width * (posX / 100);
+        const cy = off.height * (posY / 100);
+        const outerR = off.width * (sz / 100);
+        const totTh = outerR * (wPerc / 100);
+        const bands = (rType === 'fogbow') ? 3 : 7;
+        const bandTh = totTh / bands;
+        const baseAng = (Math.PI / 2) + (rotDeg * Math.PI / 180);
+        const arcRad = arcDeg * Math.PI / 180;
+        const startAng = baseAng - arcRad / 2;
+        const endAng = baseAng + arcRad / 2;
+        let cols;
+        if (rType === 'fogbow') {
+          cols = ['rgba(255,255,255,0.1)', `rgba(255,255,255,${0.7 * op})`, 'rgba(255,255,255,0.1)'];
+        } else {
+          cols = pals.rainbow.map(c => hex2rgba(c, op));
+        }
+        for (let i = 0; i < bands; i++) {
+          const rOut = outerR - i * bandTh;
+          const rIn = rOut - bandTh;
+          offCtx.save();
+          if (glow > 0) {
+            offCtx.shadowBlur = glow;
+            offCtx.shadowColor = cols[i] || cols[cols.length - 1];
+          }
+          offCtx.fillStyle = cols[i] || cols[cols.length - 1];
+          offCtx.beginPath();
+          offCtx.arc(cx, cy, rOut, startAng, endAng, false);
+          offCtx.arc(cx, cy, rIn, endAng, startAng, true);
+          offCtx.closePath();
+          offCtx.fill();
+          offCtx.restore();
+        }
+        if (rType === 'double') {
+          const secOp = op * 0.7;
+          const secCols = pals.rainbow.map(c => hex2rgba(c, secOp)).reverse();
+          const gap = bandTh * 0.5;
+          const secOut = outerR + gap;
+          for (let i = 0; i < bands; i++) {
+            const rOut = secOut - i * bandTh;
+            const rIn = rOut - bandTh;
+            offCtx.save();
+            if (glow > 0) {
+              offCtx.shadowBlur = glow;
+              offCtx.shadowColor = secCols[i] || secCols[secCols.length - 1];
+            }
+            offCtx.fillStyle = secCols[i] || secCols[secCols.length - 1];
+            offCtx.beginPath();
+            offCtx.arc(cx, cy, rOut, startAng, endAng, false);
+            offCtx.arc(cx, cy, rIn, endAng, startAng, true);
+            offCtx.closePath();
+            offCtx.fill();
+            offCtx.restore();
+          }
+        }
+      }
+      const url = off.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rainbow-' + Date.now() + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      hideLoad();
+      showToast('Image saved to your device');
+    }
+
+    // Reset UI and redraw
+    function reset() {
+      if (!oImg) return;
+      document.getElementById('opSl').value = 50;
+      document.getElementById('satSl').value = 100;
+      document.getElementById('briSl').value = 100;
+      document.getElementById('angSl').value = 90;
+      document.getElementById('ropSl').value = 70;
+      document.getElementById('xSl').value = 50;
+      document.getElementById('ySl').value = 50;
+      document.getElementById('szSl').value = 60;
+      document.getElementById('arcSl').value = 180;
+      document.getElementById('rotSl').value = 0;
+      document.getElementById('wSl').value = 10;
+      document.getElementById('vSl').value = 100;
+      document.getElementById('gSl').value = 5;
+      pal = 'rainbow';
+      document.querySelectorAll('.palette').forEach(el => {
+        el.classList.remove('active');
+        if (el.dataset.palette === 'rainbow') el.classList.add('active');
+      });
+      updateSliders();
+      draw();
+    }
+
+    // Update slider labels
+    function updateSliders() {
+      document.getElementById('opVal').textContent = document.getElementById('opSl').value + '%';
+      document.getElementById('satVal').textContent = document.getElementById('satSl').value + '%';
+      document.getElementById('briVal').textContent = document.getElementById('briSl').value + '%';
+      document.getElementById('angVal').textContent = document.getElementById('angSl').value + '°';
+      document.getElementById('xVal').textContent = document.getElementById('xSl').value + '%';
+      document.getElementById('yVal').textContent = document.getElementById('ySl').value + '%';
+      document.getElementById('szVal').textContent = document.getElementById('szSl').value + '%';
+      document.getElementById('arcVal').textContent = document.getElementById('arcSl').value + '°';
+      document.getElementById('rotVal').textContent = document.getElementById('rotSl').value + '°';
+      document.getElementById('ropVal').textContent = document.getElementById('ropSl').value + '%';
+      document.getElementById('wVal').textContent = document.getElementById('wSl').value + '%';
+      document.getElementById('vVal').textContent = document.getElementById('vSl').value + '%';
+      document.getElementById('gVal').textContent = document.getElementById('gSl').value + 'px';
+    }
+
+    // Main draw function
+    function draw() {
+      render(ctx, c.width, c.height, dImg);
+    }
+
+    // Show/hide loading and toast messages
+    function showLoad() { document.querySelector('.loading').classList.add('show'); }
+    function hideLoad() { document.querySelector('.loading').classList.remove('show'); }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => { t.classList.remove('show'); }, 3000);
+    }
+
+    // Pointer gesture handling for realistic mode
+    function onPD(e) {
+      if (mode !== 'real' || !oImg) return;
+      ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(ptrs).length === 1) {
+        singleInit = { x: e.clientX, y: e.clientY, posX: Number(document.getElementById('xSl').value), posY: Number(document.getElementById('ySl').value) };
+      } else if (Object.keys(ptrs).length === 2) {
+        const pts = Object.values(ptrs);
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const ang = Math.atan2(dy, dx);
+        gestureInit = { dist, ang, sz: Number(document.getElementById('szSl').value), rot: Number(document.getElementById('rotSl').value) };
+      }
+    }
+    function onPM(e) {
+      if (mode !== 'real' || !oImg) return;
+      if (!(e.pointerId in ptrs)) return;
+      ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(ptrs).length === 1 && singleInit) {
+        const dx = e.clientX - singleInit.x;
+        const dy = e.clientY - singleInit.y;
+        let newX = singleInit.posX + (dx / c.width) * 100;
+        let newY = singleInit.posY + (dy / c.height) * 100;
+        newX = Math.max(0, Math.min(100, newX));
+        newY = Math.max(0, Math.min(150, newY));
+        document.getElementById('xSl').value = newX;
+        document.getElementById('ySl').value = newY;
+        updateSliders();
+        draw();
+      } else if (Object.keys(ptrs).length === 2 && gestureInit) {
+        const pts = Object.values(ptrs);
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const newDist = Math.sqrt(dx * dx + dy * dy);
+        const newAng = Math.atan2(dy, dx);
+        const scaleChg = newDist / gestureInit.dist;
+        let newSz = gestureInit.sz * scaleChg;
+        let newRot = gestureInit.rot + ((newAng - gestureInit.ang) * 180 / Math.PI);
+        document.getElementById('szSl').value = newSz;
+        document.getElementById('rotSl').value = newRot;
+        updateSliders();
+        draw();
+      }
+    }
+    function onPU(e) {
+      delete ptrs[e.pointerId];
+      if (Object.keys(ptrs).length < 2) gestureInit = null;
+      if (Object.keys(ptrs).length === 0) singleInit = null;
+    }
+
+    // Bind all event listeners
+    function bind() {
+      document.getElementById('imgUp').addEventListener('change', upload);
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const t = this.dataset.tab;
+          if (t !== mode) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById(t + '-tab').classList.add('active');
+            mode = t;
+            draw();
+          }
+        });
+      });
+      document.querySelectorAll('.palette').forEach(p => {
+        p.addEventListener('click', function() {
+          document.querySelectorAll('.palette').forEach(el => el.classList.remove('active'));
+          this.classList.add('active');
+          pal = this.dataset.palette;
+          if (mode === 'ovr') draw();
+        });
+      });
+      document.querySelectorAll('input[type=range]').forEach(sl => {
+        sl.addEventListener('input', () => {
+          updateSliders();
+          draw();
+        });
+      });
+      document.getElementById('rType').addEventListener('change', () => {
+        if (mode === 'real') draw();
+      });
+      document.getElementById('dBtn').addEventListener('click', download);
+      document.getElementById('rstBtn').addEventListener('click', reset);
+    }
+
+    // Initialize on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+      setup();
+      bind();
+      updateSliders();
+    });
+  </script>
+</body>
+</html>
