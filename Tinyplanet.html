@@ -45,6 +45,10 @@
     #drop-zone.active { display: flex; }
     #drop-zone p { color: white; font-size: 24px; text-shadow: 0 0 10px black; }
     #notification { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px; display: none; z-index: 100; }
+    /* Styles for toggle controls */
+    #toggles { display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: #fff; }
+    #toggles label { cursor: pointer; }
+    #toggles input { margin-right: 5px; }
   </style>
 </head>
 <body>
@@ -57,6 +61,10 @@
     <label for="file-input" class="btn">Upload Image</label>
     <input type="file" id="file-input" accept="image/*">
     <button id="download-btn" class="btn">Download</button>
+    <div id="toggles">
+      <label><input type="checkbox" id="toggle-equirectangular" checked>Auto Equirectangular Conversion</label>
+      <label><input type="checkbox" id="toggle-regular-panorama">Regular Panorama View</label>
+    </div>
     <div class="spinner" id="loading-spinner"></div>
   </div>
   
@@ -143,7 +151,12 @@
               viewer.remove(littlePlanet);
               littlePlanet.dispose();
             }
-            littlePlanet = new PANOLENS.ImageLittlePlanet(url);
+            // Use toggle to decide which panorama view to use
+            if(document.getElementById('toggle-regular-panorama').checked) {
+              littlePlanet = new PANOLENS.ImagePanorama(url);
+            } else {
+              littlePlanet = new PANOLENS.ImageLittlePlanet(url);
+            }
             viewer.add(littlePlanet);
             spinner.style.display = 'none';
             hideNotification();
@@ -239,55 +252,96 @@
         const reader = new FileReader();
         reader.onload = function(e) {
           const imageUrl = e.target.result;
-          
-          // Create new photo thumbnail for file upload
-          const photo = document.createElement('div');
-          photo.classList.add('photo');
-          photo.style.backgroundImage = `url(${imageUrl})`;
-          
-          // Remove active class from all photos and mark new photo as active
-          document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
-          photo.classList.add('active');
-          
-          try {
-            if (littlePlanet) {
-              viewer.remove(littlePlanet);
-              littlePlanet.dispose();
-            }
-            littlePlanet = new PANOLENS.ImageLittlePlanet(imageUrl);
-            viewer.add(littlePlanet);
-            
-            // Add photo to drawer for future reference (if desired)
-            photo.addEventListener('click', function() {
-              spinner.style.display = 'block';
-              showNotification('Loading image...');
-              
-              document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
-              photo.classList.add('active');
-              
-              try {
-                if (littlePlanet) {
-                  viewer.remove(littlePlanet);
-                  littlePlanet.dispose();
-                }
-                littlePlanet = new PANOLENS.ImageLittlePlanet(imageUrl);
-                viewer.add(littlePlanet);
-                spinner.style.display = 'none';
-                hideNotification();
-              } catch(e) {
-                console.error('Error updating planet:', e);
-                showNotification('Error: ' + e.message);
-                spinner.style.display = 'none';
+          // Create an image object to check dimensions
+          let originalImage = new Image();
+          originalImage.onload = function() {
+            let naturalWidth = originalImage.naturalWidth;
+            let naturalHeight = originalImage.naturalHeight;
+            let aspect = naturalWidth / naturalHeight;
+            let convertedImageUrl = imageUrl;
+            // If toggle is on and image is not 2:1, perform center crop conversion
+            if (document.getElementById('toggle-equirectangular').checked && Math.abs(aspect - 2) > 0.01) {
+              let newWidth, newHeight, offsetX, offsetY;
+              if (aspect > 2) {
+                // Image is too wide: crop horizontally
+                newHeight = naturalHeight;
+                newWidth = naturalHeight * 2;
+                offsetX = (naturalWidth - newWidth) / 2;
+                offsetY = 0;
+              } else {
+                // Image is too tall: crop vertically
+                newWidth = naturalWidth;
+                newHeight = naturalWidth / 2;
+                offsetX = 0;
+                offsetY = (naturalHeight - newHeight) / 2;
               }
-            });
-            drawerElement.insertBefore(photo, drawerElement.firstChild);
-            spinner.style.display = 'none';
-            hideNotification();
-          } catch(e) {
-            console.error('Error creating planet from uploaded image:', e);
-            showNotification('Error: ' + e.message);
-            spinner.style.display = 'none';
-          }
+              let canvas = document.createElement('canvas');
+              canvas.width = newWidth;
+              canvas.height = newHeight;
+              let ctx = canvas.getContext('2d');
+              ctx.drawImage(originalImage, offsetX, offsetY, newWidth, newHeight, 0, 0, newWidth, newHeight);
+              convertedImageUrl = canvas.toDataURL();
+            }
+            
+            // Create new photo thumbnail for file upload
+            const photo = document.createElement('div');
+            photo.classList.add('photo');
+            photo.style.backgroundImage = `url(${convertedImageUrl})`;
+            
+            // Remove active class from all photos and mark new photo as active
+            document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+            photo.classList.add('active');
+            
+            try {
+              if (littlePlanet) {
+                viewer.remove(littlePlanet);
+                littlePlanet.dispose();
+              }
+              // Use toggle to choose between regular panorama and little planet view
+              if(document.getElementById('toggle-regular-panorama').checked) {
+                littlePlanet = new PANOLENS.ImagePanorama(convertedImageUrl);
+              } else {
+                littlePlanet = new PANOLENS.ImageLittlePlanet(convertedImageUrl);
+              }
+              viewer.add(littlePlanet);
+              
+              // Add photo to drawer for future reference (if desired)
+              photo.addEventListener('click', function() {
+                spinner.style.display = 'block';
+                showNotification('Loading image...');
+                
+                document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+                photo.classList.add('active');
+                
+                try {
+                  if (littlePlanet) {
+                    viewer.remove(littlePlanet);
+                    littlePlanet.dispose();
+                  }
+                  if(document.getElementById('toggle-regular-panorama').checked) {
+                    littlePlanet = new PANOLENS.ImagePanorama(convertedImageUrl);
+                  } else {
+                    littlePlanet = new PANOLENS.ImageLittlePlanet(convertedImageUrl);
+                  }
+                  viewer.add(littlePlanet);
+                  spinner.style.display = 'none';
+                  hideNotification();
+                } catch(e) {
+                  console.error('Error updating planet:', e);
+                  showNotification('Error: ' + e.message);
+                  spinner.style.display = 'none';
+                }
+              });
+              drawerElement.insertBefore(photo, drawerElement.firstChild);
+              spinner.style.display = 'none';
+              hideNotification();
+            } catch(e) {
+              console.error('Error creating planet from uploaded image:', e);
+              showNotification('Error: ' + e.message);
+              spinner.style.display = 'none';
+            }
+          };
+          originalImage.src = imageUrl;
         };
         reader.readAsDataURL(file);
       }
