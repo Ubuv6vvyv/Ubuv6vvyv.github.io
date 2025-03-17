@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Exhaustive Regex Builder & Text Manipulation Tool</title>
+  <style>
+    /* Base styling for desktop and mobile */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    h1, h2 {
+      color: #333;
+      margin: 0 0 10px 0;
+    }
+    #instructions {
+      background-color: #e8f0fe;
+      border: 1px solid #b3c0e6;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+    #instructions ul {
+      margin: 5px 0 15px 20px;
+    }
+    input[type="text"], textarea, select {
+      width: 80%;
+      padding: 8px;
+      margin: 10px 0;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 5px 0;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #4285f4;
+      color: #fff;
+    }
+    button:hover {
+      background-color: #357ae8;
+    }
+    #regexResults, #textManipulation {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .regex-item {
+      border-bottom: 1px solid #ccc;
+      padding: 10px 0;
+    }
+    .regex-item:last-child {
+      border-bottom: none;
+    }
+    .regex-string {
+      font-family: monospace;
+      background-color: #f0f0f0;
+      padding: 5px;
+      display: inline-block;
+      margin-bottom: 5px;
+    }
+    /* Mobile adjustments */
+    @media screen and (max-width: 480px) {
+      body {
+        font-size: 12px;
+      }
+      input[type="text"], textarea, select, button {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Exhaustive Regex Builder & Text Manipulation Tool</h1>
+  <div id="instructions">
+    <h2>How to Use This Tool</h2>
+    <p>
+      Enter the exact string you want to match into the input field below. The tool will analyze your sample and generate a variety of regex patterns designed to match that string in different ways.
+    </p>
+    <p><strong>Example Inputs:</strong></p>
+    <ul>
+      <li><strong>Abc@outlook.com</strong> – Generates exact matches, case‑insensitive versions, generalized patterns, and email‑specific patterns (generic and domain‑specific).</li>
+      <li><strong>HelloWorld</strong> – Generates exact, case‑insensitive, word‑boundary, and generalized structure patterns.</li>
+      <li><strong>12345</strong> – Generates patterns matching exactly five digits and other numeric‑specific options.</li>
+      <li><strong>Test 123</strong> – Generates patterns with flexible whitespace between words.</li>
+      <li><strong>http://www.example.com</strong> – Recognizes a URL and provides a generic URL pattern.</li>
+      <li><strong>2023-03-16</strong> – Recognizes a date in YYYY‑MM‑DD format and provides a date‑matching regex.</li>
+      <li><strong>#1A2B3C</strong> – Recognizes a hex color code and provides a hex‑color regex.</li>
+      <li><strong>192.168.1.1</strong> – Recognizes an IP address and provides an IP‑address regex.</li>
+      <li><strong>+1 (800) 555-1234</strong> – Recognizes a phone number format and provides a phone‑number regex.</li>
+      <li><strong>12345 or 12345-6789</strong> – Recognizes ZIP code formats and provides a ZIP‑code regex.</li>
+    </ul>
+    <p>
+      Instructions: Type your sample string in the box and click "Generate Regex Patterns". Review the generated patterns (which will also populate a dropdown in the Text Manipulation section). Each pattern’s short description is shown in the dropdown. Click the "Copy Regex" button next to any pattern to copy it to your clipboard.
+    </p>
+  </div>
+  <input type="text" id="userInput" placeholder="Type your sample string here..." />
+  <button id="generateBtn">Generate Regex Patterns</button>
+  <div id="regexResults"></div>
+
+  <!-- Text Manipulation Section -->
+  <div id="textManipulation">
+    <h2>Text Manipulation</h2>
+    <p>
+      Paste text into the area below, then either select one of the generated regex patterns from the dropdown (with its description) or enter your own regex. Choose an operation—Search/Extract Matches, Replace Matches, or Split Text—and click "Process Text" to manipulate the text.
+    </p>
+    <textarea id="manipulationInput" placeholder="Paste your text here..." rows="6"></textarea>
+    <br/>
+    <label for="regexSelect">Select a Generated Regex Pattern:</label>
+    <br/>
+    <select id="regexSelect"></select>
+    <br/>
+    <label for="customRegexInput">Or Enter a Custom Regex:</label>
+    <br/>
+    <input type="text" id="customRegexInput" placeholder="Enter custom regex here" />
+    <br/>
+    <p>Select Operation:</p>
+    <input type="radio" id="operationSearch" name="operation" value="search" checked>
+    <label for="operationSearch">Search/Extract Matches</label>
+    <br/>
+    <input type="radio" id="operationReplace" name="operation" value="replace">
+    <label for="operationReplace">Replace Matches</label>
+    <br/>
+    <input type="radio" id="operationSplit" name="operation" value="split">
+    <label for="operationSplit">Split Text</label>
+    <br/>
+    <div id="replacementDiv" style="display:none;">
+      <label for="replacementText">Replacement Text:</label>
+      <br/>
+      <input type="text" id="replacementText" placeholder="Enter replacement text" />
+    </div>
+    <br/>
+    <button id="processTextBtn">Process Text</button>
+    <button id="clearManipulationBtn">Clear Manipulation Area</button>
+    <br/><br/>
+    <label for="manipulationOutput">Output:</label>
+    <br/>
+    <textarea id="manipulationOutput" placeholder="Results will appear here..." rows="6"></textarea>
+    <br/>
+    <button id="copyOutputBtn">Copy Output</button>
+  </div>
+
+  <script>
+    // Utility function to escape regex special characters.
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Utility function to copy text to clipboard using the Clipboard API.
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(function() {
+        alert('Copied to clipboard: ' + text);
+      }, function(err) {
+        alert('Error copying text: ' + err);
+      });
+    }
+
+    // Generates a generalized pattern by replacing consecutive letters with [A-Za-z]{n}
+    // and consecutive digits with \d{n}, preserving other characters.
+    function generalizePattern(input) {
+      let pattern = '';
+      let i = 0;
+      while (i < input.length) {
+        let char = input[i];
+        if (/[A-Za-z]/.test(char)) {
+          let start = i;
+          while (i < input.length && /[A-Za-z]/.test(input[i])) { i++; }
+          let count = i - start;
+          pattern += '[A-Za-z]{' + count + '}';
+        } else if (/\d/.test(char)) {
+          let start = i;
+          while (i < input.length && /\d/.test(input[i])) { i++; }
+          let count = i - start;
+          pattern += '\\d{' + count + '}';
+        } else {
+          pattern += escapeRegExp(char);
+          i++;
+        }
+      }
+      return '^' + pattern + '$';
+    }
+
+    // Generates a flexible whitespace pattern by replacing literal spaces with \s+
+    function flexibleSpacePattern(input) {
+      let parts = input.trim().split(/\s+/).map(part => escapeRegExp(part));
+      return '^' + parts.join('\\s+') + '$';
+    }
+
+    // Helper functions to detect common patterns.
+    function isEmail(input) {
+      return input.includes('@') && input.indexOf('.') > input.indexOf('@');
+    }
+
+    function isUrl(input) {
+      return /^(https?:\/\/|www\.)/.test(input) || /\.(com|net|org|io|gov|edu)(\/|$)/i.test(input);
+    }
+
+    function isDate(input) {
+      // Check for YYYY-MM-DD or MM/DD/YYYY formats.
+      return /^\d{4}-\d{1,2}-\d{1,2}$/.test(input) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(input);
+    }
+
+    function isTime(input) {
+      // Matches HH:MM or HH:MM:SS in 24-hour format.
+      return /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(input);
+    }
+
+    function isHexColor(input) {
+      return /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(input);
+    }
+
+    function isIp(input) {
+      return /^((25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]?\d?\d)$/.test(input);
+    }
+
+    function isPhone(input) {
+      // A simple check: allows digits, spaces, dashes, parentheses, and a leading +
+      return /^(\+?\d[\d\s\-()]{7,}\d)$/.test(input);
+    }
+
+    function isZip(input) {
+      return /^(\d{5}(-\d{4})?)$/.test(input);
+    }
+
+    // Global variable to store generated patterns.
+    let generatedPatterns = [];
+
+    // Main function that generates an array of regex pattern objects based on the user's input.
+    function generateRegexPatterns(input) {
+      let results = [];
+      let escapedInput = escapeRegExp(input);
+
+      // 1. Exact match with anchors.
+      results.push({
+        regex: '^' + escapedInput + '$',
+        explanation: 'Matches the exact string (anchored at both start and end).'
+      });
+
+      // 2. Case-insensitive exact match.
+      results.push({
+        regex: '^' + escapedInput + '$ (with /i flag)',
+        explanation: 'Matches the exact string, ignoring case.'
+      });
+
+      // 3. Contains match.
+      results.push({
+        regex: '.*' + escapedInput + '.*',
+        explanation: 'Matches any string that contains the input as a substring.'
+      });
+
+      // 4. Starts with match.
+      results.push({
+        regex: '^' + escapedInput + '.*',
+        explanation: 'Matches any string that starts with the input.'
+      });
+
+      // 5. Ends with match.
+      results.push({
+        regex: '.*' + escapedInput + '$',
+        explanation: 'Matches any string that ends with the input.'
+      });
+
+      // 6. Generalized structure pattern.
+      let generalized = generalizePattern(input);
+      results.push({
+        regex: generalized,
+        explanation: 'Matches the structure by replacing letters/digits with character classes.'
+      });
+
+      // 7. Word boundary match (if input is a single word).
+      if (/^\w+$/.test(input)) {
+        results.push({
+          regex: '\\b' + escapedInput + '\\b',
+          explanation: 'Matches the input as a whole word using word boundaries.'
+        });
+      }
+
+      // 8. Digit-only pattern.
+      if (/^\d+$/.test(input)) {
+        results.push({
+          regex: '\\d{' + input.length + '}',
+          explanation: 'Matches exactly ' + input.length + ' digits.'
+        });
+      }
+
+      // 9. Letter-only pattern.
+      if (/^[A-Za-z]+$/.test(input)) {
+        results.push({
+          regex: '[A-Za-z]{' + input.length + '}',
+          explanation: 'Matches exactly ' + input.length + ' letters.'
+        });
+      }
+
+      // 10. Flexible whitespace pattern (if input contains spaces).
+      if (/\s/.test(input)) {
+        let flexiblePattern = flexibleSpacePattern(input);
+        results.push({
+          regex: flexiblePattern,
+          explanation: 'Matches input with flexible whitespace between words.'
+        });
+      }
+
+      // 11. Optional non-word characters around the input.
+      results.push({
+        regex: '^\\W*' + escapedInput + '\\W*$',
+        explanation: 'Matches the input even if surrounded by non-word characters.'
+      });
+
+      // Specialized patterns based on detected input type.
+      // 12. Email-specific patterns.
+      if (isEmail(input)) {
+        // Generic email regex.
+        results.push({
+          regex: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
+          explanation: 'Matches a typical email address.'
+        });
+        // Domain-specific email regex.
+        let atIndex = input.indexOf('@');
+        let domain = input.slice(atIndex + 1);
+        let escapedDomain = escapeRegExp(domain);
+        results.push({
+          regex: '^[^@]+@' + escapedDomain + '$',
+          explanation: 'Matches emails with the domain: ' + domain + '.'
+        });
+      }
+
+      // 13. URL-specific pattern.
+      if (isUrl(input)) {
+        results.push({
+          regex: '^https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)$',
+          explanation: 'Matches a typical URL (http or https).'
+        });
+      }
+
+      // 14. Date-specific patterns.
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(input)) {
+        results.push({
+          regex: '^(\\d{4})-(\\d{1,2})-(\\d{1,2})$',
+          explanation: 'Matches a date in YYYY-MM-DD format.'
+        });
+      } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(input)) {
+        results.push({
+          regex: '^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$',
+          explanation: 'Matches a date in MM/DD/YYYY format.'
+        });
+      }
+
+      // 15. Time-specific pattern.
+      if (isTime(input)) {
+        results.push({
+          regex: '^([01]?\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$',
+          explanation: 'Matches time in 24-hour format (HH:MM or HH:MM:SS).'
+        });
+      }
+
+      // 16. Hex color code pattern.
+      if (isHexColor(input)) {
+        results.push({
+          regex: '^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$',
+          explanation: 'Matches a hex color code (e.g., #FFF or #1A2B3C).'
+        });
+      }
+
+      // 17. IP address pattern.
+      if (isIp(input)) {
+        results.push({
+          regex: '^((25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$',
+          explanation: 'Matches an IPv4 address.'
+        });
+      }
+
+      // 18. Phone number pattern.
+      if (isPhone(input)) {
+        results.push({
+          regex: '^\\+?[0-9\\s\\-()]{7,}$',
+          explanation: 'Matches various international phone number formats.'
+        });
+      }
+
+      // 19. ZIP code pattern.
+      if (isZip(input)) {
+        results.push({
+          regex: '^\\d{5}(-\\d{4})?$',
+          explanation: 'Matches US ZIP code formats (5 digits or 5 digits followed by a 4-digit extension).'
+        });
+      }
+
+      return results;
+    }
+
+    // Function to display the generated regex patterns and explanations.
+    function displayRegexPatterns(patterns) {
+      let outputDiv = document.getElementById('regexResults');
+      outputDiv.innerHTML = ''; // Clear previous results
+
+      if (patterns.length === 0) {
+        outputDiv.innerHTML = '<p>No regex patterns generated. Please try a different input.</p>';
+        return;
+      }
+
+      patterns.forEach(function(item) {
+        let itemDiv = document.createElement('div');
+        itemDiv.className = 'regex-item';
+
+        let regexElem = document.createElement('div');
+        regexElem.className = 'regex-string';
+        regexElem.textContent = item.regex;
+
+        let explanationElem = document.createElement('p');
+        explanationElem.textContent = item.explanation;
+
+        let copyButton = document.createElement('button');
+        copyButton.textContent = 'Copy Regex';
+        copyButton.addEventListener('click', function() {
+          copyToClipboard(item.regex);
+        });
+
+        itemDiv.appendChild(regexElem);
+        itemDiv.appendChild(explanationElem);
+        itemDiv.appendChild(copyButton);
+
+        outputDiv.appendChild(itemDiv);
+      });
+    }
+
+    // Update the dropdown in the Text Manipulation section with generated regex patterns,
+    // including a short description for each option.
+    function updateRegexSelect(patterns) {
+      let select = document.getElementById('regexSelect');
+      select.innerHTML = '';
+      patterns.forEach(function(item) {
+        let option = document.createElement('option');
+        // Concatenate the regex and a short description (explanation).
+        option.value = item.regex;
+        option.textContent = item.regex + " - " + item.explanation;
+        select.appendChild(option);
+      });
+    }
+
+    // Event listener for the "Generate Regex Patterns" button.
+    document.getElementById('generateBtn').addEventListener('click', function() {
+      let userInput = document.getElementById('userInput').value.trim();
+      if (userInput === '') {
+        alert('Please enter a sample string.');
+        return;
+      }
+      generatedPatterns = generateRegexPatterns(userInput);
+      displayRegexPatterns(generatedPatterns);
+      updateRegexSelect(generatedPatterns);
+    });
+
+    // Show or hide the replacement input based on selected operation.
+    let operationRadios = document.getElementsByName('operation');
+    operationRadios.forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        if (this.value === 'replace') {
+          document.getElementById('replacementDiv').style.display = 'block';
+        } else {
+          document.getElementById('replacementDiv').style.display = 'none';
+        }
+      });
+    });
+
+    // Event listener for the "Process Text" button.
+    document.getElementById('processTextBtn').addEventListener('click', function() {
+      let text = document.getElementById('manipulationInput').value;
+      let customRegex = document.getElementById('customRegexInput').value.trim();
+      let regexStr = customRegex ? customRegex : document.getElementById('regexSelect').value;
+      let flags = "";
+
+      // Check if the regex string includes a note about /i flag.
+      if (regexStr.endsWith(" (with /i flag)")) {
+        regexStr = regexStr.replace(" (with /i flag)", "");
+        flags += "i";
+      }
+
+      // For search, replace, or split, ensure global matching.
+      if (!flags.includes("g")) {
+        flags += "g";
+      }
+
+      let regex;
+      try {
+        regex = new RegExp(regexStr, flags);
+      } catch (e) {
+        document.getElementById('manipulationOutput').value = "Error in regex: " + e.message;
+        return;
+      }
+
+      let output;
+      let operation = document.querySelector('input[name="operation"]:checked').value;
+      if (operation === "search") {
+        let matches = text.match(regex);
+        output = matches ? matches.join("\n") : "No matches found.";
+      } else if (operation === "replace") {
+        let replacement = document.getElementById('replacementText').value;
+        output = text.replace(regex, replacement);
+      } else if (operation === "split") {
+        let parts = text.split(regex);
+        output = parts.join("\n");
+      }
+      document.getElementById('manipulationOutput').value = output;
+    });
+
+    // Event listener for the "Clear Manipulation Area" button.
+    document.getElementById('clearManipulationBtn').addEventListener('click', function() {
+      document.getElementById('manipulationInput').value = "";
+      document.getElementById('customRegexInput').value = "";
+      document.getElementById('replacementText').value = "";
+      document.getElementById('manipulationOutput').value = "";
+    });
+
+    // Event listener for the "Copy Output" button.
+    document.getElementById('copyOutputBtn').addEventListener('click', function() {
+      let outputText = document.getElementById('manipulationOutput').value;
+      navigator.clipboard.writeText(outputText).then(function() {
+        alert("Output copied to clipboard!");
+      }, function(err) {
+        alert("Error copying output: " + err);
+      });
+    });
+  </script>
+</body>
+</html>

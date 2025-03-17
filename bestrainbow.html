@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rainbow Image Tool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+    body {
+      background: #f0f2f5;
+      color: #333;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .c {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 15px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 15px;
+      background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);
+      color: #fff;
+      border-radius: 10px;
+      font-size: 1.25em;
+      font-weight: bold;
+    }
+    .bg {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 10px 15px;
+      background: #4c00ff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 0 5px;
+    }
+    .btn:hover { background: #3a00c5; }
+    .btn:active { transform: scale(.98); }
+    .tn {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    .tn button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+      background: #eee;
+      font-size: 0.9em;
+    }
+    .tn button.a {
+      background: #4c00ff;
+      color: #fff;
+    }
+    .mc { display: none; }
+    .mc.a { display: block; }
+    .cc {
+      text-align: center;
+      margin-bottom: 10px;
+      position: relative;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      max-width: 100%;
+      display: block;
+      margin: 0 auto;
+      touch-action: none;
+    }
+    .cs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 15px;
+      justify-content: center;
+    }
+    .ct {
+      flex: 1 1 120px;
+      text-align: center;
+    }
+    .ct label {
+      font-size: 12px;
+      margin-bottom: 3px;
+      display: block;
+    }
+    .ct input[type=range] {
+      width: 100%;
+    }
+    .ct .vd {
+      font-size: 11px;
+      color: #666;
+      text-align: right;
+    }
+    .ld {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .ld.s { visibility: visible; opacity: 1; }
+    .sp {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(76,0,255,0.3);
+      border-radius: 50%;
+      border-top-color: #4c00ff;
+      animation: spin 1s infinite linear;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ts {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 5px;
+      z-index: 1001;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 14px;
+    }
+    .ts.s { visibility: visible; opacity: 1; }
+    .ph {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #ddd;
+      color: #666;
+      min-height: 200px;
+      border-radius: 5px;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .ph svg { width: 48px; height: 48px; margin-bottom: 10px; fill: #999; }
+    .tp { position: relative; display: inline-block; margin-left: 5px; cursor: help; }
+    .tp .mi { font-size: 16px; color: #4c00ff; }
+    .tt {
+      visibility: hidden;
+      width: 200px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+    }
+    .tp:hover .tt { visibility: visible; opacity: 1; }
+    
+    /* Mobile optimized styles */
+    @media (max-width: 767px) {
+      .c {
+        padding: 5px;
+        max-width: 100%;
+      }
+      header {
+        font-size: 1em;
+        padding: 5px;
+      }
+      .bg {
+        margin-bottom: 5px;
+      }
+      .cs {
+        gap: 5px;
+        margin-bottom: 5px;
+      }
+      .ct {
+        flex: 1 1 80px;
+        font-size: 10px;
+      }
+      .ct label {
+        margin-bottom: 2px;
+      }
+      .ct input[type=range] {
+        width: 100%;
+      }
+    }
+  </style>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/iconfont/material-icons.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="c">
+    <header>
+      <h1>Rainbow Image Tool</h1>
+    </header>
+    <div class="bg">
+      <button id="ub" class="btn">
+        <i class="material-icons" style="font-size:16px;vertical-align:middle">cloud_upload</i> Upload Image
+      </button>
+      <input type="file" id="fi" accept="image/*" style="display:none">
+      <button id="rb" class="btn">
+        <i class="material-icons" style="font-size:16px;vertical-align:middle">refresh</i> Reset
+      </button>
+    </div>
+    <div class="tn">
+      <button data-mode="overlay" class="tb a">Rainbow Overlay</button>
+      <button data-mode="realistic" class="tb">Realistic Rainbow</button>
+    </div>
+    <div id="om" class="mc a">
+      <div class="cc">
+        <div id="op" class="ph">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M0 0h24v24H0z" fill="none"/>
+            <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z"/>
+          </svg>
+          <p>Upload an image to start</p>
+        </div>
+        <canvas id="oc" style="display:none"></canvas>
+      </div>
+      <div class="cs">
+        <div class="ct">
+          <label>Opacity <span class="vd" id="oov">50%</span></label>
+          <input type="range" id="oo" min="0" max="100" value="50">
+        </div>
+        <div class="ct">
+          <label>Hue Shift <span class="vd" id="ohv">0°</span></label>
+          <input type="range" id="oh" min="-180" max="180" value="0">
+        </div>
+        <div class="ct">
+          <label>Brightness <span class="vd" id="obv">100%</span></label>
+          <input type="range" id="ob" min="0" max="200" value="100">
+        </div>
+        <div class="ct">
+          <label>Saturation <span class="vd" id="osv">100%</span></label>
+          <input type="range" id="os" min="0" max="200" value="100">
+        </div>
+        <div class="ct">
+          <label>Overlay Rotation <span class="vd" id="orv">0°</span></label>
+          <input type="range" id="or" min="-180" max="180" value="0">
+        </div>
+      </div>
+    </div>
+    <div id="rm" class="mc">
+      <div class="cc">
+        <div id="rp" class="ph">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M0 0h24v24H0z" fill="none"/>
+            <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z"/>
+          </svg>
+          <p>Upload an image to start</p>
+        </div>
+        <canvas id="rc" style="display:none"></canvas>
+      </div>
+      <div class="cs">
+        <div class="ct">
+          <label>Size <span class="vd" id="rsv">60%</span></label>
+          <input type="range" id="rs" min="10" max="120" value="60">
+        </div>
+        <div class="ct">
+          <label>Arc Angle <span class="vd" id="rav">180°</span></label>
+          <input type="range" id="ra" min="90" max="180" value="180">
+        </div>
+        <div class="ct">
+          <label>Rotation <span class="vd" id="rrv">0°</span></label>
+          <input type="range" id="rr" min="-180" max="180" value="0">
+        </div>
+        <div class="ct">
+          <label>Opacity <span class="vd" id="rov">70%</span></label>
+          <input type="range" id="ro" min="0" max="100" value="70">
+        </div>
+        <div class="ct">
+          <label>Band Width <span class="vd" id="rbv">10%</span></label>
+          <input type="range" id="rbw" min="1" max="20" value="10">
+        </div>
+        <div class="ct">
+          <label>Blur <span class="vd" id="rblv">5px</span></label>
+          <input type="range" id="rbl" min="0" max="30" value="5">
+        </div>
+        <div class="ct">
+          <label style="margin-bottom:0">Drag Rainbow</label>
+          <small>(tap/drag on canvas)</small>
+        </div>
+      </div>
+    </div>
+    <div class="bg">
+      <button id="db" class="btn">
+        <i class="material-icons" style="font-size:16px;vertical-align:middle">download</i> Download
+      </button>
+    </div>
+  </div>
+  <div id="ld" class="ld"><div class="sp"></div></div>
+  <div class="ts" id="ts">Image saved to your device</div>
+  
+  <script>
+    let oI = null, dI = null, oC, oX, rC, rCtx, cM = 'overlay', rPosX = 50, rPosY = 50, dS = null;
+    const maxD = 800,
+          bR = ["#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#0000FF", "#4B0082", "#8F00FF"];
+    const $ = id => document.getElementById(id);
+    
+    function sL() { $('ld').classList.add('s'); }
+    function hL() { $('ld').classList.remove('s'); }
+    function sT(m) {
+      const t = $('ts');
+      t.textContent = m;
+      t.classList.add('s');
+      setTimeout(() => { t.classList.remove('s'); }, 3000);
+    }
+    
+    function sI(i) {
+      const mW = Math.min(maxD, window.innerWidth - 40);
+      if (i.width > mW) {
+        const s = mW / i.width;
+        const o = document.createElement('canvas');
+        o.width = mW;
+        o.height = i.height * s;
+        const ctx = o.getContext('2d');
+        ctx.drawImage(i, 0, 0, o.width, o.height);
+        return o;
+      }
+      return i;
+    }
+    
+    function sH(h, s) {
+      h = h.replace(/^#/, '');
+      if (h.length === 3) h = h.split('').map(x => x + x).join('');
+      let r = parseInt(h.substr(0, 2), 16),
+          g = parseInt(h.substr(2, 2), 16),
+          b = parseInt(h.substr(4, 2), 16);
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h1, s1, l = (max + min) / 2;
+      if (max === min) { h1 = s1 = 0; }
+      else {
+        const d = max - min;
+        s1 = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h1 = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h1 = (b - r) / d + 2; break;
+          case b: h1 = (r - g) / d + 4; break;
+        }
+        h1 /= 6;
+      }
+      h1 = (h1 * 360 + s) % 360;
+      if (h1 < 0) h1 += 360;
+      h1 /= 360;
+      let r1, g1, b1;
+      if (s1 === 0) { r1 = g1 = b1 = l; }
+      else {
+        const h2r = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s1) : l + s1 - l * s1;
+        const p = 2 * l - q;
+        r1 = h2r(p, q, h1 + 1 / 3);
+        g1 = h2r(p, q, h1);
+        b1 = h2r(p, q, h1 - 1 / 3);
+      }
+      const toH = x => {
+        let hV = Math.round(x * 255).toString(16);
+        return hV.length === 1 ? "0" + hV : hV;
+      };
+      return "#" + toH(r1) + toH(g1) + toH(b1);
+    }
+    
+    function iI(i) {
+      oI = i;
+      dI = sI(i);
+      
+      oC = $('oc');
+      oX = oC.getContext('2d');
+      oC.width = dI.width;
+      oC.height = dI.height;
+      
+      rC = $('rc');
+      rCtx = rC.getContext('2d');
+      rC.width = dI.width;
+      rC.height = dI.height;
+      
+      $('op').style.display = 'none';
+      $('rp').style.display = 'none';
+      oC.style.display = 'block';
+      rC.style.display = 'block';
+      
+      uO();
+      uR();
+    }
+    
+    function uO() {
+      if (!dI) return;
+      oX.clearRect(0, 0, oC.width, oC.height);
+      oX.drawImage(dI, 0, 0, oC.width, oC.height);
+      const hS = Number($('oh').value);
+      const op = Number($('oo').value) / 100;
+      const bri = $('ob').value;
+      const sat = $('os').value;
+      const or = Number($('or').value);
+      const angle = or * Math.PI / 180;
+      const cx = oC.width / 2, cy = oC.height / 2;
+      const diag = Math.sqrt(oC.width * oC.width + oC.height * oC.height) / 2;
+      const x0 = cx - Math.cos(angle) * diag;
+      const y0 = cy - Math.sin(angle) * diag;
+      const x1 = cx + Math.cos(angle) * diag;
+      const y1 = cy + Math.sin(angle) * diag;
+      const g = oX.createLinearGradient(x0, y0, x1, y1);
+      const clrs = bR.map(c => sH(c, hS));
+      clrs.forEach((c, i) => { g.addColorStop(i / (clrs.length - 1), c); });
+      oX.save();
+      oX.filter = `brightness(${bri}%) saturate(${sat}%)`;
+      oX.globalAlpha = op;
+      oX.fillStyle = g;
+      oX.fillRect(0, 0, oC.width, oC.height);
+      oX.restore();
+      oX.globalAlpha = 1;
+      
+      $('oov').textContent = Math.round(op * 100) + '%';
+      $('ohv').textContent = hS + '°';
+      $('obv').textContent = bri + '%';
+      $('osv').textContent = sat + '%';
+      $('orv').textContent = or + '°';
+    }
+    
+    function uR() {
+      if (!dI) return;
+      rCtx.clearRect(0, 0, rC.width, rC.height);
+      rCtx.drawImage(dI, 0, 0, rC.width, rC.height);
+      
+      const size = Number($('rs').value);
+      const arcD = Number($('ra').value);
+      const rotD = Number($('rr').value);
+      const op = Number($('ro').value) / 100;
+      const bandP = Number($('rbw').value);
+      const blur = Number($('rbl').value);
+      
+      $('rsv').textContent = size + '%';
+      $('rav').textContent = arcD + '°';
+      $('rrv').textContent = rotD + '°';
+      $('rov').textContent = Math.round(op * 100) + '%';
+      $('rbv').textContent = bandP + '%';
+      $('rblv').textContent = blur + 'px';
+      
+      const cx = rC.width * (rPosX / 100);
+      const cy = rC.height * (rPosY / 100);
+      const rad = Math.min(rC.width, rC.height) * (size / 100);
+      const totT = rad * (bandP / 100);
+      const bands = 7;
+      const bandT = totT / bands;
+      const baseA = (90 + rotD) * Math.PI / 180;
+      const sweep = arcD * Math.PI / 180;
+      const startA = baseA - sweep / 2;
+      const endA = baseA + sweep / 2;
+      
+      rCtx.save();
+      rCtx.globalAlpha = op;
+      
+      for (let i = 0; i < bands; i++) {
+        const rO = rad - i * bandT;
+        const rI = rO - bandT;
+        
+        rCtx.save();
+        if (blur > 0) {
+          rCtx.shadowBlur = blur;
+          rCtx.shadowColor = bR[i];
+        }
+        
+        rCtx.fillStyle = bR[i];
+        rCtx.beginPath();
+        rCtx.arc(cx, cy, rO, startA, endA, false);
+        rCtx.arc(cx, cy, rI, endA, startA, true);
+        rCtx.closePath();
+        rCtx.fill();
+        rCtx.restore();
+      }
+      
+      rCtx.restore();
+    }
+    
+    function dC() {
+      if (!oI) {
+        sT("Please upload an image first");
+        return;
+      }
+      
+      sL();
+      const o = document.createElement('canvas');
+      o.width = oI.width;
+      o.height = oI.height;
+      const oX = o.getContext('2d');
+      oX.drawImage(oI, 0, 0, o.width, o.height);
+      
+      if (cM === 'overlay') {
+        const op = $('oo').value / 100;
+        const hS = Number($('oh').value);
+        const bri = $('ob').value;
+        const sat = $('os').value;
+        const or = Number($('or').value);
+        const angle = or * Math.PI / 180;
+        const cx = o.width / 2, cy = o.height / 2;
+        const diag = Math.sqrt(o.width * o.width + o.height * o.height) / 2;
+        const x0 = cx - Math.cos(angle) * diag;
+        const y0 = cy - Math.sin(angle) * diag;
+        const x1 = cx + Math.cos(angle) * diag;
+        const y1 = cy + Math.sin(angle) * diag;
+        const g = oX.createLinearGradient(x0, y0, x1, y1);
+        const clrs = bR.map(c => sH(c, hS));
+        clrs.forEach((c, i) => { g.addColorStop(i / (clrs.length - 1), c); });
+        
+        oX.save();
+        oX.filter = `brightness(${bri}%) saturate(${sat}%)`;
+        oX.globalAlpha = op;
+        oX.fillStyle = g;
+        oX.fillRect(0, 0, o.width, o.height);
+        oX.restore();
+      } else if (cM === 'realistic') {
+        const posX = rPosX;
+        const posY = rPosY;
+        const size = Number($('rs').value);
+        const arcD = Number($('ra').value);
+        const rotD = Number($('rr').value);
+        const op = Number($('ro').value) / 100;
+        const bandP = Number($('rbw').value);
+        const blur = Number($('rbl').value);
+        
+        const cx = o.width * (posX / 100);
+        const cy = o.height * (posY / 100);
+        const rad = Math.min(o.width, o.height) * (size / 100);
+        const totT = rad * (bandP / 100);
+        const bands = 7;
+        const bandT = totT / bands;
+        const baseA = (90 + rotD) * Math.PI / 180;
+        const sweep = arcD * Math.PI / 180;
+        const startA = baseA - sweep / 2;
+        const endA = baseA + sweep / 2;
+        
+        oX.save();
+        oX.globalAlpha = op;
+        
+        for (let i = 0; i < bands; i++) {
+          const rO = rad - i * bandT;
+          const rI = rO - bandT;
+          
+          oX.save();
+          if (blur > 0) {
+            oX.shadowBlur = blur;
+            oX.shadowColor = bR[i];
+          }
+          
+          oX.fillStyle = bR[i];
+          oX.beginPath();
+          oX.arc(cx, cy, rO, startA, endA, false);
+          oX.arc(cx, cy, rI, endA, startA, true);
+          oX.closePath();
+          oX.fill();
+          oX.restore();
+        }
+        
+        oX.restore();
+      }
+      
+      try {
+        const u = o.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = 'rainbow-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        sT("Image saved to your device");
+      } catch (e) {
+        console.error("Error saving image:", e);
+        sT("Error saving image. Try a different browser or image.");
+      }
+      
+      hL();
+    }
+    
+    function uIH(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      
+      // Check if file is an image
+      if (!f.type.match('image.*')) {
+        sT("Please upload an image file (JPEG, PNG, etc.)");
+        return;
+      }
+      
+      sL();
+      const fr = new FileReader();
+      
+      fr.onload = function(evt) {
+        const img = new Image();
+        
+        img.onload = function() {
+          iI(img);
+          hL();
+        };
+        
+        img.onerror = function() {
+          hL();
+          sT("Error loading image. Please try another.");
+        };
+        
+        img.src = evt.target.result;
+      };
+      
+      fr.onerror = function() {
+        hL();
+        sT("Error reading file. Please try again.");
+      };
+      
+      fr.readAsDataURL(f);
+    }
+    
+    function hR() {
+      if (oI) {
+        dI = sI(oI);
+        oC.width = dI.width;
+        oC.height = dI.height;
+        rC.width = dI.width;
+        rC.height = dI.height;
+        
+        if (cM === 'overlay') { uO(); }
+        else { uR(); }
+      }
+    }
+    
+    function init() {
+      // Initialize canvases
+      oC = $('oc');
+      oX = oC.getContext('2d');
+      rC = $('rc');
+      rCtx = rC.getContext('2d');
+      
+      console.log('Rainbow Image Tool initialized');
+      
+      // Button events
+      $('ub').addEventListener('click', () => {
+        $('fi').click();
+      });
+      
+      $('fi').addEventListener('change', uIH);
+      $('rb').addEventListener('click', () => location.reload());
+      $('db').addEventListener('click', dC);
+      
+      // Tab navigation
+      document.querySelectorAll('.tb').forEach(b => {
+        b.addEventListener('click', function() {
+          cM = this.dataset.mode;
+          document.querySelectorAll('.tb').forEach(b => b.classList.remove('a'));
+          this.classList.add('a');
+          $('om').classList.toggle('a', cM === 'overlay');
+          $('rm').classList.toggle('a', cM === 'realistic');
+        });
+      });
+      
+      // Overlay controls
+      $('oo').addEventListener('input', uO);
+      $('oh').addEventListener('input', uO);
+      $('ob').addEventListener('input', uO);
+      $('os').addEventListener('input', uO);
+      $('or').addEventListener('input', uO);
+      
+      // Realistic controls
+      $('rs').addEventListener('input', uR);
+      $('ra').addEventListener('input', uR);
+      $('rr').addEventListener('input', uR);
+      $('ro').addEventListener('input', uR);
+      $('rbw').addEventListener('input', uR);
+      $('rbl').addEventListener('input', uR);
+      
+      // Resize handling
+      window.addEventListener('resize', hR);
+      
+      // Touch/drag events for realistic rainbow
+      rC.addEventListener('pointerdown', function(e) {
+        if (!dI) return;
+        e.preventDefault();
+        const r = rC.getBoundingClientRect();
+        rPosX = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width * 100)));
+        rPosY = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height * 100)));
+        dS = { x: e.clientX, y: e.clientY, pX: rPosX, pY: rPosY };
+        uR();
+      });
+      
+      rC.addEventListener('pointermove', function(e) {
+        if (!dS) return;
+        e.preventDefault();
+        const dx = e.clientX - dS.x;
+        const dy = e.clientY - dS.y;
+        
+        rPosX = dS.pX + (dx / rC.width) * 100;
+        rPosY = dS.pY + (dy / rC.height) * 100;
+        
+        rPosX = Math.max(0, Math.min(100, rPosX));
+        rPosY = Math.max(0, Math.min(100, rPosY));
+        
+        uR();
+      });
+      
+      // Handle pointerup and pointercancel for better mobile experience
+      const endDrag = () => { dS = null; };
+      rC.addEventListener('pointerup', endDrag);
+      rC.addEventListener('pointercancel', endDrag);
+      rC.addEventListener('pointerleave', endDrag);
+      
+      // Add debugging info
+      window.addEventListener('error', function(e) {
+        console.error('Error caught:', e.message);
+        sT("Error: " + e.message);
+      });
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
