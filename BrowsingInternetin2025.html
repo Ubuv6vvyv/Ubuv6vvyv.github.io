@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>The Daily Update</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+      .article,
+      .header { background-color: #fff; }
+      .header,
+      .modal { left: 0; top: 0; width: 100%; }
+      .article h1,
+      .article p,
+      .paywall h3 { margin-bottom: 20px; }
+      .social-share a,
+      body { background-color: #f4f4f4; }
+      .btn,
+      .logo { font-weight: 700; }
+      :root {
+        --primary: #0066cc;
+        --dark: #222;
+        --light: #f8f9fa;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+      body { padding-top: 60px; overflow-x: hidden; position: relative; }
+      .header {
+        position: fixed;
+        padding: 10px 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, .1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 100;
+      }
+      .logo { font-size: 24px; color: var(--primary); }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+        position: relative;
+      }
+      .article {
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+        padding: 30px;
+        margin-top: 20px;
+        position: relative;
+        line-height: 1.6;
+      }
+      .modal-content,
+      .newsletter-popup { box-shadow: 0 5px 15px rgba(0, 0, 0, .2); }
+      .article h1 { font-size: 2.2rem; color: var(--dark); }
+      .article p { color: #444; font-size: 1.1rem; }
+      .blurred { filter: blur(5px); user-select: none; }
+      .modal {
+        position: fixed;
+        display: none;
+        z-index: 1000;
+        height: 100%;
+        background-color: rgba(0, 0, 0, .5);
+        opacity: 0;
+        transition: opacity .3s;
+      }
+      .modal-content {
+        position: relative;
+        background-color: #fff;
+        margin: 10vh auto;
+        padding: 20px;
+        border-radius: 5px;
+        max-width: 500px;
+        transform: translateY(-50px);
+        transition: transform .3s;
+      }
+      .btn,
+      .social-share a { transition: background-color .3s; }
+      .modal.active { display: block; opacity: 1; }
+      .cookie-banner.active,
+      .modal.active .modal-content { transform: translateY(0); }
+      .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        cursor: pointer;
+        font-size: 22px;
+        color: #aaa;
+      }
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .btn-primary { background-color: var(--primary); color: #fff; }
+      .btn-outline { background-color: transparent; border: 1px solid #ddd; color: #666; }
+      .btn-sm { padding: 6px 12px; font-size: .85rem; }
+      .newsletter-popup {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        z-index: 101;
+        display: none;
+      }
+      .cookie-banner,
+      .paywall { width: 100%; display: flex; left: 0; }
+      .cookie-banner {
+        position: fixed;
+        bottom: 0;
+        background-color: var(--dark);
+        color: #fff;
+        padding: 15px;
+        z-index: 102;
+        justify-content: space-between;
+        align-items: center;
+        transform: translateY(100%);
+        transition: transform .5s;
+      }
+      .paywall {
+        position: absolute;
+        top: 250px;
+        height: calc(100% - 250px);
+        background-image: linear-gradient(transparent, #fff);
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 30px;
+        text-align: center;
+      }
+      .notification,
+      .popup-ad { background-color: #fff; padding: 15px; position: fixed; }
+      .paywall h3 { font-size: 1.5rem; }
+      .popup-ad {
+        z-index: 999;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, .2);
+        border-radius: 5px;
+        max-width: 350px;
+        display: none;
+      }
+      .notification,
+      .social-share {
+        border-radius: 5px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, .1);
+      }
+      .ad-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .notification {
+        top: 70px;
+        right: 20px;
+        z-index: 101;
+        width: 300px;
+        transform: translateX(400px);
+        transition: transform .3s;
+        display: flex;
+        align-items: center;
+      }
+      .notification.active { transform: translateX(0); }
+      .notification i { margin-right: 10px; font-size: 1.5rem; color: var(--primary); }
+      .breaking-news {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        width: 100%;
+        background-color: red;
+        color: #fff;
+        padding: 10px;
+        z-index: 98;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .social-share,
+      .video-ad {
+        position: fixed;
+        left: 20px;
+      }
+      .scrolling-text {
+        display: inline-block;
+        animation: 20s linear infinite scroll;
+      }
+      @keyframes scroll {
+        0% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
+      }
+      .social-share {
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #fff;
+        padding: 10px;
+        z-index: 97;
+        display: flex;
+        flex-direction: column;
+      }
+      .social-share a {
+        margin: 5px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: var(--dark);
+        text-decoration: none;
+      }
+      .social-share a:hover { background-color: #e0e0e0; }
+      .video-ad {
+        bottom: 20px;
+        width: 300px;
+        height: 180px;
+        background-color: #000;
+        z-index: 98;
+        display: none;
+      }
+      .video-ad-close {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        width: 25px;
+        height: 25px;
+        background-color: #fff;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        z-index: 99;
+      }
+      .progress-container {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background-color: #f0f0f0;
+        z-index: 99;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background-color: var(--primary);
+        transition: width .1s;
+      }
+      .related-articles {
+        position: fixed;
+        right: -350px;
+        top: 120px;
+        width: 300px;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: -3px 0 10px rgba(0, 0, 0, .1);
+        padding: 20px;
+        transition: right .3s;
+        z-index: 97;
+      }
+      .related-articles.active { right: 0; }
+      .auto-play-video {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 300px;
+        height: 180px;
+        background-color: #000;
+        z-index: 96;
+        display: none;
+      }
+      .auto-play-video-header {
+        background-color: rgba(0, 0, 0, .7);
+        color: #fff;
+        padding: 5px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .login-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, .5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        display: none;
+      }
+      .login-form {
+        background-color: #fff;
+        padding: 30px;
+        border-radius: 5px;
+        max-width: 400px;
+        width: 100%;
+      }
+      .form-group { margin-bottom: 15px; }
+      .form-group label { display: block; margin-bottom: 5px; font-weight: 700; }
+      .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      @media (max-width:768px) {
+        .container { padding: 0 10px; }
+        .article { padding: 20px; }
+        .article h1 { font-size: 1.8rem; }
+        .modal-content { width: 90%; margin: 10vh auto; }
+        .social-share { display: none; }
+        .auto-play-video, .newsletter-popup, .popup-ad { width: 90%; left: 5%; right: 5%; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">The Daily Update</div>
+      <button class="btn btn-outline btn-sm" id="loginBtn">Sign In</button>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Breaking News -->
+    <div class="breaking-news">
+      <div class="scrolling-text">BREAKING NEWS: Study finds reading news articles without interruptions improves cognitive function by 85%. Experts recommend ad-free reading experiences. Click here to learn more!</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+      <div class="article" id="article">
+        <h1>Scientists Discover Revolutionary Solution to Global Challenges</h1>
+        <p>*BREAKING: Scientists Achieve Quantum Teleportation of Macroscopic Objects, Defying Laws of Physics*</p>
+
+<p>In a groundbreaking achievement that challenges our fundamental understanding of reality, a team of researchers from the European Organization for Nuclear Research (CERN) has successfully teleported a macroscopic object from one location to another using quantum entanglement.</p>
+
+<p>The experiment, which was conducted at CERN's Large Hadron Collider, involved teleporting a small, spherical object measuring 1 meter in diameter from one end of the collider to the other. The object, which was made of a specially designed, super-dense material, was placed in a quantum state of superposition, allowing it to exist in multiple locations simultaneously.</p>
+
+<p>Using a complex system of quantum entanglement and precise measurements, the researchers were able to "teleport" the object from one location to another, effectively "beaming" it across a distance of several kilometers. The entire process took place in a matter of seconds, with the object reappearing at its destination with complete fidelity.</p>
+
+<p>This achievement is nothing short of astonishing, as it appears to defy the fundamental laws of physics, including the laws of conservation of mass and energy. The implications of this discovery are profound, and could potentially revolutionize our understanding of space, time, and matter.</p>
+
+<p>"This is a game-changer," said Dr. Maria Rodriguez, lead researcher on the project. "We're talking about the ability to transport objects across vast distances without crossing the space in between. It's like something out of science fiction."</p>
+
+<p>While the scientific community is abuzz with excitement over this breakthrough, many experts are cautioning that the technology is still in its infancy, and that much work remains to be done to fully understand and harness its potential.</p>
+
+<p>As researchers continue to explore the possibilities of quantum teleportation, one thing is clear: the boundaries of what we thought was possible have just been pushed to unprecedented limits.</p>
+
+        <div class="paywall">
+          <h3>You've reached your limit of free articles this month</h3>
+          <p>Subscribe now to continue reading this premium content and gain unlimited access to all our award-winning journalism.</p>
+          <button class="btn btn-primary">Subscribe for just $1/week</button>
+          <p class="mt-3">Already a subscriber? <a href="#" id="loginTrigger">Sign in here</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cookie Banner -->
+    <div class="cookie-banner" id="cookieBanner">
+      <div>
+        <p>We value your privacy</p>
+        <p>This site uses cookies to personalize content, provide social media features, analyze our traffic, and track every movement your cursor makes. By clicking "Accept All", you consent to our use of cookies and your data.</p>
+      </div>
+      <div>
+        <button class="btn btn-outline btn-sm" id="cookieOptions">Cookie Options</button>
+        <button class="btn btn-primary btn-sm" id="acceptAllCookies">Accept All</button>
+      </div>
+    </div>
+
+    <!-- Newsletter Popup -->
+    <div class="newsletter-popup" id="newsletterPopup">
+      <div class="ad-header">
+        <h3>Stay Updated!</h3>
+        <span class="close-btn" id="closeNewsletter">×</span>
+      </div>
+      <p>Sign up for our newsletter and never miss a story.</p>
+      <div class="form-group">
+        <input type="email" placeholder="Enter your email">
+      </div>
+      <button class="btn btn-primary">Subscribe</button>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+      <i class="fas fa-bell"></i>
+      <div>
+        <p><strong>New Article Available!</strong></p>
+        <p>"10 Things You Didn't Know About Your Health" - Read Now</p>
+      </div>
+    </div>
+
+    <!-- Popup Ad -->
+    <div class="popup-ad" id="popupAd" style="top:50%; left:50%; transform:translate(-50%,-50%);">
+      <div class="ad-header">
+        <h3>Special Offer!</h3>
+        <span class="close-btn" id="closePopupAd">×</span>
+      </div>
+      <p>Limited time offer: Get 50% off on premium subscriptions!</p>
+      <button class="btn btn-primary">Claim Now</button>
+    </div>
+
+    <!-- Social Share -->
+    <div class="social-share">
+      <a href="#"><i class="fab fa-facebook-f"></i></a>
+      <a href="#"><i class="fab fa-twitter"></i></a>
+      <a href="#"><i class="fab fa-linkedin-in"></i></a>
+      <a href="#"><i class="fab fa-pinterest"></i></a>
+      <a href="#"><i class="fas fa-envelope"></i></a>
+    </div>
+
+    <!-- Video Ad -->
+    <div class="video-ad" id="videoAd">
+      <div class="video-ad-close" id="closeVideoAd">×</div>
+      <div style="width:100%; height:100%; background-color:#000; display:flex; justify-content:center; align-items:center; color:#fff;">
+        <p>Auto-playing video ad</p>
+      </div>
+    </div>
+
+    <!-- Auto Play Video -->
+    <div class="auto-play-video" id="autoPlayVideo">
+      <div class="auto-play-video-header">
+        <span>Recommended For You</span>
+        <span class="close-btn" id="closeAutoPlayVideo">×</span>
+      </div>
+      <div style="width:100%; height:calc(100% - 30px); background-color:#000; display:flex; justify-content:center; align-items:center; color:#fff;">
+        <p>Auto-playing video content</p>
+      </div>
+    </div>
+
+    <!-- Related Articles -->
+    <div class="related-articles" id="relatedArticles">
+      <h3>You May Also Like</h3>
+      <div style="margin-top:15px">
+        <p><a href="#">5 Innovative Technologies Changing Our World</a></p>
+        <p><a href="#">Climate Scientists Reveal New Findings</a></p>
+        <p><a href="#">The Future of Sustainable Cities</a></p>
+        <p><a href="#">How AI is Transforming Healthcare</a></p>
+      </div>
+    </div>
+
+    <!-- Cookie Options Modal -->
+    <div class="modal" id="cookieOptionsModal">
+      <div class="modal-content">
+        <span class="close-btn" id="closeCookieOptions">×</span>
+        <h2>Cookie Preferences</h2>
+        <p>Customize your cookie preferences below. Note that disabling certain cookies may affect the functionality of our website.</p>
+        <div style="margin:20px 0">
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+            <div>
+              <h4>Essential Cookies</h4>
+              <p>Required for basic functionality</p>
+            </div>
+            <input type="checkbox" checked disabled>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+            <div>
+              <h4>Performance Cookies</h4>
+              <p>Help us improve by tracking anonymous usage</p>
+            </div>
+            <input type="checkbox" checked>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+            <div>
+              <h4>Functional Cookies</h4>
+              <p>Enable advanced features and personalization</p>
+            </div>
+            <input type="checkbox" checked>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+            <div>
+              <h4>Targeting Cookies</h4>
+              <p>Allow us and third parties to track your browsing habits</p>
+            </div>
+            <input type="checkbox" checked>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+            <div>
+              <h4>Social Media Cookies</h4>
+              <p>Enable features from social media platforms</p>
+            </div>
+            <input type="checkbox" checked>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between">
+          <button class="btn btn-outline" id="rejectAllCookies">Reject All</button>
+          <button class="btn btn-primary" id="saveCookiePreferences">Save Preferences</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Age Verification Modal -->
+    <div class="modal" id="ageVerificationModal">
+      <div class="modal-content">
+        <h2>Age Verification</h2>
+        <p>This website contains content suitable for mature audiences. Please confirm that you are at least 18 years old to continue.</p>
+        <div style="display:flex; justify-content:space-between; margin-top:20px">
+          <button class="btn btn-outline" id="rejectAge">Exit</button>
+          <button class="btn btn-primary" id="confirmAge">I am 18 or older</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subscription Modal -->
+    <div class="modal" id="subscriptionModal">
+      <div class="modal-content">
+        <span class="close-btn" id="closeSubscriptionModal">×</span>
+        <h2>📰 Exclusive Offer!</h2>
+        <p>Subscribe today and save 50% on your first year of premium access.</p>
+        <ul style="margin:20px 0; list-style-position:inside">
+          <li>Unlimited access to all articles</li>
+          <li>Ad-free reading experience</li>
+          <li>Exclusive subscriber-only content</li>
+          <li>Monthly digital magazine</li>
+          <li>Access to our complete archive</li>
+        </ul>
+        <p style="font-weight:700; margin-bottom:20px">Only $4.99/month after 7-day free trial</p>
+        <button class="btn btn-primary" style="width:100%">Start Free Trial</button>
+        <p style="text-align:center; margin-top:15px; font-size:.85rem">Already a subscriber? <a href="#">Sign in</a></p>
+      </div>
+    </div>
+
+    <!-- GDPR Modal -->
+    <div class="modal" id="gdprModal">
+      <div class="modal-content">
+        <h2>We Care About Your Privacy</h2>
+        <p>To provide the best experiences, we use technologies like cookies to store and/or access device information. Consenting to these technologies will allow us to process data such as browsing behavior or unique IDs on this site. Not consenting or withdrawing consent, may adversely affect certain features and functions.</p>
+        <h3 style="margin-top:15px">We Process Data For:</h3>
+        <ul style="margin:10px 0; list-style-position:inside">
+          <li>Store and/or access information on a device</li>
+          <li>Use limited data to select advertising</li>
+          <li>Create profiles for personalized advertising</li>
+          <li>Use profiles to select personalized advertising</li>
+          <li>Measure advertising performance</li>
+          <li>Measure content performance</li>
+          <li>Apply market research to generate audience insights</li>
+          <li>Develop and improve products</li>
+        </ul>
+        <div style="display:flex; justify-content:space-between; margin-top:20px">
+          <button class="btn btn-outline" id="rejectGdpr">Reject All</button>
+          <button class="btn btn-primary" id="acceptGdpr">Accept All</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="login-modal" id="loginModal">
+      <div class="login-form">
+        <h2 style="margin-bottom:20px; text-align:center">Sign In</h2>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" placeholder="Enter your email" id="email">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" placeholder="Enter your password" id="password">
+        </div>
+        <button class="btn btn-primary" style="width:100%">Sign In</button>
+        <p style="text-align:center; margin-top:15px">Don't have an account? <a href="#">Register now</a></p>
+        <div style="display:flex; justify-content:space-between; margin-top:20px">
+          <button class="btn btn-outline" id="closeLogin">Close</button>
+          <button class="btn btn-outline" id="forgotPassword">Forgot Password?</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal" id="notificationsModal">
+      <div class="modal-content">
+        <h2>Stay Updated!</h2>
+        <p>Would you like to receive notifications for breaking news and important updates?</p>
+        <div style="display:flex; justify-content:space-between; margin-top:20px">
+          <button class="btn btn-outline" id="rejectNotifications">Not Now</button>
+          <button class="btn btn-primary" id="acceptNotifications">Allow Notifications</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Wait until the DOM is fully loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        // Element references
+        const cookieBanner = document.getElementById('cookieBanner');
+        const newsletterPopup = document.getElementById('newsletterPopup');
+        const notification = document.getElementById('notification');
+        const popupAd = document.getElementById('popupAd');
+        const videoAd = document.getElementById('videoAd');
+        const autoPlayVideo = document.getElementById('autoPlayVideo');
+        const relatedArticles = document.getElementById('relatedArticles');
+        const progressBar = document.getElementById('progressBar');
+        const article = document.getElementById('article');
+        
+        const cookieOptionsModal = document.getElementById('cookieOptionsModal');
+        const ageVerificationModal = document.getElementById('ageVerificationModal');
+        const subscriptionModal = document.getElementById('subscriptionModal');
+        const gdprModal = document.getElementById('gdprModal');
+        const loginModal = document.getElementById('loginModal');
+        const notificationsModal = document.getElementById('notificationsModal');
+        
+        // Close buttons
+        const closeNewsletter = document.getElementById('closeNewsletter');
+        const closePopupAd = document.getElementById('closePopupAd');
+        const closeVideoAd = document.getElementById('closeVideoAd');
+        const closeAutoPlayVideo = document.getElementById('closeAutoPlayVideo');
+        const closeCookieOptions = document.getElementById('closeCookieOptions');
+        const closeSubscriptionModal = document.getElementById('closeSubscriptionModal');
+        const closeLogin = document.getElementById('closeLogin');
+        
+        // Other buttons
+        const cookieOptions = document.getElementById('cookieOptions');
+        const acceptAllCookies = document.getElementById('acceptAllCookies');
+        const rejectAllCookies = document.getElementById('rejectAllCookies');
+        const saveCookiePreferences = document.getElementById('saveCookiePreferences');
+        const confirmAge = document.getElementById('confirmAge');
+        const rejectAge = document.getElementById('rejectAge');
+        
+        const acceptGdpr = document.getElementById('acceptGdpr');
+        const rejectGdpr = document.getElementById('rejectGdpr');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginTrigger = document.getElementById('loginTrigger');
+        const acceptNotifications = document.getElementById('acceptNotifications');
+        const rejectNotifications = document.getElementById('rejectNotifications');
+        
+        // Utility functions for modals
+        function openModal(modal) {
+          modal.classList.add('active');
+          modal.style.display = 'flex';
+        }
+        function closeModal(modal) {
+          modal.classList.remove('active');
+          modal.style.display = 'none';
+        }
+        
+        // Track scroll for progress bar and related articles
+        function trackScroll() {
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const scrollPercent = (scrollTop / docHeight) * 100;
+          progressBar.style.width = scrollPercent + '%';
+          
+          if (scrollPercent > 30 && !relatedArticles.classList.contains('active')) {
+            relatedArticles.classList.add('active');
+          }
+        }
+        
+        // Show timed elements (popups, modals, notifications)
+        function showTimedElements() {
+          // Cookie banner appears immediately
+          setTimeout(() => {
+            cookieBanner.classList.add('active');
+          }, 500);
+          
+          // Newsletter popup after 20 seconds
+          setTimeout(() => {
+            newsletterPopup.style.display = 'block';
+          }, 3000);
+          
+          // Notification after 10 seconds (auto-hide after 7 seconds)
+          setTimeout(() => {
+            notification.classList.add('active');
+            setTimeout(() => {
+              notification.classList.remove('active');
+            }, 7000);
+          }, 10000);
+          
+          // Popup ad after 15 seconds
+          setTimeout(() => {
+            popupAd.style.display = 'block';
+          }, 3000);
+          
+          // Video ad after 30 seconds
+          setTimeout(() => {
+            videoAd.style.display = 'block';
+          }, 3000);
+          
+          // Auto-play video after 45 seconds
+          setTimeout(() => {
+            autoPlayVideo.style.display = 'block';
+          }, 4500);
+          
+          // GDPR modal after 5 seconds
+          setTimeout(() => {
+            openModal(gdprModal);
+          }, 5000);
+          
+          // Subscription modal after 25 seconds
+          setTimeout(() => {
+            openModal(subscriptionModal);
+          }, 2500);
+          
+          // Notifications modal after 35 seconds
+          setTimeout(() => {
+            openModal(notificationsModal);
+          }, 3500);
+        }
+        
+        // Close button event listeners
+        closeNewsletter.addEventListener('click', () => {
+          newsletterPopup.style.display = 'none';
+        });
+        closePopupAd.addEventListener('click', () => {
+          popupAd.style.display = 'none';
+        });
+        closeVideoAd.addEventListener('click', () => {
+          videoAd.style.display = 'none';
+        });
+        closeAutoPlayVideo.addEventListener('click', () => {
+          autoPlayVideo.style.display = 'none';
+        });
+        closeCookieOptions.addEventListener('click', () => {
+          closeModal(cookieOptionsModal);
+        });
+        closeSubscriptionModal.addEventListener('click', () => {
+          closeModal(subscriptionModal);
+        });
+        closeLogin.addEventListener('click', () => {
+          loginModal.style.display = 'none';
+        });
+        
+        // Cookie banner functionality
+        cookieOptions.addEventListener('click', () => {
+          openModal(cookieOptionsModal);
+        });
+        acceptAllCookies.addEventListener('click', () => {
+          cookieBanner.classList.remove('active');
+        });
+        rejectAllCookies.addEventListener('click', () => {
+          closeModal(cookieOptionsModal);
+          setTimeout(() => {
+            openModal(ageVerificationModal);
+          }, 1000);
+        });
+        saveCookiePreferences.addEventListener('click', () => {
+          closeModal(cookieOptionsModal);
+          cookieBanner.classList.remove('active');
+        });
+        
+        // Age verification modal functionality
+        confirmAge.addEventListener('click', () => {
+          closeModal(ageVerificationModal);
+        });
+        rejectAge.addEventListener('click', () => {
+          closeModal(ageVerificationModal);
+          setTimeout(() => {
+            openModal(gdprModal);
+          }, 1000);
+        });
+        
+        // GDPR modal functionality
+        acceptGdpr.addEventListener('click', () => {
+          closeModal(gdprModal);
+        });
+        rejectGdpr.addEventListener('click', () => {
+          closeModal(gdprModal);
+        });
+        
+        // Login modal functionality
+        loginBtn.addEventListener('click', () => {
+          loginModal.style.display = 'flex';
+        });
+        loginTrigger.addEventListener('click', (e) => {
+          e.preventDefault();
+          loginModal.style.display = 'flex';
+        });
+        
+        // Notifications modal functionality
+        acceptNotifications.addEventListener('click', () => {
+          closeModal(notificationsModal);
+          setTimeout(() => {
+            alert("The site wants to send you notifications. Allow?");
+          }, 500);
+        });
+        rejectNotifications.addEventListener('click', () => {
+          closeModal(notificationsModal);
+          setTimeout(() => {
+            openModal(notificationsModal);
+          }, 60000);
+        });
+        
+        // Blur effect on article and show subscription modal
+        window.addEventListener('scroll', () => {
+          if (window.scrollY > 150) {
+            article.classList.add('blurred');
+            setTimeout(() => {
+              openModal(subscriptionModal);
+            }, 1000);
+          }
+        });
+        
+        // Prevent leaving the page
+        window.addEventListener('beforeunload', (e) => {
+          e.preventDefault();
+          e.returnValue = 'Are you sure you want to leave? You have unread articles waiting for you!';
+          return 'Are you sure you want to leave? You have unread articles waiting for you!';
+        });
+        
+        // Exit-intent: open subscription modal when mouse moves to top
+        document.addEventListener('mousemove', (e) => {
+          if (e.clientY < 20) {
+            openModal(subscriptionModal);
+          }
+        });
+        
+        // Add "read more" links to article paragraphs
+        document.querySelectorAll('.article p').forEach((p, index, arr) => {
+          if (index < arr.length - 1) {
+            const readMore = document.createElement('a');
+            readMore.href = '#';
+            readMore.textContent = ' [Read more...]';
+            readMore.style.color = 'blue';
+            readMore.style.textDecoration = 'underline';
+            readMore.addEventListener('click', (e) => {
+              e.preventDefault();
+              openModal(subscriptionModal);
+            });
+            p.appendChild(readMore);
+          }
+        });
+        
+        // Auto scroll to top randomly every 2 minutes
+        setInterval(() => {
+          if (Math.random() < 0.1) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 8000);
+        
+        // Fake loading indicator every 3 minutes
+        function showFakeLoading() {
+          const loader = document.createElement('div');
+          loader.style.position = 'fixed';
+          loader.style.top = '50%';
+          loader.style.left = '50%';
+          loader.style.transform = 'translate(-50%, -50%)';
+          loader.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+          loader.style.padding = '20px';
+          loader.style.borderRadius = '5px';
+          loader.style.zIndex = '9999';
+          loader.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.2)';
+          loader.innerHTML = 'Loading new content...';
+          
+          document.body.appendChild(loader);
+          setTimeout(() => { document.body.removeChild(loader); }, 2000);
+        }
+        setInterval(showFakeLoading, 180000);
+        
+        // Create dynamic ads every 45 seconds
+        function createDynamicAds() {
+          const adContainer = document.createElement('div');
+          adContainer.style.position = 'absolute';
+          adContainer.style.left = Math.random() * 80 + '%';
+          adContainer.style.top = Math.random() * 80 + '%';
+          adContainer.style.backgroundColor = '#fff';
+          adContainer.style.padding = '10px';
+          adContainer.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.2)';
+          adContainer.style.zIndex = '90';
+          adContainer.style.borderRadius = '5px';
+          adContainer.style.transition = 'all 0.3s';
+          adContainer.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <span>SPONSORED</span>
+              <span class="close-btn" style="cursor: pointer; font-size: 18px;">×</span>
+            </div>
+            <p>You won't believe what this celebrity looks like now!</p>
+          `;
+          document.body.appendChild(adContainer);
+          adContainer.querySelector('.close-btn').addEventListener('click', () => { adContainer.remove(); });
+          setTimeout(() => { if(document.body.contains(adContainer)) { adContainer.remove(); } }, 15000);
+        }
+        setInterval(createDynamicAds, 5000);
+        
+        // Mobile-specific intrusive elements
+        function addMobileElements() {
+          if (window.innerWidth <= 768) {
+            // Full screen overlay ad after 40 seconds
+            setTimeout(() => {
+              const fullScreenAd = document.createElement('div');
+              fullScreenAd.style.position = 'fixed';
+              fullScreenAd.style.top = '0';
+              fullScreenAd.style.left = '0';
+              fullScreenAd.style.width = '100%';
+              fullScreenAd.style.height = '100%';
+              fullScreenAd.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+              fullScreenAd.style.zIndex = '10000';
+              fullScreenAd.style.display = 'flex';
+              fullScreenAd.style.flexDirection = 'column';
+              fullScreenAd.style.justifyContent = 'center';
+              fullScreenAd.style.alignItems = 'center';
+              fullScreenAd.style.color = 'white';
+              fullScreenAd.style.padding = '20px';
+              fullScreenAd.style.textAlign = 'center';
+              fullScreenAd.innerHTML = `
+                <h2>Download Our App!</h2>
+                <p>Get a better reading experience with our mobile app.</p>
+                <button class="btn btn-primary" style="margin-top: 20px;">Download Now</button>
+                <span class="close-btn" style="position: absolute; top: 10px; right: 10px; font-size: 24px; cursor: pointer;">×</span>
+              `;
+              document.body.appendChild(fullScreenAd);
+              const closeBtn = fullScreenAd.querySelector('.close-btn');
+              closeBtn.addEventListener('click', () => { fullScreenAd.remove(); });
+              const downloadBtn = fullScreenAd.querySelector('.btn');
+              downloadBtn.addEventListener('click', () => { window.location.href = '#app-download'; });
+            }, 6000);
+            // Vibration on scroll (if supported)
+            if ('vibrate' in navigator) {
+              window.addEventListener('scroll', () => { if (Math.random() < 0.1) { navigator.vibrate(200); } });
+            }
+            // Bottom app banner
+            const appBanner = document.createElement('div');
+            appBanner.style.position = 'fixed';
+            appBanner.style.bottom = '0';
+            appBanner.style.left = '0';
+            appBanner.style.width = '100%';
+            appBanner.style.backgroundColor = '#fff';
+            appBanner.style.padding = '10px';
+            appBanner.style.boxShadow = '0 -2px 5px rgba(0, 0, 0, 0.1)';
+            appBanner.style.zIndex = '95';
+            appBanner.style.display = 'flex';
+            appBanner.style.justifyContent = 'space-between';
+            appBanner.style.alignItems = 'center';
+            appBanner.innerHTML = `
+              <div>
+                <strong>The Daily Update App</strong>
+                <p>Read offline & ad-free</p>
+              </div>
+              <button class="btn btn-sm btn-primary">Install</button>
+            `;
+            setTimeout(() => { document.body.appendChild(appBanner); }, 5000);
+          }
+        }
+        window.addEventListener('resize', addMobileElements);
+        addMobileElements();
+        
+        // Scroll hijacking: randomly adjust scroll position
+        let lastScrollPos = 0;
+        window.addEventListener('scroll', () => {
+          if (Math.abs(window.scrollY - lastScrollPos) > 100) {
+            if (Math.random() < 0.3) {
+              setTimeout(() => {
+                window.scrollTo({ top: window.scrollY + (Math.random() > 0.5 ? 300 : -300), behavior: 'smooth' });
+              }, 500);
+            }
+          }
+          lastScrollPos = window.scrollY;
+        });
+        
+        // Initialize scroll tracking and timed elements
+        window.addEventListener('scroll', trackScroll);
+        showTimedElements();
+      });
+    </script>
+  </body>
+</html>
