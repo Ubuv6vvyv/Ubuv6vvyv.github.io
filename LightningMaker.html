@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lightning Generator</title>
+    <style>
+      /* Reset and Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+        overflow: hidden;
+        height: 100vh;
+        touch-action: none;
+        font-size: 8px; /* Small overall font */
+      }
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      
+      /* Control Panel (cp) */
+      .cp {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(25, 25, 35, 0.85);
+        backdrop-filter: blur(10px);
+        z-index: 10;
+        padding: 5px; /* Reduced padding */
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.5);
+        transform: translateY(calc(100% - 40px));
+        transition: transform 0.3s ease-in-out;
+        max-height: 50vh;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #444 #222;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .cp.ex {
+        transform: translateY(0);
+      }
+      .ph {
+        width: 40px;
+        height: 5px;
+        background-color: #444;
+        border-radius: 3px;
+        margin: 0 auto 5px;
+        opacity: 0.8;
+        cursor: pointer;
+      }
+      
+      /* New Toggles Row at the Top */
+      .toggles {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .toggle-item {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      
+      /* Group Containers */
+      .cg {
+        margin-bottom: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      /* Reorder groups via CSS order:
+         Visual Effects (contains color control) are now in a separate toggles row so we move
+         the remaining groups in the following order:
+           1. Lightning Properties
+           2. Animation  */
+      .cg.visual { order: 3; }
+      .cg.lighting { order: 1; }
+      .cg.animation { order: 2; }
+      
+      .cgt {
+        font-size: 8px;
+        margin-bottom: 3px;
+        color: #9aa0a6;
+        font-weight: 500;
+      }
+      label {
+        flex: 1;
+        font-size: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 5px;
+      }
+      .sc {
+        flex: 3; /* Longer sliders */
+      }
+      input[type="range"] {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: #2d2d3d;
+        border-radius: 3px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4a80f5;
+        cursor: pointer;
+        box-shadow: 0 0 5px rgba(74, 128, 245, 0.5);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4a80f5;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 0 5px rgba(74, 128, 245, 0.5);
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 3px;
+      }
+      input[type="range"]::-moz-range-track {
+        height: 6px;
+        border-radius: 3px;
+      }
+      .vd {
+        width: 30px;
+        text-align: right;
+        font-size: 8px;
+        color: #9aa0a6;
+      }
+      .cr, .tr {
+        display: flex;
+        align-items: center;
+        margin-bottom: 3px;
+      }
+      .ts {
+        position: relative;
+        display: inline-block;
+        width: 30px;
+        height: 16px;
+      }
+      .ts input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .sl {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #2d2d3d;
+        transition: 0.4s;
+        border-radius: 12px;
+      }
+      .sl:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+      input:checked + .sl {
+        background-color: #4a80f5;
+      }
+      input:checked + .sl:before {
+        transform: translateX(14px);
+      }
+      .clp {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        background: transparent;
+      }
+      .clp::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      .clp::-webkit-color-swatch {
+        border: none;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+      }
+      .clp::-moz-color-swatch {
+        border: none;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+      }
+      .btn {
+        background-color: #2d2d3d;
+        color: #e0e0e0;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-right: 5px;
+      }
+      .btn:hover {
+        background-color: #3d3d4d;
+      }
+      .bp {
+        background-color: #4a80f5;
+        color: white;
+      }
+      .bp:hover {
+        background-color: #3a70e5;
+      }
+      .ab {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        padding-top: 5px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .bg {
+        display: flex;
+        gap: 5px;
+      }
+      @media(max-width:480px) {
+        .cr label { font-size: 8px; }
+        input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; }
+        input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; }
+        .ab { flex-direction: column; gap: 5px; }
+        .bg { justify-content: space-between; }
+      }
+      .th {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 5;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 8px;
+        text-align: center;
+        pointer-events: none;
+        animation: fadeOut 3s forwards;
+        opacity: 0.8;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+      }
+      @keyframes fadeOut {
+        0% { opacity: 0.8; }
+        70% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+      .fl {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0);
+        z-index: 2;
+        pointer-events: none;
+        transition: background-color 0.05s ease-out;
+      }
+      .btn:active { transform: scale(0.95); }
+      .swipe-hint {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 8px;
+        text-align: center;
+        opacity: 0.8;
+        animation: pulse 2s infinite;
+        z-index: 3;
+        pointer-events: none;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+      }
+      @keyframes pulse {
+        0% { opacity: 0.5; }
+        50% { opacity: 1; }
+        100% { opacity: 0.5; }
+      }
+      .arrow {
+        display: block;
+        width: 16px;
+        height: 16px;
+        border-left: 2px solid rgba(255, 255, 255, 0.7);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+        transform: rotate(-45deg);
+        margin: 3px auto;
+        animation: arrow 1.5s infinite;
+      }
+      @keyframes arrow {
+        0% { transform: rotate(-45deg) translate(0, 0); }
+        50% { transform: rotate(-45deg) translate(-3px, -3px); }
+        100% { transform: rotate(-45deg) translate(0, 0); }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="fl" id="f"></div>
+    <div class="th">Tap/Slide anywhere to create lightning</div>
+    <div class="swipe-hint" id="swipe-hint">Swipe up for controls or double tap anywhere<span class="arrow"></span></div>
+    
+    <!-- Control Panel -->
+    <div class="cp" id="cp">
+      <div class="ph" id="ph"></div>
+      
+      <!-- Top Toggles Row -->
+      <div class="toggles">
+        <div class="toggle-item">
+          <label for="sound">Sound</label>
+          <label class="ts">
+            <input type="checkbox" id="sound">
+            <span class="sl"></span>
+          </label>
+        </div>
+        <div class="toggle-item">
+          <label for="as">Auto Strike</label>
+          <label class="ts">
+            <input type="checkbox" id="as" checked>
+            <span class="sl"></span>
+          </label>
+        </div>
+        <div class="toggle-item">
+          <label for="rb">Rainbow</label>
+          <label class="ts">
+            <input type="checkbox" id="rb">
+            <span class="sl"></span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Group: Lightning Properties -->
+      <div class="cg lighting">
+        <div class="cgt">Lightning Properties</div>
+        <div class="cr">
+          <label for="b">Branches</label>
+          <div class="sc">
+            <input type="range" id="b" min="1" max="12" value="6" step="1">
+          </div>
+          <div class="vd" id="bv">6</div>
+        </div>
+        <div class="cr">
+          <label for="t">Thickness</label>
+          <div class="sc">
+            <input type="range" id="t" min="0.1" max="8" value="2" step="0.01">
+          </div>
+          <div class="vd" id="tv">4</div>
+        </div>
+        <div class="cr">
+          <label for="r">Roughness</label>
+          <div class="sc">
+            <input type="range" id="r" min="0" max="3" value="0.9" step="0.01">
+          </div>
+          <div class="vd" id="rv">0.45</div>
+        </div>
+        <div class="cr">
+          <label for="ch">Chaos</label>
+          <div class="sc">
+            <input type="range" id="ch" min="0" max="3" value="0.5" step="0.01">
+          </div>
+          <div class="vd" id="chv">0.50</div>
+        </div>
+      </div>
+      
+      <!-- Group: Animation -->
+      <div class="cg animation">
+        <div class="cgt">Animation</div>
+        <div class="cr">
+          <label for="s">Speed</label>
+          <div class="sc">
+            <input type="range" id="s" min="10" max="300" value="100" step="1">
+          </div>
+          <div class="vd" id="sv">100</div>
+        </div>
+        <div class="cr">
+          <label for="fl">Flicker Speed</label>
+          <div class="sc">
+            <input type="range" id="fl" min="0" max="1" value="0.3" step="0.01">
+          </div>
+          <div class="vd" id="flv">0.30</div>
+        </div>
+        <div class="cr">
+          <label for="ml">Lifetime</label>
+          <div class="sc">
+            <input type="range" id="ml" min="5" max="200" value="120" step="1">
+          </div>
+          <div class="vd" id="mlv">100</div>
+        </div>
+        <div class="cr">
+          <label for="dt">Drag Throttle (ms)</label>
+          <div class="sc">
+            <input type="range" id="dt" min="5" max="200" value="50" step="1">
+          </div>
+          <div class="vd" id="dtd">50</div>
+        </div>
+        <div class="cr">
+          <label for="fr">Auto Frequency</label>
+          <div class="sc">
+            <input type="range" id="fr" min="0.5" max="8" value="2" step="0.1">
+          </div>
+          <div class="vd" id="frv">3</div>
+        </div>
+      </div>
+      
+      <!-- Group: Visual Effects (remaining controls) -->
+      <div class="cg visual">
+        <div class="cgt">Visual Effects</div>
+        <div class="cr">
+          <label for="g">Glow Intensity</label>
+          <div class="sc">
+            <input type="range" id="g" min="0" max="30" value="10" step="1">
+          </div>
+          <div class="vd" id="gv">20</div>
+        </div>
+        <div class="cr">
+          <label for="fi">Flash Intensity</label>
+          <div class="sc">
+            <input type="range" id="fi" min="0" max="2" value="0.5" step="0.01">
+          </div>
+          <div class="vd" id="fiv">0.30</div>
+        </div>
+        <div class="cr">
+          <label for="bc">Color</label>
+          <input type="color" id="bc" class="clp" value="#4a80f5">
+        </div>
+      </div>
+      
+      <!-- Buttons Row -->
+      <div class="ab">
+        <div class="bg">
+          <button class="btn" id="rs">Reset</button>
+          <button class="btn" id="ra">Randomize</button>
+        </div>
+        <div class="bg">
+          <button class="btn bp" id="st">Strike Now!</button>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      const c = document.getElementById('c'),
+        x = c.getContext('2d'),
+        f = document.getElementById('f'),
+        cp = document.getElementById('cp'),
+        ph = document.getElementById('ph'),
+        swipeHint = document.getElementById('swipe-hint');
+
+      function rsC() {
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
+      }
+      rsC();
+      window.addEventListener('resize', rsC);
+      // Updated configuration with increased aggressiveness and new drag throttle (dt)
+      const cfg = {
+        b: 6, // increased branches
+        t: 0.8, // increased thickness
+        r: 1,
+        ch: 1, // increased chaos
+        s: 100,
+        fl: 0.3,
+        as: true,
+        fr: 2, // increased auto frequency
+        g: 10, // increased glow intensity
+        fi: 0.5, // increased flash intensity
+        bc: '#4a80f5',
+        rb: false,
+        ml: 100,
+        sound: false,
+        dt: 50 // drag throttle in ms
+      };
+      const ctrl = {
+        b: document.getElementById('b'),
+        t: document.getElementById('t'),
+        r: document.getElementById('r'),
+        ch: document.getElementById('ch'),
+        s: document.getElementById('s'),
+        fl: document.getElementById('fl'),
+        as: document.getElementById('as'),
+        fr: document.getElementById('fr'),
+        g: document.getElementById('g'),
+        fi: document.getElementById('fi'),
+        bc: document.getElementById('bc'),
+        rb: document.getElementById('rb'),
+        ml: document.getElementById('ml'),
+        sound: document.getElementById('sound'),
+        dt: document.getElementById('dt')
+      };
+      const dsp = {
+        b: document.getElementById('bv'),
+        t: document.getElementById('tv'),
+        r: document.getElementById('rv'),
+        ch: document.getElementById('chv'),
+        s: document.getElementById('sv'),
+        fl: document.getElementById('flv'),
+        fr: document.getElementById('frv'),
+        g: document.getElementById('gv'),
+        fi: document.getElementById('fiv'),
+        ml: document.getElementById('mlv'),
+        dt: document.getElementById('dtd')
+      };
+      Object.keys(ctrl).forEach(k => {
+        const ct = ctrl[k];
+        if (ct.type === 'range') {
+          ct.value = cfg[k];
+          if (dsp[k]) {
+            dsp[k].textContent = cfg[k];
+          }
+          ct.addEventListener('input', () => {
+            cfg[k] = parseFloat(ct.value);
+            if (dsp[k]) {
+              dsp[k].textContent = parseFloat(ct.value).toFixed(k === 'r' || k === 'ch' || k === 'fl' || k === 'fi' || k === 'fr' || k === 'ml' || k === 'dt' ? 2 : 1);
+            }
+          });
+        } else if (ct.type === 'checkbox') {
+          ct.checked = cfg[k];
+          ct.addEventListener('change', () => {
+            cfg[k] = ct.checked;
+          });
+        } else if (ct.type === 'color') {
+          ct.value = cfg[k];
+          ct.addEventListener('input', () => {
+            cfg[k] = ct.value;
+          });
+        }
+      });
+      document.getElementById('rs').addEventListener('click', () => {
+        cfg.b = 6;
+        cfg.t = 4;
+        cfg.r = 0.45;
+        cfg.ch = 0.5;
+        cfg.s = 100;
+        cfg.fl = 0.3;
+        cfg.as = true;
+        cfg.fr = 3;
+        cfg.g = 20;
+        cfg.fi = 0.3;
+        cfg.bc = '#4a80f5';
+        cfg.rb = false;
+        cfg.ml = 100;
+        cfg.sound = true;
+        cfg.dt = 50;
+        Object.keys(ctrl).forEach(k => {
+          const ct = ctrl[k];
+          if (ct.type === 'range' || ct.type === 'color') {
+            ct.value = cfg[k];
+            if (dsp[k]) {
+              dsp[k].textContent = parseFloat(cfg[k]).toFixed(k === 'r' || k === 'ch' || k === 'fl' || k === 'fi' || k === 'fr' || k === 'ml' || k === 'dt' ? 2 : 1);
+            }
+          } else if (ct.type === 'checkbox') {
+            ct.checked = cfg[k];
+          }
+        });
+      });
+      document.getElementById('ra').addEventListener('click', () => {
+        cfg.b = Math.floor(Math.random() * 7) + 1;
+        cfg.t = (Math.random() * 7) + 1;
+        cfg.r = Math.random();
+        cfg.ch = Math.random();
+        cfg.s = Math.floor(Math.random() * 290) + 10;
+        cfg.fl = Math.random();
+        cfg.as = Math.random() > 0.3;
+        cfg.fr = (Math.random() * 4.5) + 0.5;
+        cfg.g = Math.floor(Math.random() * 30);
+        cfg.fi = Math.random() * 0.5;
+        cfg.rb = Math.random() > 0.7;
+        cfg.ml = Math.floor(Math.random() * 150) + 50;
+        cfg.sound = Math.random() > 0.5;
+        cfg.dt = Math.floor(Math.random() * 195) + 5;
+        const h = Math.floor(Math.random() * 360);
+        cfg.bc = `hsl(${h},80%,60%)`;
+        Object.keys(ctrl).forEach(k => {
+          const ct = ctrl[k];
+          if (ct.type === 'range') {
+            ct.value = cfg[k];
+            if (dsp[k]) {
+              dsp[k].textContent = parseFloat(cfg[k]).toFixed(k === 'r' || k === 'ch' || k === 'fl' || k === 'fi' || k === 'fr' || k === 'ml' || k === 'dt' ? 2 : 1);
+            }
+          } else if (ct.type === 'checkbox') {
+            ct.checked = cfg[k];
+          } else if (ct.type === 'color') {
+            ct.value = cfg.bc;
+          }
+        });
+        // Generate lightning after randomizing
+        setTimeout(() => cL(), 100);
+      });
+      document.getElementById('st').addEventListener('click', () => {
+        cL(Math.random() * c.width, c.height * 0.8);
+      });
+      
+      // Helper function to convert hex to RGB
+      function hexToRgb(hex) {
+        let r = parseInt(hex.slice(1, 3), 16);
+        let g = parseInt(hex.slice(3, 5), 16);
+        let b = parseInt(hex.slice(5, 7), 16);
+        return { r, g, b };
+      }
+      
+      // Spark particle class for extra electric effects
+      class Spark {
+        constructor(x, y, color) {
+          this.x = x;
+          this.y = y;
+          this.vx = (Math.random() - 0.5) * 4;
+          this.vy = (Math.random() - 0.5) * 4;
+          this.life = Math.random() * 50 + 50;
+          this.alpha = 1;
+          this.color = color; // color as an object {r, g, b}
+        }
+        update() {
+          this.x += this.vx;
+          this.y += this.vy;
+          this.life--;
+          this.alpha = Math.max(0, this.life / 100);
+        }
+        draw(ctx) {
+          ctx.save();
+          ctx.globalAlpha = this.alpha;
+          ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 1)`;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      
+      let bolts = [];
+      let sparks = [];
+      let lX = c.width / 2;
+      let lY = 0;
+      let lTX = c.width / 2;
+      let lTY = c.height;
+      let lastAutoStrike = 0;
+      let lastMotion = 0;
+      // AudioContext variable
+      let audioCtx;
+      // Initialize AudioContext on first user gesture to avoid warnings.
+      function initAudioContext() {
+        if (!audioCtx) {
+          audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        document.removeEventListener('click', initAudioContext);
+        document.removeEventListener('touchstart', initAudioContext);
+      }
+      document.addEventListener('click', initAudioContext, {
+        once: true
+      });
+      document.addEventListener('touchstart', initAudioContext, {
+        once: true
+      });
+// Play thunder sound with rotating variants using noise synthesis and a pronounced buzz overlay
+function playThunderSound() {
+  if (!cfg.sound) return;
+  try {
+    initAudioContext();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    // Helper function to add the buzz overlay – a powerful, cartoon-like electrical buzz.
+    function addBuzzOverlay() {
+      const buzzDuration = 0.6; // duration in seconds for the buzz
+      const buzzOsc = audioCtx.createOscillator();
+      const buzzGain = audioCtx.createGain();
+      // Use a sawtooth wave for a harsh, buzzy texture.
+      buzzOsc.type = 'sawtooth';
+      // Set the buzz frequency to produce a powerful electrical tone.
+      buzzOsc.frequency.setValueAtTime(50, audioCtx.currentTime);
+      // Increase the gain so the buzz is more prominent than the crack.
+      buzzGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      buzzOsc.connect(buzzGain);
+      buzzGain.connect(audioCtx.destination);
+      buzzOsc.start();
+      buzzOsc.stop(audioCtx.currentTime + buzzDuration);
+    }
+    
+    // Randomly select one of three thunder variants.
+    const variant = Math.floor(Math.random() * 3);
+    
+    if (variant === 0) {
+      // Variant 0: Classic deep boom using white noise passed through a lowpass filter.
+      const duration = 1.0; // seconds
+      const sampleRate = audioCtx.sampleRate;
+      const bufferSize = sampleRate * duration;
+      // Create a noise buffer filled with white noise.
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noiseSource = audioCtx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      // Filter out high frequencies for a deep, rumbling boom.
+      const lowpass = audioCtx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(30, audioCtx.currentTime);
+      noiseSource.connect(lowpass);
+      const gainNode = audioCtx.createGain();
+      lowpass.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      // Apply an exponential decay envelope.
+      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      noiseSource.start();
+      // Add the pronounced buzz overlay.
+      addBuzzOverlay();
+    } else if (variant === 1) {
+      // Variant 1: Focused thunder crack using white noise passed through a bandpass filter.
+      const duration = 1.0;
+      const sampleRate = audioCtx.sampleRate;
+      const bufferSize = sampleRate * duration;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noiseSource = audioCtx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      // Use a bandpass filter to emphasize mid-range frequencies for a crisp crack.
+      const bandpass = audioCtx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.setValueAtTime(500, audioCtx.currentTime);
+      bandpass.Q.setValueAtTime(1.5, audioCtx.currentTime);
+      noiseSource.connect(bandpass);
+      const gainNode = audioCtx.createGain();
+      bandpass.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      noiseSource.start();
+      // Add the pronounced buzz overlay.
+      addBuzzOverlay();
+    } else if (variant === 2) {
+      // Variant 2: A blend of a deep boom using noise with a lowpass filter.
+      const duration = 1.0;
+      const sampleRate = audioCtx.sampleRate;
+      const bufferSize = sampleRate * duration;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noiseSource = audioCtx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      // Use a lowpass filter set slightly lower for a deep boom effect.
+      const lowpass = audioCtx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(250, audioCtx.currentTime);
+      noiseSource.connect(lowpass);
+      const gainNode = audioCtx.createGain();
+      lowpass.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      noiseSource.start();
+      // Add the pronounced buzz overlay.
+      addBuzzOverlay();
+    }
+  } catch (e) {
+    console.log("AudioContext not supported", e);
+  }
+}
+
+
+
+      
+      // Electric ball initial load effect (pulsating orb)
+      const initialLoadDuration = 3000; // show for 3 seconds
+      const initialLoadStart = Date.now();
+      function drawElectricBall(ctx) {
+        const cx = c.width / 2;
+        const cy = c.height / 2;
+        const time = Date.now();
+        const radius = 12 + 5 * Math.sin(time / 200);
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(0.5, 'rgba(74,128,245,0.6)');
+        grad.addColorStop(1, 'rgba(74,128,245,0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+      
+      function cL(x, y) {
+        const sX = Math.random() * c.width;
+        const sY = 0;
+        const tX = x !== undefined ? x : Math.random() * c.width;
+        const tY = y !== undefined ? y : Math.random() * c.height * 0.8 + c.height * 0.2;
+        lTX = tX;
+        lTY = tY;
+        const displace = Math.sqrt(Math.pow(c.width, 2) + Math.pow(c.height, 2)) / 20;
+        bolts.push(new Lightning(sX, sY, tX, tY, {
+          ...cfg,
+          r: cfg.r * displace
+        }));
+        if (cfg.fi > 0) {
+          f.style.backgroundColor = `rgba(255,255,255,${cfg.fi})`;
+          setTimeout(() => {
+            f.style.backgroundColor = 'rgba(255,255,255,0)';
+          }, 50);
+        }
+        playThunderSound();
+        // Generate sparks at the strike point for extra electric effect
+        const sparkColorObj = cfg.rb ? { r: Math.floor(Math.random() * 255), g: Math.floor(Math.random() * 255), b: Math.floor(Math.random() * 255) } : hexToRgb(cfg.bc);
+        for (let i = 0; i < 15; i++) {
+          sparks.push(new Spark(tX, tY, sparkColorObj));
+        }
+      }
+      
+      class Lightning {
+        constructor(sX, sY, eX, eY, cfg) {
+          this.sX = sX;
+          this.sY = sY;
+          this.eX = eX;
+          this.eY = eY;
+          this.segs = [];
+          this.br = [];
+          this.lt = 0;
+          this.ml = cfg.ml;
+          this.a = 1;
+          this.col = cfg.rb ? this.rC() : this.hToR(cfg.bc);
+          this.gen(cfg);
+        }
+        hToR(h) {
+          // Handle HSL colors
+          if (h.includes('hsl')) {
+            const hslMatch = /hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/i.exec(h);
+            if (hslMatch) {
+              return this.hslToR(parseInt(hslMatch[1]) / 360, parseInt(hslMatch[2]) / 100, parseInt(hslMatch[3]) / 100);
+            }
+          }
+          // Handle hex colors
+          const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+          return r ? {
+            r: parseInt(r[1], 16),
+            g: parseInt(r[2], 16),
+            b: parseInt(r[3], 16)
+          } : {
+            r: 255,
+            g: 255,
+            b: 255
+          };
+        }
+        rC() {
+          const h = Math.floor(Math.random() * 360);
+          return this.hslToR(h / 360, 0.8, 0.6);
+        }
+        hslToR(h, s, l) {
+          let r, g, b;
+          if (s === 0) {
+            r = g = b = l;
+          } else {
+            const h2r = (p, q, t) => {
+              if (t < 0) t += 1;
+              if (t > 1) t -= 1;
+              if (t < 1 / 6) return p + (q - p) * 6 * t;
+              if (t < 1 / 2) return q;
+              if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+              return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = h2r(p, q, h + 1 / 3);
+            g = h2r(p, q, h);
+            b = h2r(p, q, h - 1 / 3);
+          }
+          return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255)
+          };
+        }
+        gen(cfg) {
+          this.segs = this.cP(this.sX, this.sY, this.eX, this.eY, cfg.r);
+          if (cfg.b > 0) {
+            for (let i = 0; i < cfg.b; i++) {
+              const sIdx = Math.floor(Math.random() * (this.segs.length - 1));
+              if (sIdx < 1) continue;
+              const seg = this.segs[sIdx];
+              const ang = Math.random() * Math.PI - Math.PI / 2;
+              const len = Math.random() * 100 + 50;
+              const eX = seg.x + Math.cos(ang) * len;
+              const eY = seg.y + Math.sin(ang) * len;
+              const bP = this.cP(seg.x, seg.y, eX, eY, cfg.r * 1.5);
+              this.br.push(bP);
+              if (Math.random() < 0.4 && cfg.b > 2) {
+                const sbIdx = Math.floor(Math.random() * (bP.length - 1));
+                if (sbIdx < 1) continue;
+                const sSeg = bP[sbIdx];
+                const sAng = Math.random() * Math.PI - Math.PI / 2;
+                const sLen = Math.random() * 60 + 20;
+                const seX = sSeg.x + Math.cos(sAng) * sLen;
+                const seY = sSeg.y + Math.sin(sAng) * sLen;
+                const sbP = this.cP(sSeg.x, sSeg.y, seX, seY, cfg.r * 2);
+                this.br.push(sbP);
+              }
+            }
+          }
+        }
+        cP(x1, y1, x2, y2, d) {
+          const p = [];
+          p.push({
+            x: x1,
+            y: y1
+          });
+          this.cPS(x1, y1, x2, y2, d, p);
+          p.push({
+            x: x2,
+            y: y2
+          });
+          return p;
+        }
+        cPS(x1, y1, x2, y2, d, p) {
+          if (d < 2) {
+            return;
+          }
+          const mX = (x1 + x2) / 2 + (Math.random() - 0.5) * d * 2;
+          const mY = (y1 + y2) / 2 + (Math.random() - 0.5) * d * 2;
+          // Insert points in order to maintain path
+          const insertIdx = p.findIndex(pt => Math.sqrt(Math.pow(pt.x - x2, 2) + Math.pow(pt.y - y2, 2)) < Math.sqrt(Math.pow(mX - x2, 2) + Math.pow(mY - y2, 2)));
+          if (insertIdx === -1) {
+            p.push({
+              x: mX,
+              y: mY
+            });
+          } else {
+            p.splice(insertIdx, 0, {
+              x: mX,
+              y: mY
+            });
+          }
+          this.cPS(x1, y1, mX, mY, d / 2, p);
+          this.cPS(mX, mY, x2, y2, d / 2, p);
+        }
+        update(cfg) {
+          this.lt += cfg.s / 50;
+          this.a = Math.max(0, 1 - (this.lt / this.ml));
+          if (cfg.fl > 0) {
+            this.a *= 0.8 + Math.random() * 0.4 * (1 - cfg.fl);
+          }
+          return this.a > 0;
+        }
+        draw(ctx, cfg) {
+          const dP = (p, t) => {
+            if (!p || p.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(p[0].x, p[0].y);
+            for (let i = 1; i < p.length; i++) {
+              ctx.lineTo(p[i].x, p[i].y);
+            }
+            ctx.lineWidth = t;
+            ctx.stroke();
+            if (cfg.g > 0) {
+              ctx.lineWidth = t * 3;
+              ctx.globalAlpha = this.a * 0.3;
+              ctx.stroke();
+              ctx.lineWidth = t * 6;
+              ctx.globalAlpha = this.a * 0.1;
+              ctx.stroke();
+            }
+          };
+          const t = cfg.t * (1 + Math.random() * cfg.ch * 0.5);
+          const col = this.col;
+          ctx.strokeStyle = `rgba(${col.r},${col.g},${col.b},1)`;
+          ctx.globalAlpha = this.a;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          dP(this.segs, t);
+          this.br.forEach((b, i) => {
+            const bT = t * 0.6 * (1 - i * 0.1);
+            dP(b, bT);
+          });
+          ctx.globalAlpha = 1;
+        }
+      }
+      
+      function animate() {
+        x.clearRect(0, 0, c.width, c.height);
+        const now = Date.now();
+        // Auto strike using its own timing variable.
+        if (cfg.as && now - lastAutoStrike > 1000 / cfg.fr) {
+          cL();
+          lastAutoStrike = now;
+        }
+        bolts = bolts.filter(bolt => bolt.update(cfg));
+        bolts.forEach(bolt => {
+          bolt.draw(x, cfg);
+        });
+        // Update and draw spark particles for extra electric effects.
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          sparks[i].update();
+          sparks[i].draw(x);
+          if (sparks[i].life <= 0) {
+            sparks.splice(i, 1);
+          }
+        }
+        // During initial load, display a pulsating electric ball in the center.
+        if (Date.now() - initialLoadStart < initialLoadDuration) {
+          drawElectricBall(x);
+        }
+        requestAnimationFrame(animate);
+      }
+      animate();
+      // Basic tap to create lightning
+      c.addEventListener('click', e => {
+        if (e.target === c) {
+          lX = e.clientX;
+          lY = e.clientY;
+          cL(lX, lY);
+        }
+      });
+      // Make handle more obvious
+      ph.addEventListener('click', () => {
+        cp.classList.toggle('ex');
+        if (cp.classList.contains('ex')) {
+          swipeHint.style.display = 'none';
+        }
+      });
+      // Better swipe detection for the control panel
+      let startY;
+      let startTime;
+      let minSwipeDistance = 300;
+
+      function tS(e) {
+        if (e.touches && e.touches[0]) {
+          startY = e.touches[0].clientY;
+          startTime = Date.now();
+        }
+      }
+
+      function tM(e) {
+        if (!startY || !e.touches || !e.touches[0]) return;
+        const currentY = e.touches[0].clientY;
+        const diff = startY - currentY;
+        const timeElapsed = Date.now() - startTime;
+        const swipeThreshold = timeElapsed < 300 ? minSwipeDistance / 2 : minSwipeDistance;
+        if (diff > swipeThreshold) {
+          cp.classList.add('ex');
+          swipeHint.style.display = 'none';
+          startY = null;
+        } else if (diff < -swipeThreshold) {
+          cp.classList.remove('ex');
+          startY = null;
+        }
+      }
+
+      function tE(e) {
+        startY = null;
+      }
+      document.addEventListener('touchstart', tS, {
+        passive: true
+      });
+      document.addEventListener('touchmove', tM, {
+        passive: true
+      });
+      document.addEventListener('touchend', tE, {
+        passive: true
+      });
+      ph.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        tS(e);
+      }, {
+        passive: true
+      });
+      ph.addEventListener('touchmove', (e) => {
+        e.stopPropagation();
+        tM(e);
+      }, {
+        passive: true
+      });
+      let lastTap = 0;
+      document.addEventListener('touchend', (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        if (tapLength < 300 && tapLength > 0) {
+          cp.classList.add('ex');
+          swipeHint.style.display = 'none';
+          e.preventDefault();
+        }
+        lastTap = currentTime;
+      });
+      // Easter egg - shake detection
+      let lastX = 0,
+        lastY = 0,
+        lastZ = 0;
+      let shakeTimeout;
+
+      function deviceMotionHandler(e) {
+        const acc = e.accelerationIncludingGravity;
+        if (!acc || acc.x === null) return;
+        const curTime = new Date().getTime();
+        if ((curTime - lastMotion) > 100) {
+          const diffTime = curTime - lastMotion;
+          lastMotion = curTime;
+          const x = acc.x;
+          const y = acc.y;
+          const z = acc.z;
+          const speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
+          if (speed > 800) {
+            if (!shakeTimeout) {
+              shakeTimeout = setTimeout(() => {
+                shakeTimeout = null;
+              }, 1000);
+              document.getElementById('ra').click();
+              for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                  cL();
+                }, i * 100);
+              }
+            }
+          }
+          lastX = x;
+          lastY = y;
+          lastZ = z;
+        }
+      }
+      window.addEventListener('devicemotion', deviceMotionHandler);
+      // Enhanced Touch and Drag Interaction for lightning strikes
+      let isDragging = false;
+      let lastDragTime = 0;
+      let dragStart = {
+        x: 0,
+        y: 0
+      };
+      // Touch events for dragging on mobile devices
+      c.addEventListener('touchstart', function(e) {
+        if (e.touches && e.touches.length === 1) {
+          isDragging = true;
+          const touch = e.touches[0];
+          dragStart = {
+            x: touch.clientX,
+            y: touch.clientY
+          };
+        }
+      }, {
+        passive: true
+      });
+      c.addEventListener('touchmove', function(e) {
+        if (isDragging && e.touches && e.touches.length === 1) {
+          const touch = e.touches[0];
+          let now = Date.now();
+          if (now - lastDragTime > cfg.dt) { // Use dynamic drag throttle
+            lX = touch.clientX;
+            lY = touch.clientY;
+            cL(lX, lY);
+            lastDragTime = now;
+          }
+        }
+      }, {
+        passive: true
+      });
+      c.addEventListener('touchend', function(e) {
+        isDragging = false;
+      }, {
+        passive: true
+      });
+      // Mouse events for dragging (desktop)
+      let isMouseDragging = false;
+      c.addEventListener('mousedown', function(e) {
+        isMouseDragging = true;
+        dragStart = {
+          x: e.clientX,
+          y: e.clientY
+        };
+      });
+      c.addEventListener('mousemove', function(e) {
+        if (isMouseDragging) {
+          let now = Date.now();
+          if (now - lastDragTime > cfg.dt) {
+            lX = e.clientX;
+            lY = e.clientY;
+            cL(lX, lY);
+            lastDragTime = now;
+          }
+        }
+      });
+      c.addEventListener('mouseup', function(e) {
+        isMouseDragging = false;
+      });
+      c.addEventListener('mouseleave', function(e) {
+        isMouseDragging = false;
+      });
+    </script>
+  </body>
+</html>
