@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Color Extractor</title>
+  <style>
+    :root {
+      --primary: #333;
+      --secondary: #eee;
+      --accent: #3498db;
+      --text: #222;
+      --bg: #f9f9f9;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+    }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 15px;
+      transition: all 0.3s ease;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+      text-align: center;
+      color: var(--primary);
+    }
+    
+    .upload-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 20px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .upload-btn {
+      background-color: var(--accent);
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+    
+    .upload-btn:hover {
+      background-color: #2980b9;
+      transform: translateY(-2px);
+    }
+    
+    #preview {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      border-radius: 8px;
+      display: none;
+      margin-bottom: 10px;
+    }
+    
+    .colors-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+      transition: opacity 0.3s ease;
+    }
+    
+    .color-box {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .color-box:hover::after {
+      content: "Click to copy";
+      position: absolute;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 0.7rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      bottom: 5px;
+    }
+    
+    .color-box span {
+      font-size: 0.7rem;
+      background-color: rgba(255,255,255,0.85);
+      padding: 4px 6px;
+      border-radius: 4px;
+      text-align: center;
+      font-family: monospace;
+    }
+    
+    .code-container {
+      margin-top: 20px;
+      background: #2d2d2d;
+      border-radius: 12px;
+      padding: 15px;
+      overflow-x: auto;
+      max-height: 300px;
+      display: none;
+    }
+    
+    .code-container pre {
+      color: #e6e6e6;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    
+    .example-element {
+      margin: 20px 0;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: none;
+      /* Apply animation on update */
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .sample-card {
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      transition: all 0.3s ease;
+    }
+    
+    .card-header {
+      padding: 15px;
+      color: white;
+    }
+    
+    .card-header h3 {
+      margin-bottom: 5px;
+      font-size: 1.2rem;
+    }
+    
+    .card-body {
+      padding: 15px;
+    }
+    
+    .card-footer {
+      padding: 12px 15px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    
+    .btn {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    
+    .btn-primary {
+      color: white;
+    }
+    
+    .btn-secondary {
+      background-color: transparent;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(0,0,0,0.1);
+      border-radius: 50%;
+      border-top-color: var(--accent);
+      animation: spin 1s ease-in-out infinite;
+      margin: 0 auto;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* New fadeIn animation for responsiveness */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    /* Controls styling */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .controls label {
+      font-size: 0.9rem;
+      color: var(--primary);
+    }
+    
+    .controls input[type="range"] {
+      width: 100%;
+    }
+    
+    /* Responsive styles */
+    @media (max-width: 480px) {
+      .colors-container {
+        justify-content: center;
+      }
+      
+      .color-box {
+        width: 70px;
+        height: 70px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Image Color Extractor</h1>
+    
+    <div class="upload-container">
+      <input type="file" id="fileInput" accept="image/*" style="display: none;">
+      <button class="upload-btn" id="uploadBtn">Select Image</button>
+      <img id="preview" alt="Preview">
+      
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <p>Extracting colors...</p>
+      </div>
+      
+      <div class="colors-container" id="colorsContainer"></div>
+    </div>
+    
+    <!-- New Controls -->
+    <div class="controls">
+      <label for="colorCountSlider">Number of Colors: <span id="colorCountLabel">4</span></label>
+      <input type="range" id="colorCountSlider" min="2" max="10" value="4">
+      
+      <label for="comboSlider">Color Combination: <span id="comboLabel">0</span></label>
+      <!-- Limited to 0 and 1 -->
+      <input type="range" id="comboSlider" min="0" max="3" value="0">
+      
+      <button class="upload-btn" id="reRollBtn">Re-roll Colors</button>
+    </div>
+    
+    <div class="example-element" id="exampleElement">
+      <h3>Example Element Using Extracted Colors</h3>
+      <div class="sample-card" id="sampleCard">
+        <div class="card-header" id="cardHeader">
+          <h3>Sample Card</h3>
+          <p>Using extracted colors from your image</p>
+        </div>
+        <div class="card-body" id="cardBody">
+          <p>This is a sample card styled with the colors extracted from your image. The colors are applied intelligently based on their contrast and prominence.</p>
+        </div>
+        <div class="card-footer" id="cardFooter">
+          <button class="btn btn-secondary" id="btnSecondary">Cancel</button>
+          <button class="btn btn-primary" id="btnPrimary">OK</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="code-container" id="codeContainer">
+      <pre id="codeContent"></pre>
+    </div>
+  </div>
+  
+  <script>
+    "use strict";
+    var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+      function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+      return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+      });
+    };
+    
+    // Global variables for controls
+    let colorCount = 4;           // Set to 4 for faster processing
+    // The comboIndex toggles between 0 (default optimal) and 1 (alternative)
+    let comboIndex = 0;
+    
+    // Create a single reusable off-screen canvas for processing images
+    let reusableCanvas = document.createElement("canvas");
+    
+    // Utility to add a fade-in effect to an element
+    function applyFadeIn(element) {
+      element.classList.remove('updated');
+      // Force reflow for restarting animation
+      void element.offsetWidth;
+      element.classList.add('updated');
+    }
+    
+    // Utils
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+      ] : [0, 0, 0];
+    }
+    
+    // Node class for the Octree
+    class Node {
+      constructor() {
+        this.isLeaf = false;
+        this.pixelCount = 0;
+        this.red = 0;
+        this.green = 0;
+        this.blue = 0;
+        this.children = new Array(8).fill(null);
+      }
+      
+      static toReduce = new Array(8).fill(0).map(() => []);
+      static leafNum = 0;
+      
+      addColor(color, level) {
+        if (level === 8) {
+          this.isLeaf = true;
+          this.pixelCount++;
+          this.red += color[0];
+          this.green += color[1];
+          this.blue += color[2];
+          return;
+        }
+        
+        const index = this.getColorIndex(color, level);
+        if (!this.children[index]) {
+          this.children[index] = new Node();
+          if (level < 7) {
+            Node.toReduce[level].push(this);
+          }
+        }
+        
+        if (!this.children[index].isLeaf) {
+          this.children[index].addColor(color, level + 1);
+        } else {
+          this.children[index].pixelCount++;
+          this.children[index].red += color[0];
+          this.children[index].green += color[1];
+          this.children[index].blue += color[2];
+        }
+      }
+      
+      getColorIndex(color, level) {
+        const mask = 0b10000000 >> level;
+        const r = color[0] & mask ? 1 : 0;
+        const g = color[1] & mask ? 1 : 0;
+        const b = color[2] & mask ? 1 : 0;
+        return (r << 2) | (g << 1) | b;
+      }
+      
+      getColor() {
+        const r = Math.round(this.red / this.pixelCount);
+        const g = Math.round(this.green / this.pixelCount);
+        const b = Math.round(this.blue / this.pixelCount);
+        return "#" + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+      }
+    }
+    
+    function reduceTree() {
+      let lv = 7;
+      while (lv >= 0) {
+        if (Node.toReduce[lv].length === 0) {
+          lv--;
+          continue;
+        }
+        
+        const node = Node.toReduce[lv].pop();
+        let r = 0, g = 0, b = 0, count = 0;
+        
+        for (let i = 0; i < 8; i++) {
+          const child = node.children[i];
+          if (!child) continue;
+          
+          if (child.isLeaf) {
+            Node.leafNum--;
+          }
+          
+          r += child.red;
+          g += child.green;
+          b += child.blue;
+          count += child.pixelCount;
+        }
+        
+        node.red = r;
+        node.green = g;
+        node.blue = b;
+        node.pixelCount = count;
+        node.isLeaf = true;
+        node.children.fill(null);
+        
+        Node.leafNum++;
+        return;
+      }
+    }
+    
+    function colorsStats(node, record) {
+      if (node.isLeaf) {
+        const color = node.getColor();
+        if (record[color]) {
+          record[color] += node.pixelCount;
+        } else {
+          record[color] = node.pixelCount;
+        }
+        return;
+      }
+      
+      for (let i = 0; i < 8; i++) {
+        const child = node.children[i];
+        if (child) {
+          colorsStats(child, record);
+        }
+      }
+    }
+    
+    // Readable color functions
+    function getLuminance(color) {
+      const [r, g, b] = hexToRgb(color);
+      const RsRGB = r / 255;
+      const GsRGB = g / 255;
+      const BsRGB = b / 255;
+      let R, G, B;
+      
+      if (RsRGB <= 0.03928) {
+        R = RsRGB / 12.92;
+      } else {
+        R = Math.pow((RsRGB + 0.055) / 1.055, 2.4);
+      }
+      
+      if (GsRGB <= 0.03928) {
+        G = GsRGB / 12.92;
+      } else {
+        G = Math.pow((GsRGB + 0.055) / 1.055, 2.4);
+      }
+      
+      if (BsRGB <= 0.03928) {
+        B = BsRGB / 12.92;
+      } else {
+        B = Math.pow((BsRGB + 0.055) / 1.055, 2.4);
+      }
+      
+      return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+    }
+    
+    function getContrast(back, front) {
+      const backLum = getLuminance(back) + 0.05;
+      const frontLum = getLuminance(front) + 0.05;
+      return Math.max(backLum, frontLum) / Math.min(backLum, frontLum);
+    }
+    
+    function getScore(d) {
+      return d.contrast * d.contrast * 4 - d.index * d.index;
+    }
+    
+    // Compute candidate color pairs from extracted colors.
+    // We only keep two distinct candidates.
+    function computeCandidatePairs(colors) {
+  const bgc = colors[0];
+  let candidatePairs = [];
+  for (let i = 1; i < colors.length; i++) {
+    const front = colors[i];
+    const contrast = getContrast(bgc, front);
+    candidatePairs.push({ contrast, front, index: i });
+  }
+  candidatePairs.sort((a, b) => getScore(b) - getScore(a));
+  
+  // Filter out candidates that are too similar in contrast (threshold: 0.5)
+  let uniqueCandidates = [];
+  candidatePairs.forEach(candidate => {
+    let isUnique = true;
+    for (let uniq of uniqueCandidates) {
+      if (Math.abs(candidate.contrast - uniq.contrast) < 0.5) {
+        isUnique = false;
+        break;
+      }
+    }
+    if (isUnique) uniqueCandidates.push(candidate);
+  });
+  
+  // If less than 4 unique candidates, use the best candidates from the full list
+  if (uniqueCandidates.length < 4) {
+    uniqueCandidates = candidatePairs.slice(0, 4);
+  } else {
+    uniqueCandidates = uniqueCandidates.slice(0, 4);
+  }
+  return { bgc, candidates: uniqueCandidates };
+}
+
+    function chooseReadableColor(colors, candidateIndex = 0) {
+  const { bgc, candidates } = computeCandidatePairs(colors);
+  const chosen = candidates[candidateIndex % candidates.length];
+  return [bgc, chosen.front];
+}
+
+    // Color Extractor class
+    class ColorExtractor {
+      constructor(config) {
+        this.config = {
+          // Further scale down for faster processing
+          compresionRate: 0.1,
+          topColorCount: colorCount,
+          timeout: 100 * 10,
+        };
+        
+        if (config) this.setConfig(config);
+        this.colors = null;
+      }
+      
+      setConfig(config) {
+        if (!config) throw "config must not be empty";
+        if (config.compresionRate !== undefined && config.compresionRate < 0)
+          throw "compresion rate must not be negative";
+        if (config.timeout !== undefined && typeof config.timeout !== "number")
+          throw "timeout must be number";
+        
+        Object.keys(config).forEach((k) => {
+          const newVal = config[k];
+          if (newVal === undefined) return;
+          this.config[k] = newVal;
+        });
+      }
+      
+      extractColor(image) {
+        return __awaiter(this, void 0, void 0, function* () {
+          let imageEl;
+          
+          if (typeof image === "string") {
+            imageEl = document.createElement("img");
+          } else {
+            imageEl = image;
+          }
+          
+          // Fix canvas CORS problem
+          imageEl.crossOrigin = "Anonymous";
+          
+          yield new Promise((res) => {
+            imageEl.onload = () => {
+              res();
+            };
+            
+            if (this.config.timeout >= 0) {
+              setTimeout(res, this.config.timeout);
+            }
+            
+            if (typeof image === "string") imageEl.src = image;
+          });
+          
+          this._extractColor(imageEl);
+          return this.colors;
+        });
+      }
+      
+      _extractColor(image) {
+        let { width, height } = image;
+        width *= this.config.compresionRate;
+        height *= this.config.compresionRate;
+        
+        // Reuse the global canvas
+        reusableCanvas.width = width;
+        reusableCanvas.height = height;
+        
+        const ctx = reusableCanvas.getContext("2d");
+        if (!ctx) throw "cannot get canvas context";
+        
+        ctx.drawImage(image, 0, 0, width, height);
+        const imgData = ctx.getImageData(0, 0, width, height).data;
+        // Sample pixel data by skipping many pixels (for faster processing)
+        const sampleStep = 128; // process roughly 1 in every 8 pixels
+        const sampledData = [];
+        for (let i = 0; i < imgData.length; i += sampleStep) {
+          sampledData.push(
+            imgData[i],
+            imgData[i + 1],
+            imgData[i + 2],
+            imgData[i + 3]
+          );
+        }
+        const colors = this.getMainColors(new Uint8ClampedArray(sampledData));
+        this.colors = colors;
+      }
+      
+      getMainColors(data) {
+        const root = new Node();
+        Node.toReduce = new Array(8).fill(0).map(() => []);
+        Node.leafNum = 0;
+        
+        for (let i = 0; i < data.length; i += 4) {
+          root.addColor([data[i], data[i + 1], data[i + 2]], 0);
+          while (Node.leafNum > this.config.topColorCount * 2) reduceTree();
+        }
+        
+        const record = {};
+        colorsStats(root, record);
+        
+        const result = [];
+        for (const k in record) {
+          result.push({ color: k, count: record[k] });
+        }
+        
+        result.sort((a, b) => b.count - a.count);
+        return result.slice(0, this.config.topColorCount);
+      }
+      
+      chooseReadableColor(candidateIndex = 0) {
+        if (!this.colors)
+          throw "you haven't extracted colors, please call `extractColor` first";
+        if (this.colors.length < 2)
+          throw "cannot generate two colors because there is only one color in this image";
+        
+        return chooseReadableColor(this.colors.map((c) => c.color), candidateIndex);
+      }
+    }
+    
+    // DOM elements
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const preview = document.getElementById('preview');
+    const colorsContainer = document.getElementById('colorsContainer');
+    const exampleElement = document.getElementById('exampleElement');
+    const codeContainer = document.getElementById('codeContainer');
+    const codeContent = document.getElementById('codeContent');
+    const loading = document.querySelector('.loading');
+    
+    // Sample card elements
+    const sampleCard = document.getElementById('sampleCard');
+    const cardHeader = document.getElementById('cardHeader');
+    const cardBody = document.getElementById('cardBody');
+    const cardFooter = document.getElementById('cardFooter');
+    const btnPrimary = document.getElementById('btnPrimary');
+    const btnSecondary = document.getElementById('btnSecondary');
+    
+    // New control elements
+    const colorCountSlider = document.getElementById('colorCountSlider');
+    const colorCountLabel = document.getElementById('colorCountLabel');
+    const comboSlider = document.getElementById('comboSlider');
+    const comboLabel = document.getElementById('comboLabel');
+    const reRollBtn = document.getElementById('reRollBtn');
+    
+    // Initialize color extractor
+    const extractor = new ColorExtractor();
+    
+    // Handle file upload
+    uploadBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(event) {
+          preview.src = event.target.result;
+          preview.style.display = 'block';
+          colorsContainer.innerHTML = '';
+          loading.style.display = 'block';
+          
+          setTimeout(() => {
+            processImage(preview);
+          }, 100);
+        };
+        
+        reader.readAsDataURL(file);
+      }
+    });
+    
+    // Update color count when slider changes
+    colorCountSlider.addEventListener('input', () => {
+      colorCount = parseInt(colorCountSlider.value, 10);
+      colorCountLabel.textContent = colorCount;
+      extractor.config.topColorCount = colorCount;
+      if (preview.src) {
+        loading.style.display = 'block';
+        setTimeout(() => {
+          processImage(preview);
+        }, 100);
+      }
+    });
+    
+    // Update combination immediately when slider changes (only 0 or 1)
+    comboSlider.addEventListener('input', () => {
+      comboIndex = parseInt(comboSlider.value, 10);
+      comboLabel.textContent = comboIndex;
+      if (extractor.colors) {
+        const colors = extractor.colors;
+        const readableColors = extractor.chooseReadableColor(comboIndex);
+        applyColorsToElement(colors, readableColors);
+        generateCssCode(colors, readableColors);
+        applyFadeIn(sampleCard);
+        colorsContainer.style.opacity = 0;
+        setTimeout(() => {
+          colorsContainer.style.opacity = 1;
+        }, 100);
+      }
+    });
+    
+    // Re-roll button: toggle candidate between 0 and 1.
+    reRollBtn.addEventListener('click', () => {
+      if (extractor.colors) {
+        comboIndex = (comboIndex + 1) % 4;
+        comboSlider.value = comboIndex;
+        comboLabel.textContent = comboIndex;
+        const colors = extractor.colors;
+        const readableColors = extractor.chooseReadableColor(comboIndex);
+        applyColorsToElement(colors, readableColors);
+        generateCssCode(colors, readableColors);
+        applyFadeIn(sampleCard);
+        colorsContainer.style.opacity = 0;
+        setTimeout(() => {
+          colorsContainer.style.opacity = 1;
+        }, 100);
+      }
+    });
+    
+    // Process image and extract colors
+    async function processImage(imageElement) {
+      try {
+        await extractor.extractColor(imageElement);
+        const colors = extractor.colors;
+        // Default optimal combination (candidate index 0)
+        const readableColors = extractor.chooseReadableColor(0);
+        
+        // Display the extracted colors with a fade in effect
+        colorsContainer.innerHTML = '';
+        colors.forEach(colorObj => {
+          const colorBox = document.createElement('div');
+          colorBox.className = 'color-box';
+          colorBox.style.backgroundColor = colorObj.color;
+          
+          const colorSpan = document.createElement('span');
+          colorSpan.textContent = colorObj.color;
+          colorBox.appendChild(colorSpan);
+          
+          colorBox.addEventListener('click', () => {
+            navigator.clipboard.writeText(colorObj.color)
+              .then(() => {
+                const originalText = colorSpan.textContent;
+                colorSpan.textContent = 'Copied!';
+                setTimeout(() => {
+                  colorSpan.textContent = originalText;
+                }, 1000);
+              });
+          });
+          
+          colorsContainer.appendChild(colorBox);
+        });
+        
+        // Apply optimal combination to the sample element
+        applyColorsToElement(colors, readableColors);
+        
+        // Show example element and code
+        exampleElement.style.display = 'block';
+        codeContainer.style.display = 'block';
+        
+        // Generate and display the CSS code
+        generateCssCode(colors, readableColors);
+        
+        loading.style.display = 'none';
+        // Reset combination slider to 0 on new image load
+        comboIndex = 0;
+        comboSlider.value = 0;
+        comboLabel.textContent = 0;
+      } catch (error) {
+        console.error('Error extracting colors:', error);
+        loading.style.display = 'none';
+      }
+    }
+    
+    // Apply extracted colors to the sample element
+    function applyColorsToElement(colors, readableColors) {
+      const [bgColor, textColor] = readableColors;
+      const allColors = colors.map(c => c.color);
+      
+      const accentColor = allColors.find(color =>
+        color !== bgColor &&
+        color !== textColor &&
+        getContrast(bgColor, color) > 2.5
+      ) || allColors[2] || '#3498db';
+      
+      const secondaryBg = allColors.find(color =>
+        color !== bgColor &&
+        color !== textColor &&
+        color !== accentColor &&
+        getContrast(color, textColor) > 3
+      ) || allColors[3] || '#f4f4f4';
+      
+      sampleCard.style.backgroundColor = bgColor;
+      cardBody.style.color = textColor;
+      
+      cardHeader.style.backgroundColor = accentColor;
+      cardHeader.style.color = getContrast(accentColor, '#fff') > 2 ? '#fff' : '#222';
+      
+      cardFooter.style.borderTop = `1px solid ${secondaryBg}`;
+      cardFooter.style.backgroundColor = getLuminance(bgColor) > 0.5 ?
+        `rgba(0,0,0,0.05)` : `rgba(255,255,255,0.05)`;
+      
+      btnPrimary.style.backgroundColor = accentColor;
+      btnPrimary.style.color = cardHeader.style.color;
+      
+      btnSecondary.style.color = textColor;
+      btnSecondary.style.borderColor = textColor;
+    }
+    
+    // Generate CSS code from the extracted colors
+    function generateCssCode(colors, readableColors) {
+      const [bgColor, textColor] = readableColors;
+      const allColors = colors.map(c => c.color);
+      
+      const accentColor = allColors.find(color =>
+        color !== bgColor &&
+        color !== textColor &&
+        getContrast(bgColor, color) > 2.5
+      ) || allColors[2] || '#3498db';
+      
+      const secondaryBg = allColors.find(color =>
+        color !== bgColor &&
+        color !== textColor &&
+        color !== accentColor &&
+        getContrast(color, textColor) > 3
+      ) || allColors[3] || '#f4f4f4';
+      
+      const cssCode = `/* Generated CSS Variables */
+:root {
+  --primary-bg: ${bgColor};
+  --text-color: ${textColor};
+  --accent-color: ${accentColor};
+  --secondary-bg: ${secondaryBg};
+}
+
+/* Sample Card Styling */
+.card {
+  background-color: var(--primary-bg);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  overflow: hidden;
+  max-width: 400px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.card-header {
+  background-color: var(--accent-color);
+  color: ${getContrast(accentColor, '#fff') > 2 ? '#fff' : '#222'};
+  padding: 15px;
+}
+
+.card-header h3 {
+  margin-bottom: 5px;
+  font-size: 1.2rem;
+}
+
+.card-body {
+  padding: 15px;
+  color: var(--text-color);
+}
+
+.card-footer {
+  padding: 12px 15px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--secondary-bg);
+  background-color: ${getLuminance(bgColor) > 0.5 ?
+    'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'};
+}
+
+.btn {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background-color: var(--accent-color);
+  color: ${getContrast(accentColor, '#fff') > 2 ? '#fff' : '#222'};
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-color);
+}`;
+      
+      const htmlCode = `<!-- Sample Card HTML Structure -->
+<div class="card">
+  <div class="card-header">
+    <h3>Sample Card</h3>
+    <p>Using extracted colors from your image</p>
+  </div>
+  <div class="card-body">
+    <p>This is a sample card styled with the colors extracted from your image. 
+    The colors are applied intelligently based on their contrast and prominence.</p>
+  </div>
+  <div class="card-footer">
+    <button class="btn btn-secondary">Cancel</button>
+    <button class="btn btn-primary">OK</button>
+  </div>
+</div>`;
+      
+      const colorTable = `/* All Extracted Colors */
+${colors.map((c, i) => `--color-${i + 1}: ${c.color}; /* ${Math.round((c.count / colors[0].count) * 100)}% */`).join('\n')}`;
+      
+      codeContent.textContent = `${cssCode}\n\n${colorTable}\n\n${htmlCode}`;
+    }
+  </script>
+</body>
+</html>
