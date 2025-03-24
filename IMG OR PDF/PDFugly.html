@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Scanner Malfunction Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0
+    }
+
+    body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f5f5f5;
+        overflow: hidden
+    }
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh
+    }
+
+    header {
+        background: #4285f4;
+        color: #fff;
+        text-align: center;
+        padding: 4px 6px;
+        font-size: 0.9rem;
+        flex-shrink: 0
+    }
+
+    .canvas-container {
+        flex: 1;
+        position: relative;
+        background: #eee center center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 35%;
+        overflow: auto
+    }
+
+    canvas {
+        max-width: 100%;
+        max-height: 100%;
+        display: block
+    }
+
+    .file-label {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(240, 240, 240, 0.9);
+        border: 1px dashed #aaa;
+        padding: 8px 10px;
+        text-align: center;
+        border-radius: 3px;
+        cursor: pointer;
+        z-index: 10;
+        font-size: 12px
+    }
+
+    .loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 5
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(66, 133, 244, 0.3);
+        border-radius: 50%;
+        border-top-color: #4285f4;
+        animation: spin 1s linear infinite;
+        margin-bottom: 10px
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg)
+        }
+
+        100% {
+            transform: rotate(360deg)
+        }
+    }
+
+    .pages {
+        text-align: center;
+        font-size: 10px;
+        padding: 2px;
+        background: #fafafa;
+        border-top: 1px solid #ddd;
+        flex-shrink: 0
+    }
+
+    .pages button {
+        padding: 2px 4px;
+        margin: 0 2px
+    }
+
+    .fixed-bottom {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fafafa;
+        border-top: 1px solid #ddd;
+        z-index: 15;
+        display: flex;
+        flex-direction: column;
+        max-height: 35vh;
+        overflow-y: auto
+    }
+
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 3px;
+        padding: 4px
+    }
+
+    .btn-group button {
+        background: #4285f4;
+        color: #fff;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 8px;
+        transition: background 0.2s
+    }
+
+    .btn-group button:hover {
+        background: #3367d6
+    }
+
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        padding: 4px;
+        font-size: 9px
+    }
+
+    .control {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch
+    }
+
+    .control label {
+        margin-bottom: 2px;
+        white-space: nowrap
+    }
+
+    .control input[type="range"],
+    .control input[type="color"] {
+        width: 100%
+    }
+
+    .control .value {
+        text-align: right;
+        font-size: 9px
+    }
+
+    @media (max-width:600px) {
+        .control {
+            font-size: 9px
+        }
+    }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>Scanner Malfunction Simulator</header>
+        <div class="canvas-container">
+            <canvas id="outputCanvas"></canvas>
+            <label class="file-label" for="fileInput" id="dropZone">Tap to select PDF or Image</label>
+            <div id="loading" class="loading" style="display:none;">
+                <div class="spinner"></div>
+                <div>Processing...</div>
+            </div>
+            <input type="file" id="fileInput" accept="application/pdf,image/*" style="display:none;">
+        </div>
+        <div class="pages" id="pageControls" style="display:none;">
+            <button id="prevPage">❮</button><span id="pageInfo">Page 1 of 1</span><button id="nextPage">❯</button>
+        </div>
+        <div class="fixed-bottom">
+            <div class="btn-group">
+                <button id="saveImgBtn">Save as Image</button>
+                <button id="savePdfBtn">Save as PDF</button>
+                <button id="saveAllPagesBtn" style="display:none;">Save All Pages</button>
+                <button id="batchBtn">Batch Process</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+            <div class="controls">
+                <div class="control"><label for="brightness">Brightness</label><input type="range" id="brightness" min="50" max="150" value="100"><span class="value">100</span></div>
+                <div class="control"><label for="contrast">Contrast</label><input type="range" id="contrast" min="50" max="150" value="100"><span class="value">100</span></div>
+                <div class="control"><label for="grayscale">Grayscale</label><input type="checkbox" id="grayscale"></div>
+                <div class="control"><label for="resolution">Resolution</label><input type="range" id="resolution" min="10" max="100" value="100"><span class="value">100</span></div>
+                <div class="control"><label for="threshold">Threshold</label><input type="range" id="threshold" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="noise">Noise</label><input type="range" id="noise" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="coffee">Coffee Stains</label><input type="range" id="coffee" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="scanlines">Scan Lines</label><input type="range" id="scanlines" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="creases">Creases</label><input type="range" id="creases" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="dirt">Dirt</label><input type="range" id="dirt" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="skew">Skew</label><input type="range" id="skew" min="-10" max="10" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="border">Border</label><input type="range" id="border" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="curl">Page Curl</label><input type="range" id="curl" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="fade">Fade</label><input type="range" id="fade" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="moire">Moire</label><input type="range" id="moire" min="0" max="100" value="0"><span class="value">0</span></div>
+                <div class="control"><label for="colorMap">Apply Color Mapping</label><input type="checkbox" id="colorMap"></div>
+                <div class="control"><label for="contentColor">Content Color</label><input type="color" id="contentColor" value="#000000"></div>
+                <div class="control"><label for="backgroundColor">BG Color</label><input type="color" id="backgroundColor" value="#ffffff"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    const {
+        jsPDF
+    } = window.jspdf;
+    let originalImage = null,
+        currentCanvas = null,
+        isPDF = false,
+        pdfDoc = null,
+        currentPage = 1,
+        totalPages = 1,
+        fileName = "scanned-document",
+        processingBatch = false,
+        cachedPages = [],
+        effectTimeout = null;
+    const canvas = document.getElementById("outputCanvas"),
+        ctx = canvas.getContext("2d"),
+        fileInput = document.getElementById("fileInput"),
+        loadingDiv = document.getElementById("loading"),
+        dropZone = document.getElementById("dropZone"),
+        pageInfo = document.getElementById("pageInfo"),
+        pageControls = document.getElementById("pageControls"),
+        saveAllBtn = document.getElementById("saveAllPagesBtn");
+    const controls = {};
+    document.querySelectorAll(".controls input").forEach(input => {
+        controls[input.id] = input;
+        input.addEventListener("input", () => {
+            if (input.type === "range") input.nextElementSibling && (input.nextElementSibling.textContent = input.value);
+            debounceApplyEffects();
+        });
+        if (input.type === "checkbox") input.addEventListener("change", debounceApplyEffects);
+    });
+
+    function debounceApplyEffects(delay = 50) {
+        if (effectTimeout) clearTimeout(effectTimeout);
+        effectTimeout = setTimeout(applyEffects, delay);
+    }
+    fileInput.addEventListener("change", handleFileSelect);
+    dropZone.addEventListener("click", () => fileInput.click());
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(eName => {
+        dropZone.addEventListener(eName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    ["dragenter", "dragover"].forEach(eName => {
+        dropZone.addEventListener(eName, () => {
+            dropZone.style.background = "#e3f2fd";
+            dropZone.style.borderColor = "#2196f3";
+        }, false);
+    });
+    ["dragleave", "drop"].forEach(eName => {
+        dropZone.addEventListener(eName, () => {
+            dropZone.style.background = "transparent";
+            dropZone.style.borderColor = "#aaa";
+        }, false);
+    });
+    dropZone.addEventListener("drop", e => {
+        const files = e.dataTransfer.files;
+        if (files.length) fileInput.files = files;
+        handleFileSelect({
+            target: {
+                files: files
+            }
+        });
+    }, false);
+    document.getElementById("prevPage").addEventListener("click", () => {
+        if (currentPage > 1) renderPage(--currentPage);
+    });
+    document.getElementById("nextPage").addEventListener("click", () => {
+        if (currentPage < totalPages) renderPage(++currentPage);
+    });
+    document.getElementById("saveImgBtn").addEventListener("click", saveAsImage);
+    document.getElementById("savePdfBtn").addEventListener("click", saveAsPdf);
+    document.getElementById("saveAllPagesBtn").addEventListener("click", saveAllPages);
+    document.getElementById("batchBtn").addEventListener("click", toggleBatchMode);
+    document.getElementById("resetBtn").addEventListener("click", resetControls);
+    async function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        fileName = file.name.split(".")[0];
+        loadingDiv.style.display = "flex";
+        try {
+            if (file.type === "application/pdf") {
+                isPDF = true;
+                await loadPdf(file);
+                pageControls.style.display = "block";
+                saveAllBtn.style.display = "inline-block";
+            } else {
+                isPDF = false;
+                await loadImage(file);
+                pageControls.style.display = "none";
+                saveAllBtn.style.display = "none";
+            }
+            dropZone.value = "";
+            dropZone.style.display = "none";
+            fileInput.value = "";
+        } catch (err) {
+            console.error("Error loading file:", err);
+            alert("Error loading file. Please try again.");
+        } finally {
+            loadingDiv.style.display = "none";
+        }
+    }
+    async function loadPdf(file) {
+        const buf = await file.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument({
+            data: buf
+        }).promise;
+        totalPages = pdfDoc.numPages;
+        cachedPages = new Array(totalPages).fill(null);
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        await renderPage(1);
+    }
+    async function renderPage(num) {
+        loadingDiv.style.display = "flex";
+        try {
+            currentPage = num;
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            if (cachedPages[num - 1]) {
+                originalImage = cachedPages[num - 1];
+                canvas.width = originalImage.width;
+                canvas.height = originalImage.height;
+                ctx.drawImage(originalImage, 0, 0);
+                applyEffects();
+                loadingDiv.style.display = "none";
+                return;
+            }
+            const page = await pdfDoc.getPage(num);
+            const vp = page.getViewport({
+                scale: 1.5
+            });
+            canvas.width = vp.width;
+            canvas.height = vp.height;
+            await page.render({
+                canvasContext: ctx,
+                viewport: vp
+            }).promise;
+            originalImage = new Image();
+            originalImage.onload = () => {
+                cachedPages[num - 1] = originalImage;
+                applyEffects();
+                loadingDiv.style.display = "none";
+            };
+            originalImage.src = canvas.toDataURL();
+        } catch (err) {
+            console.error("Error rendering page:", err);
+            loadingDiv.style.display = "none";
+        }
+    }
+
+    function loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImage = new Image();
+                originalImage.onload = function() {
+                    canvas.width = originalImage.width;
+                    canvas.height = originalImage.height;
+                    ctx.drawImage(originalImage, 0, 0);
+                    applyEffects();
+                    resolve();
+                };
+                originalImage.onerror = reject;
+                originalImage.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function applyEffects() {
+        if (!originalImage) return;
+        const v = {
+            brightness: parseInt(controls.brightness.value),
+            contrast: parseInt(controls.contrast.value),
+            resolution: parseInt(controls.resolution ? controls.resolution.value : "100"),
+            threshold: parseInt(controls.threshold.value),
+            noise: parseInt(controls.noise.value),
+            coffee: parseInt(controls.coffee.value),
+            scanlines: parseInt(controls.scanlines.value),
+            creases: parseInt(controls.creases.value),
+            dirt: parseInt(controls.dirt.value),
+            skew: parseInt(controls.skew.value),
+            border: parseInt(controls.border.value),
+            curl: parseInt(controls.curl.value),
+            fade: parseInt(controls.fade.value),
+            moire: parseInt(controls.moire.value),
+            grayscale: controls.grayscale.checked,
+            applyColor: controls.colorMap && controls.colorMap.checked
+        };
+        currentCanvas = document.createElement("canvas");
+        currentCanvas.width = canvas.width;
+        currentCanvas.height = canvas.height;
+        canvas.width = originalImage.width;
+        canvas.height = originalImage.height;
+        ctx.drawImage(originalImage, 0, 0);
+        if (v.grayscale) applyGrayscale();
+        if (v.brightness !== 100 || v.contrast !== 100) applyBrightnessContrast(v.brightness, v.contrast);
+        if (v.threshold > 0) applyThreshold(v.threshold);
+        if (v.skew !== 0) applySkew(v.skew);
+        if (v.resolution < 100) applyResolution(v.resolution);
+        if (v.noise > 0) applyNoise(v.noise);
+        if (v.coffee > 0) applyCoffeeStains(v.coffee);
+        if (v.scanlines > 0) applyScanLines(v.scanlines);
+        if (v.creases > 0) applyCreases(v.creases);
+        if (v.dirt > 0) applyDirt(v.dirt);
+        if (v.border > 0) applyScannerBorder(v.border);
+        if (v.curl > 0) applyCurl(v.curl);
+        if (v.fade > 0) applyFade(v.fade);
+        if (v.moire > 0) applyMoire(v.moire);
+        if (v.applyColor) applyColorMapping();
+        currentCanvas.getContext("2d").drawImage(canvas, 0, 0);
+    }
+
+    function applyResolution(val) {
+        const scale = val / 100,
+            w = canvas.width,
+            h = canvas.height;
+        const temp = document.createElement("canvas");
+        temp.width = w * scale;
+        temp.height = h * scale;
+        temp.getContext("2d").drawImage(canvas, 0, 0, w, h, 0, 0, temp.width, temp.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(temp, 0, 0, temp.width, temp.height, 0, 0, w, h);
+    }
+
+    function applyThreshold(a) {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data,
+            th = 128 - (a / 100) * 50;
+        for (let i = 0; i < d.length; i += 4) {
+            const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            const val = avg < th ? 0 : 255;
+            d[i] = d[i + 1] = d[i + 2] = val
+        }
+        ctx.putImageData(img, 0, 0)
+    }
+
+    function applyGrayscale() {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            d[i] = d[i + 1] = d[i + 2] = avg
+        }
+        ctx.putImageData(img, 0, 0)
+    }
+
+    function applyBrightnessContrast(br, con) {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data,
+            bf = (br - 100) / 200,
+            cf = (con - 100) / 200;
+        for (let i = 0; i < d.length; i += 4) {
+            d[i] += bf * 255;
+            d[i + 1] += bf * 255;
+            d[i + 2] += bf * 255;
+            for (let j = 0; j < 3; j++) {
+                d[i + j] = Math.max(0, Math.min(255, (d[i + j] - 128) * (1 + cf) + 128))
+            }
+        }
+        ctx.putImageData(img, 0, 0)
+    }
+
+    function applyNoise(a) {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data,
+            inst = a * 0.8;
+        for (let i = 0; i < d.length; i += 4) {
+            if (Math.random() < 0.2 * a / 100) {
+                const n = Math.random() * inst - inst / 2;
+                d[i] = Math.max(0, Math.min(255, d[i] + n));
+                d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+                d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n))
+            }
+        }
+        ctx.putImageData(img, 0, 0)
+    }
+
+    function applyCoffeeStains(a) {
+        const n = Math.floor((canvas.width * canvas.height / 30000) * (a / 10));
+        for (let i = 0; i < n; i++) {
+            const x = Math.random() * canvas.width,
+                y = Math.random() * canvas.height,
+                r = Math.random() * 3 + 3,
+                grad = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+            grad.addColorStop(0, "rgba(120,70,40,0.1)");
+            grad.addColorStop(0.7, "rgba(100,60,30,0.1)");
+            grad.addColorStop(1, "rgba(100,60,30,0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2 * Math.PI);
+            ctx.fill()
+        }
+    }
+
+    function applyScanLines(a) {
+        const sp = Math.max(2, 20 - Math.floor(a / 5)),
+            int = a / 200;
+        for (let y = 0; y < canvas.height; y += sp) {
+            ctx.fillStyle = `rgba(0,0,0,${int})`;
+            ctx.fillRect(0, y, canvas.width, 1)
+        }
+    }
+
+    function applyCreases(a) {
+        const num = Math.floor(a / 5);
+        for (let i = 0; i < num; i++) {
+            const x1 = Math.random() * canvas.width,
+                y1 = Math.random() * canvas.height,
+                len = Math.random() * canvas.width / 2 + canvas.width / 4,
+                angle = Math.random() * Math.PI,
+                x2 = x1 + Math.cos(angle) * len,
+                y2 = y1 + Math.sin(angle) * len,
+                cpX = x1 + (x2 - x1) / 2 + Math.random() * 20 - 10,
+                cpY = y1 + (y2 - y1) / 2 + Math.random() * 20 - 10,
+                lw = 2 + (a / 50) * 3;
+            let grad = ctx.createLinearGradient(x1, y1, x2, y2);
+            grad.addColorStop(0, "rgba(0,0,0," + (0.1 + (a / 200)) + ")");
+            grad.addColorStop(0.5, "rgba(0,0,0," + (0.1 + (a / 150)) + ")");
+            grad.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = lw;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(cpX, cpY, x2, y2);
+            ctx.stroke();
+        }
+    }
+
+    function applyDirt(a) {
+        applyDirtSpecks(a);
+        const overlay = Math.min(0.5, a / 200);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            d[i] = d[i] + (overlay * (Math.random() - 0.5) * brightness);
+            d[i + 1] = d[i + 1] + (overlay * (Math.random() - 0.5) * brightness);
+            d[i + 2] = d[i + 2] + (overlay * (Math.random() - 0.5) * brightness)
+        }
+        ctx.putImageData(img, 0, 0)
+    }
+
+    function applyDirtSpecks(a) {
+        const n = Math.floor(canvas.width * canvas.height * 0.00005 * a);
+        for (let i = 0; i < n; i++) {
+            const x = Math.random() * canvas.width,
+                y = Math.random() * canvas.height,
+                s = Math.random() * 3 + 1,
+                alp = Math.random() * 0.3 + 0.2;
+            ctx.fillStyle = `rgba(0,0,0,${alp})`;
+            ctx.beginPath();
+            ctx.arc(x, y, s, 0, 2 * Math.PI);
+            ctx.fill()
+        }
+    }
+
+    function applySkew(ang) {
+        const sr = ang * Math.PI / 180,
+            tmp = document.createElement("canvas");
+        tmp.width = canvas.width;
+        tmp.height = canvas.height;
+        tmp.getContext("2d").drawImage(canvas, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.transform(1, 0, Math.tan(sr), 1, 0, 0);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        ctx.drawImage(tmp, 0, 0);
+        ctx.restore()
+    }
+
+    function applyScannerBorder(a) {
+        const bs = Math.max(5, canvas.width * 0.02 * (a / 50));
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.fillRect(0, 0, canvas.width, bs);
+        ctx.fillRect(0, canvas.height - bs, canvas.width, bs);
+        ctx.fillRect(0, 0, bs, canvas.height);
+        ctx.fillRect(canvas.width - bs, 0, bs, canvas.height)
+    }
+
+    function applyCurl(a) {
+        if (a < 1) return;
+        const cs = Math.max(10, canvas.width * 0.05 * (a / 50)),
+            img = ctx.getImageData(canvas.width - cs, canvas.height - cs, cs, cs);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(canvas.width, canvas.height - cs);
+        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cs, canvas.height);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.closePath();
+        ctx.clip();
+        ctx.clearRect(canvas.width - cs, canvas.height - cs, cs, cs);
+        ctx.restore();
+        const tmp = document.createElement("canvas");
+        tmp.width = cs;
+        tmp.height = cs;
+        tmp.getContext("2d").putImageData(img, 0, 0);
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.translate(canvas.width - cs, canvas.height - cs);
+        ctx.rotate(-Math.PI / 8);
+        ctx.drawImage(tmp, 0, 0, cs, cs);
+        ctx.restore();
+    }
+
+    function applyFade(a) {
+        if (a < 1) return;
+        const intens = a / 100,
+            grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        grad.addColorStop(0, "rgba(255,255,255,0)");
+        grad.addColorStop(1, "rgba(255,255,255," + intens + ")");
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = "source-over";
+    }
+
+    function applyMoire(a) {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data,
+            amp = a / 50;
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const idx = (y * canvas.width + x) * 4,
+                    off = Math.sin(x / 10) * amp;
+                d[idx] = Math.max(0, Math.min(255, d[idx] + off));
+                d[idx + 1] = Math.max(0, Math.min(255, d[idx + 1] + off));
+                d[idx + 2] = Math.max(0, Math.min(255, d[idx + 2] + off));
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+    }
+
+    function applyColorMapping() {
+        if (!controls.colorMap || !controls.colorMap.checked) return;
+        const content = hexToRgb(document.getElementById("contentColor").value),
+            bg = hexToRgb(document.getElementById("backgroundColor").value);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height),
+            d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const b = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            if (b < 128) {
+                d[i] = content.r;
+                d[i + 1] = content.g;
+                d[i + 2] = content.b
+            } else {
+                d[i] = bg.r;
+                d[i + 1] = bg.g;
+                d[i + 2] = bg.b
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+    }
+
+    function hexToRgb(hex) {
+        hex = hex.replace("#", "");
+        const num = parseInt(hex, 16);
+        return {
+            r: (num >> 16) & 255,
+            g: (num >> 8) & 255,
+            b: num & 255
+        };
+    }
+
+    function toggleBatchMode() {
+        processingBatch = !processingBatch;
+        document.getElementById("batchBtn").textContent = processingBatch ? "Cancel Batch" : "Batch Process";
+        if (processingBatch) {
+            if (isPDF && pdfDoc) {
+                processBatch();
+            } else {
+                alert("Batch processing is only for multi-page PDFs.");
+                processingBatch = false;
+            }
+        }
+    }
+    async function processBatch() {
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            await renderPage(i);
+            pages.push(canvas.toDataURL());
+        }
+        cachedPages = pages.map(src => {
+            const img = new Image();
+            img.src = src;
+            return img;
+        });
+        alert("Batch processing complete. You can now save all pages.");
+    }
+
+    function saveAsImage() {
+        const link = document.createElement("a");
+        link.download = fileName + ".png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+    }
+
+    function saveAsPdf() {
+        const pdf = new jsPDF({
+            orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+            unit: "px",
+            format: [canvas.width, canvas.height]
+        });
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+        pdf.save(fileName + ".pdf");
+    }
+
+    function saveAllPages() {
+        if (!processingBatch || !cachedPages.length) {
+            alert("No batch processed pages available.");
+            return;
+        }
+        const pdf = new jsPDF({
+            orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+            unit: "px",
+            format: [canvas.width, canvas.height]
+        });
+        cachedPages.forEach((img, index) => {
+            if (index > 0) pdf.addPage();
+            pdf.addImage(img.src, "PNG", 0, 0, canvas.width, canvas.height)
+        });
+        pdf.save(fileName + "_all.pdf");
+    }
+
+    function resetControls() {
+        controls.brightness.value = 100;
+        controls.brightness.nextElementSibling.textContent = 100;
+        controls.contrast.value = 100;
+        controls.contrast.nextElementSibling.textContent = 100;
+        controls.resolution && (controls.resolution.value = 100, controls.resolution.nextElementSibling.textContent = 100);
+        controls.threshold.value = 0;
+        controls.threshold.nextElementSibling.textContent = 0;
+        controls.noise.value = 0;
+        controls.noise.nextElementSibling.textContent = 0;
+        controls.coffee.value = 0;
+        controls.coffee.nextElementSibling.textContent = 0;
+        controls.scanlines.value = 0;
+        controls.scanlines.nextElementSibling.textContent = 0;
+        controls.creases.value = 0;
+        controls.creases.nextElementSibling.textContent = 0;
+        controls.dirt.value = 0;
+        controls.dirt.nextElementSibling.textContent = 0;
+        controls.skew.value = 0;
+        controls.skew.nextElementSibling.textContent = 0;
+        controls.border.value = 0;
+        controls.border.nextElementSibling.textContent = 0;
+        controls.curl.value = 0;
+        controls.curl.nextElementSibling.textContent = 0;
+        controls.fade.value = 0;
+        controls.fade.nextElementSibling.textContent = 0;
+        controls.moire.value = 0;
+        controls.moire.nextElementSibling.textContent = 0;
+        if (controls.colorMap) controls.colorMap.checked = false;
+        document.getElementById("contentColor").value = "#000000";
+        document.getElementById("backgroundColor").value = "#ffffff";
+        controls.grayscale.checked = false;
+        applyEffects();
+    }
+    </script>
+</body>
+
+</html>
