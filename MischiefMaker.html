@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stop It Please Disorientation Generator</title>
+    <title>Turn that shit off Generator</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -11,7 +11,8 @@
             color: #e0e0e0;
             margin: 0;
             padding: 20px;
-            line-height: 1.3;
+            line-height: 1.1;
+            overscroll-behavior: none;
         }
         .container {
             max-width: 600px;
@@ -21,7 +22,7 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        h1 {
+        h1, h2 {
             text-align: center;
             color: #0f3460;
             background-color: #e94560;
@@ -53,6 +54,7 @@
             flex: 0.5;
             color: #e0e0e0;
             margin-left: 10px;
+            min-width: 50px;
         }
         button {
             background-color: #e94560;
@@ -63,6 +65,8 @@
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         button:hover {
             background-color: #ff6b81;
@@ -70,6 +74,10 @@
         }
         button:active {
             transform: scale(0.95);
+        }
+        button.active {
+            background-color: #ff6b81;
+            box-shadow: 0 0 8px #ff6b81;
         }
         #visualizer {
             width: 100%;
@@ -84,12 +92,93 @@
             gap: 5px;
             justify-content: center;
         }
+        .toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 26px;
+            margin-right: 10px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 26px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #e94560;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        .shake {
+            animation: shake 0.5s infinite;
+        }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .flash {
+            animation: flash 0.3s infinite alternate;
+        }
+        @keyframes flash {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.5); }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 5px; }
+            button { padding: 8px 10px; font-size: 0.7em; }
+            .slider-container { flex-direction: column; align-items: flex-start; }
+            .slider-container label { margin-bottom: 5px; }
+            .slider-container input[type="range"] { width: 100%; }
+            .slider-container span { margin-top: 5px; align-self: flex-end; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Advanced Ear Wrestler And Disorientation Generator</h1>
-<div class="control-group button-group">
+    <div class="container" id="mainContainer">
+        <h1>Ear Wrestler And Bad Noise Generator</h1>
+        <div class="control-group button-group">
             <button id="playButton">Start Tone</button>
             <button id="stopButton">Stop Tone</button>
             <button id="autoToggleButton">Auto Morph</button>
@@ -103,7 +192,7 @@
             </div>
             <div class="slider-container">
                 <label for="detuneSlider">Detune (Cents)</label>
-                <input type="range" id="detuneSlider" min="-100" max="1000" step="1" value="0">
+                <input type="range" id="detuneSlider" min="-1000" max="1000" step="1" value="0">
                 <span id="detuneValue">0</span> cents
             </div>
             <div class="slider-container">
@@ -130,9 +219,61 @@
                 <input type="range" id="gainSlider" min="-2" max="50" step="0.01" value="1">
                 <span id="gainValue">1</span>
             </div>
+            <div class="slider-container">
+                <label for="stereoWidthSlider">Stereo Width</label>
+                <input type="range" id="stereoWidthSlider" min="0" max="1" step="0.01" value="0.5">
+                <span id="stereoWidthValue">0.5</span>
+            </div>
+            <div class="slider-container">
+                <label for="stereoSpeedSlider">Stereo Oscillation</label>
+                <input type="range" id="stereoSpeedSlider" min="0" max="10" step="0.01" value="1">
+                <span id="stereoSpeedValue">1</span> Hz
+            </div>
         </div>
 
-        
+        <div class="control-group">
+            <h2>Advanced Effects</h2>
+            <div class="toggles">
+                <div class="toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="dualToneToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="dualToneToggle">Dual Tone</label>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="binauraBeatsToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="binauraBeatsToggle">Binaural Beats</label>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="noiseToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="noiseToggle">White Noise</label>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="screenEffectsToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="screenEffectsToggle">Visual Effects</label>
+                </div>
+            </div>
+            <div class="slider-container">
+                <label for="dualToneOffset">Dual Tone Offset (Hz)</label>
+                <input type="range" id="dualToneOffset" min="1" max="1000" step="0.1" value="10">
+                <span id="dualToneOffsetValue">10</span> Hz
+            </div>
+            <div class="slider-container">
+                <label for="noiseVolumeSlider">Noise Volume</label>
+                <input type="range" id="noiseVolumeSlider" min="0" max="1" step="0.01" value="0.2">
+                <span id="noiseVolumeValue">0.2</span>
+            </div>
+        </div>
 
         <div class="control-group">
             <h2>Preset Annoying Tones</h2>
@@ -144,9 +285,12 @@
                 <button id="highPitchTone1">Extreme High 1</button>
                 <button id="highPitchTone2">Extreme High 2</button>
                 <button id="dogTone">Dog Goes Mad</button>
+                <button id="humanDiscomfort">Human Discomfort</button>
+                <button id="migraine">Migraine Trigger</button>
                 <button id="detuneRandomButton">Random Detune</button>
-                <button id="startButton">Evasive Sound Mode</button>
                 <button id="evasiveBtn">Evasive Mode</button>
+                <button id="pulseBtn">Pulsing Wave</button>
+                <button id="randomBtn">Chaos Mode</button>
             </div>
         </div>
 
@@ -155,297 +299,846 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-    // Audio context setup
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Audio context setup
+            let audioContext;
+            
+            // Prevent auto-starting on mobile
+            function initAudio() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                document.removeEventListener('touchstart', initAudio);
+                document.removeEventListener('click', initAudio);
+            }
+            
+            document.addEventListener('touchstart', initAudio);
+            document.addEventListener('click', initAudio);
 
-    // DOM Element Selections
-    const elements = {
-        frequencySlider: document.getElementById('frequencySlider'),
-        detuneSlider: document.getElementById('detuneSlider'),
-        modulationFreqSlider: document.getElementById('modulationFreqSlider'),
-        modulationDepthSlider: document.getElementById('modulationDepthSlider'),
-        volumeSlider: document.getElementById('volumeSlider'),
-        gainSlider: document.getElementById('gainSlider'),
-        frequencyValue: document.getElementById('frequencyValue'),
-        detuneValue: document.getElementById('detuneValue'),
-        modulationFreqValue: document.getElementById('modulationFreqValue'),
-        modulationDepthValue: document.getElementById('modulationDepthValue'),
-        volumeValue: document.getElementById('volumeValue'),
-        gainValue: document.getElementById('gainValue'),
-        playButton: document.getElementById('playButton'),
-        stopButton: document.getElementById('stopButton'),
-        autoToggleButton: document.getElementById('autoToggleButton'),
-        evasiveBtn: document.getElementById('evasiveBtn'),
-        canvas: document.getElementById('visualizer'),
-        annoyingTones: {
-            tone1: document.getElementById('annoyingTone1'),
-            tone2: document.getElementById('annoyingTone2'),
-            tone3: document.getElementById('annoyingTone3'),
-            tone4: document.getElementById('annoyingTone4'),
-            highPitch1: document.getElementById('highPitchTone1'),
-            highPitch2: document.getElementById('highPitchTone2'),
-            dogTone: document.getElementById('dogTone'),
-            detuneRandom: document.getElementById('detuneRandomButton')
-        }
-    };
+            // DOM Element Selections
+            const elements = {
+                frequencySlider: document.getElementById('frequencySlider'),
+                detuneSlider: document.getElementById('detuneSlider'),
+                modulationFreqSlider: document.getElementById('modulationFreqSlider'),
+                modulationDepthSlider: document.getElementById('modulationDepthSlider'),
+                volumeSlider: document.getElementById('volumeSlider'),
+                gainSlider: document.getElementById('gainSlider'),
+                stereoWidthSlider: document.getElementById('stereoWidthSlider'),
+                stereoSpeedSlider: document.getElementById('stereoSpeedSlider'),
+                dualToneOffset: document.getElementById('dualToneOffset'),
+                noiseVolumeSlider: document.getElementById('noiseVolumeSlider'),
+                frequencyValue: document.getElementById('frequencyValue'),
+                detuneValue: document.getElementById('detuneValue'),
+                modulationFreqValue: document.getElementById('modulationFreqValue'),
+                modulationDepthValue: document.getElementById('modulationDepthValue'),
+                volumeValue: document.getElementById('volumeValue'),
+                gainValue: document.getElementById('gainValue'),
+                stereoWidthValue: document.getElementById('stereoWidthValue'),
+                stereoSpeedValue: document.getElementById('stereoSpeedValue'),
+                dualToneOffsetValue: document.getElementById('dualToneOffsetValue'),
+                noiseVolumeValue: document.getElementById('noiseVolumeValue'),
+                playButton: document.getElementById('playButton'),
+                stopButton: document.getElementById('stopButton'),
+                autoToggleButton: document.getElementById('autoToggleButton'),
+                evasiveBtn: document.getElementById('evasiveBtn'),
+                pulseBtn: document.getElementById('pulseBtn'),
+                randomBtn: document.getElementById('randomBtn'),
+                dualToneToggle: document.getElementById('dualToneToggle'),
+                binauraBeatsToggle: document.getElementById('binauraBeatsToggle'),
+                noiseToggle: document.getElementById('noiseToggle'),
+                screenEffectsToggle: document.getElementById('screenEffectsToggle'),
+                mainContainer: document.getElementById('mainContainer'),
+                canvas: document.getElementById('visualizer'),
+                annoyingTones: {
+                    tone1: document.getElementById('annoyingTone1'),
+                    tone2: document.getElementById('annoyingTone2'),
+                    tone3: document.getElementById('annoyingTone3'),
+                    tone4: document.getElementById('annoyingTone4'),
+                    highPitch1: document.getElementById('highPitchTone1'),
+                    highPitch2: document.getElementById('highPitchTone2'),
+                    dogTone: document.getElementById('dogTone'),
+                    humanDiscomfort: document.getElementById('humanDiscomfort'),
+                    migraine: document.getElementById('migraine'),
+                    detuneRandom: document.getElementById('detuneRandomButton')
+                }
+            };
 
-    // Audio Nodes
-    let audioNodes = {
-        oscillator: null,
-        gainNode: null,
-        modulationOscillator: null,
-        modulationGainNode: null,
-        analyser: null
-    };
+            // Audio Nodes
+            let audioNodes = {
+                oscillator: null,
+                oscillatorRight: null,
+                gainNode: null,
+                gainNodeRight: null,
+                modulationOscillator: null,
+                modulationGainNode: null,
+                analyser: null,
+                stereoPanner: null,
+                noiseSource: null,
+                noiseGain: null,
+                compressor: null,
+                merger: null
+            };
 
-    // Visualization Context
-    const ctx = elements.canvas.getContext('2d');
-    ctx.canvas.width = elements.canvas.offsetWidth;
-    ctx.canvas.height = elements.canvas.offsetHeight;
+            // Visualization Context
+            const ctx = elements.canvas.getContext('2d');
+            ctx.canvas.width = elements.canvas.offsetWidth;
+            ctx.canvas.height = elements.canvas.offsetHeight;
 
-    // Audio State
-    let state = {
-        isPlaying: false,
-        isAutoToggle: false,
-        autoToggleInterval: null,
-        evasiveInterval: null
-    };
+            // Audio State
+            let state = {
+                isPlaying: false,
+                isAutoToggle: false,
+                isPulsing: false,
+                autoToggleInterval: null,
+                evasiveInterval: null,
+                pulseInterval: null,
+                randomInterval: null,
+                stereoOscillator: null
+            };
 
-    function setupAudioNodes() {
-        // Safely stop and disconnect existing nodes
-        if (audioNodes.oscillator) {
-            audioNodes.oscillator.stop();
-            audioNodes.oscillator.disconnect();
-        }
-        if (audioNodes.modulationOscillator) {
-            audioNodes.modulationOscillator.stop();
-            audioNodes.modulationOscillator.disconnect();
-        }
+            // Main audio setup function
+            function setupAudioNodes() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Resume context if suspended (autoplay policy)
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                
+                // Clean up existing nodes
+                clearAllIntervals();
+                if (audioNodes.oscillator) {
+                    try {
+                        audioNodes.oscillator.stop();
+                        audioNodes.oscillator.disconnect();
+                    } catch (e) {}
+                }
+                if (audioNodes.oscillatorRight) {
+                    try {
+                        audioNodes.oscillatorRight.stop();
+                        audioNodes.oscillatorRight.disconnect();
+                    } catch (e) {}
+                }
+                if (audioNodes.modulationOscillator) {
+                    try {
+                        audioNodes.modulationOscillator.stop();
+                        audioNodes.modulationOscillator.disconnect();
+                    } catch (e) {}
+                }
+                if (audioNodes.noiseSource) {
+                    try {
+                        audioNodes.noiseSource.stop();
+                        audioNodes.noiseSource.disconnect();
+                    } catch (e) {}
+                }
 
-        // Create new audio nodes
-        audioNodes.oscillator = audioContext.createOscillator();
-        audioNodes.gainNode = audioContext.createGain();
-        audioNodes.modulationOscillator = audioContext.createOscillator();
-        audioNodes.modulationGainNode = audioContext.createGain();
-        audioNodes.analyser = audioContext.createAnalyser();
-
-        // Node connections
-        audioNodes.oscillator.connect(audioNodes.gainNode);
-        audioNodes.gainNode.connect(audioNodes.analyser);
-        audioNodes.analyser.connect(audioContext.destination);
-
-        audioNodes.modulationOscillator.connect(audioNodes.modulationGainNode);
-        audioNodes.modulationGainNode.connect(audioNodes.gainNode.gain);
-
-        // Start oscillators
-        audioNodes.oscillator.start();
-        audioNodes.modulationOscillator.start();
-
-        state.isPlaying = true;
-    }
-
-    function updateSound() {
-        if (!state.isPlaying) return;
-
-        const frequency = parseFloat(elements.frequencySlider.value);
-        const detune = parseFloat(elements.detuneSlider.value);
-        const modulationFreq = parseFloat(elements.modulationFreqSlider.value);
-        const modulationDepth = parseFloat(elements.modulationDepthSlider.value);
-        const volume = parseFloat(elements.volumeSlider.value);
-        const gain = parseFloat(elements.gainSlider.value);
-
-        // Update oscillator parameters
-        audioNodes.oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-        audioNodes.oscillator.detune.setValueAtTime(detune, audioContext.currentTime);
-        audioNodes.modulationOscillator.frequency.setValueAtTime(modulationFreq, audioContext.currentTime);
-        audioNodes.modulationGainNode.gain.setValueAtTime(modulationDepth, audioContext.currentTime);
-        audioNodes.gainNode.gain.setValueAtTime(volume * gain, audioContext.currentTime);
-
-        // Update UI values
-        elements.frequencyValue.textContent = frequency;
-        elements.detuneValue.textContent = detune;
-        elements.modulationFreqValue.textContent = modulationFreq;
-        elements.modulationDepthValue.textContent = modulationDepth.toFixed(2);
-        elements.volumeValue.textContent = volume.toFixed(2);
-        elements.gainValue.textContent = gain.toFixed(2);
-
-        visualizeSound();
-    }
-
-    function visualizeSound() {
-        const analyser = audioNodes.analyser;
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        requestAnimationFrame(visualizeSound);
-        analyser.getByteFrequencyData(dataArray);
-        
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        
-        const barWidth = (ctx.canvas.width / bufferLength) * 2.5;
-        let x = 0;
-
-        for(let i = 0; i < bufferLength; i++) {
-            const barHeight = dataArray[i] / 2;
-            ctx.fillStyle = `hsl(${i * 360 / bufferLength}, 70%, 50%)`;
-            ctx.fillRect(x, ctx.canvas.height - barHeight, barWidth, barHeight);
-            x += barWidth + 1;
-        }
-    }
-
-    // Event Listeners
-    function addSliderListeners() {
-        [
-            'frequencySlider', 
-            'detuneSlider', 
-            'modulationFreqSlider', 
-            'modulationDepthSlider', 
-            'volumeSlider', 
-            'gainSlider'
-        ].forEach(sliderId => {
-            elements[sliderId].addEventListener('input', updateSound);
-        });
-    }
-
-    addSliderListeners();
-
-    elements.playButton.addEventListener('click', () => {
-        if (!state.isPlaying) {
-            setupAudioNodes();
-            updateSound();
-        }
-    });
-
-    elements.stopButton.addEventListener('click', () => {
-        if (state.isPlaying) {
-            state.isPlaying = false;
-            audioNodes.oscillator.stop();
-            audioNodes.modulationOscillator.stop();
-            audioNodes.gainNode.disconnect();
-            audioNodes.analyser.disconnect();
-        }
-    });
-
-    // Auto Toggle (Morphing Tone)
-    elements.autoToggleButton.addEventListener('click', () => {
-        state.isAutoToggle = !state.isAutoToggle;
-        if (state.isAutoToggle) {
-            elements.autoToggleButton.textContent = 'Stop Auto Morph';
-            state.autoToggleInterval = setInterval(() => {
-                elements.frequencySlider.value = Math.random() * (10000 - 10) + 10;
-                elements.detuneSlider.value = Math.random() * (2000 - (-2000)) + (-2000);
+                // Create new audio nodes
+                audioNodes.compressor = audioContext.createDynamicsCompressor();
+                audioNodes.merger = audioContext.createChannelMerger(2);
+                
+                // Main oscillator (left channel)
+                audioNodes.oscillator = audioContext.createOscillator();
+                audioNodes.gainNode = audioContext.createGain();
+                
+                // Secondary oscillator (right channel or dual tone)
+                audioNodes.oscillatorRight = audioContext.createOscillator();
+                audioNodes.gainNodeRight = audioContext.createGain();
+                
+                // Modulation for frequency
+                audioNodes.modulationOscillator = audioContext.createOscillator();
+                audioNodes.modulationGainNode = audioContext.createGain();
+                
+                // Stereo panning
+                audioNodes.stereoPanner = audioContext.createStereoPanner();
+                
+                // Noise generator
+                const bufferSize = 2 * audioContext.sampleRate;
+                const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                audioNodes.noiseSource = audioContext.createBufferSource();
+                audioNodes.noiseSource.buffer = noiseBuffer;
+                audioNodes.noiseSource.loop = true;
+                audioNodes.noiseGain = audioContext.createGain();
+                
+                // Analyzer for visualization
+                audioNodes.analyser = audioContext.createAnalyser();
+                audioNodes.analyser.fftSize = 1024;
+                
+                // Base connections for main oscillator
+                audioNodes.oscillator.connect(audioNodes.gainNode);
+                audioNodes.gainNode.connect(audioNodes.merger, 0, 0); // Left channel
+                
+                // Right oscillator connections
+                audioNodes.oscillatorRight.connect(audioNodes.gainNodeRight);
+                audioNodes.gainNodeRight.connect(audioNodes.merger, 0, 1); // Right channel
+                
+                // Noise connections
+                audioNodes.noiseSource.connect(audioNodes.noiseGain);
+                audioNodes.noiseGain.connect(audioNodes.merger);
+                
+                // Modulation connections
+                audioNodes.modulationOscillator.connect(audioNodes.modulationGainNode);
+                audioNodes.modulationGainNode.connect(audioNodes.oscillator.frequency);
+                audioNodes.modulationGainNode.connect(audioNodes.oscillatorRight.frequency);
+                
+                // Final output chain
+                audioNodes.merger.connect(audioNodes.stereoPanner);
+                audioNodes.stereoPanner.connect(audioNodes.compressor);
+                audioNodes.compressor.connect(audioNodes.analyser);
+                audioNodes.analyser.connect(audioContext.destination);
+                
+                // Start sound sources
+                audioNodes.oscillator.start();
+                audioNodes.oscillatorRight.start();
+                audioNodes.modulationOscillator.start();
+                audioNodes.noiseSource.start();
+                
+                state.isPlaying = true;
+                
+                // Setup stereo oscillation if enabled
+                setupStereoOscillation();
+                
+                // Initial update
                 updateSound();
-            }, 100);
-        } else {
-            elements.autoToggleButton.textContent = 'Start Auto Morph';
-            clearInterval(state.autoToggleInterval);
-        }
-    });
+            }
 
-    // Preset Annoying Tones
-    function setPresetTone(freq, detune, modFreq, modDepth, volume, gain) {
-        elements.frequencySlider.value = freq;
-        elements.detuneSlider.value = detune;
-        elements.modulationFreqSlider.value = modFreq;
-        elements.modulationDepthSlider.value = modDepth;
-        elements.volumeSlider.value = volume;
-        elements.gainSlider.value = gain;
-        updateSound();
-    }
+            // Setup stereo oscillation
+            function setupStereoOscillation() {
+                const stereoSpeed = parseFloat(elements.stereoSpeedSlider.value);
+                if (stereoSpeed > 0) {
+                    state.stereoOscillator = setInterval(() => {
+                        const now = audioContext.currentTime;
+                        const width = parseFloat(elements.stereoWidthSlider.value);
+                        const panValue = Math.sin(now * stereoSpeed * Math.PI * 2) * width;
+                        audioNodes.stereoPanner.pan.setValueAtTime(panValue, now);
+                    }, 16); // ~60fps
+                }
+            }
 
-    elements.annoyingTones.tone1.addEventListener('click', () => {
-        setPresetTone(200, 500, 50, 0.8, 0.7, 1.5);
-    });
+            // Update sound parameters
+            function updateSound() {
+                if (!state.isPlaying || !audioContext) return;
 
-    elements.annoyingTones.tone2.addEventListener('click', () => {
-        setPresetTone(10000, -2000, 100, 1, 0.8, 1);
-    });
+                // Get current values from sliders
+                const frequency = parseFloat(elements.frequencySlider.value);
+                const detune = parseFloat(elements.detuneSlider.value);
+                const modulationFreq = parseFloat(elements.modulationFreqSlider.value);
+                const modulationDepth = parseFloat(elements.modulationDepthSlider.value);
+                const volume = parseFloat(elements.volumeSlider.value);
+                const gain = parseFloat(elements.gainSlider.value);
+                const stereoWidth = parseFloat(elements.stereoWidthSlider.value);
+                const stereoSpeed = parseFloat(elements.stereoSpeedSlider.value);
+                const dualToneOffset = parseFloat(elements.dualToneOffset.value);
+                const noiseVolume = parseFloat(elements.noiseVolumeSlider.value);
+                
+                // Apply to audio nodes
+                const now = audioContext.currentTime;
+                
+                // Main oscillator (left)
+                audioNodes.oscillator.frequency.setValueAtTime(frequency, now);
+                audioNodes.oscillator.detune.setValueAtTime(detune, now);
+                
+                // Second oscillator (right)
+                const secondFreq = elements.binauraBeatsToggle.checked ? 
+                    frequency + dualToneOffset : frequency;
+                audioNodes.oscillatorRight.frequency.setValueAtTime(secondFreq, now);
+                audioNodes.oscillatorRight.detune.setValueAtTime(detune, now);
+                
+                // Modulation
+                audioNodes.modulationOscillator.frequency.setValueAtTime(modulationFreq, now);
+                audioNodes.modulationGainNode.gain.setValueAtTime(modulationDepth, now);
+                
+                // Volume and gain
+                const baseGain = volume * gain;
+                audioNodes.gainNode.gain.setValueAtTime(baseGain, now);
+                
+                // Handle dual tone mode
+                if (elements.dualToneToggle.checked) {
+                    audioNodes.oscillatorRight.frequency.setValueAtTime(frequency + dualToneOffset, now);
+                    audioNodes.gainNodeRight.gain.setValueAtTime(baseGain, now);
+                } else if (!elements.binauraBeatsToggle.checked) {
+                    // If not in dual tone or binaural mode, mute right oscillator
+                    audioNodes.gainNodeRight.gain.setValueAtTime(0, now);
+                } else {
+                    audioNodes.gainNodeRight.gain.setValueAtTime(baseGain, now);
+                }
+                
+                // Noise
+                if (elements.noiseToggle.checked) {
+                    audioNodes.noiseGain.gain.setValueAtTime(noiseVolume * volume, now);
+                } else {
+                    audioNodes.noiseGain.gain.setValueAtTime(0, now);
+                }
+                
+                // Stereo
+                audioNodes.stereoPanner.pan.setValueAtTime(elements.binauraBeatsToggle.checked ? 0 : (Math.random() * 2 - 1) * stereoWidth, now);
+                
+                // Clear and reset stereo oscillation if needed
+                if (state.stereoOscillator) {
+                    clearInterval(state.stereoOscillator);
+                    state.stereoOscillator = null;
+                }
+                if (stereoSpeed > 0 && !elements.binauraBeatsToggle.checked) {
+                    setupStereoOscillation();
+                }
+                
+                // Visual effects
+                if (elements.screenEffectsToggle.checked) {
+                    elements.mainContainer.classList.add('flash');
+                    document.body.classList.add('shake');
+                } else {
+                    elements.mainContainer.classList.remove('flash');
+                    document.body.classList.remove('shake');
+                }
 
-    elements.annoyingTones.tone3.addEventListener('click', () => {
-        setPresetTone(1000, 0, 20, 0.5, 0.8, 1);
-    });
+                // Update display values
+                elements.frequencyValue.textContent = frequency;
+                elements.detuneValue.textContent = detune;
+                elements.modulationFreqValue.textContent = modulationFreq;
+                elements.modulationDepthValue.textContent = modulationDepth.toFixed(2);
+                elements.volumeValue.textContent = volume.toFixed(2);
+                elements.gainValue.textContent = gain.toFixed(2);
+                elements.stereoWidthValue.textContent = stereoWidth.toFixed(2);
+                elements.stereoSpeedValue.textContent = stereoSpeed.toFixed(1);
+                elements.dualToneOffsetValue.textContent = dualToneOffset;
+                elements.noiseVolumeValue.textContent = noiseVolume.toFixed(2);
+            }
 
-    elements.annoyingTones.tone4.addEventListener('click', () => {
-        setPresetTone(15000, 0, 25, 1.0, 0.5, 1);
-    });
+            // Sound visualization
+            function visualizeSound() {
+                if (!audioNodes.analyser || !state.isPlaying) return;
+                
+                requestAnimationFrame(visualizeSound);
+                
+                const analyser = audioNodes.analyser;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                analyser.getByteFrequencyData(dataArray);
+                
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                const barWidth = (ctx.canvas.width / bufferLength) * 2.5;
+                let x = 0;
 
-    elements.annoyingTones.highPitch1.addEventListener('click', () => {
-        setPresetTone(15000, 0, 30, 1.5, 0.8, 2);
-    });
+                for(let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    // Dynamic coloring based on frequencies
+                    const hue = (i * 360 / bufferLength + (audioContext.currentTime * 20)) % 360;
+                    ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+                    ctx.fillRect(x, ctx.canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
 
-    elements.annoyingTones.highPitch2.addEventListener('click', () => {
-        setPresetTone(13000, 0, 30, 1.5, 0.9, 2);
-    });
+            // Pulse effect - rhythmic volume modulation
+            function startPulseEffect() {
+                if (state.pulseInterval) {
+                    clearInterval(state.pulseInterval);
+                }
+                
+                const baseVolume = parseFloat(elements.volumeSlider.value);
+                const baseGain = parseFloat(elements.gainSlider.value);
+                let pulseUp = true;
+                
+                state.isPulsing = true;
+                elements.pulseBtn.classList.add('active');
+                
+                state.pulseInterval = setInterval(() => {
+                    if (!state.isPlaying) return;
+                    
+                    const now = audioContext.currentTime;
+                    const pulseMagnitude = pulseUp ? baseGain * 1.5 : baseGain * 0.5;
+                    
+                    audioNodes.gainNode.gain.setValueAtTime(baseVolume * pulseMagnitude, now);
+                    audioNodes.gainNodeRight.gain.setValueAtTime(baseVolume * pulseMagnitude, now);
+                    
+                    pulseUp = !pulseUp;
+                }, 100 + Math.random() * 300); // Random pulse rate for added discomfort
+            }
 
-    elements.annoyingTones.dogTone.addEventListener('click', () => {
-        setPresetTone(12000, 0, 50, 0.6, 0.7, 1.4);
-    });
+            // Stop pulse effect
+            function stopPulseEffect() {
+                if (state.pulseInterval) {
+                    clearInterval(state.pulseInterval);
+                    state.pulseInterval = null;
+                }
+                state.isPulsing = false;
+                elements.pulseBtn.classList.remove('active');
+                updateSound(); // Reset to normal volume
+            }
 
-    elements.annoyingTones.detuneRandom.addEventListener('click', () => {
-        elements.detuneSlider.value = Math.random() * (2000 - (-2000)) + (-2000);
-        updateSound();
-    });
+            // Random parameter changes - "Chaos Mode"
+            function startRandomMode() {
+                if (state.randomInterval) {
+                    clearInterval(state.randomInterval);
+                }
+                
+                elements.randomBtn.classList.add('active');
+                
+                state.randomInterval = setInterval(() => {
+                    if (!state.isPlaying) return;
+                    
+                    // Randomly choose which parameters to change
+                    const params = [
+                        'frequency', 'detune', 'modulationFreq', 'modulationDepth',
+                        'stereoWidth', 'stereoSpeed'
+                    ];
+                    
+                    // Only change 1-3 parameters at a time for more unsettling effect
+                    const numToChange = Math.floor(Math.random() * 3) + 1;
+                    for (let i = 0; i < numToChange; i++) {
+                        const paramIndex = Math.floor(Math.random() * params.length);
+                        const param = params[paramIndex];
+                        
+                        switch(param) {
+                            case 'frequency':
+                                elements.frequencySlider.value = Math.random() * 15000 + 5000;
+                                break;
+                            case 'detune':
+                                elements.detuneSlider.value = (Math.random() * 2000) - 1000;
+                                break;
+                            case 'modulationFreq':
+                                elements.modulationFreqSlider.value = Math.random() * 100;
+                                break;
+                            case 'modulationDepth':
+                                elements.modulationDepthSlider.value = Math.random() * 100;
+                                break;
+                            case 'stereoWidth':
+                                elements.stereoWidthSlider.value = Math.random();
+                                break;
+                            case 'stereoSpeed':
+                                elements.stereoSpeedSlider.value = Math.random() * 10;
+                                break;
+                        }
+                    }
+                    
+                    updateSound();
+                }, 2000 + Math.random() * 3000); // Random intervals between 2-5 seconds
+            }
 
-    // Evasive Mode Button
-    elements.evasiveBtn.addEventListener('click', () => {
-        evasiveMode();
-    });
+            // Stop random parameter changes
+            function stopRandomMode() {
+                if (state.randomInterval) {
+                    clearInterval(state.randomInterval);
+                    state.randomInterval = null;
+                }
+                elements.randomBtn.classList.remove('active');
+            }
 
-    // Evasive Mode Logic
-    function evasiveMode() {
-        stopOscillator();
-        initializeContext();
-        audioNodes.oscillator = audioContext.createOscillator();
-        audioNodes.gainNode = audioContext.createGain();
-        audioNodes.oscillator.connect(audioNodes.gainNode);
-        audioNodes.gainNode.connect(audioContext.destination);
-        audioNodes.oscillator.start();
-        
-        const fade = (gainNode, target, duration) => {
-            const now = audioContext.currentTime;
-            gainNode.gain.cancelScheduledValues(now);
-            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-            gainNode.gain.linearRampToValueAtTime(target, now + duration);
-        };
-        
-        const playBurst = () => {
-            const randomFrequency = Math.random() * 5000 + 8000;
-            audioNodes.oscillator.frequency.setValueAtTime(randomFrequency, audioContext.currentTime);
-            fade(audioNodes.gainNode, 0.5, 2);
-            setTimeout(() => fade(audioNodes.gainNode, 0, 2), 3000);
-            const randomDelay = Math.random() * (15 - 5) + 5;
-            state.evasiveInterval = setTimeout(playBurst, (7 + randomDelay) * 1000);
-        };
-        
-        playBurst();
-    }
+            // Evasive mode - frequency changes to avoid habituation
+            function startEvasiveMode() {
+                if (state.evasiveInterval) {
+                    clearInterval(state.evasiveInterval);
+                }
+                
+                elements.evasiveBtn.classList.add('active');
+                
+                const baseFreq = parseFloat(elements.frequencySlider.value);
+                
+                state.evasiveInterval = setInterval(() => {
+                    if (!state.isPlaying) return;
+                    
+                    // Subtle changes to frequency and detune
+                    const freqShift = (Math.random() * 200) - 100; // +/- 100 Hz
+                    const detuneShift = (Math.random() * 200) - 100; // +/- 100 cents
+                    
+                    elements.frequencySlider.value = baseFreq + freqShift;
+                    elements.detuneSlider.value = parseFloat(elements.detuneSlider.value) + detuneShift;
+                    
+                    updateSound();
+                }, 500 + Math.random() * 1000); // Random intervals between 0.5-1.5 seconds
+            }
 
-    function stopOscillator() {
-        if (audioNodes.oscillator) {
-            audioNodes.oscillator.stop();
-            audioNodes.oscillator.disconnect();
-        }
-    }
+            // Stop evasive mode
+            function stopEvasiveMode() {
+                if (state.evasiveInterval) {
+                    clearInterval(state.evasiveInterval);
+                    state.evasiveInterval = null;
+                }
+                elements.evasiveBtn.classList.remove('active');
+            }
 
-    function initializeContext() {
-        audioNodes = {
-            oscillator: null,
-            gainNode: null,
-            modulationOscillator: null,
-            modulationGainNode: null,
-            analyser: null
-        };
-    }
-});
-</script>
+            // Auto toggle - periodically change waveform types
+            function toggleAutoMode() {
+                if (state.isAutoToggle) {
+                    clearInterval(state.autoToggleInterval);
+                    state.autoToggleInterval = null;
+                    state.isAutoToggle = false;
+                    elements.autoToggleButton.classList.remove('active');
+                } else {
+                    state.isAutoToggle = true;
+                    elements.autoToggleButton.classList.add('active');
+                    const waveTypes = ['sine', 'square', 'sawtooth', 'triangle'];
+                    
+                    state.autoToggleInterval = setInterval(() => {
+                        if (!state.isPlaying) return;
+                        
+                        // Randomly select waveform types
+                        const leftType = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+                        const rightType = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+                        
+                        audioNodes.oscillator.type = leftType;
+                        audioNodes.oscillatorRight.type = rightType;
+                        audioNodes.modulationOscillator.type = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+                        
+                        // Also vary modulation a bit
+                        elements.modulationFreqSlider.value = Math.random() * 50 + 0.5;
+                        elements.modulationDepthSlider.value = Math.random() * 100 + 10;
+                        
+                        updateSound();
+                    }, 2000); // Change every 2 seconds
+                }
+            }
+
+            // Clear all intervals to prevent multiple effects running
+            function clearAllIntervals() {
+                // Clear all intervals
+                if (state.autoToggleInterval) {
+                    clearInterval(state.autoToggleInterval);
+                    state.autoToggleInterval = null;
+                    state.isAutoToggle = false;
+                    elements.autoToggleButton.classList.remove('active');
+                }
+                
+                if (state.evasiveInterval) {
+                    clearInterval(state.evasiveInterval);
+                    state.evasiveInterval = null;
+                    elements.evasiveBtn.classList.remove('active');
+                }
+                
+                if (state.pulseInterval) {
+                    clearInterval(state.pulseInterval);
+                    state.pulseInterval = null;
+                    state.isPulsing = false;
+                    elements.pulseBtn.classList.remove('active');
+                }
+                
+                if (state.randomInterval) {
+                    clearInterval(state.randomInterval);
+                    state.randomInterval = null;
+                    elements.randomBtn.classList.remove('active');
+                }
+                
+                if (state.stereoOscillator) {
+                    clearInterval(state.stereoOscillator);
+                    state.stereoOscillator = null;
+                }
+            }
+
+            // Predefined annoying tones
+            const presets = {
+                annoyingTone1: () => {
+                    elements.frequencySlider.value = 110;
+                    elements.detuneSlider.value = 50;
+                    elements.modulationFreqSlider.value = 7;
+                    elements.modulationDepthSlider.value = 30;
+                    elements.volumeSlider.value = 0.7;
+                    elements.gainSlider.value = 2;
+                    elements.dualToneToggle.checked = true;
+                    elements.dualToneOffset.value = 7;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = true;
+                    elements.noiseVolumeSlider.value = 0.1;
+                    audioNodes.oscillator.type = 'square';
+                    audioNodes.oscillatorRight.type = 'sawtooth';
+                },
+                annoyingTone2: () => {
+                    elements.frequencySlider.value = 7500;
+                    elements.detuneSlider.value = 200;
+                    elements.modulationFreqSlider.value = 5;
+                    elements.modulationDepthSlider.value = 15;
+                    elements.volumeSlider.value = 0.5;
+                    elements.gainSlider.value = 1;
+                    elements.dualToneToggle.checked = false;
+                    elements.binauraBeatsToggle.checked = true;
+                    elements.dualToneOffset.value = 15;
+                    elements.noiseToggle.checked = false;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'sine';
+                },
+                annoyingTone3: () => {
+                    elements.frequencySlider.value = 2500;
+                    elements.detuneSlider.value = -300;
+                    elements.modulationFreqSlider.value = 12;
+                    elements.modulationDepthSlider.value = 50;
+                    elements.volumeSlider.value = 0.6;
+                    elements.gainSlider.value = 1.5;
+                    elements.dualToneToggle.checked = true;
+                    elements.dualToneOffset.value = 27;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = true;
+                    elements.noiseVolumeSlider.value = 0.2;
+                    audioNodes.oscillator.type = 'sawtooth';
+                    audioNodes.oscillatorRight.type = 'square';
+                    startPulseEffect();
+                },
+                annoyingTone4: () => {
+                    elements.frequencySlider.value = 16000;
+                    elements.detuneSlider.value = 0;
+                    elements.modulationFreqSlider.value = 0.5;
+                    elements.modulationDepthSlider.value = 100;
+                    elements.volumeSlider.value = 0.4;
+                    elements.gainSlider.value = 1;
+                    elements.dualToneToggle.checked = false;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = false;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'sine';
+                },
+                highPitchTone1: () => {
+                    elements.frequencySlider.value = 18000;
+                    elements.detuneSlider.value = 0;
+                    elements.modulationFreqSlider.value = 0;
+                    elements.modulationDepthSlider.value = 0;
+                    elements.volumeSlider.value = 0.5;
+                    elements.gainSlider.value = 1;
+                    elements.dualToneToggle.checked = false;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = false;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'sine';
+                },
+                highPitchTone2: () => {
+                    elements.frequencySlider.value = 19500;
+                    elements.detuneSlider.value = 0;
+                    elements.modulationFreqSlider.value = 0;
+                    elements.modulationDepthSlider.value = 0;
+                    elements.volumeSlider.value = 0.5;
+                    elements.gainSlider.value = 1;
+                    elements.dualToneToggle.checked = false;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = false;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'sine';
+                },
+                dogTone: () => {
+                    elements.frequencySlider.value = 20000;
+                    elements.detuneSlider.value = 0;
+                    elements.modulationFreqSlider.value = 15;
+                    elements.modulationDepthSlider.value = 500;
+                    elements.volumeSlider.value = 0.8;
+                    elements.gainSlider.value = 1;
+                    elements.dualToneToggle.checked = false;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = false;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'sine';
+                },
+                humanDiscomfort: () => {
+                    elements.frequencySlider.value = 19;
+                    elements.detuneSlider.value = 0;
+                    elements.modulationFreqSlider.value = 0.2;
+                    elements.modulationDepthSlider.value = 5;
+                    elements.volumeSlider.value = 0.9;
+                    elements.gainSlider.value = 3;
+                    elements.dualToneToggle.checked = true;
+                    elements.dualToneOffset.value = 4;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = true;
+                    elements.noiseVolumeSlider.value = 0.05;
+                    audioNodes.oscillator.type = 'sine';
+                    audioNodes.oscillatorRight.type = 'triangle';
+                },
+                migraine: () => {
+                    elements.frequencySlider.value = 3000;
+                    elements.detuneSlider.value = 700;
+                    elements.modulationFreqSlider.value = 8;
+                    elements.modulationDepthSlider.value = 120;
+                    elements.volumeSlider.value = 0.7;
+                    elements.gainSlider.value = 1.5;
+                    elements.dualToneToggle.checked = true;
+                    elements.dualToneOffset.value = 13;
+                    elements.binauraBeatsToggle.checked = false;
+                    elements.noiseToggle.checked = true;
+                    elements.noiseVolumeSlider.value = 0.15;
+                    elements.stereoWidthSlider.value = 1;
+                    elements.stereoSpeedSlider.value = 2.5;
+                    audioNodes.oscillator.type = 'square';
+                    audioNodes.oscillatorRight.type = 'sawtooth';
+                    startPulseEffect();
+                },
+                detuneRandom: () => {
+                    elements.detuneSlider.value = Math.random() * 2000 - 1000;
+                    updateSound();
+                }
+            };
+
+            // Toggle playing state
+            function togglePlayState(play) {
+                if (play) {
+                    if (!state.isPlaying) {
+                        setupAudioNodes();
+                        visualizeSound();
+                    }
+                    elements.playButton.classList.add('active');
+                    elements.stopButton.classList.remove('active');
+                } else {
+                    clearAllIntervals();
+                    if (audioNodes.oscillator) {
+                        try {
+                            audioNodes.oscillator.stop();
+                            audioNodes.oscillator.disconnect();
+                        } catch (e) {}
+                    }
+                    if (audioNodes.oscillatorRight) {
+                        try {
+                            audioNodes.oscillatorRight.stop();
+                            audioNodes.oscillatorRight.disconnect();
+                        } catch (e) {}
+                    }
+                    if (audioNodes.modulationOscillator) {
+                        try {
+                            audioNodes.modulationOscillator.stop();
+                            audioNodes.modulationOscillator.disconnect();
+                        } catch (e) {}
+                    }
+                    if (audioNodes.noiseSource) {
+                        try {
+                            audioNodes.noiseSource.stop();
+                            audioNodes.noiseSource.disconnect();
+                        } catch (e) {}
+                    }
+                    
+                    state.isPlaying = false;
+                    elements.playButton.classList.remove('active');
+                    elements.stopButton.classList.add('active');
+                    
+                    // Also clear visual effects
+                    elements.mainContainer.classList.remove('flash');
+                    document.body.classList.remove('shake');
+                }
+            }
+
+            // Event Listeners
+            elements.playButton.addEventListener('click', () => togglePlayState(true));
+            elements.stopButton.addEventListener('click', () => togglePlayState(false));
+            elements.autoToggleButton.addEventListener('click', toggleAutoMode);
+
+            elements.evasiveBtn.addEventListener('click', () => {
+                if (state.evasiveInterval) {
+                    stopEvasiveMode();
+                } else {
+                    startEvasiveMode();
+                }
+            });
+
+            elements.pulseBtn.addEventListener('click', () => {
+                if (state.isPulsing) {
+                    stopPulseEffect();
+                } else {
+                    startPulseEffect();
+                }
+            });
+
+            elements.randomBtn.addEventListener('click', () => {
+                if (state.randomInterval) {
+                    stopRandomMode();
+                } else {
+                    startRandomMode();
+                }
+            });
+
+            // Preset button event listeners
+            elements.annoyingTones.tone1.addEventListener('click', () => {
+                presets.annoyingTone1();
+                updateSound();
+            });
+
+            elements.annoyingTones.tone2.addEventListener('click', () => {
+                presets.annoyingTone2();
+                updateSound();
+            });
+
+            elements.annoyingTones.tone3.addEventListener('click', () => {
+                presets.annoyingTone3();
+                updateSound();
+            });
+
+            elements.annoyingTones.tone4.addEventListener('click', () => {
+                presets.annoyingTone4();
+                updateSound();
+            });
+
+            elements.annoyingTones.highPitch1.addEventListener('click', () => {
+                presets.highPitchTone1();
+                updateSound();
+            });
+
+            elements.annoyingTones.highPitch2.addEventListener('click', () => {
+                presets.highPitchTone2();
+                updateSound();
+            });
+
+            elements.annoyingTones.dogTone.addEventListener('click', () => {
+                presets.dogTone();
+                updateSound();
+            });
+
+            elements.annoyingTones.humanDiscomfort.addEventListener('click', () => {
+                presets.humanDiscomfort();
+                updateSound();
+            });
+
+            elements.annoyingTones.migraine.addEventListener('click', () => {
+                presets.migraine();
+                updateSound();
+            });
+
+            elements.annoyingTones.detuneRandom.addEventListener('click', presets.detuneRandom);
+
+            // Slider event listeners
+            const sliders = [
+                elements.frequencySlider,
+                elements.detuneSlider,
+                elements.modulationFreqSlider,
+                elements.modulationDepthSlider,
+                elements.volumeSlider,
+                elements.gainSlider,
+                elements.stereoWidthSlider,
+                elements.stereoSpeedSlider,
+                elements.dualToneOffset,
+                elements.noiseVolumeSlider
+            ];
+
+            sliders.forEach(slider => {
+                slider.addEventListener('input', updateSound);
+            });
+
+            // Toggle event listeners
+            const toggles = [
+                elements.dualToneToggle,
+                elements.binauraBeatsToggle,
+                elements.noiseToggle,
+                elements.screenEffectsToggle
+            ];
+
+            toggles.forEach(toggle => {
+                toggle.addEventListener('change', updateSound);
+            });
+
+            // Window resize event for canvas
+            window.addEventListener('resize', () => {
+                ctx.canvas.width = elements.canvas.offsetWidth;
+                ctx.canvas.height = elements.canvas.offsetHeight;
+            });
+
+            // Touch events for mobile (prevents scrolling while using sliders)
+            const preventDefaultTouch = (e) => {
+                e.preventDefault();
+            };
+
+            sliders.forEach(slider => {
+                slider.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+            });
+
+            // Initial setup
+            elements.stopButton.classList.add('active');
+        });
+    </script>
 </body>
-
 </html>
-
-
-
-
-
-    
-    
