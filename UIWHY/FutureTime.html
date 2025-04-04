@@ -1,0 +1,382 @@
+<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Fluid Time Clock - Bold Edition</title><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"rel=stylesheet><style>body{margin:0;padding:0;overflow:hidden;background-color:#000;font-family:Montserrat,sans-serif;color:#fff;font-weight:700}canvas{display:block;position:fixed;top:0;left:0}#info-overlay{position:fixed;top:20px;left:20px;color:#fff;font-size:16px;background-color:rgba(51,51,51,.95);padding:20px;border-radius:10px;z-index:100;max-width:380px;display:none;border:2px solid gold;box-shadow:0 4px 20px rgba(0,0,0,.8)}#info-overlay h3{margin-top:0;color:gold;font-weight:700;letter-spacing:1px}#info-overlay ul{padding-left:20px}#info-overlay li{margin-bottom:10px}#controls{position:fixed;bottom:20px;left:20px;z-index:101;display:flex;gap:12px}.control-btn{background-color:rgba(51,51,51,.9);color:gold;border:2px solid gold;border-radius:25px;padding:10px 20px;cursor:pointer;font-size:16px;letter-spacing:1px;text-transform:uppercase;transition:all .3s ease}.control-btn:hover{background-color:rgba(51,51,51,1)}#digital-time{position:fixed;bottom:20px;right:20px;color:#fff;font-size:11px;background-color:rgba(51,51,51,.9);padding:12px 22px;border-radius:25px;z-index:100;font-weight:700;letter-spacing:1px;border:2px solid gold}</style><div id=info-overlay><h3>Fluid Time Clock</h3><p>This timepiece uses bold colours and fluid motion to display the current time:<ul><li><b>Hours (yellow):</b> Glowing markers on a 40% radius ring.<li><b>Minutes (silver):</b> Tiny markers on a 18% radius ring.<li><b>Seconds (red):</b> A pulsing red second-hand with a subtle trail.</ul><p>The layout is spaced out to ensure clear, contrasting visibility.</div><div id=controls><button class=control-btn id=toggle-info>Guide</button> <button class=control-btn id=toggle-vortex>Vortex: On</button></div><div id=digital-time>00:00:00</div><script src=https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js></script><script>let particles = [];
+    let hourParticles = [];
+    let minuteParticles = [];
+    let secondRipples = [];
+    let vortexOn = true;
+
+    const colors = {
+      background: '#000000',
+      hourColor: 'red',    
+      minuteColor: 'yellow',  
+      secondColor: 'orange',  
+      accentColor: '#fff',
+    };
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      angleMode(DEGREES);
+      colorMode(HSB, 360, 100, 100, 1);
+
+      for (let i = 0; i < 12; i++) {
+        const angle = map(i, 0, 12, 0, 360);
+        const radius = min(width, height) * 0.4;
+        const x = width / 2 + cos(angle) * radius;
+        const y = height / 2 + sin(angle) * radius;
+        hourParticles.push(new Particle(x, y, 10, colors.hourColor, i));
+      }
+
+      for (let i = 0; i < 60; i++) {
+        const angle = map(i, 0, 60, 0, 360);
+        const radius = min(width, height) * 0.18;
+        const x = width / 2 + cos(angle) * radius;
+        const y = height / 2 + sin(angle) * radius;
+        minuteParticles.push(new Particle(x, y, 2, colors.minuteColor, i));
+      }
+
+      for (let i = 0; i < 100; i++) {
+        particles.push(new Particle(
+          random(width),
+          random(height),
+          random(1, 2.5),
+          color(random(0, 360), 50, 100, 0.5)
+        ));
+      }
+    }
+
+    function draw() {
+      background(colors.background);
+
+      const time = new Date();
+      const hours = time.getHours() % 12;
+      const minutes = time.getMinutes();
+      const seconds = time.getSeconds();
+      const millis = time.getMilliseconds();
+
+      updateDigitalTime(time);
+
+      if (frameCount % 60 === 0 || frameCount === 1) {
+        secondRipples.push(new Ripple(width / 2, height / 2));
+      }
+
+      for (let i = secondRipples.length - 1; i >= 0; i--) {
+        secondRipples[i].update();
+        secondRipples[i].display();
+        if (secondRipples[i].isDead()) {
+          secondRipples.splice(i, 1);
+        }
+      }
+
+      drawFluidBackground();
+      drawClockElements(hours, minutes, seconds, millis);
+    }
+
+    function drawFluidBackground() {
+      const vortexX = width / 2;
+      const vortexY = height / 2;
+      const vortexRadius = min(width, height) * 0.4;
+
+      for (let i = 0; i < particles.length; i++) {
+        const particle = particles[i];
+        if (vortexOn) {
+          const dx = particle.pos.x - vortexX;
+          const dy = particle.pos.y - vortexY;
+          const distance = sqrt(dx * dx + dy * dy);
+          if (distance < vortexRadius) {
+            const angle = atan2(dy, dx);
+
+            const force = map(distance, 0, vortexRadius, 0.6, 0.17);
+            particle.vel.x += cos(angle + 90) * force;
+            particle.vel.y += sin(angle + 90) * force;
+          }
+        }
+
+        particle.vel.x += random(-0.01, 0.01);
+        particle.vel.y += random(-0.01, 0.01);
+        particle.update();
+        particle.display();
+        particle.checkEdges();
+      }
+    }
+
+    function drawClockElements(hours, minutes, seconds, millis) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+
+      push();
+      noStroke();
+      for (let i = 15; i > 0; i--) {
+        const alpha = map(i, 0, 15, 0, 0.1);
+        fill(color(255, 255, 200, alpha));
+        const size = i * min(width, height) * 0.02;
+        ellipse(centerX, centerY, size, size);
+      }
+      pop();
+
+      const hourFloat = hours + minutes / 60;
+      for (let i = 0; i < hourParticles.length; i++) {
+        const particle = hourParticles[i];
+        const hourDiff = abs(i - hourFloat);
+        const hourDiffWrapped = min(hourDiff, 12 - hourDiff);
+
+        const baseBrightness = map(hourDiffWrapped, 0, 6, 1, 0.01);
+
+        const pulse = map(sin((seconds + millis / 1000) * 360 + i * 30), -1, 1, 0, 0.1);
+        const brightness = constrain(baseBrightness + pulse, 0, 1);
+
+        const size = map(hourDiffWrapped, 0, 6, 30, 22);
+
+        const angle = map(i, 0, 12, 0, 360) - 90;
+        const targetX = centerX + cos(angle) * (min(width, height) * 0.4);
+        const targetY = centerY + sin(angle) * (min(width, height) * 0.4);
+        particle.seek(targetX, targetY);
+        particle.display(brightness, size);
+
+        push();
+        textAlign(CENTER, CENTER);
+        if (hourDiffWrapped < 0.5) {
+          fill(colors.accentColor);
+          textStyle(BOLD);
+          textSize(min(width, height) * 0.06);
+        } else {
+          fill(200);
+          textSize(min(width, height) * 0.05);
+        }
+        const textRadius = min(width, height) * 0.38 * 1.2;
+        const textX = centerX + cos(angle) * textRadius;
+        const textY = centerY + sin(angle) * textRadius;
+        text(i === 0 ? '12' : i, textX, textY);
+        pop();
+      }
+
+      for (let i = 0; i < minuteParticles.length; i++) {
+        const particle = minuteParticles[i];
+        const angle = map(i, 0, 60, 0, 360) - 90;
+        const radius = min(width, height) * 0.2; 
+        particle.seek(centerX + cos(angle) * radius,
+                      centerY + sin(angle) * radius);
+
+        const minuteDiff = abs(i - minutes);
+        const minuteDiffWrapped = min(minuteDiff, 60 - minuteDiff);
+        const baseBrightness = map(minuteDiffWrapped, 0, 30, 1, 0.2);
+        const pulse = map(sin((seconds + millis / 1000) * 360 + i * 6), -1, 1, 0, 0.1);
+        const brightness = constrain(baseBrightness + pulse, 0, 1);
+        const size = map(minuteDiffWrapped, 0, 5, 6, 5);
+        particle.display(brightness, size);
+
+        if (i % 5 === 0) {
+          push();
+          textAlign(CENTER, CENTER);
+          if (minuteDiffWrapped < 1) {
+            fill(colors.accentColor);
+            textStyle(BOLD);
+            textSize(min(width, height) * 0.05);
+          } else {
+            fill(245);
+            textSize(min(width, height) * 0.03);
+          }
+          const textRadius = radius * 1.4;
+          const textX = centerX + cos(angle) * textRadius;
+          const textY = centerY + sin(angle) * textRadius;
+          if (i > 0) {
+            text(i, textX, textY);
+          }
+          pop();
+        }
+      }
+
+      push();
+      const secondAngle = map(seconds + millis / 1000, 0, 60, 0, 360) - 90;
+      const secondRadius = min(width, height) * 0.25;
+      const secondX = centerX + cos(secondAngle) * secondRadius;
+      const secondY = centerY + sin(secondAngle) * secondRadius;
+
+      noFill();
+      strokeWeight(3);
+      beginShape();
+      for (let i = 0; i < 15; i++) {
+        const trailAngle = map(seconds + millis / 1000 - i * 0.5, 0, 60, 0, 360) - 90;
+        const trailX = centerX + cos(trailAngle) * secondRadius;
+        const trailY = centerY + sin(trailAngle) * secondRadius;
+        const alpha = map(i, 0, 15, 1, 0);
+        stroke(color(colors.secondColor + alpha * 255));
+        vertex(trailX, trailY);
+      }
+      endShape();
+
+      noStroke();
+      let secGlowSize = 12;
+      let secGlowAlpha = 0.3;
+      fill(color(
+        hue(color(colors.secondColor)),
+        saturation(color(colors.secondColor)),
+        brightness(color(colors.secondColor)),
+        secGlowAlpha
+      ));
+      ellipse(secondX, secondY, secGlowSize, secGlowSize);
+      stroke(255);
+      strokeWeight(2);
+      noFill();
+      ellipse(secondX, secondY, 8, 8);
+      noStroke();
+      fill(255);
+      ellipse(secondX, secondY, 6, 6);
+      pop();
+    }
+
+    class Particle {
+      constructor(x, y, size, col, index) {
+        this.pos = createVector(x, y);
+        this.vel = createVector(random(-1, 1), random(-1, 1));
+        this.acc = createVector(0, 0);
+        this.size = size;
+        this.color = col;
+        this.index = index;
+        this.maxSpeed = 1.5;
+        this.maxForce = 0.3;
+      }
+
+      update() {
+        this.vel.add(this.acc);
+        this.vel.limit(this.maxSpeed);
+        this.pos.add(this.vel);
+        this.acc.mult(0);
+      }
+
+      applyForce(force) {
+        this.acc.add(force);
+      }
+
+      seek(targetX, targetY) {
+        const target = createVector(targetX, targetY);
+        const desired = p5.Vector.sub(target, this.pos);
+        const distance = desired.mag();
+        if (distance < 1) {
+          this.vel.mult(0.9);
+        } else {
+          desired.normalize();
+          desired.mult(this.maxSpeed);
+          const steer = p5.Vector.sub(desired, this.vel);
+          steer.limit(this.maxForce);
+          this.applyForce(steer);
+        }
+        this.update();
+      }
+
+      display(brightVal = 1, customSize = null) {
+        const displaySize = customSize || this.size;
+        push();
+        noStroke();
+        let particleColor;
+        if (typeof this.color === 'string') {
+          particleColor = color(this.color);
+        } else {
+          particleColor = this.color;
+        }
+
+        const glowSize = displaySize * 1.2;
+        const glowAlpha = 0.3 * brightVal;
+        let glowColor = color(
+          hue(particleColor),
+          saturation(particleColor),
+          brightness(particleColor),
+          glowAlpha
+        );
+        fill(glowColor);
+        ellipse(this.pos.x, this.pos.y, glowSize, glowSize);
+
+        fill(
+          hue(particleColor),
+          saturation(particleColor),
+          brightness(particleColor),
+          brightVal
+        );
+        ellipse(this.pos.x, this.pos.y, displaySize, displaySize);
+        pop();
+      }
+
+      checkEdges() {
+        if (this.pos.x < 0) {
+          this.pos.x = width;
+        } else if (this.pos.x > width) {
+          this.pos.x = 0;
+        }
+        if (this.pos.y < 0) {
+          this.pos.y = height;
+        } else if (this.pos.y > height) {
+          this.pos.y = 0;
+        }
+      }
+    }
+
+    class Ripple {
+      constructor(x, y) {
+        this.pos = createVector(x, y);
+        this.radius = 5;
+        this.maxRadius = min(width, height) * 0.6;
+        this.speed = 4;
+        this.life = 1;
+      }
+
+      update() {
+        this.radius += this.speed;
+        this.life -= 0.015;
+      }
+
+      display() {
+        push();
+        noFill();
+        const rippleColor = color(colors.secondColor);
+        stroke(
+          hue(rippleColor),
+          saturation(rippleColor),
+          brightness(rippleColor),
+          this.life
+        );
+        strokeWeight(2);
+        ellipse(this.pos.x, this.pos.y, this.radius * 2);
+        pop();
+      }
+
+      isDead() {
+        return this.life <= 0 || this.radius >= this.maxRadius;
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      for (let i = 0; i < hourParticles.length; i++) {
+        const angle = map(i, 0, 12, 0, 360);
+        const radius = min(width, height) * 0.4;
+        hourParticles[i].pos.x = width / 2 + cos(angle) * radius;
+        hourParticles[i].pos.y = height / 2 + sin(angle) * radius;
+      }
+      for (let i = 0; i < minuteParticles.length; i++) {
+        const angle = map(i, 0, 60, 0, 360);
+        const radius = min(width, height) * 0.10;
+        minuteParticles[i].pos.x = width / 2 + cos(angle) * radius;
+        minuteParticles[i].pos.y = height / 2 + sin(angle) * radius;
+      }
+    }
+
+    function updateDigitalTime(date) {
+      const hrs = date.getHours().toString().padStart(2, '0');
+      const mins = date.getMinutes().toString().padStart(2, '0');
+      const secs = date.getSeconds().toString().padStart(2, '0');
+      document.getElementById('digital-time').textContent = `${hrs}:${mins}:${secs}`;
+    }
+
+    document.getElementById('toggle-info').addEventListener('click', function() {
+      const infoOverlay = document.getElementById('info-overlay');
+      if (infoOverlay.style.display === 'block') {
+        infoOverlay.style.display = 'none';
+        this.textContent = 'Guide';
+      } else {
+        infoOverlay.style.display = 'block';
+        this.textContent = 'Hide';
+      }
+    });
+
+    document.getElementById('toggle-vortex').addEventListener('click', function() {
+      vortexOn = !vortexOn;
+      this.textContent = vortexOn ? 'Vortex: On' : 'Vortex: Off';
+    });</script>
