@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luxury Modern Clock</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #050508;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    
+    #info-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: #f0f0f0;
+      font-size: 14px;
+      background-color: rgba(12, 12, 20, 0.85);
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 100;
+      max-width: 320px;
+      display: none;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    
+    #info-overlay h3 {
+      margin-top: 0;
+      color: #e0c36d;
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    
+    #info-overlay ul {
+      padding-left: 20px;
+    }
+    
+    #info-overlay li {
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    
+    #toggle-info {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background-color: rgba(12, 12, 20, 0.7);
+      color: #e0c36d;
+      border: 1px solid rgba(224, 195, 109, 0.3);
+      border-radius: 20px;
+      padding: 8px 16px;
+      cursor: pointer;
+      z-index: 101;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    #toggle-info:hover {
+      background-color: rgba(20, 20, 30, 0.9);
+      border-color: rgba(224, 195, 109, 0.8);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+    
+    #toggle-info:active {
+      transform: translateY(1px);
+    }
+    
+    #digital-time {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: #e0c36d;
+      font-size: 14px;
+      background-color: rgba(12, 12, 20, 0.7);
+      padding: 8px 16px;
+      border-radius: 20px;
+      z-index: 100;
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(224, 195, 109, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    #digital-time:hover {
+      background-color: rgba(20, 20, 30, 0.9);
+      border-color: rgba(224, 195, 109, 0.8);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+    
+    .pulsate {
+      animation: pulsate 2s ease-out infinite;
+      opacity: 0.7;
+    }
+    
+    @keyframes pulsate {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+  </style>
+</head>
+<body>
+  <div id="info-overlay">
+    <h3>HOW TO READ THIS CLOCK</h3>
+    <p>This luxury timepiece displays time using three concentric rotating rings:</p>
+    <ul>
+      <li><b>Inner ring (rose gold):</b> Hours - marked at 3-hour intervals with elegant numerals</li>
+      <li><b>Middle ring (platinum):</b> Minutes - each mark represents 5 minutes with subtle texture</li>
+      <li><b>Outer ring (silver):</b> Seconds - each mark represents 1 second with fine detailing</li>
+    </ul>
+    <p>The stationary gold indicator at the top points to the current time across all three rings.</p>
+    <p>The guilloche center pattern and decorative accent rings create depth and luxury reminiscent of haute horlogerie.</p>
+  </div>
+  
+  <button id="toggle-info">Guide</button>
+  <div id="digital-time" class="pulsate">00:00:00</div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script>
+    // Enhanced Color palette
+    const colors = {
+      background: '#050508',
+      gold: '#e0c36d',
+      roseGold: '#b76e79',
+      roseGoldDark: '#7e4a50',
+      lightGold: '#f4e0a8',
+      platinum: '#e5e4e2',
+      platinumDark: '#a9a8a6',
+      silver: '#d0d0d0',
+      silverDark: '#a0a0a0',
+      darkGold: '#9a8547',
+      accent1: '#1a1a24',
+      accent2: '#20202a',
+      accent3: '#101018',
+      midnight: '#080814'
+    };
+    
+    let smallestDimension, date, miliSeconds, seconds, minutes, hours;
+    let particles = [];
+    let canvas;
+    
+    function setup() {
+      canvas = createCanvas(windowWidth, windowHeight);
+      angleMode(DEGREES);
+      frameRate(60);
+      pixelDensity(2); // Higher resolution for retina displays
+      
+      // Initialize particles
+      for (let i = 0; i < 15; i++) {
+        let angle = random(0, 360);
+        let distance = random(windowWidth * 0.15, windowWidth * 0.4);
+        particles.push({
+          x: distance * cos(angle),
+          y: distance * sin(angle),
+          size: random(1, 3),
+          alpha: random(100, 200),
+          life: random(50, 200),
+          color: random() > 0.5 ? colors.gold : colors.platinum
+        });
+      }
+    }
+
+    function draw() {
+      date = new Date();
+      miliSeconds = date.getMilliseconds();
+      seconds = date.getSeconds() + miliSeconds / 1000;
+      minutes = date.getMinutes() + seconds / 60;
+      hours = date.getHours() + minutes / 60;
+      
+      // Update digital time display
+      updateDigitalTime(date);
+
+      clear();
+      translate(windowWidth / 2, windowHeight / 2);
+      background(colors.background);
+
+      smallestDimension = min(windowWidth, windowHeight);
+      
+      // Ambient glow effect
+      drawAmbientGlow();
+      
+      // Draw decorative background elements
+      drawBackgroundElements();
+      
+      let secondAngle = map(seconds, 0, 60, 0, 360);
+      let minuteAngle = map(minutes, 0, 60, 0, 360);
+      let hourAngle = map(hours % 12, 0, 12, 0, 360);
+
+      // Draw the three dials
+      drawHoursDial(2.4, 20, hourAngle);
+      drawMinutesDial(3, 15, minuteAngle);
+      drawSecondsDial(3.5, 10, secondAngle);
+      
+      // Draw center elements and hand
+      drawCenterElements();
+      drawHand(0.28);
+      
+      // Draw floating particles for luxury effect
+      updateAndDrawParticles();
+    }
+    
+    function drawAmbientGlow() {
+      push();
+      // Enhanced radial gradient glow
+      let radius = smallestDimension * 0.6;
+      drawingContext.save();
+      let gradient = drawingContext.createRadialGradient(0, 0, 0, 0, 0, radius);
+      gradient.addColorStop(0, 'rgba(65, 65, 90, 0.25)');
+      gradient.addColorStop(0.3, 'rgba(40, 40, 70, 0.15)');
+      gradient.addColorStop(0.7, 'rgba(20, 20, 40, 0.05)');
+      gradient.addColorStop(1, 'rgba(5, 5, 10, 0)');
+      
+      drawingContext.fillStyle = gradient;
+      drawingContext.beginPath();
+      drawingContext.arc(0, 0, radius, 0, Math.PI * 2);
+      drawingContext.fill();
+      drawingContext.restore();
+      pop();
+    }
+
+    function drawBackgroundElements() {
+      // Draw enhanced background with subtle watch face
+      push();
+      noStroke();
+      
+      // Outer gradient for depth
+      drawingContext.save();
+      let outerGradient = drawingContext.createRadialGradient(0, 0, 0, 0, 0, smallestDimension * 0.4);
+      outerGradient.addColorStop(0, colors.accent3);
+      outerGradient.addColorStop(0.7, colors.accent1);
+      outerGradient.addColorStop(1, colors.background);
+      drawingContext.fillStyle = outerGradient;
+      drawingContext.beginPath();
+      drawingContext.arc(0, 0, smallestDimension * 0.4, 0, Math.PI * 2);
+      drawingContext.fill();
+      drawingContext.restore();
+      
+      // Add subtle circular background textures
+      for (let i = 0; i < 360; i += 6) {
+        let radius = smallestDimension * 0.38;
+        let x = radius * cos(i);
+        let y = radius * sin(i);
+        fill(colors.midnight + '20');
+        noStroke();
+        ellipse(x, y, 2, 2);
+      }
+      
+      // Draw decorative outer rings with enhanced glow
+      stroke(colors.darkGold + '40');
+      strokeWeight(smallestDimension / 200);
+      drawingContext.shadowBlur = 5;
+      drawingContext.shadowColor = colors.gold + '30';
+      noFill();
+      ellipse(0, 0, smallestDimension * 0.85, smallestDimension * 0.85);
+      
+      // Draw elegant accent ring
+      stroke(colors.darkGold + '60');
+      strokeWeight(smallestDimension / 300);
+      ellipse(0, 0, smallestDimension * 0.82, smallestDimension * 0.82);
+      drawingContext.shadowBlur = 0;
+      pop();
+    }
+    
+    function drawCenterElements() {
+      // Center decoration with luxury guilloche pattern
+      push();
+      // Base center circle
+      noStroke();
+      fill(colors.accent3);
+      ellipse(0, 0, smallestDimension/8, smallestDimension/8);
+      
+      // Draw luxury guilloche pattern
+      drawingContext.save();
+      drawingContext.beginPath();
+      drawingContext.arc(0, 0, smallestDimension/16, 0, Math.PI * 2);
+      drawingContext.clip();
+      
+      // Radial gradient for center
+      let gradient = drawingContext.createRadialGradient(0, 0, 0, 0, 0, smallestDimension/16);
+      gradient.addColorStop(0, '#3a2c18');
+      gradient.addColorStop(0.4, '#70593a');
+      gradient.addColorStop(0.7, '#9a8547');
+      gradient.addColorStop(1, '#70593a');
+      drawingContext.fillStyle = gradient;
+      
+      // Fill with gradient
+      drawingContext.fillRect(-smallestDimension/8, -smallestDimension/8, smallestDimension/4, smallestDimension/4);
+      
+      // Draw guilloche pattern
+      drawingContext.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      drawingContext.lineWidth = 0.5;
+      
+      // Pattern 1: Concentric circles
+      for(let r = 2; r < smallestDimension/16; r += 3) {
+        drawingContext.beginPath();
+        drawingContext.arc(0, 0, r, 0, Math.PI * 2);
+        drawingContext.stroke();
+      }
+      
+      // Pattern 2: Radial lines
+      for(let angle = 0; angle < 360; angle += 15) {
+        let rad = angle * Math.PI / 180;
+        let x = Math.cos(rad) * smallestDimension/16;
+        let y = Math.sin(rad) * smallestDimension/16;
+        
+        drawingContext.beginPath();
+        drawingContext.moveTo(0, 0);
+        drawingContext.lineTo(x, y);
+        drawingContext.stroke();
+      }
+      
+      // Pattern 3: Wave pattern
+      drawingContext.lineWidth = 0.3;
+      let waveCount = 3;
+      let waveAmplitude = smallestDimension/64;
+      
+      for(let waveOffset = 0; waveOffset < 360; waveOffset += 45) {
+        drawingContext.beginPath();
+        for(let angle = 0; angle <= 360; angle += 2) {
+          let rad = angle * Math.PI / 180;
+          let waveRad = (angle + waveOffset) * waveCount * Math.PI / 180;
+          let waveR = smallestDimension/32 + Math.sin(waveRad) * waveAmplitude;
+          let x = Math.cos(rad) * waveR;
+          let y = Math.sin(rad) * waveR;
+          
+          if(angle === 0) {
+            drawingContext.moveTo(x, y);
+          } else {
+            drawingContext.lineTo(x, y);
+          }
+        }
+        drawingContext.closePath();
+        drawingContext.stroke();
+      }
+      
+      drawingContext.restore();
+      
+      // Gold rim around center with glow
+      drawingContext.shadowBlur = 8;
+      drawingContext.shadowColor = colors.gold + '70';
+      stroke(colors.gold);
+      strokeWeight(smallestDimension/200);
+      noFill();
+      ellipse(0, 0, smallestDimension/8, smallestDimension/8);
+      drawingContext.shadowBlur = 0;
+      
+      // Inner gold accent
+      fill(colors.gold);
+      noStroke();
+      ellipse(0, 0, smallestDimension/40, smallestDimension/40);
+      
+      // Central point
+      fill(colors.midnight);
+      ellipse(0, 0, smallestDimension/80, smallestDimension/80);
+      pop();
+    }
+
+    function drawHand(scale) {
+      push();
+      scale = smallestDimension * scale;
+      
+      // Draw hand shadow
+      fill(0, 0, 0, 30);
+      noStroke();
+      beginShape();
+      vertex(-5, 3);
+      vertex(0, 7);
+      vertex(5, 3);
+      vertex(0, -1 * scale + 3);
+      endShape(CLOSE);
+      
+      // Draw main hand with glow
+      drawingContext.shadowBlur = 5;
+      drawingContext.shadowColor = colors.gold + '80';
+      fill(colors.gold);
+      noStroke();
+      beginShape();
+      vertex(-4, 0);
+      vertex(0, 4);
+      vertex(4, 0);
+      vertex(0, -1 * scale);
+      endShape(CLOSE);
+      drawingContext.shadowBlur = 0;
+      
+      // Add highlight to hand
+      fill(colors.lightGold);
+      beginShape();
+      vertex(0, 0);
+      vertex(2, 0);
+      vertex(0, -1 * scale * 0.9);
+      endShape(CLOSE);
+      
+      // Add ornate detail to hand
+      stroke(colors.darkGold);
+      strokeWeight(1);
+      noFill();
+      line(0, -scale * 0.2, 0, -scale * 0.6);
+      
+      // Add small diamond accent with sparkle
+      drawingContext.shadowBlur = 3;
+      drawingContext.shadowColor = '#ffffff';
+      fill(255);
+      noStroke();
+      push();
+      translate(0, -scale * 0.7);
+      rotate(45);
+      rect(-1, -1, 2, 2);
+      pop();
+      drawingContext.shadowBlur = 0;
+      
+      pop();
+    }
+
+    function drawSecondsDial(radius, markerLength, angle) {
+      push();
+      radius = smallestDimension / radius;
+      rotate(-angle);
+      
+      // Draw track for seconds with enhanced texture
+      noFill();
+      stroke(colors.silver + '60');
+      strokeWeight(smallestDimension / 400);
+      ellipse(0, 0, radius * 2, radius * 2);
+      
+      // Draw seconds markers
+      angleMode(DEGREES);
+      let sec = 0;
+      for (let i = 0; i < 360; ++i) {
+        let interm = i - 90; // so that 0 is at top
+        let x = radius * cos(interm);
+        let y = radius * sin(interm);
+        
+        if (i % 6 == 0) {
+          // Gradient color for seconds markers
+          let markerColor = lerpColor(color(colors.silver), color(colors.silverDark), map(sec, 0, 60, 0, 1));
+          stroke(markerColor);
+          
+          // Thicker marker for every 15 seconds
+          if (sec % 15 === 0) {
+            strokeWeight(smallestDimension / 300);
+            let x1 = (radius + markerLength * 1.2) * cos(interm);
+            let y1 = (radius + markerLength * 1.2) * sin(interm);
+            line(x, y, x1, y1);
+          } else {
+            strokeWeight(smallestDimension / 400);
+            let x1 = (radius + markerLength) * cos(interm);
+            let y1 = (radius + markerLength) * sin(interm);
+            line(x, y, x1, y1);
+          }
+          
+          // Only show text for multiples of 5
+          if (sec % 5 === 0) {
+            let x2 = (radius + markerLength * 2.5) * cos(interm);
+            let y2 = (radius + markerLength * 2.5) * sin(interm);
+            drawSecondsText(sec, x2, y2, angle, radius);
+          }
+          sec++;
+        }
+      }
+      pop();
+    }
+
+    function drawMinutesDial(radius, markerLength, angle) {
+      push();
+      radius = smallestDimension / radius;
+      rotate(-angle);
+      
+      // Draw track for minutes with enhanced texture
+      noFill();
+      stroke(colors.platinum + '60');
+      strokeWeight(smallestDimension / 350);
+      ellipse(0, 0, radius * 2, radius * 2);
+      
+      // Draw minute markers
+      angleMode(DEGREES);
+      let min = 0;
+      for (let i = 0; i < 360; ++i) {
+        let interm = i - 90; // so that 0 is at top
+        let x = radius * cos(interm);
+        let y = radius * sin(interm);
+        
+        if (i % 30 == 0) {
+          // Gradient color for minute markers
+          let markerColor = lerpColor(color(colors.platinum), color(colors.platinumDark), map(min, 0, 60, 0, 1));
+          stroke(markerColor);
+          
+          // Thicker marker for every 15 minutes
+          if (min % 15 === 0) {
+            strokeWeight(smallestDimension / 250);
+            let x1 = (radius + markerLength * 1.2) * cos(interm);
+            let y1 = (radius + markerLength * 1.2) * sin(interm);
+            line(x, y, x1, y1);
+          } else {
+            strokeWeight(smallestDimension / 300);
+            let x1 = (radius + markerLength) * cos(interm);
+            let y1 = (radius + markerLength) * sin(interm);
+            line(x, y, x1, y1);
+          }
+          
+          let x2 = (radius + markerLength * 3) * cos(interm);
+          let y2 = (radius + markerLength * 3) * sin(interm);
+          drawMinutesText(min, x2, y2, angle, radius);
+          min += 5;
+        }
+      }
+      pop();
+    }
+
+    function drawHoursDial(radius, markerLength, angle) {
+      push();
+      radius = smallestDimension / radius;
+      rotate(-angle);
+      
+      // Draw track for hours with enhanced texture
+      noFill();
+      stroke(colors.roseGold + '60');
+      strokeWeight(smallestDimension / 300);
+      ellipse(0, 0, radius * 2, radius * 2);
+      
+      // Draw hour markers
+      angleMode(DEGREES);
+      let hour = 0;
+      for (let i = 0; i < 360; ++i) {
+        let interm = i - 90; // so that 0 is at top
+        let x = radius * cos(interm);
+        let y = radius * sin(interm);
+        
+        // Draw hour markers
+        if (i % 30 == 0) {
+          // Hour markers
+          let markerColor = lerpColor(color(colors.roseGold), color(colors.roseGoldDark), map(hour, 0, 12, 0, 1));
+          stroke(markerColor);
+          
+          if (i % 90 == 0) {
+            // Major hours (12, 3, 6, 9)
+            strokeWeight(smallestDimension / 200);
+            let x1 = (radius + markerLength * 1.3) * cos(interm);
+            let y1 = (radius + markerLength * 1.3) * sin(interm);
+            line(x, y, x1, y1);
+            
+            let x2 = (radius + markerLength * 3.2) * cos(interm);
+            let y2 = (radius + markerLength * 3.2) * sin(interm);
+            drawHoursText(hour, x2, y2, angle, radius);
+            hour += 3;
+          } else {
+            // Minor hours (1, 2, 4, 5, etc)
+            strokeWeight(smallestDimension / 250);
+            let x1 = (radius + markerLength * 0.8) * cos(interm);
+            let y1 = (radius + markerLength * 0.8) * sin(interm);
+            line(x, y, x1, y1);
+          }
+        }
+      }
+      drawBezel(radius * 2.2);
+      pop();
+    }
+
+    function drawSecondsText(second, x, y, angle, scale) {
+      push();
+      scale = scale / 14;
+      if (second == 0) {
+        angle = 0;
+        second = "⬤"; // Circle marker for 0
+      }
+      translate(x, y);
+      rotate(angle);
+      fill(colors.silver);
+      noStroke();
+      textSize(scale);
+      textAlign(CENTER, CENTER);
+      text(second, 0, 0);
+      pop();
+    }
+
+    function drawMinutesText(minute, x, y, angle, scale) {
+      push();
+      scale = scale / 10;
+      if (minute == 0) {
+        angle = 0;
+        minute = "⬤"; // Circle marker for 0
+      }
+      translate(x, y);
+      rotate(angle);
+      fill(colors.platinum);
+      noStroke();
+      textSize(scale);
+      textAlign(CENTER, CENTER);
+      text(minute, 0, 0);
+      pop();
+    }
+
+    function drawHoursText(hour, x, y, angle, scale) {
+      push();
+      scale = scale / 6;
+      // Convert to regular numbers instead of Roman numerals
+      switch (hour) {
+        case 3:
+          hour = "3";
+          break;
+        case 6:
+          hour = "6";
+          break;
+        case 9:
+          hour = "9";
+          break;
+        case 0:
+          hour = "12";
+          scale *= 1.1;
+          break;
+      }
+      translate(x, y);
+      rotate(angle);
+      fill(colors.roseGold);
+      noStroke();
+      textSize(scale);
+      textAlign(CENTER, CENTER);
+      textStyle(BOLD);
+      text(hour, 0, 0);
+      pop();
+    }
+
+    function drawBezel(radius) {
+      push();
+      noFill();
+      strokeWeight(radius / 45);
+      
+      // Draw subtle decorative rings with enhanced gradient
+      drawingContext.save();
+      let gradient = drawingContext.createLinearGradient(-radius/2, -radius/2, radius/2, radius/2);
+      gradient.addColorStop(0, colors.darkGold + '60');
+      gradient.addColorStop(0.5, colors.gold + '50');
+      gradient.addColorStop(1, colors.darkGold + '60');
+      
+      drawingContext.strokeStyle = gradient;
+      drawingContext.lineWidth = radius / 60;
+      drawingContext.beginPath();
+      drawingContext.arc(0, 0, radius * 0.98, 0, Math.PI * 2);
+      drawingContext.stroke();
+      drawingContext.restore();
+      
+      // Segmented decorative arc with enhanced glow
+      drawingContext.shadowBlur = 15;
+      drawingContext.shadowColor = colors.gold + '80';
+      stroke(colors.gold + '70');
+      strokeWeight(radius / 80);
+      
+      let numSegments = 12;
+      let segmentAngle = 20;
+      let gap = 10;
+      
+      for (let i = 0; i < numSegments; i++) {
+        let startAngle = i * (segmentAngle + gap);
+        arc(0, 0, radius, radius, startAngle, startAngle + segmentAngle);
+      }
+      
+      // Reset shadow
+      drawingContext.shadowBlur = 0;
+      
+      // Add enhanced subtle texture to bezel
+      stroke(255, 255, 255, 15);
+      strokeWeight(0.5);
+      for (let i = 0; i < 120; i++) {
+        let angle1 = random(0, 360);
+        let angle2 = angle1 + random(-5, 5);
+        let r1 = radius * 0.98 + random(-2, 2);
+        let r2 = radius * 0.98 + random(-2, 2);
+        let x1 = r1 * cos(angle1);
+        let y1 = r1 * sin(angle1);
+        let x2 = r2 * cos(angle2);
+        let y2 = r2 * sin(angle2);
+        line(x1, y1, x2, y2);
+      }
+      pop();
+    }
+    
+    function updateAndDrawParticles() {
+      // Create new particles occasionally
+      if (random() < 0.08) {
+        let angle = random(0, 360);
+        let distance = random(smallestDimension * 0.15, smallestDimension * 0.4);
+        particles.push({
+          x: distance * cos(angle),
+          y: distance * sin(angle),
+          size: random(1, 4),
+          alpha: random(150, 220),
+          life: random(50, 200),
+          color: random() > 0.5 ? colors.gold : colors.platinum
+        });
+      }
+      
+      // Update and draw particles with enhanced glow
+      drawingContext.shadowBlur = 5;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        
+        // Set glow color based on particle color
+        drawingContext.shadowColor = p.color + p.alpha.toString(16);
+        
+        // Draw particle
+        noStroke();
+        fill(p.color + p.alpha.toString(16));
+        ellipse(p.x, p.y, p.size, p.size);
+        
+        // Update life and remove dead particles
+        p.life--;
+        p.alpha = max(0, p.alpha - 1);
+        
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+      drawingContext.shadowBlur = 0;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+    
+    function updateDigitalTime(date) {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      document.getElementById('digital-time').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    // Add info toggle functionality
+    document.getElementById('toggle-info').addEventListener('click', function() {
+      const infoOverlay = document.getElementById('info-overlay');
+      if (infoOverlay.style.display === 'block') {
+        infoOverlay.style.display = 'none';
+        this.textContent = 'Guide';
+      } else {
+        infoOverlay.style.display = 'block';
+        this.textContent = 'Hide';
+      }
+    });
+  </script>
+</body>
+</html>
