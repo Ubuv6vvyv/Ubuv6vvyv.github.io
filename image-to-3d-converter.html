@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to 3D Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #121212;
+            color: #eee;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #container {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            z-index: 10;
+        }
+        
+        #upload {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        
+        .slider-container {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .slider-container label {
+            width: 120px;
+            font-size: 14px;
+        }
+        
+        .slider-container input {
+            flex: 1;
+            min-width: 120px;
+            margin-right: 10px;
+        }
+        
+        .slider-container span {
+            width: 30px;
+            text-align: right;
+            font-size: 14px;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            z-index: 20;
+        }
+        
+        button {
+            background: #4e4eff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 14px;
+        }
+        
+        button:active {
+            background: #3030cc;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            background: #4e4eff;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 14px;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .toggle-container label {
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #ui {
+                overflow-y: auto;
+                max-height: 40vh;
+            }
+            
+            .slider-container label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            
+            .slider-container input {
+                width: calc(100% - 40px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="upload">
+        <label class="file-label" for="imageInput">Select Image</label>
+        <input type="file" id="imageInput" accept="image/*">
+    </div>
+    <div id="ui">
+        <div class="slider-container">
+            <label for="depthStrength">Depth Strength:</label>
+            <input type="range" id="depthStrength" min="0" max="20" value="5" step="0.1">
+            <span id="depthStrengthValue">5.0</span>
+        </div>
+        <div class="slider-container">
+            <label for="smoothing">Smoothing:</label>
+            <input type="range" id="smoothing" min="0" max="5" value="1" step="0.1">
+            <span id="smoothingValue">1.0</span>
+        </div>
+        <div class="slider-container">
+            <label for="vertexDetail">Vertex Detail:</label>
+            <input type="range" id="vertexDetail" min="10" max="200" value="50" step="5">
+            <span id="vertexDetailValue">50</span>
+        </div>
+        <div class="slider-container">
+            <label for="brightnessThreshold">Brightness Threshold:</label>
+            <input type="range" id="brightnessThreshold" min="0" max="1" value="0.5" step="0.01">
+            <span id="brightnessThresholdValue">0.5</span>
+        </div>
+        <div class="toggle-container">
+            <label for="wireframe">Wireframe:</label>
+            <input type="checkbox" id="wireframe">
+        </div>
+        <button id="resetCamera">Reset View</button>
+        <button id="toggleUI">Hide UI</button>
+    </div>
+    <div id="loading">Processing image...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Main variables
+        let scene, camera, renderer, mesh, geometry, material;
+        let originalImageData;
+        let isProcessing = false;
+        let controls = {
+            depthStrength: 5.0,
+            smoothing: 1.0,
+            vertexDetail: 50,
+            brightnessThreshold: 0.5,
+            wireframe: false
+        };
+        
+        // Touch interaction variables
+        let isDragging = false;
+        let previousTouchX = 0;
+        let previousTouchY = 0;
+        let pinchDistance = 0;
+        let isRotating = true;
+        
+        // Initialize the 3D scene
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x121212);
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Create default plane mesh
+            geometry = new THREE.PlaneGeometry(4, 4, 1, 1);
+            material = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                side: THREE.DoubleSide,
+                flatShading: true
+            });
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Start animation loop
+            animate();
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (mesh && isRotating) {
+                mesh.rotation.y += 0.005;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Set up all event listeners
+        function setupEventListeners() {
+            // Window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Image upload
+            document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+            
+            // UI sliders
+            document.getElementById('depthStrength').addEventListener('input', function(e) {
+                controls.depthStrength = parseFloat(e.target.value);
+                document.getElementById('depthStrengthValue').textContent = controls.depthStrength.toFixed(1);
+                if (originalImageData) {
+                    processImage(originalImageData);
+                }
+            });
+            
+            document.getElementById('smoothing').addEventListener('input', function(e) {
+                controls.smoothing = parseFloat(e.target.value);
+                document.getElementById('smoothingValue').textContent = controls.smoothing.toFixed(1);
+                if (originalImageData) {
+                    processImage(originalImageData);
+                }
+            });
+            
+            document.getElementById('vertexDetail').addEventListener('input', function(e) {
+                controls.vertexDetail = parseInt(e.target.value);
+                document.getElementById('vertexDetailValue').textContent = controls.vertexDetail;
+                if (originalImageData) {
+                    processImage(originalImageData);
+                }
+            });
+            
+            document.getElementById('brightnessThreshold').addEventListener('input', function(e) {
+                controls.brightnessThreshold = parseFloat(e.target.value);
+                document.getElementById('brightnessThresholdValue').textContent = controls.brightnessThreshold.toFixed(2);
+                if (originalImageData) {
+                    processImage(originalImageData);
+                }
+            });
+            
+            document.getElementById('wireframe').addEventListener('change', function(e) {
+                controls.wireframe = e.target.checked;
+                if (material) {
+                    material.wireframe = controls.wireframe;
+                }
+            });
+            
+            // Buttons
+            document.getElementById('resetCamera').addEventListener('click', resetCamera);
+            document.getElementById('toggleUI').addEventListener('click', toggleUI);
+            
+            // Touch and mouse controls
+            const container = document.getElementById('container');
+            
+            // Mouse controls
+            container.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            container.addEventListener('wheel', onMouseWheel);
+            
+            // Touch controls
+            container.addEventListener('touchstart', onTouchStart);
+            container.addEventListener('touchmove', onTouchMove);
+            container.addEventListener('touchend', onTouchEnd);
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Create a canvas to get image data
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Get image data
+                    originalImageData = {
+                        data: ctx.getImageData(0, 0, img.width, img.height),
+                        width: img.width,
+                        height: img.height,
+                        img: img
+                    };
+                    
+                    // Process image
+                    processImage(originalImageData);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Process image and create 3D model
+        function processImage(imageData) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            document.getElementById('loading').style.display = 'block';
+            
+            // Use setTimeout to allow the UI to update
+            setTimeout(() => {
+                const { data, width, height, img } = imageData;
+                const pixelData = data.data;
+                
+                // Determine grid size based on vertex detail
+                const gridX = Math.min(Math.max(10, Math.floor(width / (200 / controls.vertexDetail))), 200);
+                const gridY = Math.min(Math.max(10, Math.floor(height / (200 / controls.vertexDetail))), 200);
+                
+                // Create new geometry
+                if (mesh) scene.remove(mesh);
+                
+                // Create geometry with proper aspect ratio
+                const aspect = width / height;
+                const geoWidth = aspect >= 1 ? 4 : 4 * aspect;
+                const geoHeight = aspect >= 1 ? 4 / aspect : 4;
+                
+                geometry = new THREE.PlaneGeometry(geoWidth, geoHeight, gridX - 1, gridY - 1);
+                
+                // Calculate vertices displacement based on brightness
+                const vertices = geometry.attributes.position.array;
+                const uvs = geometry.attributes.uv.array;
+                
+                // Apply displacement to vertices
+                for (let i = 0; i < vertices.length / 3; i++) {
+                    const x = uvs[i * 2] * width;
+                    const y = (1 - uvs[i * 2 + 1]) * height;
+                    
+                    const pixelX = Math.min(Math.floor(x), width - 1);
+                    const pixelY = Math.min(Math.floor(y), height - 1);
+                    
+                    // Sample surrounding pixels for smoothing
+                    let brightness = 0;
+                    let samples = 0;
+                    
+                    const smoothRadius = Math.max(1, Math.floor(controls.smoothing));
+                    
+                    for (let sx = -smoothRadius; sx <= smoothRadius; sx++) {
+                        for (let sy = -smoothRadius; sy <= smoothRadius; sy++) {
+                            const sampleX = Math.min(Math.max(0, pixelX + sx), width - 1);
+                            const sampleY = Math.min(Math.max(0, pixelY + sy), height - 1);
+                            
+                            const idx = (sampleY * width + sampleX) * 4;
+                            const r = pixelData[idx] / 255;
+                            const g = pixelData[idx + 1] / 255;
+                            const b = pixelData[idx + 2] / 255;
+                            
+                            // Calculate brightness using perceived luminance formula
+                            const pixelBrightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                            brightness += pixelBrightness;
+                            samples++;
+                        }
+                    }
+                    
+                    brightness /= samples;
+                    
+                    // Apply brightness threshold
+                    let displacement = 0;
+                    if (brightness > controls.brightnessThreshold) {
+                        displacement = (brightness - controls.brightnessThreshold) / (1 - controls.brightnessThreshold);
+                    } else {
+                        displacement = -controls.brightnessThreshold / 2 * (1 - brightness / controls.brightnessThreshold);
+                    }
+                    
+                    // Apply depth strength
+                    displacement *= controls.depthStrength / 10;
+                    
+                    // Update z-coordinate
+                    vertices[i * 3 + 2] = displacement;
+                }
+                
+                // Update geometry
+                geometry.attributes.position.needsUpdate = true;
+                geometry.computeVertexNormals();
+                
+                // Create or update material
+                material = new THREE.MeshStandardMaterial({
+                    map: new THREE.CanvasTexture(imageData.img),
+                    side: THREE.DoubleSide,
+                    flatShading: true,
+                    wireframe: controls.wireframe
+                });
+                
+                // Create new mesh
+                mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+                
+                // Reset camera
+                resetCamera();
+                
+                isProcessing = false;
+                document.getElementById('loading').style.display = 'none';
+                isRotating = false;
+            }, 50);
+        }
+        
+        // Reset camera position
+        function resetCamera() {
+            camera.position.set(0, 0, 5);
+            camera.lookAt(0, 0, 0);
+            
+            if (mesh) {
+                mesh.rotation.set(0, 0, 0);
+            }
+        }
+        
+        // Toggle UI visibility
+        function toggleUI() {
+            const ui = document.getElementById('ui');
+            const button = document.getElementById('toggleUI');
+            
+            if (ui.style.transform === 'translateY(100%)') {
+                ui.style.transform = 'translateY(0)';
+                button.textContent = 'Hide UI';
+            } else {
+                ui.style.transform = 'translateY(100%)';
+                button.textContent = 'Show UI';
+            }
+        }
+        
+        // Mouse interaction handlers
+        function onMouseDown(event) {
+            isDragging = true;
+            previousTouchX = event.clientX;
+            previousTouchY = event.clientY;
+            isRotating = false;
+        }
+        
+        function onMouseMove(event) {
+            if (!isDragging || !mesh) return;
+            
+            const deltaX = event.clientX - previousTouchX;
+            const deltaY = event.clientY - previousTouchY;
+            
+            mesh.rotation.y += deltaX * 0.01;
+            mesh.rotation.x += deltaY * 0.01;
+            
+            previousTouchX = event.clientX;
+            previousTouchY = event.clientY;
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+        }
+        
+        function onMouseWheel(event) {
+            event.preventDefault();
+            camera.position.z += event.deltaY * 0.01;
+            camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+        }
+        
+        // Touch interaction handlers
+        function onTouchStart(event) {
+            isRotating = false;
+            
+            if (event.touches.length === 1) {
+                isDragging = true;
+                previousTouchX = event.touches[0].clientX;
+                previousTouchY = event.touches[0].clientY;
+            } else if (event.touches.length === 2) {
+                // Calculate initial pinch distance
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                pinchDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Update rotation center
+                previousTouchX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                previousTouchY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+            }
+        }
+        
+        function onTouchMove(event) {
+            event.preventDefault();
+            
+            if (!mesh) return;
+            
+            if (event.touches.length === 1 && isDragging) {
+                // Single touch - rotate
+                const deltaX = event.touches[0].clientX - previousTouchX;
+                const deltaY = event.touches[0].clientY - previousTouchY;
+                
+                mesh.rotation.y += deltaX * 0.01;
+                mesh.rotation.x += deltaY * 0.01;
+                
+                previousTouchX = event.touches[0].clientX;
+                previousTouchY = event.touches[0].clientY;
+            } else if (event.touches.length === 2) {
+                // Calculate current pinch distance
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                const currentPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Zoom based on pinch difference
+                const pinchDelta = currentPinchDistance - pinchDistance;
+                camera.position.z -= pinchDelta * 0.01;
+                camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+                
+                pinchDistance = currentPinchDistance;
+                
+                // Update rotation center
+                const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+                
+                const deltaX = centerX - previousTouchX;
+                const deltaY = centerY - previousTouchY;
+                
+                mesh.rotation.y += deltaX * 0.01;
+                mesh.rotation.x += deltaY * 0.01;
+                
+                previousTouchX = centerX;
+                previousTouchY = centerY;
+            }
+        }
+        
+        function onTouchEnd(event) {
+            if (event.touches.length === 0) {
+                isDragging = false;
+            } else if (event.touches.length === 1) {
+                previousTouchX = event.touches[0].clientX;
+                previousTouchY = event.touches[0].clientY;
+            }
+        }
+        
+        // Initialize the application
+        init();
+    </script>
+</body>
+</html>

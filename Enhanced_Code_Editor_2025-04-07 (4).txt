@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced 3D Image Transformer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      touch-action: none;
+      font-family: Arial, sans-serif;
+    }
+    #container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    /* Compact top-right controls panel */
+    #controls {
+      position: fixed;
+      top: 5px;
+      right: 5px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 5px;
+      border-radius: 5px;
+      max-width: 250px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 11px;
+    }
+    #controls label {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 11px;
+    }
+    #fileInput {
+      margin-bottom: 3px;
+    }
+    .modeButton {
+      margin-top: 2px;
+      padding: 3px 6px;
+      border-radius: 5px;
+      border: none;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+      font-size: 11px;
+    }
+    .modeButton:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    /* Style for the Random button */
+    #randomBtn {
+      background: #009688;
+      color: white;
+      border: none;
+      padding: 4px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    #randomBtn:hover {
+      background: #00796B;
+    }
+    @media (max-width: 768px) {
+      .dg.main {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)) !important;
+      }
+      #controls {
+        padding: 4px;
+        max-width: 90%;
+      }
+    }
+    #loadingMessage {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1000;
+      display: none;
+    }
+    #presetSelector {
+      padding: 4px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+    }
+    #presetSelector option {
+      background: #333;
+      color: white;
+    }
+    /* New styling for dat.GUI in a grid layout at the bottom */
+    .dg.main {
+      position: fixed !important;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 250px;  /* Fixed height to display controllers properly */
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.7);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 2px;
+      padding: 4px;
+      font-size: 10px !important;
+      z-index: 101;
+    }
+    .dg.main .c {
+      padding: 2px 1px !important;
+      font-size: 10px !important;
+    }
+    .dg .property-name {
+      font-size: 10px !important;
+      padding: 2px 1px !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div id="controls">
+    <input type="file" id="fileInput" accept="image/*">
+    <label for="fileInput">Choose an image</label>
+    
+    <label for="presetSelector">Effect Presets:</label>
+    <select id="presetSelector">
+      <option value="none">None</option>
+      <option value="dance">Dance Party</option>
+      <option value="bubble">Bubble</option>
+      <option value="shake">Earthquake</option>
+      <option value="spiral">Spiral</option>
+      <option value="gravity">Gravity Drop</option>
+      <option value="funny">Funny</option>
+      <option value="sphere">Sphere Wrap</option>
+      <option value="cylinder">Cylinder</option>
+      <option value="wave">Ocean Wave</option>
+    </select>
+    
+    <div id="shapeButtons">
+      <button class="modeButton" id="planeBtn">Plane</button>
+      <button class="modeButton" id="sphereBtn">Sphere</button>
+      <button class="modeButton" id="cubeBtn">Cube</button>
+      <button class="modeButton" id="cylinderBtn">Cylinder</button>
+    </div>
+    <button id="randomBtn">Random</button>
+  </div>
+  <div id="loadingMessage">Loading...</div>
+
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+
+  <script>
+    // Main app
+    class ImageTransformer {
+      constructor() {
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.mesh = null;
+        this.controls = null;
+        this.gui = null;
+        this.clock = new THREE.Clock();
+        this.currentGeometryType = 'plane';
+        this.alphaData = null;  // Stores alpha channel info from loaded images
+        this.params = {
+          // Basic transform
+          stretchX: 1,
+          stretchY: 1,
+          
+          // Original effects
+          jump: 0,
+          wobble: 0,
+          twist: 0,
+          pulse: 0,
+          ripple: 0,
+          
+          // New dance effects
+          swing: 0,
+          bounce: 0,
+          wave: 0,
+          sway: 0,
+          spin: 0,
+          
+          // New wiggle effects
+          shake: 0,
+          jiggle: 0,
+          vibrate: 0,
+          
+          // New stretch effects
+          rubberBand: 0,
+          squash: 0,
+          
+          // New 3D effects
+          extrude: 0,
+          spiral: 0,
+          
+          // New advanced effects
+          gravity: 0,
+          inertia: 0,
+          
+          // Extra effects
+          orbit: 0,
+          glitch: 0,
+          
+          // Settings
+          subdivisions: 30,
+          animation: true,
+          wireframe: false,
+          currentMode: 'plane',
+          useTransparency: true,  // Toggle for using transparency in animations
+          
+          // Functions
+          resetPosition: () => this.resetPosition(),
+          resetEffects: () => this.resetEffects()
+        };
+        
+        // Physics variables
+        this.physicsObjects = [];
+        this.gravity = 9.8;
+        this.lastTime = 0;
+        
+        this.init();
+        this.setupEventListeners();
+        this.setupPresets();
+      }
+      
+      init() {
+        // Scene setup
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x222222);
+        
+        // Camera setup
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera.position.z = 5;
+        
+        // Renderer setup
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('container').appendChild(this.renderer.domElement);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        this.scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        this.scene.add(directionalLight);
+        
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        backLight.position.set(-1, -1, -1);
+        this.scene.add(backLight);
+        
+        // Setup GUI
+        this.setupGUI();
+        
+        // Start animation loop
+        this.animate();
+      }
+      
+      setupGUI() {
+        this.gui = new dat.GUI({ autoPlace: true });
+        // Reposition dat.GUI to the bottom; grid layout is set via CSS
+        this.gui.domElement.style.position = 'fixed';
+        this.gui.domElement.style.bottom = '0';
+        this.gui.domElement.style.left = '0';
+        this.gui.domElement.style.zIndex = '101';
+        
+        const transformFolder = this.gui.addFolder('Transform');
+        transformFolder.add(this.params, 'stretchX', 0.1, 3).name('Stretch X');
+        transformFolder.add(this.params, 'stretchY', 0.1, 3).name('Stretch Y');
+        transformFolder.open();
+        
+        const danceFolder = this.gui.addFolder('Dance Effects');
+        danceFolder.add(this.params, 'swing', 0, 1).name('Swing');
+        danceFolder.add(this.params, 'bounce', 0, 1).name('Bounce');
+        danceFolder.add(this.params, 'wave', 0, 1).name('Wave');
+        danceFolder.add(this.params, 'sway', 0, 1).name('Sway');
+        danceFolder.add(this.params, 'spin', 0, 1).name('Spin');
+        
+        const wiggleFolder = this.gui.addFolder('Wiggle Effects');
+        wiggleFolder.add(this.params, 'wobble', 0, 1).name('Wobble');
+        wiggleFolder.add(this.params, 'shake', 0, 1).name('Shake');
+        wiggleFolder.add(this.params, 'jiggle', 0, 1).name('Jiggle');
+        wiggleFolder.add(this.params, 'vibrate', 0, 1).name('Vibrate');
+        
+        const stretchFolder = this.gui.addFolder('Stretch Effects');
+        stretchFolder.add(this.params, 'rubberBand', 0, 1).name('Rubber Band');
+        stretchFolder.add(this.params, 'squash', 0, 1).name('Squash');
+        
+        const effectsFolder = this.gui.addFolder('Wave Effects');
+        effectsFolder.add(this.params, 'twist', 0, 2).name('Twist');
+        effectsFolder.add(this.params, 'pulse', 0, 1).name('Pulse');
+        effectsFolder.add(this.params, 'ripple', 0, 1).name('Ripple');
+        effectsFolder.add(this.params, 'jump', 0, 1).name('Jump');
+        
+        const advancedFolder = this.gui.addFolder('Advanced Effects');
+        advancedFolder.add(this.params, 'extrude', 0, 2).name('Extrude');
+        advancedFolder.add(this.params, 'spiral', 0, 1).name('Spiral');
+        advancedFolder.add(this.params, 'gravity', 0, 1).name('Gravity');
+        advancedFolder.add(this.params, 'inertia', 0, 1).name('Inertia');
+        
+        const extraFolder = this.gui.addFolder('Extra Effects');
+        extraFolder.add(this.params, 'orbit', 0, 1).name('Orbit');
+        extraFolder.add(this.params, 'glitch', 0, 1).name('Glitch');
+        
+        const settingsFolder = this.gui.addFolder('Settings');
+        settingsFolder.add(this.params, 'subdivisions', 5, 60).step(1).name('Quality')
+          .onChange(() => { if (this.texture) { this.createMesh(this.texture); } });
+        settingsFolder.add(this.params, 'animation').name('Animation');
+        settingsFolder.add(this.params, 'wireframe').name('Wireframe')
+          .onChange(value => { if (this.mesh && this.mesh.material) { this.mesh.material.wireframe = value; } });
+        settingsFolder.add(this.params, 'useTransparency').name('Use Transparency')
+          .onChange(() => { if (this.texture) { this.createMesh(this.texture); } });
+        
+        this.gui.add(this.params, 'resetPosition').name('Reset Position');
+        this.gui.add(this.params, 'resetEffects').name('Reset Effects');
+        
+        // Set a compact width for the grid GUI
+        this.gui.width = window.innerWidth;
+      }
+      
+      loadImage(file) {
+        document.getElementById('loadingMessage').style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            // Create an offscreen canvas to extract alpha channel info
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            this.alphaData = ctx.getImageData(0, 0, img.width, img.height);
+            const texture = new THREE.Texture(img);
+            texture.needsUpdate = true;
+            this.texture = texture;
+            this.createMesh(texture);
+            document.getElementById('loadingMessage').style.display = 'none';
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+      
+      createMesh(texture) {
+        if (this.mesh) {
+          this.scene.remove(this.mesh);
+          this.mesh.geometry.dispose();
+          this.mesh.material.dispose();
+        }
+        const aspectRatio = texture.image.width / texture.image.height;
+        let geometry;
+        switch (this.currentGeometryType) {
+          case 'sphere':
+            geometry = new THREE.SphereGeometry(2, this.params.subdivisions, this.params.subdivisions);
+            break;
+          case 'cube':
+            geometry = new THREE.BoxGeometry(aspectRatio * 3, 3, 3, this.params.subdivisions, this.params.subdivisions, this.params.subdivisions);
+            break;
+          case 'cylinder':
+            geometry = new THREE.CylinderGeometry(1.5, 1.5, 4, this.params.subdivisions, this.params.subdivisions);
+            break;
+          case 'plane':
+          default:
+            geometry = new THREE.PlaneGeometry(aspectRatio * 4, 4, this.params.subdivisions, this.params.subdivisions);
+            break;
+        }
+        const materialOptions = {
+          map: texture,
+          side: THREE.DoubleSide,
+          wireframe: this.params.wireframe
+        };
+        if (this.params.useTransparency) {
+          materialOptions.transparent = true;
+          materialOptions.alphaTest = 0.05;
+        } else {
+          materialOptions.transparent = false;
+          materialOptions.alphaTest = 0;
+        }
+        const material = new THREE.MeshStandardMaterial(materialOptions);
+        
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.scene.add(this.mesh);
+        
+        this.mesh.geometry.userData.originalPositions = [];
+        const positions = this.mesh.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+          this.mesh.geometry.userData.originalPositions.push({ x: positions[i], y: positions[i+1], z: positions[i+2] });
+        }
+        
+        if (this.alphaData && this.mesh.geometry.attributes.uv) {
+          const uv = this.mesh.geometry.attributes.uv.array;
+          const width = this.alphaData.width;
+          const height = this.alphaData.height;
+          this.mesh.geometry.userData.alphaValues = [];
+          for (let i = 0; i < uv.length; i += 2) {
+            const u = uv[i], v = uv[i+1];
+            const x = Math.floor(u * width), y = Math.floor((1 - v) * height);
+            const index = (y * width + x) * 4;
+            const alpha = this.alphaData.data[index+3] / 255;
+            this.mesh.geometry.userData.alphaValues.push(alpha);
+          }
+        }
+        this.resetPosition();
+      }
+      
+      resetPosition() {
+        if (this.mesh) {
+          gsap.to(this.mesh.rotation, { x: 0, y: 0, z: 0, duration: 0.8, ease: "back.out" });
+          gsap.to(this.mesh.position, { x: 0, y: 0, z: 0, duration: 0.8, ease: "back.out" });
+          gsap.to(this.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.8, ease: "back.out" });
+        }
+      }
+      
+      resetEffects() {
+        gsap.to(this.params, {
+          jump: 0, wobble: 0, twist: 0, pulse: 0, ripple: 0,
+          stretchX: 1, stretchY: 1, swing: 0, bounce: 0, wave: 0,
+          sway: 0, spin: 0, shake: 0, jiggle: 0, vibrate: 0,
+          rubberBand: 0, squash: 0, extrude: 0, spiral: 0,
+          gravity: 0, inertia: 0, orbit: 0, glitch: 0,
+          duration: 0.8, ease: "back.out", onUpdate: () => this.gui.updateDisplay()
+        });
+        this.physicsObjects = [];
+      }
+      
+      updateGeometry() {
+        if (!this.mesh || !this.mesh.geometry.userData.originalPositions) return;
+        
+        const time = this.clock.getElapsedTime();
+        const deltaTime = time - this.lastTime;
+        this.lastTime = time;
+        
+        const positions = this.mesh.geometry.attributes.position.array;
+        const originalPositions = this.mesh.geometry.userData.originalPositions;
+        const alphaValues = this.mesh.geometry.userData.alphaValues || [];
+        
+        if (this.params.animation) {
+          if (this.params.swing > 0) {
+            this.mesh.rotation.y = Math.sin(time * 2) * this.params.swing * 0.5;
+          }
+          if (this.params.spin > 0) {
+            this.mesh.rotation.y += this.params.spin * 0.03;
+            this.mesh.rotation.x += this.params.spin * 0.01;
+          }
+          if (this.params.bounce > 0) {
+            const bounceScale = 1 + Math.abs(Math.sin(time * 3)) * this.params.bounce * 0.2;
+            this.mesh.scale.set(bounceScale, bounceScale, bounceScale);
+            this.mesh.position.y = Math.abs(Math.sin(time * 3)) * this.params.bounce;
+          }
+          if (this.params.sway > 0) {
+            this.mesh.position.x = Math.sin(time * 1.5) * this.params.sway;
+          }
+          if (this.params.gravity > 0) {
+            this.applyGravity(deltaTime);
+          }
+        }
+        
+        for (let i = 0, j = 0; i < positions.length; i += 3, j++) {
+          const originalPos = originalPositions[j];
+          if (this.params.useTransparency) {
+            const alpha = alphaValues[j] !== undefined ? alphaValues[j] : 1;
+            if (alpha < 0.05) {
+              positions[i] = originalPos.x;
+              positions[i+1] = originalPos.y;
+              positions[i+2] = originalPos.z;
+              continue;
+            }
+          }
+          let x = originalPos.x * this.params.stretchX;
+          let y = originalPos.y * this.params.stretchY;
+          let z = originalPos.z;
+          
+          if (this.params.twist > 0) {
+            const angle = this.params.twist * y * Math.PI;
+            const tempX = x;
+            x = tempX * Math.cos(angle) - z * Math.sin(angle);
+            z = tempX * Math.sin(angle) + z * Math.cos(angle);
+          }
+          if (this.params.wobble > 0 && this.params.animation) {
+            x += Math.sin(y * 2 + time * 3) * this.params.wobble * 0.3;
+            y += Math.sin(x * 2 + time * 2) * this.params.wobble * 0.2;
+          }
+          if (this.params.jump > 0 && this.params.animation) {
+            y += Math.abs(Math.sin(time * 2)) * this.params.jump;
+          }
+          if (this.params.pulse > 0 && this.params.animation) {
+            const scale = 1 + Math.sin(time * 3) * this.params.pulse * 0.2;
+            x *= scale;
+            y *= scale;
+          }
+          if (this.params.ripple > 0 && this.params.animation) {
+            const dist = Math.sqrt(x*x+y*y);
+            z += Math.sin(dist * 3 - time * 4) * this.params.ripple * 0.5;
+          }
+          if (this.params.wave > 0 && this.params.animation) {
+            z += Math.sin(x * 2 + time * 3) * this.params.wave * 0.5;
+          }
+          if (this.params.shake > 0 && this.params.animation) {
+            x += (Math.random()-0.5) * this.params.shake * 0.2;
+            y += (Math.random()-0.5) * this.params.shake * 0.2;
+            z += (Math.random()-0.5) * this.params.shake * 0.2;
+          }
+          if (this.params.jiggle > 0 && this.params.animation) {
+            x += Math.sin(time*10+j*0.1) * this.params.jiggle * 0.1;
+            y += Math.cos(time*8+j*0.1) * this.params.jiggle * 0.1;
+          }
+          if (this.params.vibrate > 0 && this.params.animation) {
+            x += Math.sin(time*30) * this.params.vibrate * 0.05;
+            y += Math.cos(time*30) * this.params.vibrate * 0.05;
+          }
+          if (this.params.rubberBand > 0 && this.params.animation) {
+            const stretchFactor = 1 + Math.sin(time*5) * this.params.rubberBand * 0.3;
+            x *= stretchFactor;
+            y /= stretchFactor;
+          }
+          if (this.params.squash > 0 && this.params.animation) {
+            const squashY = 1 + Math.abs(Math.sin(time*4)) * this.params.squash * 0.5;
+            y /= squashY;
+            x *= (1 + this.params.squash * 0.2);
+          }
+          if (this.params.extrude > 0) {
+            const brightness = (originalPos.x * originalPos.y) % 1;
+            z += brightness * this.params.extrude * 2;
+          }
+          if (this.params.spiral > 0 && this.params.animation) {
+            const dist = Math.sqrt(x*x+y*y);
+            const angle = this.params.spiral * dist + time * 2;
+            const spiralX = x * Math.cos(angle) - y * Math.sin(angle);
+            const spiralY = x * Math.sin(angle) + y * Math.cos(angle);
+            x = spiralX;
+            y = spiralY;
+          }
+          if (this.params.inertia > 0 && this.params.animation) {
+            const inertiaFactor = 1 - Math.pow(0.9, this.params.inertia*10);
+            if (!this.mesh.geometry.userData.lastPositions) {
+              this.mesh.geometry.userData.lastPositions = [];
+              for (let k = 0; k < originalPositions.length; k++) {
+                this.mesh.geometry.userData.lastPositions.push({ x: originalPositions[k].x, y: originalPositions[k].y, z: originalPositions[k].z });
+              }
+            }
+            const lastPos = this.mesh.geometry.userData.lastPositions[j];
+            lastPos.x += (x - lastPos.x)*inertiaFactor;
+            lastPos.y += (y - lastPos.y)*inertiaFactor;
+            lastPos.z += (z - lastPos.z)*inertiaFactor;
+            x = lastPos.x;
+            y = lastPos.y;
+            z = lastPos.z;
+          }
+          // Extra effects:
+          if (this.params.orbit > 0 && this.params.animation) {
+            const dist = Math.sqrt(x*x+y*y);
+            const orbitAngle = this.params.orbit * Math.sin(time*2+dist);
+            const newX = x * Math.cos(orbitAngle) - y * Math.sin(orbitAngle);
+            const newY = x * Math.sin(orbitAngle) + y * Math.cos(orbitAngle);
+            x = newX;
+            y = newY;
+          }
+          if (this.params.glitch > 0 && this.params.animation) {
+            x += (Math.random()-0.5)*this.params.glitch*0.2;
+            y += (Math.random()-0.5)*this.params.glitch*0.2;
+            z += (Math.random()-0.5)*this.params.glitch*0.2;
+          }
+          positions[i] = x;
+          positions[i+1] = y;
+          positions[i+2] = z;
+        }
+        this.mesh.geometry.attributes.position.needsUpdate = true;
+      }
+      
+      applyGravity(deltaTime) {
+        if (!this.mesh) return;
+        if (this.params.gravity > 0) {
+          if (this.physicsObjects.length === 0) {
+            this.physicsObjects.push({ velocityY: 0, onGround: false });
+          }
+          const physics = this.physicsObjects[0];
+          const gravityStrength = this.gravity * this.params.gravity;
+          physics.velocityY -= gravityStrength * deltaTime;
+          this.mesh.position.y += physics.velocityY * deltaTime;
+          const floorY = -3;
+          if (this.mesh.position.y < floorY) {
+            this.mesh.position.y = floorY;
+            if (Math.abs(physics.velocityY) > 0.1) {
+              physics.velocityY = -physics.velocityY * 0.6;
+            } else {
+              physics.velocityY = 0;
+              physics.onGround = true;
+            }
+          }
+        }
+      }
+      
+      setupEventListeners() {
+        window.addEventListener('resize', () => {
+          this.camera.aspect = window.innerWidth / window.innerHeight;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            this.loadImage(e.target.files[0]);
+          }
+        });
+        document.getElementById('planeBtn').addEventListener('click', () => { this.changeGeometryType('plane'); });
+        document.getElementById('sphereBtn').addEventListener('click', () => { this.changeGeometryType('sphere'); });
+        document.getElementById('cubeBtn').addEventListener('click', () => { this.changeGeometryType('cube'); });
+        document.getElementById('cylinderBtn').addEventListener('click', () => { this.changeGeometryType('cylinder'); });
+        document.getElementById('presetSelector').addEventListener('change', (e) => { this.applyPreset(e.target.value); });
+        
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        this.renderer.domElement.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+        this.renderer.domElement.addEventListener('mousemove', (e) => {
+          if (isDragging && this.mesh) {
+            const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+            this.mesh.rotation.y += deltaMove.x * 0.01;
+            this.mesh.rotation.x += deltaMove.y * 0.01;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+          }
+        });
+        this.renderer.domElement.addEventListener('mouseup', () => { isDragging = false; });
+        this.renderer.domElement.addEventListener('wheel', (e) => {
+          if (this.mesh) {
+            const scale = this.mesh.scale.x - e.deltaY * 0.001;
+            const clampedScale = Math.max(0.1, Math.min(3, scale));
+            this.mesh.scale.set(clampedScale, clampedScale, clampedScale);
+          }
+        });
+        
+        this.setupTouchEvents();
+        
+        document.getElementById('randomBtn').addEventListener('click', () => {
+          const effectMax = {
+            jump: 1, wobble: 1, twist: 0.5, pulse: 1, ripple: 1,
+            swing: 1, bounce: 1, wave: 1, sway: 1, spin: 1,
+            shake: 1, jiggle: 1, vibrate: 1, rubberBand: 1, squash: 1,
+            extrude: 0.8, spiral: 0.8, gravity: 1, inertia: 1, orbit: 1, glitch: 1
+          };
+          for (const key in effectMax) {
+            if (this.params.hasOwnProperty(key)) {
+              this.params[key] = Math.random() * effectMax[key];
+            }
+          }
+          this.gui.updateDisplay();
+        });
+      }
+      
+      setupTouchEvents() {
+        const element = this.renderer.domElement;
+        let mc = new Hammer.Manager(element);
+        const pinch = new Hammer.Pinch();
+        const pan = new Hammer.Pan({ direction: Hammer.DIRECTION_ALL });
+        const rotate = new Hammer.Rotate();
+        rotate.recognizeWith(pan);
+        mc.add([pinch, pan, rotate]);
+        mc.on('pinch', (e) => {
+          if (this.mesh) {
+            const clampedScale = Math.max(0.5, Math.min(5, e.scale));
+            this.mesh.scale.set(clampedScale, clampedScale, clampedScale);
+          }
+        });
+        mc.on('pan', (e) => {
+          if (this.mesh) {
+            this.mesh.rotation.y += e.deltaX * 0.005;
+            this.mesh.rotation.x += e.deltaY * 0.005;
+          }
+        });
+        mc.on('rotate', (e) => {
+          if (this.mesh) {
+            this.mesh.rotation.z += e.rotation * 0.01;
+          }
+        });
+      }
+      
+      changeGeometryType(type) {
+        this.currentGeometryType = type;
+        if (this.texture) { this.createMesh(this.texture); }
+      }
+      
+      setupPresets() {
+        this.presets = {
+          none: () => { this.resetEffects(); },
+          dance: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              swing: 0.8,
+              bounce: 0.7,
+              sway: 0.5,
+              pulse: 0.3,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          bubble: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              wobble: 0.7,
+              pulse: 0.6,
+              squash: 0.3,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          shake: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              shake: 0.8,
+              vibrate: 0.5,
+              jiggle: 0.3,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          spiral: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              spiral: 0.8,
+              twist: 0.5,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          gravity: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              gravity: 1,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          funny: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 2,
+              jump: 0.3,
+              sway: 0.4,
+              stretchX: 1.1,
+              stretchY: 0.9,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 3,
+              wobble: 0.2,
+              bounce: 0.2,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 4,
+              orbit: 0.15,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 5,
+              twist: 0.2,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 5,
+              extrude: 0.3,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 5,
+              spiral: 0.3,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+            gsap.to(this.params, {
+              duration: 6,
+              glitch: 0.2,
+              ease: "sine.inOut",
+              repeat: -1,
+              yoyo: true,
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          },
+          sphere: () => { this.resetEffects(); this.changeGeometryType('sphere'); },
+          cylinder: () => { this.resetEffects(); this.changeGeometryType('cylinder'); },
+          wave: () => {
+            this.resetEffects();
+            gsap.to(this.params, {
+              duration: 0.8,
+              wave: 0.8,
+              ripple: 0.5,
+              ease: "back.out",
+              onUpdate: () => this.gui.updateDisplay()
+            });
+          }
+        };
+      }
+      
+      applyPreset(presetName) {
+        if (this.presets[presetName]) { this.presets[presetName](); }
+      }
+      
+      animate() {
+        requestAnimationFrame(() => this.animate());
+        if (this.mesh && this.params.animation) { this.updateGeometry(); }
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      window.app = new ImageTransformer();
+      const defaultImage = new Image();
+      defaultImage.onload = () => {
+        const texture = new THREE.Texture(defaultImage);
+        texture.needsUpdate = true;
+        window.app.texture = texture;
+        window.app.createMesh(texture);
+      };
+      defaultImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIj48cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iIzMzMzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0id2hpdGUiPkNob29zZSBhbiBpbWFnZTwvdGV4dD48L3N2Zz4=';
+      
+      document.addEventListener('keydown', (e) => {
+        if (!window.app.mesh) return;
+        const step = 0.1;
+        switch(e.key) {
+          case 'ArrowUp': window.app.mesh.rotation.x -= step; break;
+          case 'ArrowDown': window.app.mesh.rotation.x += step; break;
+          case 'ArrowLeft': window.app.mesh.rotation.y -= step; break;
+          case 'ArrowRight': window.app.mesh.rotation.y += step; break;
+          case 'r': window.app.resetPosition(); break;
+          case 'c': window.app.resetEffects(); break;
+          case 'w': 
+            window.app.params.wireframe = !window.app.params.wireframe;
+            if (window.app.mesh && window.app.mesh.material) {
+              window.app.mesh.material.wireframe = window.app.params.wireframe;
+            }
+            window.app.gui.updateDisplay();
+            break;
+          case 'a': 
+            window.app.params.animation = !window.app.params.animation;
+            window.app.gui.updateDisplay();
+            break;
+          case '+':
+          case '=':
+            if (window.app.mesh) {
+              const scale = Math.min(3, window.app.mesh.scale.x + 0.1);
+              window.app.mesh.scale.set(scale, scale, scale);
+            }
+            break;
+          case '-':
+            if (window.app.mesh) {
+              const scale = Math.max(0.1, window.app.mesh.scale.x - 0.1);
+              window.app.mesh.scale.set(scale, scale, scale);
+            }
+            break;
+          case '1': window.app.changeGeometryType('plane'); break;
+          case '2': window.app.changeGeometryType('sphere'); break;
+          case '3': window.app.changeGeometryType('cube'); break;
+          case '4': window.app.changeGeometryType('cylinder'); break;
+        }
+      });
+      
+      let lastTap = 0;
+      document.addEventListener('touchend', (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        if (tapLength < 300 && tapLength > 0) { window.app.resetPosition(); }
+        lastTap = currentTime;
+      });
+      
+      let lastClick = 0;
+      document.addEventListener('click', (e) => {
+        const currentTime = new Date().getTime();
+        const clickLength = currentTime - lastClick;
+        if (clickLength < 300 && clickLength > 0) { window.app.resetPosition(); }
+        lastClick = currentTime;
+      });
+    });
+    
+    function showHelp() {
+      const helpContent = `
+        <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); color:white; padding:20px; overflow:auto; z-index:1000; text-align:center;">
+          <h2>3D Image Transformer Help</h2>
+          <div style="max-width:600px; margin:0 auto; text-align:left;">
+            <h3>Controls:</h3>
+            <ul>
+              <li><strong>Mouse Drag/Touch:</strong> Rotate the image</li>
+              <li><strong>Mouse Wheel/Pinch:</strong> Zoom in/out</li>
+              <li><strong>Double Click/Tap:</strong> Reset position</li>
+              <li><strong>Arrow Keys:</strong> Rotate image</li>
+              <li><strong>+/-:</strong> Zoom in/out</li>
+              <li><strong>R key:</strong> Reset position</li>
+              <li><strong>C key:</strong> Clear all effects</li>
+              <li><strong>W key:</strong> Toggle wireframe</li>
+              <li><strong>A key:</strong> Toggle animation</li>
+              <li><strong>1-4 keys:</strong> Change geometry type</li>
+            </ul>
+            <h3>Effect Types:</h3>
+            <ul>
+              <li><strong>Transform:</strong> Basic stretching</li>
+              <li><strong>Dance Effects:</strong> Swing, bounce, wave, sway, spin</li>
+              <li><strong>Wiggle Effects:</strong> Wobble, shake, jiggle, vibrate</li>
+              <li><strong>Stretch Effects:</strong> Rubber band, squash</li>
+              <li><strong>Wave Effects:</strong> Twist, pulse, ripple, jump</li>
+              <li><strong>Advanced Effects:</strong> Extrude, spiral, gravity, inertia</li>
+              <li><strong>Extra Effects:</strong> Orbit, glitch</li>
+            </ul>
+            <p>Click anywhere to close this help window.</p>
+          </div>
+        </div>
+      `;
+      const helpDiv = document.createElement('div');
+      helpDiv.innerHTML = helpContent;
+      document.body.appendChild(helpDiv);
+      helpDiv.addEventListener('click', () => { document.body.removeChild(helpDiv); });
+    }
+    
+    const helpButton = document.createElement('button');
+    helpButton.textContent = '?';
+    helpButton.style.cssText = 'position:fixed; bottom:20px; right:20px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.7); color:white; font-size:20px; border:none; cursor:pointer; z-index:1000;';
+    document.body.appendChild(helpButton);
+    helpButton.addEventListener('click', showHelp);
+  </script>
+</body>
+</html>
