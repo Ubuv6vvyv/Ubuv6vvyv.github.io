@@ -1,0 +1,424 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable 3D GLB Viewer</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.7/build/dat.gui.min.js"></script>
+
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        canvas { 
+            display: block; 
+        }
+        #fileInput {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .status-loading {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+        }
+        .status-error {
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+        }
+        #webgl-error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <input type="file" id="fileInput" accept=".glb">
+        <div id="status"></div>
+        <div id="webgl-error">
+            WebGL context lost. Please refresh the page.<br>
+            <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 10px;">Refresh</button>
+        </div>
+    </div>
+
+<script>
+let scene, camera, renderer, controls, loader;
+let model, gui, light, clock;
+let isInitialized = false;
+let contextLostCount = 0;
+const MAX_CONTEXT_LOSS_RETRIES = 3;
+
+const params = {
+    // Fun effects
+    boingIntensity: 0,
+    dropIntensity: 0,
+    spinCrazySpeed: 0,
+    jellyWobble: 0,
+    shakyShake: 0,
+    stretchSquash: 0,
+    tiltTumble: 0,
+    zigzagDrift: 0,
+    // Material controls
+    brightness: 1,
+    metalness: 0,
+    roughness: 0.5,
+    envMapIntensity: 1,
+    ambientIntensity: 0.5,
+    // Light controls
+    lightIntensity: 1,
+    lightColor: '#ffffff',
+    lightHeight: 5,
+    lightDistance: 5
+};
+
+function showStatus(message, isError = false) {
+    const status = document.getElementById('status');
+    status.textContent = message;
+    status.className = isError ? 'status-error' : 'status-loading';
+    status.style.display = message ? 'block' : 'none';
+}
+
+function initRenderer() {
+    const container = document.getElementById('canvas-container');
+    
+    try {
+        renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            powerPreference: "high-performance",
+            failIfMajorPerformanceCaveat: true
+        });
+        
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        
+        // Clean up any existing canvas
+        const oldCanvas = container.querySelector('canvas');
+        if (oldCanvas) {
+            container.removeChild(oldCanvas);
+        }
+        
+        container.appendChild(renderer.domElement);
+        
+        // Add context loss handlers
+        renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+        renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
+        
+        return true;
+    } catch (error) {
+        console.error('Renderer initialization failed:', error);
+        showStatus('Failed to initialize 3D viewer: ' + error.message, true);
+        return false;
+    }
+}
+
+function handleContextLost(event) {
+    event.preventDefault();
+    contextLostCount++;
+    console.warn('WebGL context lost:', event);
+    
+    if (contextLostCount > MAX_CONTEXT_LOSS_RETRIES) {
+        document.getElementById('webgl-error').style.display = 'block';
+        return;
+    }
+    
+    showStatus('3D context lost, attempting to recover...', true);
+    
+    // Cleanup
+    if (controls) controls.dispose();
+    if (gui) gui.destroy();
+    
+    // Attempt recovery after a short delay
+    setTimeout(() => {
+        initializeScene();
+    }, 1000);
+}
+
+function handleContextRestored(event) {
+    console.log('WebGL context restored:', event);
+    showStatus('Recovered! Reloading model...', false);
+    initializeScene();
+}
+
+function initializeScene() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2, 5);
+
+    if (!initRenderer()) return;
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    loader = new THREE.GLTFLoader();
+    clock = new THREE.Clock();
+
+    // Enhanced lighting setup
+    light = new THREE.DirectionalLight(params.lightColor, params.lightIntensity);
+    light.position.set(params.lightDistance, params.lightHeight, params.lightDistance);
+    scene.add(light);
+
+    const ambientLight = new THREE.AmbientLight("#ffffff", params.ambientIntensity);
+    scene.add(ambientLight);
+
+    // Add environment light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+    scene.add(hemiLight);
+
+    setupGUI();
+    isInitialized = true;
+    animate();
+}
+
+function setupGUI() {
+    if (gui) gui.destroy();
+    gui = new dat.GUI();
+    
+    // Fun effects folder
+    const effectsFolder = gui.addFolder('Fun Effects');
+    effectsFolder.add(params, "boingIntensity", 0, 2).name('Boing');
+    effectsFolder.add(params, "dropIntensity", 0, 2).name('Drop');
+    effectsFolder.add(params, "spinCrazySpeed", 0, 2).name('Spin');
+    effectsFolder.add(params, "jellyWobble", 0, 2).name('Wobble');
+    effectsFolder.add(params, "shakyShake", 0, 2).name('Shake');
+    effectsFolder.add(params, "stretchSquash", 0, 2).name('Stretch');
+    effectsFolder.add(params, "tiltTumble", 0, 2).name('Tilt');
+    effectsFolder.add(params, "zigzagDrift", 0, 2).name('Zigzag');
+    
+    // Material controls folder
+    const materialFolder = gui.addFolder('Material');
+    materialFolder.add(params, "brightness", 0, 2).onChange(updateMaterials);
+    materialFolder.add(params, "metalness", 0, 1).onChange(updateMaterials);
+    materialFolder.add(params, "roughness", 0, 1).onChange(updateMaterials);
+    materialFolder.add(params, "envMapIntensity", 0, 2).onChange(updateMaterials);
+    
+    // Lighting controls folder
+    const lightFolder = gui.addFolder('Lighting');
+    lightFolder.add(params, "lightIntensity", 0, 3).onChange(updateLight);
+    lightFolder.add(params, "ambientIntensity", 0, 2).onChange(updateLight);
+    lightFolder.add(params, "lightHeight", 0, 10).onChange(updateLight);
+    lightFolder.add(params, "lightDistance", 0, 10).onChange(updateLight);
+    lightFolder.addColor(params, "lightColor").onChange(updateLight);
+
+    // Open folders by default
+    effectsFolder.open();
+    materialFolder.open();
+    lightFolder.open();
+}
+
+function updateMaterials() {
+    if (!model) return;
+    
+    model.traverse((node) => {
+        if (node.isMesh && node.material) {
+            node.material.metalness = params.metalness;
+            node.material.roughness = params.roughness;
+            node.material.envMapIntensity = params.envMapIntensity;
+            node.material.emissiveIntensity = params.brightness;
+            node.material.needsUpdate = true;
+        }
+    });
+}
+
+function updateLight() {
+    if (!light) return;
+    
+    light.intensity = params.lightIntensity;
+    light.color.set(params.lightColor);
+    light.position.set(params.lightDistance, params.lightHeight, params.lightDistance);
+    
+    scene.traverse((node) => {
+        if (node.isAmbientLight) {
+            node.intensity = params.ambientIntensity;
+        }
+    });
+}
+
+function loadGLB(data) {
+    if (!isInitialized) {
+        showStatus('Viewer not initialized. Please refresh the page.', true);
+        return;
+    }
+
+    showStatus('Loading model...');
+    
+    try {
+        loader.parse(data, '', 
+            function(gltf) {
+                if (model) {
+                    scene.remove(model);
+                    // Dispose of old model resources
+                    model.traverse((node) => {
+                        if (node.isMesh) {
+                            if (node.geometry) node.geometry.dispose();
+                            if (node.material) {
+                                if (node.material.map) node.material.map.dispose();
+                                node.material.dispose();
+                            }
+                        }
+                    });
+                }
+
+                model = gltf.scene;
+                
+                // Center and scale model
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 2 / maxDim;
+                
+                model.scale.multiplyScalar(scale);
+                model.position.sub(center.multiplyScalar(scale));
+                
+                // Apply initial material settings
+                model.traverse((node) => {
+                    if (node.isMesh) {
+                        if (node.material) {
+                            node.material.metalness = params.metalness;
+                            node.material.roughness = params.roughness;
+                            node.material.envMapIntensity = params.envMapIntensity;
+                            node.material.needsUpdate = true;
+                        }
+                    }
+                });
+                
+                scene.add(model);
+                showStatus('');
+                
+            },
+            function(error) {
+                console.error('Error loading model:', error);
+                showStatus('Error loading model: ' + error.message, true);
+            }
+        );
+    } catch (error) {
+        console.error('Critical error loading model:', error);
+        showStatus('Critical error loading model: ' + error.message, true);
+    }
+}
+
+function animate() {
+    if (!isInitialized) return;
+    
+    try {
+        requestAnimationFrame(animate);
+        controls.update();
+
+        if (model) {
+            let time = clock.getElapsedTime();
+            
+            // Animation calculations
+            let boing = Math.sin(time * 5) * params.boingIntensity;
+            let drop = Math.abs(Math.sin(time * 3)) * params.dropIntensity;
+            let spin = time * params.spinCrazySpeed * 10;
+            let wobble = Math.sin(time * 10) * params.jellyWobble * 0.2;
+            let shake = (Math.random() - 0.5) * params.shakyShake * 0.1;
+            let stretch = Math.sin(time * 6) * params.stretchSquash * 0.2 + 1;
+            let tilt = Math.sin(time * 4) * params.tiltTumble * 0.3;
+            let zigzag = Math.sin(time * 3) * params.zigzagDrift * 0.5;
+
+            // Apply animations
+            model.rotation.y = spin;
+            model.position.y = drop;
+            model.rotation.x = boing * 0.2;
+            model.rotation.z = boing * 0.1;
+            model.scale.y = stretch;
+            model.position.x = zigzag;
+            model.rotation.x += shake;
+            model.rotation.y += tilt;
+            model.scale.x = 1 + wobble;
+            model.scale.z = 1 - wobble;
+        }
+
+        renderer.render(scene, camera);
+    } catch (error) {
+        console.error('Animation error:', error);
+        if (!document.getElementById('webgl-error').style.display) {
+            showStatus('Rendering error: ' + error.message, true);
+        }
+    }
+}
+
+// Handle file input
+document.getElementById("fileInput").addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        showStatus('Reading file...');
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            loadGLB(e.target.result);
+        };
+        reader.onerror = function(e) {
+            showStatus('Error reading file: ' + e.target.error, true);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+});
+
+
+
+
+
+
+
+// Handle window resizing
+window.addEventListener('resize', function() {
+    if (!isInitialized) return;
+    
+    const container = document.getElementById('canvas-container');
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}, false);
+
+// Initialize everything
+initializeScene();
+</script>
+
+</body>
+</html>
+
+
+
