@@ -8,11 +8,11 @@
     :root {
       --primary: #0078D4;
       --text: #333;
-      --bg: #f0f2f5;
+      --bg: linear-gradient(to right, #e6ffff, #FFFFFF);
       --card-bg: #fff;
-      --border: #ddd;
-      --shadow: 0 2px 8px rgba(0, 0, 0, .3);
-      --radius: 8px;
+      --border: #000;
+      --shadow: 0 2px 8px rgba(0, 0, 0, .2);
+      --radius: 5px;
       --transition: all .2s ease;
     }
     * {
@@ -36,7 +36,7 @@
     }
     h1 {
       text-align: center;
-      font-size: 1.5rem;
+      font-size: 1.rem;
       margin: 10px 0;
     }
     h2 {
@@ -116,14 +116,14 @@
       margin-bottom: 8px;
     }
     .slider-container label {
-      font-size: .8rem;
+      font-size: .95rem;
       margin-right: 5px;
     }
     .slider-container input[type="range"] {
       flex-grow: 1;
     }
     .color-display {
-      height: 80px;
+      height: 90px;
       border-radius: var(--radius);
       margin-bottom: 8px;
       position: relative;
@@ -137,7 +137,7 @@
       right: 0;
       background: rgba(255, 255, 255, .85);
       padding: 4px 8px;
-      font-size: .8rem;
+      font-size: 1.6rem;
     }
     .color-row {
       display: flex;
@@ -149,6 +149,10 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 8.0px;
+color:#000E65;
+font-weight: 400;
+background: linear-gradient(to right, #F0F0F0, #FFFFFF);
+
     }
     .color-square,
     .palette-color,
@@ -160,8 +164,8 @@
     }
     .color-square {
       width: 25px;
-      height: 28px;
-      border-radius: 4px;
+      height: 30px;
+      border-radius: 6px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
     }
     .color-square:hover {
@@ -504,7 +508,9 @@ margin-bottom: 5px;
         <div class="card-title">
           <h2>Color Picker</h2>
         </div>
+<h5> Use the Picker tool or the sliders to select your colour. Below, you may also upload an image and select the colour directly from your image. </h5>
         <div class="color-picker-container">
+
           <input type="color" id="colorPicker" value="#1ABC9C">
           <input type="text" id="colorCode" value="#1ABC9C">
           <button class="btn btn-sm" id="setColorBtn">Set</button>
@@ -516,23 +522,15 @@ margin-bottom: 5px;
           <label for="brightnessSlider">Brightness</label>
           <input type="range" id="brightnessSlider" min="0" max="100" value="50">
         </div>
+
+
         
         <div class="color-display copy-container" id="currentColor">
           <div class="color-info" id="colorDetails"></div>
           <button class="copy-btn" data-copy="currentColorCSS">Copy CSS</button>
         </div>
       </div>
-      
-      <div class="card">
-        <div class="card-title section-toggle" id="commonColorsToggle">
-          <h2>Common Colors</h2>
-        </div>
-        <div class="collapsible" id="commonColorsSection">
-          <div class="color-row" id="commonColors"></div>
-        </div>
-      </div>
-      
-      <div class="card">
+  <div class="card">
         <div class="card-title section-toggle" id="imageColorsToggle">
           <h2>Extract from Image</h2>
         </div>
@@ -542,7 +540,18 @@ margin-bottom: 5px;
           <div class="color-row" id="extractedColors"></div>
           <p class="mt-5" style="font-size:10px">Click image to use eyedropper</p>
         </div>
+      </div>    
+      <div class="card">
+        <div class="card-title section-toggle" id="commonColorsToggle">
+          <h2>Common Colors</h2>
+        </div>
+
+        <div class="collapsible" id="commonColorsSection">
+          <div class="color-row" id="commonColors"></div>
+        </div>
       </div>
+      
+      
       
       <div class="card">
         <div class="card-title section-toggle" id="colorMeaningsToggle">
@@ -586,7 +595,7 @@ margin-bottom: 5px;
       <div class="card">
         <h2>Harmonious Pairings</h2>
         <div class="color-grid" id="colorPairs"></div>
-        <p style="font-size:10px;text-align:center">Pairings are suggested for common design situations (e.g. clean minimalist, bold contrast, or balanced complementary)</p>
+        <p style="font-size:14px;text-align:center;">Pairings are suggested for common design situations (e.g. clean minimalist, bold contrast, or balanced complementary)</p>
       </div>
       
       <div class="card">
@@ -1023,6 +1032,51 @@ margin-bottom: 5px;
         });
       },
       
+handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = event => {
+    const imgContainer = document.getElementById("imagePreviewContainer");
+    imgContainer.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = event.target.result;
+    img.className = "image-preview";
+    imgContainer.appendChild(img);
+    
+    // Ensure the image is loaded before extracting colors
+    if (img.complete) {
+      this.extractColorsFromImage(img);
+    } else {
+      img.onload = () => { 
+        this.extractColorsFromImage(img);
+      };
+    }
+    
+    // Eyedropper functionality: clicking the image sets the active color from the clicked pixel
+    img.addEventListener("click", e => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+      
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const scaleX = img.naturalWidth / img.width;
+      const scaleY = img.naturalHeight / img.height;
+      
+      const pixelData = ctx.getImageData(x * scaleX, y * scaleY, 1, 1).data;
+      const color = this.rgbToHex(`rgb(${pixelData[0]},${pixelData[1]},${pixelData[2]})`);
+      this.setActiveColor(color);
+    });
+  };
+  reader.readAsDataURL(file);
+},
+
+
+
       renderGradients() {
         const container = document.getElementById("colorGradients");
         container.innerHTML = "";
