@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Perspective Visualization Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    <!-- Added tracking.js for computer vision capabilities -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
+    <!-- Added OpenCV.js for more advanced image processing -->
+    <script src="https://docs.opencv.org/master/opencv.js" async></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #scene-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #interface {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 360px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        
+        /* Added tabs for better organization */
+        .tab {
+            overflow: hidden;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+        
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            transition: 0.3s;
+            font-size: 14px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        
+        .tab button.active {
+            background-color: #ccc;
+        }
+        
+        .tabcontent {
+            display: none;
+            padding: 10px 0;
+            border-top: none;
+        }
+        
+        #image-upload-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        #image-upload {
+            display: none;
+        }
+        
+        #image-upload-btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin-right: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        #image-upload-btn:hover {
+            background-color: #45a049;
+        }
+        
+        #image-name {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+        
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 8px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #45a049;
+        }
+        
+        .analyze-button {
+            background-color: #2196F3;
+        }
+        
+        .analyze-button:hover {
+            background-color: #0b7dda;
+        }
+        
+        .export-button {
+            background-color: #ff9800;
+        }
+        
+        .export-button:hover {
+            background-color: #e68a00;
+        }
+        
+        .grid-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        #calculations {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .slider-container {
+            margin: 10px 0;
+        }
+        
+        .slider-container label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        
+        .slider-container input {
+            width: calc(100% - 180px);
+            margin-right: 10px;
+        }
+        
+        .slider-container span {
+            min-width: 40px;
+            display: inline-block;
+            text-align: right;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .toggle-container label {
+            margin-left: 8px;
+        }
+        
+        /* Added color picker container */
+        .color-picker-container {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .color-picker-container label {
+            margin-right: 10px;
+            width: 120px;
+            font-weight: bold;
+        }
+        
+        .color-picker-container input[type="color"] {
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        #image-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        #analysis-results {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+        }
+        
+        #analysis-progress {
+            height: 5px;
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 3px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        #analysis-bar {
+            height: 5px;
+            width: 0%;
+            background-color: #4CAF50;
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 768px) {
+            #interface {
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+                max-height: 60vh;
+                max-width: none;
+            }
+            
+            .slider-container label {
+                width: 100px;
+            }
+            
+            .slider-container input {
+                width: calc(100% - 160px);
+            }
+            
+            .slider-container span {
+                min-width: 30px;
+            }
+            
+            .color-picker-container label {
+                width: 100px;
+            }
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -18px;
+            margin-left: -18px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Notification styles */
+        #notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        #notification.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="scene-container"></div>
+        <div class="spinner" id="loading-spinner"></div>
+        
+        <div id="interface">
+            <h2>Perspective Controls</h2>
+            
+            <!-- Added tabs for better organization -->
+            <div class="tab">
+                <button class="tablinks active" onclick="openTab(event, 'image-tab')">Image</button>
+                <button class="tablinks" onclick="openTab(event, 'adjust-tab')">Adjust</button>
+                <button class="tablinks" onclick="openTab(event, 'display-tab')">Display</button>
+                <button class="tablinks" onclick="openTab(event, 'advanced-tab')">Advanced</button>
+            </div>
+            
+            <!-- Image Tab -->
+            <div id="image-tab" class="tabcontent" style="display: block;">
+                <div id="image-upload-container">
+                    <button id="image-upload-btn" class="button">Choose Image</button>
+                    <span id="image-name">No image selected</span>
+                    <input type="file" id="image-upload" accept="image/*">
+                </div>
+                
+                <img id="image-preview" alt="Preview">
+                
+                <button id="analyze-btn" class="button analyze-button">Analyze Image</button>
+                
+                <div id="analysis-progress">
+                    <div id="analysis-bar"></div>
+                </div>
+                
+                <div id="analysis-results">
+                    <p><strong>Analysis Results:</strong></p>
+                    <div id="vanishing-points-result"></div>
+                    <div id="fov-result"></div>
+                    <div id="distortion-result"></div>
+                    <div id="tilt-result"></div>
+                </div>
+            </div>
+            
+            <!-- Adjust Tab -->
+            <div id="adjust-tab" class="tabcontent">
+                <div class="slider-container">
+                    <label for="fov-slider">Field of View:</label>
+                    <input type="range" id="fov-slider" min="10" max="150" value="75">
+                    <span id="fov-value">75°</span>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="perspective-slider">Perspective:</label>
+                    <input type="range" id="perspective-slider" min="0" max="100" value="50">
+                    <span id="perspective-value">50</span>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="shift-slider">Shift:</label>
+                    <input type="range" id="shift-slider" min="-100" max="100" value="0">
+                    <span id="shift-value">0</span>
+                </div>
+                
+                <!-- Added horizontal tilt slider -->
+                <div class="slider-container">
+                    <label for="horizontal-tilt-slider">Horizontal Tilt:</label>
+                    <input type="range" id="horizontal-tilt-slider" min="-45" max="45" value="0">
+                    <span id="horizontal-tilt-value">0°</span>
+                </div>
+                
+                <!-- Added vertical tilt slider -->
+                <div class="slider-container">
+                    <label for="vertical-tilt-slider">Vertical Tilt:</label>
+                    <input type="range" id="vertical-tilt-slider" min="-45" max="45" value="0">
+                    <span id="vertical-tilt-value">0°</span>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="warp-slider">Warp:</label>
+                    <input type="range" id="warp-slider" min="0" max="100" value="0">
+                    <span id="warp-value">0</span>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="skew-slider">Skew:</label>
+                    <input type="range" id="skew-slider" min="-45" max="45" value="0">
+                    <span id="skew-value">0°</span>
+                </div>
+                
+                <!-- Added distortion correction slider -->
+                <div class="slider-container">
+                    <label for="distortion-correction-slider">Distortion:</label>
+                    <input type="range" id="distortion-correction-slider" min="-100" max="100" value="0">
+                    <span id="distortion-correction-value">0</span>
+                </div>
+                
+                <button id="reset-adjust-button" class="button">Reset Adjustments</button>
+            </div>
+            
+            <!-- Display Tab -->
+            <div id="display-tab" class="tabcontent">
+                <div class="toggle-container">
+                    <input type="checkbox" id="fov-outline-toggle" checked>
+                    <label for="fov-outline-toggle">FOV Outline</label>
+                </div>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="grid-toggle" checked>
+                    <label for="grid-toggle">Grid Lines</label>
+                </div>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="shapes-toggle" checked>
+                    <label for="shapes-toggle">Shapes</label>
+                </div>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="perspective-lines-toggle" checked>
+                    <label for="perspective-lines-toggle">Perspective Lines</label>
+                </div>
+                
+                <!-- Added vanishing points toggle -->
+                <div class="toggle-container">
+                    <input type="checkbox" id="vanishing-points-toggle" checked>
+                    <label for="vanishing-points-toggle">Vanishing Points</label>
+                </div>
+                
+                <!-- Added color pickers -->
+                <div class="color-picker-container">
+                    <label for="grid-color">Grid Color:</label>
+                    <input type="color" id="grid-color" value="#888888">
+                </div>
+                
+                <div class="color-picker-container">
+                    <label for="perspective-color">Perspective Color:</label>
+                    <input type="color" id="perspective-color" value="#0088ff">
+                </div>
+                
+                <div class="color-picker-container">
+                    <label for="fov-color">FOV Color:</label>
+                    <input type="color" id="fov-color" value="#ff0000">
+                </div>
+                
+                <!-- Added thickness controls -->
+                <div class="slider-container">
+                    <label for="line-thickness">Line Thickness:</label>
+                    <input type="range" id="line-thickness" min="1" max="10" value="1">
+                    <span id="line-thickness-value">1</span>
+                </div>
+                
+                <button id="reset-display-button" class="button">Reset Display</button>
+            </div>
+            
+            <!-- Advanced Tab -->
+            <div id="advanced-tab" class="tabcontent">
+                <!-- Added auto detection toggles -->
+                <div class="toggle-container">
+                    <input type="checkbox" id="auto-vanishing-point-toggle" checked>
+                    <label for="auto-vanishing-point-toggle">Auto Vanishing Point Detection</label>
+                </div>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="auto-fov-toggle" checked>
+                    <label for="auto-fov-toggle">Auto FOV Estimation</label>
+                </div>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="distortion-correction-toggle" checked>
+                    <label for="distortion-correction-toggle">Distortion Correction</label>
+                </div>
+                
+                <div id="calculations">
+                    <h3>Calculations</h3>
+                    <p>Vanishing Point: <span id="vanishing-point">Center</span></p>
+                    <p>Perspective Angle: <span id="calculated-angle">45°</span></p>
+                    <p>Shift Factor: <span id="calculated-shift">0</span></p>
+                    <p>Warp Factor: <span id="calculated-warp">0</span></p>
+                    <p>Distortion: <span id="calculated-distortion">0</span></p>
+                </div>
+                
+                <button id="export-button" class="button export-button">Export Settings</button>
+                <button id="reset-all-button" class="button">Reset All</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification"></div>
+
+    <script>
+        // Helper function for tab navigation
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+        
+        // Notification system
+        function showNotification(message, duration = 3000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+        
+        // Check if OpenCV is loaded
+        function isOpenCvReady() {
+            return typeof cv !== 'undefined';
+        }
+        
+        // Wait for OpenCV to load
+        function waitForOpenCV(callback) {
+            if (isOpenCvReady()) {
+                callback();
+            } else {
+                // If OpenCV.js is not loaded yet, wait
+                const interval = setInterval(() => {
+                    if (isOpenCvReady()) {
+                        clearInterval(interval);
+                        callback();
+                    }
+                }, 500);
+            }
+        }
+        
+        // Main controller for the application
+        class PerspectiveVisualizer {
+            constructor() {
+                // DOM elements
+                this.container = document.getElementById('scene-container');
+                this.loadingSpinner = document.getElementById('loading-spinner');
+                this.imagePreview = document.getElementById('image-preview');
+                
+                // Settings
+                this.settings = {
+                    fov: 75,
+                    perspective: 50,
+                    shift: 0,
+                    horizontalTilt: 0,  // Added horizontal tilt
+                    verticalTilt: 0,    // Added vertical tilt
+                    warp: 0,
+                    skew: 0,
+                    distortionCorrection: 0, // Added distortion correction
+                    showFovOutline: true,
+                    showGrid: true,
+                    showShapes: true,
+                    showPerspectiveLines: true,
+                    showVanishingPoints: true, // Added vanishing points visibility
+                    gridColor: '#888888',      // Added color settings
+                    perspectiveColor: '#0088ff',
+                    fovColor: '#ff0000',
+                    lineThickness: 1,          // Added line thickness
+                    autoVanishingPoint: true,  // Auto detection settings
+                    autoFov: true,
+                    applyDistortionCorrection: true
+                };
+                
+                // Image analysis results
+                this.analysisResults = {
+                    vanishingPoints: [],
+                    initialFov: 75,
+                    distortion: 0,
+                    horizontalTilt: 0,
+                    verticalTilt: 0
+                };
+                
+                // Original uploaded image data
+                this.originalImageData = null;
+                this.processedImageData = null;
+                
+                // Scene setup
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0xdddddd);
+                
+                // Camera setup
+                this.camera = new THREE.PerspectiveCamera(
+                    this.settings.fov,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.z = 5;
+                
+                // Renderer setup
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.container.appendChild(this.renderer.domElement);
+                
+                // Lighting setup
+                this.setupLights();
+                
+                // Create scene objects
+                this.createObjects();
+                
+                // Event listeners
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                this.setupEventListeners();
+                
+                // Start animation loop
+                this.animate();
+                
+                // Hide loading spinner when ready
+                setTimeout(() => {
+                    this.loadingSpinner.style.display = 'none';
+                }, 1000);
+                
+                // Initialize OpenCV when ready
+                waitForOpenCV(() => {
+                    console.log("OpenCV.js is ready");
+                    showNotification("Computer vision capabilities loaded");
+                });
+            }
+            
+            setupLights() {
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(2, 2, 5);
+                this.scene.add(directionalLight);
+            }
+            
+            createObjects() {
+                // Create groups for organization
+                this.gridGroup = new THREE.Group();
+                this.shapesGroup = new THREE.Group();
+                this.fovGroup = new THREE.Group();
+                this.perspectiveLinesGroup = new THREE.Group();
+                this.backgroundGroup = new THREE.Group();
+                this.vanishingPointsGroup = new THREE.Group(); // Added vanishing points group
+                
+                this.scene.add(this.backgroundGroup);
+                this.scene.add(this.gridGroup);
+                this.scene.add(this.shapesGroup);
+                this.scene.add(this.fovGroup);
+                this.scene.add(this.perspectiveLinesGroup);
+                this.scene.add(this.vanishingPointsGroup);
+                
+                this.createGrid();
+                this.createShapes();
+                this.createFOVOutline();
+                this.createPerspectiveLines();
+                this.updateVisibility();
+            }
+            
+            createGrid() {
+                // Clear previous grid
+                while(this.gridGroup.children.length > 0) {
+                    this.gridGroup.remove(this.gridGroup.children[0]);
+                }
+                
+                // Get color from settings
+                const gridColor = new THREE.Color(this.settings.gridColor);
+                const gridColorLight = new THREE.Color(gridColor.r * 1.5, gridColor.g * 1.5, gridColor.b * 1.5);
+                
+                // Create grid with custom colors
+                const gridSize = 20;
+                const gridDivisions = 20;
+                const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColorLight);
+                gridHelper.rotation.x = Math.PI / 2;
+                gridHelper.position.z = -10;
+                
+                // Apply line thickness
+                if (this.settings.lineThickness > 1) {
+                    gridHelper.material.linewidth = this.settings.lineThickness;
+                }
+                
+                this.gridGroup.add(gridHelper);
+                
+                // Create axes with custom colors
+                const axesHelper = new THREE.AxesHelper(10);
+                axesHelper.position.z = -10;
+                
+                // Apply line thickness
+                if (this.settings.lineThickness > 1) {
+                    axesHelper.material.linewidth = this.settings.lineThickness;
+                }
+                
+                this.gridGroup.add(axesHelper);
+            }
+            
+            createShapes() {
+                // Clear previous shapes
+                while(this.shapesGroup.children.length > 0) {
+                    this.shapesGroup.remove(this.shapesGroup.children[0]);
+                }
+                
+                // Create various shapes at different depths
+                
+                // Cubes
+                for (let i = 0; i < 5; i++) {
+                    const geometry = new THREE.BoxGeometry(1, 1, 1);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(i / 5, 0.7, 0.5),
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    
+                    const cube = new THREE.Mesh(geometry, material);
+                    cube.position.set(i * 2 - 4, i - 2, -5 - i * 2);
+                    this.shapesGroup.add(cube);
+                }
+                
+                // Spheres
+                for (let i = 0; i < 3; i++) {
+                    const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0.6 + i / 10, 0.7, 0.5),
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    
+                    const sphere = new THREE.Mesh(geometry, material);
+                    sphere.position.set(i * 3 - 3, 2, -7 - i);
+                    this.shapesGroup.add(sphere);
+                }
+                
+                // Cones
+                for (let i = 0; i < 3; i++) {
+                    const geometry = new THREE.ConeGeometry(0.5, 1, 32);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0.1 + i / 10, 0.7, 0.5),
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    
+                    const cone = new THREE.Mesh(geometry, material);
+                    cone.position.set(i * 2 - 2, -2, -6 - i * 1.5);
+                    this.shapesGroup.add(cone);
+                }
+            }
+            
+            createFOVOutline() {
+                // Clear previous FOV outline
+                while(this.fovGroup.children.length > 0) {
+                    this.fovGroup.remove(this.fovGroup.children[0]);
+                }
+                
+                // Get color from settings
+                const fovColor = new THREE.Color(this.settings.fovColor);
+                
+                // Create FOV outline
+                const fovRadians = this.degToRad(this.settings.fov);
+                const aspect = window.innerWidth / window.innerHeight;
+                
+                const vFovRadians = fovRadians;
+                const hFovRadians = 2 * Math.atan(Math.tan(vFovRadians / 2) * aspect);
+                
+                const depth = 15;
+                const nearPlane = 1;
+                
+                // Calculate the corners at the near plane
+                const nearHeight = 2 * Math.tan(vFovRadians / 2) * nearPlane;
+                const nearWidth = nearHeight * aspect;
+                
+                const nearTopLeft = new THREE.Vector3(-nearWidth / 2, nearHeight / 2, -nearPlane);
+                const nearTopRight = new THREE.Vector3(nearWidth / 2, nearHeight / 2, -nearPlane);
+                const nearBottomRight = new THREE.Vector3(nearWidth / 2, -nearHeight / 2, -nearPlane);
+                const nearBottomLeft = new THREE.Vector3(-nearWidth / 2, -nearHeight / 2, -nearPlane);
+                
+                // Calculate the corners at the far plane
+                const farHeight = 2 * Math.tan(vFovRadians / 2) * depth;
+                const farWidth = farHeight * aspect;
+                
+                const farTopLeft = new THREE.Vector3(-farWidth / 2, farHeight / 2, -depth);
+                const farTopRight = new THREE.Vector3(farWidth / 2, farHeight / 2, -depth);
+                const farBottomRight = new THREE.Vector3(farWidth / 2, -farHeight / 2, -depth);
+                const farBottomLeft = new THREE.Vector3(-farWidth / 2, -farHeight / 2, -depth);
+                
+                // Create line segments
+                const points = [
+                    // Near plane
+                    nearTopLeft, nearTopRight,
+                    nearTopRight, nearBottomRight,
+                    nearBottomRight, nearBottomLeft,
+                    nearBottomLeft, nearTopLeft,
+                    
+                    // Far plane
+                    farTopLeft, farTopRight,
+                    farTopRight, farBottomRight,
+                    farBottomRight, farBottomLeft,
+                    farBottomLeft, farTopLeft,
+                    
+                    // Connecting lines
+                    nearTopLeft, farTopLeft,
+                    nearTopRight, farTopRight,
+                    nearBottomRight, farBottomRight,
+                    nearBottomLeft, farBottomLeft
+                ];
+                
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ 
+                    color: fovColor,
+                    linewidth: this.settings.lineThickness
+                });
+                const lineSegments = new THREE.LineSegments(geometry, material);
+                
+                this.fovGroup.add(lineSegments);
+                
+                // Add frustum visual
+                const frustumGeometry = new THREE.BufferGeometry();
+                const vertices = [
+                    // Front face (near plane)
+            
+                    nearTopLeft.x, nearTopLeft.y, nearTopLeft.z,
+                    nearTopRight.x, nearTopRight.y, nearTopRight.z,
+                    nearBottomLeft.x, nearBottomLeft.y, nearBottomLeft.z,
+                    
+                    nearBottomLeft.x, nearBottomLeft.y, nearBottomLeft.z,
+                    nearTopRight.x, nearTopRight.y, nearTopRight.z,
+                    nearBottomRight.x, nearBottomRight.y, nearBottomRight.z,
+                    
+                    // Back face (far plane)
+                    farTopLeft.x, farTopLeft.y, farTopLeft.z,
+                    farBottomLeft.x, farBottomLeft.y, farBottomLeft.z,
+                    farTopRight.x, farTopRight.y, farTopRight.z,
+                    
+                    farTopRight.x, farTopRight.y, farTopRight.z,
+                    farBottomLeft.x, farBottomLeft.y, farBottomLeft.z,
+                    farBottomRight.x, farBottomRight.y, farBottomRight.z,
+                    
+                    // Top face
+                    nearTopLeft.x, nearTopLeft.y, nearTopLeft.z,
+                    farTopLeft.x, farTopLeft.y, farTopLeft.z,
+                    nearTopRight.x, nearTopRight.y, nearTopRight.z,
+                    
+                    nearTopRight.x, nearTopRight.y, nearTopRight.z,
+                    farTopLeft.x, farTopLeft.y, farTopLeft.z,
+                    farTopRight.x, farTopRight.y, farTopRight.z,
+                    
+                    // Bottom face
+                    nearBottomLeft.x, nearBottomLeft.y, nearBottomLeft.z,
+                    nearBottomRight.x, nearBottomRight.y, nearBottomRight.z,
+                    farBottomLeft.x, farBottomLeft.y, farBottomLeft.z,
+                    
+                    farBottomLeft.x, farBottomLeft.y, farBottomLeft.z,
+                    nearBottomRight.x, nearBottomRight.y, nearBottomRight.z,
+                    farBottomRight.x, farBottomRight.y, farBottomRight.z,
+                    
+                    // Left face
+                    nearTopLeft.x, nearTopLeft.y, nearTopLeft.z,
+                    nearBottomLeft.x, nearBottomLeft.y, nearBottomLeft.z,
+                    farTopLeft.x, farTopLeft.y, farTopLeft.z,
+                    
+                    farTopLeft.x, farTopLeft.y, farTopLeft.z,
+                    nearBottomLeft.x, nearBottomLeft.y, nearBottomLeft.z,
+                    farBottomLeft.x, farBottomLeft.y, farBottomLeft.z,
+                    
+                    // Right face
+                    nearTopRight.x, nearTopRight.y, nearTopRight.z,
+                    farTopRight.x, farTopRight.y, farTopRight.z,
+                    nearBottomRight.x, nearBottomRight.y, nearBottomRight.z,
+                    
+                    nearBottomRight.x, nearBottomRight.y, nearBottomRight.z,
+                    farTopRight.x, farTopRight.y, farTopRight.z,
+                    farBottomRight.x, farBottomRight.y, farBottomRight.z
+                ];
+                
+                frustumGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                frustumGeometry.computeVertexNormals();
+                
+                const frustumMaterial = new THREE.MeshBasicMaterial({
+                    color: fovColor,
+                    transparent: true,
+                    opacity: 0.1,
+                    side: THREE.DoubleSide
+                });
+                
+                const frustumMesh = new THREE.Mesh(frustumGeometry, frustumMaterial);
+                this.fovGroup.add(frustumMesh);
+            }
+            
+            createPerspectiveLines() {
+                // Clear previous perspective lines
+                while(this.perspectiveLinesGroup.children.length > 0) {
+                    this.perspectiveLinesGroup.remove(this.perspectiveLinesGroup.children[0]);
+                }
+                
+                // Get color from settings
+                const perspectiveColor = new THREE.Color(this.settings.perspectiveColor);
+                
+                // Create perspective lines
+                const lineCount = 20;
+                const lineLength = 20;
+                const lineSpacing = 1;
+                
+                // Apply perspective factor
+                const perspectiveFactor = this.settings.perspective / 50;
+                
+                for (let i = -lineCount / 2; i <= lineCount / 2; i++) {
+                    const startPoint = new THREE.Vector3(i * lineSpacing, 0, 0);
+                    
+                    // Apply perspective to end point
+                    const endPoint = new THREE.Vector3(
+                        i * lineSpacing * perspectiveFactor,
+                        0,
+                        -lineLength
+                    );
+                    
+                    const geometry = new THREE.BufferGeometry().setFromPoints([startPoint, endPoint]);
+                    const material = new THREE.LineBasicMaterial({ 
+                        color: perspectiveColor,
+                        linewidth: this.settings.lineThickness
+                    });
+                    
+                    const line = new THREE.Line(geometry, material);
+                    this.perspectiveLinesGroup.add(line);
+                }
+            }
+            
+            createVanishingPoints() {
+                // Clear previous vanishing points
+                while(this.vanishingPointsGroup.children.length > 0) {
+                    this.vanishingPointsGroup.remove(this.vanishingPointsGroup.children[0]);
+                }
+                
+                // Add vanishing points from analysis
+                if (this.analysisResults.vanishingPoints && this.analysisResults.vanishingPoints.length > 0) {
+                    for (let i = 0; i < this.analysisResults.vanishingPoints.length; i++) {
+                        const vp = this.analysisResults.vanishingPoints[i];
+                        
+                        // Normalize to THREE.js coordinate system
+                        const normalizedX = (vp.x * 2 - 1) * 10;
+                        const normalizedY = -(vp.y * 2 - 1) * 10;
+                        
+                        // Create a sphere for each vanishing point
+                        const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+                        const material = new THREE.MeshBasicMaterial({ 
+                            color: i === 0 ? 0xff0000 : (i === 1 ? 0x00ff00 : 0x0000ff)
+                        });
+                        
+                        const sphere = new THREE.Mesh(geometry, material);
+                        sphere.position.set(normalizedX, normalizedY, -20);
+                        
+                        this.vanishingPointsGroup.add(sphere);
+                        
+                        // Add label
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 128;
+                        canvas.height = 64;
+                        const context = canvas.getContext('2d');
+                        context.fillStyle = 'white';
+                        context.font = '24px Arial';
+                        context.fillText(`VP ${i+1}`, 10, 30);
+                        
+                        const texture = new THREE.CanvasTexture(canvas);
+                        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                        const sprite = new THREE.Sprite(spriteMaterial);
+                        sprite.position.set(normalizedX + 1, normalizedY + 0.5, -20);
+                        sprite.scale.set(2, 1, 1);
+                        
+                        this.vanishingPointsGroup.add(sprite);
+                    }
+                }
+            }
+            
+            updateVisibility() {
+                this.gridGroup.visible = this.settings.showGrid;
+                this.shapesGroup.visible = this.settings.showShapes;
+                this.fovGroup.visible = this.settings.showFovOutline;
+                this.perspectiveLinesGroup.visible = this.settings.showPerspectiveLines;
+                this.vanishingPointsGroup.visible = this.settings.showVanishingPoints;
+            }
+            
+            updateColors() {
+                // Update grid color
+                if (this.gridGroup.children.length > 0) {
+                    const gridColor = new THREE.Color(this.settings.gridColor);
+                    const gridColorLight = new THREE.Color(gridColor.r * 1.5, gridColor.g * 1.5, gridColor.b * 1.5);
+                    
+                    this.gridGroup.children[0].material.color = gridColor;
+                    this.gridGroup.children[0].material.color1 = gridColor;
+                    this.gridGroup.children[0].material.color2 = gridColorLight;
+                }
+                
+                // Update perspective lines color
+                if (this.perspectiveLinesGroup.children.length > 0) {
+                    const perspectiveColor = new THREE.Color(this.settings.perspectiveColor);
+                    
+                    this.perspectiveLinesGroup.children.forEach(line => {
+                        line.material.color = perspectiveColor;
+                    });
+                }
+                
+                // Update FOV outline color
+                if (this.fovGroup.children.length > 0) {
+                    const fovColor = new THREE.Color(this.settings.fovColor);
+                    
+                    this.fovGroup.children.forEach(item => {
+                        item.material.color = fovColor;
+                    });
+                }
+            }
+            
+            updateLineThickness() {
+                // Apply line thickness to all line materials
+                // (Note: This has limitations in WebGL - it may not work in all browsers)
+                const updateMaterial = (obj) => {
+                    if (obj.material && obj.material.linewidth !== undefined) {
+                        obj.material.linewidth = this.settings.lineThickness;
+                    }
+                    
+                    if (obj.children) {
+                        obj.children.forEach(child => updateMaterial(child));
+                    }
+                };
+                
+                updateMaterial(this.gridGroup);
+                updateMaterial(this.perspectiveLinesGroup);
+                updateMaterial(this.fovGroup);
+            }
+            
+            updateScene() {
+                // Update camera FOV
+                this.camera.fov = this.settings.fov;
+                this.camera.updateProjectionMatrix();
+                
+                // Update objects
+                this.createGrid();
+                this.createFOVOutline();
+                this.createPerspectiveLines();
+                
+                // Apply transformations
+                this.applyPerspectiveTransformations();
+                
+                // Update visibility
+                this.updateVisibility();
+                
+                // Update colors
+                this.updateColors();
+                
+                // Update line thickness
+                this.updateLineThickness();
+                
+                // Update calculations display
+                this.updateCalculationsDisplay();
+            }
+            
+            applyPerspectiveTransformations() {
+                // Apply perspective transformations to the scene
+                
+                // Reset transforms
+                this.gridGroup.position.set(0, 0, 0);
+                this.gridGroup.rotation.set(Math.PI / 2, 0, 0);
+                this.shapesGroup.position.set(0, 0, 0);
+                this.shapesGroup.rotation.set(0, 0, 0);
+                this.perspectiveLinesGroup.position.set(0, 0, 0);
+                this.perspectiveLinesGroup.rotation.set(0, 0, 0);
+                
+                // Apply horizontal and vertical tilt
+                const horizontalTiltRad = this.degToRad(this.settings.horizontalTilt);
+                const verticalTiltRad = this.degToRad(this.settings.verticalTilt);
+                
+                this.gridGroup.rotation.y = horizontalTiltRad;
+                this.shapesGroup.rotation.y = horizontalTiltRad;
+                this.perspectiveLinesGroup.rotation.y = horizontalTiltRad;
+                
+                this.gridGroup.rotation.x = Math.PI / 2 + verticalTiltRad;
+                this.shapesGroup.rotation.x = verticalTiltRad;
+                this.perspectiveLinesGroup.rotation.x = verticalTiltRad;
+                
+                // Apply shift
+                const shiftAmount = this.settings.shift / 20;
+                this.gridGroup.position.x = shiftAmount;
+                this.shapesGroup.position.x = shiftAmount;
+                this.perspectiveLinesGroup.position.x = shiftAmount;
+                
+                // Apply skew
+                const skewRad = this.degToRad(this.settings.skew);
+                const skewMatrix = new THREE.Matrix4().makeShear(skewRad, 0, 0, 0, 0, 0);
+                
+                this.gridGroup.applyMatrix4(skewMatrix);
+                this.shapesGroup.applyMatrix4(skewMatrix);
+                this.perspectiveLinesGroup.applyMatrix4(skewMatrix);
+                
+                // Apply warp (non-linear distortion)
+                if (this.settings.warp > 0) {
+                    const warpFactor = this.settings.warp / 100;
+                    
+                    // Apply to shapes
+                    this.shapesGroup.children.forEach(shape => {
+                        if (shape.geometry) {
+                            const positionAttr = shape.geometry.getAttribute('position');
+                            const positions = positionAttr.array;
+                            
+                            for (let i = 0; i < positions.length; i += 3) {
+                                const x = positions[i];
+                                const y = positions[i + 1];
+                                const z = positions[i + 2];
+                                
+                                // Apply barrel distortion
+                                const r = Math.sqrt(x * x + y * y);
+                                const distortionFactor = 1 + warpFactor * r * r;
+                                
+                                positions[i] = x * distortionFactor;
+                                positions[i + 1] = y * distortionFactor;
+                            }
+                            
+                            positionAttr.needsUpdate = true;
+                        }
+                    });
+                }
+            }
+            
+            updateCalculationsDisplay() {
+                // Update calculations display with current values
+                document.getElementById('vanishing-point').textContent = 
+                    this.analysisResults.vanishingPoints.length > 0 ? 
+                    `(${this.analysisResults.vanishingPoints[0].x.toFixed(2)}, ${this.analysisResults.vanishingPoints[0].y.toFixed(2)})` : 
+                    'Center';
+                
+                document.getElementById('calculated-angle').textContent = 
+                    `${this.settings.perspective}°`;
+                
+                document.getElementById('calculated-shift').textContent = 
+                    this.settings.shift.toFixed(2);
+                
+                document.getElementById('calculated-warp').textContent = 
+                    this.settings.warp.toFixed(2);
+                
+                document.getElementById('calculated-distortion').textContent = 
+                    this.settings.distortionCorrection.toFixed(2);
+            }
+            
+            setupEventListeners() {
+                // Input element references
+                const fovSlider = document.getElementById('fov-slider');
+                const perspectiveSlider = document.getElementById('perspective-slider');
+                const shiftSlider = document.getElementById('shift-slider');
+                const horizontalTiltSlider = document.getElementById('horizontal-tilt-slider');
+                const verticalTiltSlider = document.getElementById('vertical-tilt-slider');
+                const warpSlider = document.getElementById('warp-slider');
+                const skewSlider = document.getElementById('skew-slider');
+                const distortionCorrectionSlider = document.getElementById('distortion-correction-slider');
+                
+                const fovOutlineToggle = document.getElementById('fov-outline-toggle');
+                const gridToggle = document.getElementById('grid-toggle');
+                const shapesToggle = document.getElementById('shapes-toggle');
+                const perspectiveLinesToggle = document.getElementById('perspective-lines-toggle');
+                const vanishingPointsToggle = document.getElementById('vanishing-points-toggle');
+                
+                const gridColorPicker = document.getElementById('grid-color');
+                const perspectiveColorPicker = document.getElementById('perspective-color');
+                const fovColorPicker = document.getElementById('fov-color');
+                
+                const lineThicknessSlider = document.getElementById('line-thickness');
+                
+                const autoVanishingPointToggle = document.getElementById('auto-vanishing-point-toggle');
+                const autoFovToggle = document.getElementById('auto-fov-toggle');
+                const distortionCorrectionToggle = document.getElementById('distortion-correction-toggle');
+                
+                const resetAdjustButton = document.getElementById('reset-adjust-button');
+                const resetDisplayButton = document.getElementById('reset-display-button');
+                const resetAllButton = document.getElementById('reset-all-button');
+                const exportButton = document.getElementById('export-button');
+                
+                const imageUpload = document.getElementById('image-upload');
+                const imageUploadBtn = document.getElementById('image-upload-btn');
+                const analyzeBtn = document.getElementById('analyze-btn');
+                
+                // Slider event listeners
+                fovSlider.addEventListener('input', () => {
+                    this.settings.fov = parseInt(fovSlider.value);
+                    document.getElementById('fov-value').textContent = `${this.settings.fov}°`;
+                    this.updateScene();
+                });
+                
+                perspectiveSlider.addEventListener('input', () => {
+                    this.settings.perspective = parseInt(perspectiveSlider.value);
+                    document.getElementById('perspective-value').textContent = this.settings.perspective.toString();
+                    this.updateScene();
+                });
+                
+                shiftSlider.addEventListener('input', () => {
+                    this.settings.shift = parseInt(shiftSlider.value);
+                    document.getElementById('shift-value').textContent = this.settings.shift.toString();
+                    this.updateScene();
+                });
+                
+                horizontalTiltSlider.addEventListener('input', () => {
+                    this.settings.horizontalTilt = parseInt(horizontalTiltSlider.value);
+                    document.getElementById('horizontal-tilt-value').textContent = `${this.settings.horizontalTilt}°`;
+                    this.updateScene();
+                });
+                
+                verticalTiltSlider.addEventListener('input', () => {
+                    this.settings.verticalTilt = parseInt(verticalTiltSlider.value);
+                    document.getElementById('vertical-tilt-value').textContent = `${this.settings.verticalTilt}°`;
+                    this.updateScene();
+                });
+                
+                warpSlider.addEventListener('input', () => {
+                    this.settings.warp = parseInt(warpSlider.value);
+                    document.getElementById('warp-value').textContent = this.settings.warp.toString();
+                    this.updateScene();
+                });
+                
+                skewSlider.addEventListener('input', () => {
+                    this.settings.skew = parseInt(skewSlider.value);
+                    document.getElementById('skew-value').textContent = `${this.settings.skew}°`;
+                    this.updateScene();
+                });
+                
+                distortionCorrectionSlider.addEventListener('input', () => {
+                    this.settings.distortionCorrection = parseInt(distortionCorrectionSlider.value);
+                    document.getElementById('distortion-correction-value').textContent = this.settings.distortionCorrection.toString();
+                    this.updateScene();
+                });
+                
+                lineThicknessSlider.addEventListener('input', () => {
+                    this.settings.lineThickness = parseInt(lineThicknessSlider.value);
+                    document.getElementById('line-thickness-value').textContent = this.settings.lineThickness.toString();
+                    this.updateScene();
+                });
+                
+                // Toggle event listeners
+                fovOutlineToggle.addEventListener('change', () => {
+                    this.settings.showFovOutline = fovOutlineToggle.checked;
+                    this.updateVisibility();
+                });
+                
+                gridToggle.addEventListener('change', () => {
+                    this.settings.showGrid = gridToggle.checked;
+                    this.updateVisibility();
+                });
+                
+                shapesToggle.addEventListener('change', () => {
+                    this.settings.showShapes = shapesToggle.checked;
+                    this.updateVisibility();
+                });
+                
+                perspectiveLinesToggle.addEventListener('change', () => {
+                    this.settings.showPerspectiveLines = perspectiveLinesToggle.checked;
+                    this.updateVisibility();
+                });
+                
+                vanishingPointsToggle.addEventListener('change', () => {
+                    this.settings.showVanishingPoints = vanishingPointsToggle.checked;
+                    this.updateVisibility();
+                });
+                
+                autoVanishingPointToggle.addEventListener('change', () => {
+                    this.settings.autoVanishingPoint = autoVanishingPointToggle.checked;
+                });
+                
+                autoFovToggle.addEventListener('change', () => {
+                    this.settings.autoFov = autoFovToggle.checked;
+                });
+                
+                distortionCorrectionToggle.addEventListener('change', () => {
+                    this.settings.applyDistortionCorrection = distortionCorrectionToggle.checked;
+                });
+                
+                // Color picker event listeners
+                gridColorPicker.addEventListener('change', () => {
+                    this.settings.gridColor = gridColorPicker.value;
+                    this.updateColors();
+                });
+                
+                perspectiveColorPicker.addEventListener('change', () => {
+                    this.settings.perspectiveColor = perspectiveColorPicker.value;
+                    this.updateColors();
+                });
+                
+                fovColorPicker.addEventListener('change', () => {
+                    this.settings.fovColor = fovColorPicker.value;
+                    this.updateColors();
+                });
+                
+                // Button event listeners
+                resetAdjustButton.addEventListener('click', () => {
+                    // Reset adjustment settings
+                    this.settings.fov = 75;
+                    this.settings.perspective = 50;
+                    this.settings.shift = 0;
+                    this.settings.horizontalTilt = 0;
+                    this.settings.verticalTilt = 0;
+                    this.settings.warp = 0;
+                    this.settings.skew = 0;
+                    this.settings.distortionCorrection = 0;
+                    
+                    // Update sliders
+                    fovSlider.value = this.settings.fov;
+                    document.getElementById('fov-value').textContent = `${this.settings.fov}°`;
+                    
+                    perspectiveSlider.value = this.settings.perspective;
+                    document.getElementById('perspective-value').textContent = this.settings.perspective.toString();
+                    
+                    shiftSlider.value = this.settings.shift;
+                    document.getElementById('shift-value').textContent = this.settings.shift.toString();
+                    
+                    horizontalTiltSlider.value = this.settings.horizontalTilt;
+                    document.getElementById('horizontal-tilt-value').textContent = `${this.settings.horizontalTilt}°`;
+                    
+                    verticalTiltSlider.value = this.settings.verticalTilt;
+                    document.getElementById('vertical-tilt-value').textContent = `${this.settings.verticalTilt}°`;
+                    
+                    warpSlider.value = this.settings.warp;
+                    document.getElementById('warp-value').textContent = this.settings.warp.toString();
+                    
+                    skewSlider.value = this.settings.skew;
+                    document.getElementById('skew-value').textContent = `${this.settings.skew}°`;
+                    
+                    distortionCorrectionSlider.value = this.settings.distortionCorrection;
+                    document.getElementById('distortion-correction-value').textContent = this.settings.distortionCorrection.toString();
+                    
+                    this.updateScene();
+                    showNotification("Adjustments reset to defaults");
+                });
+                
+                resetDisplayButton.addEventListener('click', () => {
+                    // Reset display settings
+                    this.settings.showFovOutline = true;
+                    this.settings.showGrid = true;
+                    this.settings.showShapes = true;
+                    this.settings.showPerspectiveLines = true;
+                    this.settings.showVanishingPoints = true;
+                    this.settings.gridColor = '#888888';
+                    this.settings.perspectiveColor = '#0088ff';
+                    this.settings.fovColor = '#ff0000';
+                    this.settings.lineThickness = 1;
+                    
+                    // Update toggles
+                    fovOutlineToggle.checked = this.settings.showFovOutline;
+                    gridToggle.checked = this.settings.showGrid;
+                    shapesToggle.checked = this.settings.showShapes;
+                    perspectiveLinesToggle.checked = this.settings.showPerspectiveLines;
+                    vanishingPointsToggle.checked = this.settings.showVanishingPoints;
+                    
+                    // Update color pickers
+                    gridColorPicker.value = this.settings.gridColor;
+                    perspectiveColorPicker.value = this.settings.perspectiveColor;
+                    fovColorPicker.value = this.settings.fovColor;
+                    
+                    // Update line thickness
+                    lineThicknessSlider.value = this.settings.lineThickness;
+                    document.getElementById('line-thickness-value').textContent = this.settings.lineThickness.toString();
+                    
+                    this.updateScene();
+                    showNotification("Display settings reset to defaults");
+                });
+                
+                resetAllButton.addEventListener('click', () => {
+                    resetAdjustButton.click();
+                    resetDisplayButton.click();
+                    
+                    // Reset advanced settings
+                    this.settings.autoVanishingPoint = true;
+                    this.settings.autoFov = true;
+                    this.settings.applyDistortionCorrection = true;
+                    
+                    // Update toggles
+                    autoVanishingPointToggle.checked = this.settings.autoVanishingPoint;
+                    autoFovToggle.checked = this.settings.autoFov;
+                    distortionCorrectionToggle.checked = this.settings.applyDistortionCorrection;
+                    
+                    showNotification("All settings reset to defaults");
+                });
+                
+                exportButton.addEventListener('click', () => {
+                    const settings = JSON.stringify(this.settings, null, 2);
+                    const blob = new Blob([settings], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'perspective-settings.json';
+                    a.click();
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    showNotification("Settings exported successfully");
+                });
+                
+                // Image upload
+                imageUploadBtn.addEventListener('click', () => {
+                    imageUpload.click();
+                });
+                
+                imageUpload.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        document.getElementById('image-name').textContent = file.name;
+                        
+                        const reader = new FileReader();
+                        
+                        reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                this.originalImageData = img;
+                                this.imagePreview.src = event.target.result;
+                                this.imagePreview.style.display = 'block';
+                                
+                                // Create texture and apply to background
+                                const texture = new THREE.TextureLoader().load(event.target.result);
+                                this.applyBackgroundTexture(texture);
+                                
+                                showNotification("Image loaded successfully");
+                            };
+                            img.src = event.target.result;
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    }
+                });
+                
+                // Analyze image
+                analyzeBtn.addEventListener('click', () => {
+                    if (!this.originalImageData) {
+                        showNotification("Please upload an image first");
+                        return;
+                    }
+                    
+                    if (!isOpenCvReady()) {
+                        showNotification("OpenCV.js is not ready yet. Please wait a moment and try again.");
+                        return;
+                    }
+                    
+                    this.analyzeImage();
+                });
+            }
+            
+            applyBackgroundTexture(texture) {
+                // Clear previous background
+                while(this.backgroundGroup.children.length > 0) {
+                    this.backgroundGroup.remove(this.backgroundGroup.children[0]);
+                }
+                
+                // Create a plane for the background
+                const aspectRatio = this.originalImageData.width / this.originalImageData.height;
+                const planeHeight = 8;
+                const planeWidth = planeHeight * aspectRatio;
+                
+                const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+                const material = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                
+                const plane = new THREE.Mesh(geometry, material);
+                plane.position.z = -15;
+                
+                this.backgroundGroup.add(plane);
+            }
+            
+            analyzeImage() {
+                if (!this.originalImageData) return;
+                
+                // Show progress
+                const progressBar = document.getElementById('analysis-progress');
+                const analysisBar = document.getElementById('analysis-bar');
+                progressBar.style.display = 'block';
+                analysisBar.style.width = '0%';
+                
+                // Simulate progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 5;
+                    analysisBar.style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(progressInterval);
+                    }
+                }, 100);
+                
+                // Convert image to OpenCV format
+                const img = this.originalImageData;
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const mat = cv.matFromImageData(imgData);
+                
+                try {
+                    // Convert to grayscale
+                    const gray = new cv.Mat();
+                    cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+                    
+                    // Apply Canny edge detection
+                    const edges = new cv.Mat();
+                    cv.Canny(gray, edges, 50, 150, 3);
+                    
+                    // Detect lines using Hough transform
+                    const lines = new cv.

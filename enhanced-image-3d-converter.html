@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Image to 3D Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #121212;
+            color: #eee;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #container {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            z-index: 10;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+        
+        #upload {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        
+        .slider-container {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .slider-container label {
+            width: 120px;
+            font-size: 10px;
+        }
+        
+        .slider-container input {
+            flex: 1;
+            min-width: 120px;
+            margin-right: 10px;
+        }
+        
+        .slider-container span {
+            width: 30px;
+            text-align: right;
+            font-size: 10px;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            z-index: 20;
+        }
+        
+        button {
+            background: #4e4eff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 10px;
+        }
+        
+        button:active {
+            background: #3030cc;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            background: #4e4eff;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 12px;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .toggle-container label {
+            margin-right: 10px;
+            font-size: 10px;
+            width: 120px;
+        }
+        
+        .effect-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        
+        .effect-toggles label {
+            margin-right: 15px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .effect-toggles input {
+            margin-right: 5px;
+        }
+        
+        .section-title {
+            margin: 15px 0 5px;
+            font-size: 12px;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+            padding-bottom: 3px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #ui {
+                max-height: 50vh;
+            }
+            
+            .slider-container label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            
+            .slider-container input {
+                width: calc(100% - 40px);
+            }
+            
+            .effect-toggles label {
+                width: 45%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="upload">
+        <label class="file-label" for="imageInput">Select Image</label>
+        <input type="file" id="imageInput" accept="image/*">
+    </div>
+    <div id="ui">
+        <div class="section-title">3D Effects</div>
+        <div class="effect-toggles">
+            <label><input type="radio" name="effectType" value="normal" checked> Normal</label>
+            <label><input type="radio" name="effectType" value="bulge"> Bulge</label>
+            <label><input type="radio" name="effectType" value="pinch"> Pinch</label>
+            <label><input type="radio" name="effectType" value="sphere"> Sphere</label>
+        </div>
+        
+        <div class="slider-container">
+            <label for="depthStrength">Depth Strength:</label>
+            <input type="range" id="depthStrength" min="0" max="20" value="5" step="0.1">
+            <span id="depthStrengthValue">5.0</span>
+        </div>
+        <div class="slider-container">
+            <label for="smoothing">Smoothing:</label>
+            <input type="range" id="smoothing" min="0" max="5" value="1" step="0.1">
+            <span id="smoothingValue">1.0</span>
+        </div>
+        <div class="slider-container">
+            <label for="vertexDetail">Vertex Detail:</label>
+            <input type="range" id="vertexDetail" min="10" max="200" value="50" step="5">
+            <span id="vertexDetailValue">50</span>
+        </div>
+        <div class="slider-container">
+            <label for="brightnessThreshold">Brightness Threshold:</label>
+            <input type="range" id="brightnessThreshold" min="0" max="1" value="0.5" step="0.01">
+            <span id="brightnessThresholdValue">0.5</span>
+        </div>
+        <div class="slider-container">
+            <label for="effectIntensity">Effect Intensity:</label>
+            <input type="range" id="effectIntensity" min="0" max="5" value="1" step="0.1">
+            <span id="effectIntensityValue">1.0</span>
+        </div>
+        
+        <div class="section-title">Image Adjustments</div>
+        <div class="slider-container">
+            <label for="hueRotation">Hue Rotation:</label>
+            <input type="range" id="hueRotation" min="0" max="360" value="0" step="1">
+            <span id="hueRotationValue">0°</span>
+        </div>
+        <div class="slider-container">
+            <label for="saturation">Saturation:</label>
+            <input type="range" id="saturation" min="0" max="2" value="1" step="0.05">
+            <span id="saturationValue">1.00</span>
+        </div>
+        <div class="slider-container">
+            <label for="brightness">Brightness:</label>
+            <input type="range" id="brightness" min="0" max="2" value="1" step="0.05">
+            <span id="brightnessValue">1.00</span>
+        </div>
+        <div class="slider-container">
+            <label for="contrast">Contrast:</label>
+            <input type="range" id="contrast" min="0" max="2" value="1" step="0.05">
+            <span id="contrastValue">1.00</span>
+        </div>
+        
+        <div class="section-title">Display</div>
+        <div class="toggle-container">
+            <label for="wireframe">Wireframe:</label>
+            <input type="checkbox" id="wireframe">
+        </div>
+        <div class="toggle-container">
+            <label for="autoRotate">Auto Rotate:</label>
+            <input type="checkbox" id="autoRotate">
+        </div>
+        
+        <button id="resetCamera">Reset View</button>
+        <button id="resetImage">Reset Image</button>
+        <button id="toggleUI">Hide UI</button>
+    </div>
+    <div id="loading">Processing image...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Main variables
+        let scene, camera, renderer, mesh, geometry, material;
+        let originalImageData, modifiedImageData, currentImageData;
+        let isProcessing = false;
+        let currentRotation = { x: 0, y: 0, z: 0 };
+        let currentCameraPosition = { x: 0, y: 0, z: 5 };
+        
+        let controls = {
+            depthStrength: 5.0,
+            smoothing: 1.0,
+            vertexDetail: 50,
+            brightnessThreshold: 0.5,
+            wireframe: false,
+            effectType: 'normal',
+            effectIntensity: 1.0,
+            hueRotation: 0,
+            saturation: 1,
+            brightness: 1,
+            contrast: 1,
+            autoRotate: false
+        };
+        
+        // Touch interaction variables
+        let isDragging = false;
+        let previousTouchX = 0;
+        let previousTouchY = 0;
+        let pinchDistance = 0;
+        
+        // Initialize the 3D scene
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x121212);
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Create default plane mesh
+            geometry = new THREE.PlaneGeometry(4, 4, 1, 1);
+            material = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                side: THREE.DoubleSide,
+                flatShading: true
+            });
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Start animation loop
+            animate();
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (mesh && controls.autoRotate) {
+                mesh.rotation.y += 0.005;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Set up all event listeners
+        function setupEventListeners() {
+            // Window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Image upload
+            document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+            
+            // Effect type radio buttons
+            const effectRadios = document.querySelectorAll('input[name="effectType"]');
+            effectRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    controls.effectType = this.value;
+                    updateGeometry();
+                });
+            });
+            
+            // UI sliders - 3D effects
+            document.getElementById('depthStrength').addEventListener('input', function(e) {
+                controls.depthStrength = parseFloat(e.target.value);
+                document.getElementById('depthStrengthValue').textContent = controls.depthStrength.toFixed(1);
+                updateGeometry();
+            });
+            
+            document.getElementById('smoothing').addEventListener('input', function(e) {
+                controls.smoothing = parseFloat(e.target.value);
+                document.getElementById('smoothingValue').textContent = controls.smoothing.toFixed(1);
+                updateGeometry();
+            });
+            
+            document.getElementById('vertexDetail').addEventListener('input', function(e) {
+                controls.vertexDetail = parseInt(e.target.value);
+                document.getElementById('vertexDetailValue').textContent = controls.vertexDetail;
+                updateGeometry();
+            });
+            
+            document.getElementById('brightnessThreshold').addEventListener('input', function(e) {
+                controls.brightnessThreshold = parseFloat(e.target.value);
+                document.getElementById('brightnessThresholdValue').textContent = controls.brightnessThreshold.toFixed(2);
+                updateGeometry();
+            });
+            
+            document.getElementById('effectIntensity').addEventListener('input', function(e) {
+                controls.effectIntensity = parseFloat(e.target.value);
+                document.getElementById('effectIntensityValue').textContent = controls.effectIntensity.toFixed(1);
+                updateGeometry();
+            });
+            
+            // UI sliders - Image adjustments
+            document.getElementById('hueRotation').addEventListener('input', function(e) {
+                controls.hueRotation = parseInt(e.target.value);
+                document.getElementById('hueRotationValue').textContent = controls.hueRotation + '°';
+                updateImageAdjustments();
+            });
+            
+            document.getElementById('saturation').addEventListener('input', function(e) {
+                controls.saturation = parseFloat(e.target.value);
+                document.getElementById('saturationValue').textContent = controls.saturation.toFixed(2);
+                updateImageAdjustments();
+            });
+            
+            document.getElementById('brightness').addEventListener('input', function(e) {
+                controls.brightness = parseFloat(e.target.value);
+                document.getElementById('brightnessValue').textContent = controls.brightness.toFixed(2);
+                updateImageAdjustments();
+            });
+            
+            document.getElementById('contrast').addEventListener('input', function(e) {
+                controls.contrast = parseFloat(e.target.value);
+                document.getElementById('contrastValue').textContent = controls.contrast.toFixed(2);
+                updateImageAdjustments();
+            });
+            
+            // Toggles
+            document.getElementById('wireframe').addEventListener('change', function(e) {
+                controls.wireframe = e.target.checked;
+                if (material) {
+                    material.wireframe = controls.wireframe;
+                }
+            });
+            
+            document.getElementById('autoRotate').addEventListener('change', function(e) {
+                controls.autoRotate = e.target.checked;
+            });
+            
+            // Buttons
+            document.getElementById('resetCamera').addEventListener('click', resetCamera);
+            document.getElementById('resetImage').addEventListener('click', resetImageAdjustments);
+            document.getElementById('toggleUI').addEventListener('click', toggleUI);
+            
+            // Touch and mouse controls
+            const container = document.getElementById('container');
+            
+            // Mouse controls
+            container.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            container.addEventListener('wheel', onMouseWheel);
+            
+            // Touch controls
+            container.addEventListener('touchstart', onTouchStart);
+            container.addEventListener('touchmove', onTouchMove);
+            container.addEventListener('touchend', onTouchEnd);
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Create a canvas to get image data
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Get image data
+                    originalImageData = {
+                        data: ctx.getImageData(0, 0, img.width, img.height),
+                        width: img.width,
+                        height: img.height,
+                        img: img
+                    };
+                    
+                    // Reset image adjustments
+                    resetImageAdjustments();
+                    
+                    // Reset camera and rotation
+                    currentRotation = { x: 0, y: 0, z: 0 };
+                    resetCamera();
+                    
+                    // Process image
+                    updateImageAdjustments();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Update image adjustments
+        function updateImageAdjustments() {
+            if (!originalImageData) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = originalImageData.width;
+            canvas.height = originalImageData.height;
+            
+            // Draw original image
+            ctx.drawImage(originalImageData.img, 0, 0);
+            
+            // Apply image adjustments if needed
+            if (controls.hueRotation !== 0 || 
+                controls.saturation !== 1 || 
+                controls.brightness !== 1 || 
+                controls.contrast !== 1) {
+                
+                // Apply filters
+                let filterString = '';
+                if (controls.hueRotation !== 0) filterString += `hue-rotate(${controls.hueRotation}deg) `;
+                if (controls.saturation !== 1) filterString += `saturate(${controls.saturation}) `;
+                if (controls.brightness !== 1) filterString += `brightness(${controls.brightness}) `;
+                if (controls.contrast !== 1) filterString += `contrast(${controls.contrast}) `;
+                
+                // Create a temporary canvas for the filtered image
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = originalImageData.width;
+                tempCanvas.height = originalImageData.height;
+                
+                // Apply the filter
+                tempCtx.filter = filterString;
+                tempCtx.drawImage(originalImageData.img, 0, 0);
+                
+                // Clear and draw the filtered image
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(tempCanvas, 0, 0);
+            }
+            
+            // Get modified image data
+            modifiedImageData = {
+                data: ctx.getImageData(0, 0, canvas.width, canvas.height),
+                width: canvas.width,
+                height: canvas.height,
+                img: canvas
+            };
+            
+            currentImageData = modifiedImageData;
+            
+            // Update geometry with the new image
+            updateGeometry();
+        }
+        
+        // Reset image adjustments
+        function resetImageAdjustments() {
+            // Reset sliders
+            document.getElementById('hueRotation').value = 0;
+            document.getElementById('hueRotationValue').textContent = '0°';
+            controls.hueRotation = 0;
+            
+            document.getElementById('saturation').value = 1;
+            document.getElementById('saturationValue').textContent = '1.00';
+            controls.saturation = 1;
+            
+            document.getElementById('brightness').value = 1;
+            document.getElementById('brightnessValue').textContent = '1.00';
+            controls.brightness = 1;
+            
+            document.getElementById('contrast').value = 1;
+            document.getElementById('contrastValue').textContent = '1.00';
+            controls.contrast = 1;
+            
+            // Update image
+            if (originalImageData) {
+                updateImageAdjustments();
+            }
+        }
+        
+        // Update the 3D geometry based on current settings
+        function updateGeometry() {
+            if (!currentImageData || isProcessing) return;
+            
+            // Save current rotation and camera position
+            if (mesh) {
+                currentRotation.x = mesh.rotation.x;
+                currentRotation.y = mesh.rotation.y;
+                currentRotation.z = mesh.rotation.z;
+            }
+            
+            currentCameraPosition.x = camera.position.x;
+            currentCameraPosition.y = camera.position.y;
+            currentCameraPosition.z = camera.position.z;
+            
+            isProcessing = true;
+            document.getElementById('loading').style.display = 'block';
+            
+            // Use setTimeout to allow the UI to update
+            setTimeout(() => {
+                const { data, width, height, img } = currentImageData;
+                const pixelData = data.data;
+                
+                // Determine grid size based on vertex detail
+                const gridX = Math.min(Math.max(10, Math.floor(width / (200 / controls.vertexDetail))), 200);
+                const gridY = Math.min(Math.max(10, Math.floor(height / (200 / controls.vertexDetail))), 200);
+                
+                // Create new geometry
+                if (mesh) scene.remove(mesh);
+                
+                // Create geometry with proper aspect ratio
+                const aspect = width / height;
+                const geoWidth = aspect >= 1 ? 4 : 4 * aspect;
+                const geoHeight = aspect >= 1 ? 4 / aspect : 4;
+                
+                geometry = new THREE.PlaneGeometry(geoWidth, geoHeight, gridX - 1, gridY - 1);
+                
+                // Calculate vertices displacement based on brightness
+                const vertices = geometry.attributes.position.array;
+                const uvs = geometry.attributes.uv.array;
+                
+                // Apply displacement to vertices
+                for (let i = 0; i < vertices.length / 3; i++) {
+                    const x = uvs[i * 2] * width;
+                    const y = (1 - uvs[i * 2 + 1]) * height;
+                    
+                    const pixelX = Math.min(Math.floor(x), width - 1);
+                    const pixelY = Math.min(Math.floor(y), height - 1);
+                    
+                    // Sample surrounding pixels for smoothing
+                    let brightness = 0;
+                    let samples = 0;
+                    
+                    const smoothRadius = Math.max(1, Math.floor(controls.smoothing));
+                    
+                    for (let sx = -smoothRadius; sx <= smoothRadius; sx++) {
+                        for (let sy = -smoothRadius; sy <= smoothRadius; sy++) {
+                            const sampleX = Math.min(Math.max(0, pixelX + sx), width - 1);
+                            const sampleY = Math.min(Math.max(0, pixelY + sy), height - 1);
+                            
+                            const idx = (sampleY * width + sampleX) * 4;
+                            const r = pixelData[idx] / 255;
+                            const g = pixelData[idx + 1] / 255;
+                            const b = pixelData[idx + 2] / 255;
+                            
+                            // Calculate brightness using perceived luminance formula
+                            const pixelBrightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                            brightness += pixelBrightness;
+                            samples++;
+                        }
+                    }
+                    
+                    brightness /= samples;
+                    
+                    // Apply brightness threshold
+                    let displacement = 0;
+                    if (brightness > controls.brightnessThreshold) {
+                        displacement = (brightness - controls.brightnessThreshold) / (1 - controls.brightnessThreshold);
+                    } else {
+                        displacement = -controls.brightnessThreshold / 2 * (1 - brightness / controls.brightnessThreshold);
+                    }
+                    
+                    // Apply depth strength
+                    displacement *= controls.depthStrength / 10;
+                    
+                    // Get normalized vertex position (from -0.5 to 0.5)
+                    const vx = vertices[i * 3] / geoWidth;
+                    const vy = vertices[i * 3 + 1] / geoHeight;
+                    const distFromCenter = Math.sqrt(vx * vx + vy * vy);
+                    
+                    // Apply different effects based on selection
+                    switch(controls.effectType) {
+                        case 'normal':
+                            // Normal effect (already applied)
+                            vertices[i * 3 + 2] = displacement;
+                            break;
+                        
+                        case 'bulge':
+                            // Bulge effect - vertices closer to center bulge more
+                            vertices[i * 3 + 2] = displacement + (1 - distFromCenter * 2) * controls.effectIntensity;
+                            break;
+                        
+                        case 'pinch':
+                            // Pinch effect - vertices closer to edges displaced more
+                            vertices[i * 3 + 2] = displacement + distFromCenter * controls.effectIntensity;
+                            break;
+                            
+                        case 'sphere':
+                            // Sphere wrap effect
+                            const sphereFactor = Math.sin(Math.PI * (0.5 - distFromCenter));
+                            vertices[i * 3 + 2] = displacement + sphereFactor * controls.effectIntensity;
+                            
+                            // Push vertices on a sphere
+                            if (distFromCenter < 0.5) {
+                                const sphereStrength = controls.effectIntensity * 0.5;
+                                const sphereZ = Math.sqrt(Math.max(0, 0.25 - vx * vx - vy * vy)) * sphereStrength;
+                                vertices[i * 3 + 2] += sphereZ;
+                            }
+                            break;
+                    }
+                }
+                
+                // Update geometry
+                geometry.attributes.position.needsUpdate = true;
+                geometry.computeVertexNormals();
+                
+                // Create or update material with the modified image
+                const texture = new THREE.CanvasTexture(currentImageData.img);
+                material = new THREE.MeshStandardMaterial({
+                    map: texture,
+                    side: THREE.DoubleSide,
+                    flatShading: true,
+                    wireframe: controls.wireframe
+                });
+                
+                // Create new mesh
+                mesh = new THREE.Mesh(geometry, material);
+                
+                // Restore rotation
+                mesh.rotation.x = currentRotation.x;
+                mesh.rotation.y = currentRotation.y;
+                mesh.rotation.z = currentRotation.z;
+                
+                scene.add(mesh);
+                
+                // Restore camera position
+                camera.position.set(
+                    currentCameraPosition.x,
+                    currentCameraPosition.y,
+                    currentCameraPosition.z
+                );
+                
+                isProcessing = false;
+                document.getElementById('loading').style.display = 'none';
+            }, 50);
+        }
+        
+        // Reset camera position
+        function resetCamera() {
+            camera.position.set(0, 0, 5);
+            camera.lookAt(0, 0, 0);
+            
+            currentCameraPosition = { x: 0, y: 0, z: 5 };
+            
+            if (mesh) {
+                mesh.rotation.set(0, 0, 0);
+                currentRotation = { x: 0, y: 0, z: 0 };
+            }
+        }
+        
+        // Toggle UI visibility
+        function toggleUI() {
+            const ui = document.getElementById('ui');
+            const button = document.getElementById('toggleUI');
+            
+            if (ui.style.transform === 'translateY(100%)') {
+                ui.style.transform = 'translateY(0)';
+                button.textContent = 'Hide UI';
+            } else {
+                ui.style.transform = 'translateY(100%)';
+                button.textContent = 'Show UI';
+            }
+        }
+        
+        // Mouse interaction handlers
+        function onMouseDown(event) {
+            isDragging = true;
+            previousTouchX = event.clientX;
+            previousTouchY = event.clientY;
+        }
+        
+        function onMouseMove(event) {
+            if (!isDragging || !mesh) return;
+            
+            const deltaX = event.clientX - previousTouchX;
+            const deltaY = event.clientY - previousTouchY;
+            
+            mesh.rotation.y += deltaX * 0.01;
+            mesh.rotation.x += deltaY * 0.01;
+            
+            currentRotation.x = mesh.rotation.x;
+            currentRotation.y = mesh.rotation.y;
+            
+            previousTouchX = event.clientX;
+            previousTouchY = event.clientY;
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+        }
+        
+        function onMouseWheel(event) {
+            event.preventDefault();
+            camera.position.z += event.deltaY * 0.01;
+            camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+            currentCameraPosition.z = camera.position.z;
+        }
+        
+        // Touch interaction handlers
+        function onTouchStart(event) {
+            if (event.touches.length === 1) {
+                isDragging = true;
+                previousTouchX = event.touches[0].clientX;
+                previousTouchY = event.touches[0].clientY;
+            } else if (event.touches.length === 2) {
+                // Calculate initial pinch distance
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                pinchDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Update rotation center
+                previousTouchX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                previousTouchY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+            }
+        }
+        
+        function onTouchMove(event) {
+            event.preventDefault();
+            
+            if (!mesh) return;
+            
+            if (event.touches.length === 1 && isDragging) {
+                // Single touch - rotate
+                const deltaX = event.touches[0].clientX - previousTouchX;
+                const deltaY = event.touches[0].clientY - previousTouchY;
+                
+                mesh.rotation.y += deltaX * 0.01;
+mesh.rotation.x += deltaY * 0.01;
+
+currentRotation.x = mesh.rotation.x;
+currentRotation.y = mesh.rotation.y;
+
+previousTouchX = event.touches[0].clientX;
+previousTouchY = event.touches[0].clientY;
+} else if (event.touches.length === 2) {
+    // Two touches - pinch to zoom
+    const dx = event.touches[0].clientX - event.touches[1].clientX;
+    const dy = event.touches[0].clientY - event.touches[1].clientY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate center point
+    const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+    const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+    
+    // Calculate zoom factor
+    const scaleFactor = 0.01;
+    const zoomAmount = (distance - pinchDistance) * scaleFactor;
+    
+    // Update camera position - zoom in/out
+    camera.position.z -= zoomAmount;
+    camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+    currentCameraPosition.z = camera.position.z;
+    
+    // Also handle rotation from center point movement
+    const deltaX = centerX - previousTouchX;
+    const deltaY = centerY - previousTouchY;
+    
+    mesh.rotation.y += deltaX * 0.005;
+    mesh.rotation.x += deltaY * 0.005;
+    
+    currentRotation.x = mesh.rotation.x;
+    currentRotation.y = mesh.rotation.y;
+    
+    // Update for next frame
+    pinchDistance = distance;
+    previousTouchX = centerX;
+    previousTouchY = centerY;
+}
+}
+
+function onTouchEnd() {
+    isDragging = false;
+}
+
+// Initialize the application
+init();
+</script>
+</body>
+</html>

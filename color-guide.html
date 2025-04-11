@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Guide & Generator</title>
+  <style>
+    :root {
+      --primary: #0078D4;
+      --text: #333;
+      --bg: #f9f9f9;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      padding: 15px;
+    }
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: var(--primary);
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+    .tab {
+      padding: 10px 15px;
+      cursor: pointer;
+      background: #eee;
+      border-radius: 4px 4px 0 0;
+      margin-right: 5px;
+      border: 1px solid #ddd;
+      border-bottom: none;
+    }
+    .tab.active {
+      background: white;
+      border-bottom: 1px solid white;
+      position: relative;
+      z-index: 1;
+    }
+    .content {
+      background: white;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 0 4px 4px 4px;
+      margin-top: -1px;
+    }
+    .panel {
+      display: none;
+    }
+    .panel.active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      display: block;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+      position: sticky;
+      top: 0;
+    }
+    .color-tile {
+      width: 40px;
+      height: 40px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    .palette-color {
+      width: 80px;
+      height: 80px;
+      border-radius: 4px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      position: relative;
+    }
+    .palette-color span {
+      background: rgba(255,255,255,0.8);
+      padding: 2px 5px;
+      border-radius: 2px;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .pairings {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin: 15px 0;
+    }
+    .pairing {
+      display: flex;
+      flex-direction: column;
+      width: calc(50% - 8px);
+      margin-bottom: 15px;
+    }
+    .pairing-colors {
+      display: flex;
+      height: 60px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .pairing-color {
+      flex: 1;
+    }
+    .pairing-info {
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .gradients {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .gradient {
+      height: 100px;
+      border-radius: 4px;
+      width: calc(50% - 8px);
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .gradient-info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .flex {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 768px) {
+      .pairing, .gradient {
+        width: 100%;
+      }
+      .palette-color {
+        width: 60px;
+        height: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Color Style Guide</h1>
+    
+    <div class="tabs">
+      <div class="tab active" data-tab="colors">Colors</div>
+      <div class="tab" data-tab="pairings">Pairings</div>
+      <div class="tab" data-tab="gradients">Gradients</div>
+      <div class="tab" data-tab="generator">Generator</div>
+    </div>
+    
+    <div class="content">
+      <div class="panel active" id="colors">
+        <table id="colorTable">
+          <thead>
+            <tr>
+              <th>Color</th>
+              <th>Code</th>
+              <th>Tile</th>
+              <th>Associations</th>
+              <th>Complementary</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      
+      <div class="panel" id="pairings">
+        <h2>Effective Color Combinations</h2>
+        <div class="pairings" id="colorPairings"></div>
+      </div>
+      
+      <div class="panel" id="gradients">
+        <h2>Gradients</h2>
+        <div class="gradients" id="colorGradients"></div>
+      </div>
+      
+      <div class="panel" id="generator">
+        <h2>Color Scheme Generator</h2>
+        <p>Click any color from the colors tab to generate a scheme</p>
+        <div id="schemeDisplay">
+          <div class="palette" id="colorPalette"></div>
+          <button id="regenerateBtn">Regenerate</button>
+          <div class="flex">
+            <button id="monochromaticBtn">Monochromatic</button>
+            <button id="analogousBtn">Analogous</button>
+            <button id="complementaryBtn">Complementary</button>
+            <button id="triadicBtn">Triadic</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const c = {
+      data: [
+        {name:"Red", code:"#FF0000", associations:"Energy, Passion, Action, Excitement, Danger"},
+        {name:"Orange", code:"#FFA500", associations:"Warmth, Enthusiasm, Creativity, Success, Stimulation"},
+        {name:"Yellow", code:"#FFFF00", associations:"Happiness, Optimism, Positivity, Light, Warmth"},
+        {name:"Green", code:"#008000", associations:"Growth, Health, Harmony, Environment, Wealth"},
+        {name:"Blue", code:"#0000FF", associations:"Trust, Calm, Intelligence, Security, Serenity"},
+        {name:"Purple", code:"#800080", associations:"Luxury, Mystery, Creativity, Spirituality, Royalty"},
+        {name:"Pink", code:"#FFC0CB", associations:"Femininity, Romance, Playfulness, Compassion, Sensitivity"},
+        {name:"Brown", code:"#964B00", associations:"Earth, Stability, Reliability, Support, Comfort"},
+        {name:"Gray", code:"#808080", associations:"Neutrality, Balance, Sophistication, Elegance, Modernity"},
+        {name:"Black", code:"#000000", associations:"Power, Elegance, Death, Mourning, Rebellion"},
+        {name:"White", code:"#FFFFFF", associations:"Purity, Innocence, Cleanliness, Simplicity, Hope"},
+        {name:"Turquoise", code:"#1ABC9C", associations:"Freshness, Vibrancy, Energy, Playfulness, Youth"},
+        {name:"Silver", code:"#B1B1B1", associations:"Luxury, Technology"},
+        {name:"Gold", code:"#FFD700", associations:"Wealth, Success, Achievement, Prestige, Sophistication"},
+        {name:"Beige", code:"#F5F5DC", associations:"Neutrality, Calmness, Serenity, Comfort, Warmth"},
+        {name:"Ivory", code:"#FFFFF0", associations:"Elegance, Sophistication, Luxury, Purity, Innocence"},
+        {name:"Lavender", code:"#C7B8EA", associations:"Calmness, Serenity, Peacefulness, Femininity, Romance"},
+        {name:"Peach", code:"#FFD7BE", associations:"Warmth, Softness, Femininity, Playfulness, Youth"},
+        {name:"Magenta", code:"#FF00FF", associations:"Energy, Vibrancy, Playfulness, Creativity, Fun"},
+        {name:"Cyan", code:"#00FFFF", associations:"Freshness, Vibrancy, Energy, Calmness, Serenity"},
+        {name:"Coral", code:"#FFC67D", associations:"Warmth, Energy, Playfulness, Femininity, Vibrancy"},
+        {name:"Fuchsia", code:"#FFC0CB", associations:"Luxury, Elegance, Sophistication, Femininity, Romance"},
+        {name:"Olive", code:"#808000", associations:"Earth, Nature, Stability, Support, Comfort"},
+        {name:"Teal", code:"#008080", associations:"Freshness, Vibrancy, Energy, Calmness, Serenity"},
+        {name:"Charcoal", code:"#333333", associations:"Neutrality, Balance, Sophistication, Elegance, Modernity"}
+      ],
+      pairings: [
+        {colors: ["#FF0000", "#FFFFFF"], name: "Red & White", desc: "High contrast - Alert, Warning"},
+        {colors: ["#0000FF", "#FFA500"], name: "Blue & Orange", desc: "Complementary - Energetic balance"},
+        {colors: ["#FFFF00", "#800080"], name: "Yellow & Purple", desc: "Complementary - Regal, vibrant"},
+        {colors: ["#008000", "#FFD7BE"], name: "Green & Peach", desc: "Earthy, Natural palette"},
+        {colors: ["#333333", "#FFD700"], name: "Charcoal & Gold", desc: "Luxury, Premium feel"},
+        {colors: ["#1ABC9C", "#F5F5DC"], name: "Turquoise & Beige", desc: "Coastal, Relaxing"},
+        {colors: ["#C7B8EA", "#FFC67D"], name: "Lavender & Coral", desc: "Soft, Feminine, Romantic"},
+        {colors: ["#FF00FF", "#FFFFF0"], name: "Magenta & Ivory", desc: "Bold with elegant balance"},
+        {colors: ["#808080", "#00FFFF"], name: "Gray & Cyan", desc: "Modern, Techy"},
+        {colors: ["#964B00", "#008080"], name: "Brown & Teal", desc: "Earthy, Natural contrast"},
+        {colors: ["#FFC0CB", "#808000"], name: "Pink & Olive", desc: "Vintage, Muted palette"},
+        {colors: ["#000000", "#B1B1B1"], name: "Black & Silver", desc: "Sleek, Modern, Elegant"}
+      ],
+      gradients: [
+        {colors: ["#FF0000", "#FFA500"], name: "Sunset", orient: "to right"},
+        {colors: ["#0000FF", "#00FFFF"], name: "Ocean", orient: "to bottom right"},
+        {colors: ["#800080", "#C7B8EA"], name: "Twilight", orient: "to bottom"},
+        {colors: ["#008000", "#FFFF00"], name: "Spring", orient: "to right"},
+        {colors: ["#333333", "#808080"], name: "Smoke", orient: "to bottom left"},
+        {colors: ["#FFC0CB", "#FFD7BE"], name: "Blush", orient: "to right"},
+        {colors: ["#1ABC9C", "#0000FF"], name: "Aqua", orient: "to bottom right"},
+        {colors: ["#FF00FF", "#0000FF"], name: "Neon", orient: "to right"},
+        {colors: ["#FFD700", "#FFA500"], name: "Gold", orient: "to bottom"},
+        {colors: ["#964B00", "#FFC67D"], name: "Autumn", orient: "to right"}
+      ],
+      activeColor: null,
+      activeSchemeType: "analogous",
+      
+      init() {
+        this.renderColors();
+        this.renderPairings();
+        this.renderGradients();
+        this.setupTabs();
+        
+        document.getElementById('monochromaticBtn').addEventListener('click', () => this.generateScheme('monochromatic'));
+        document.getElementById('analogousBtn').addEventListener('click', () => this.generateScheme('analogous'));
+        document.getElementById('complementaryBtn').addEventListener('click', () => this.generateScheme('complementary'));
+        document.getElementById('triadicBtn').addEventListener('click', () => this.generateScheme('triadic'));
+        document.getElementById('regenerateBtn').addEventListener('click', () => this.generateScheme(this.activeSchemeType));
+      },
+      
+      setupTabs() {
+        document.querySelectorAll('.tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.tab).classList.add('active');
+          });
+        });
+      },
+      
+      renderColors() {
+        const tbody = document.querySelector('#colorTable tbody');
+        this.data.forEach(color => {
+          const complementary = this.getComplementary(color.code);
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${color.name}</td>
+            <td>${color.code}</td>
+            <td><div class="color-tile" style="background-color: ${color.code}" data-color="${color.code}"></div></td>
+            <td>${color.associations}</td>
+            <td><div class="color-tile" style="background-color: ${complementary}" title="${complementary}"></div></td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        document.querySelectorAll('.color-tile').forEach(tile => {
+          tile.addEventListener('click', (e) => {
+            const color = e.target.dataset.color || e.target.style.backgroundColor;
+            this.activeColor = color;
+            document.querySelector('.tab[data-tab="generator"]').click();
+            this.generateScheme('analogous');
+          });
+        });
+      },
+      
+      renderPairings() {
+        const container = document.getElementById('colorPairings');
+        this.pairings.forEach(pair => {
+          const div = document.createElement('div');
+          div.className = 'pairing';
+          
+          const colorDiv = document.createElement('div');
+          colorDiv.className = 'pairing-colors';
+          
+          pair.colors.forEach(color => {
+            const colorEl = document.createElement('div');
+            colorEl.className = 'pairing-color';
+            colorEl.style.backgroundColor = color;
+            colorDiv.appendChild(colorEl);
+          });
+          
+          const info = document.createElement('div');
+          info.className = 'pairing-info';
+          info.textContent = `${pair.name}: ${pair.desc}`;
+          
+          div.appendChild(colorDiv);
+          div.appendChild(info);
+          container.appendChild(div);
+        });
+      },
+      
+      renderGradients() {
+        const container = document.getElementById('colorGradients');
+        this.gradients.forEach(grad => {
+          const div = document.createElement('div');
+          div.className = 'gradient';
+          div.style.background = `linear-gradient(${grad.orient}, ${grad.colors[0]}, ${grad.colors[1]})`;
+          
+          const info = document.createElement('div');
+          info.className = 'gradient-info';
+          info.textContent = grad.name;
+          
+          div.appendChild(info);
+          container.appendChild(div);
+        });
+      },
+      
+      generateScheme(type) {
+        if (!this.activeColor) return;
+        
+        this.activeSchemeType = type;
+        const palette = document.getElementById('colorPalette');
+        palette.innerHTML = '';
+        
+        let colors = [];
+        const baseColor = this.activeColor.startsWith('#') ? 
+          this.activeColor : 
+          this.rgbToHex(this.activeColor);
+        
+        switch(type) {
+          case 'monochromatic':
+            colors = this.generateMonochromatic(baseColor, 5);
+            break;
+          case 'analogous':
+            colors = this.generateAnalogous(baseColor, 5);
+            break;
+          case 'complementary':
+            colors = this.generateComplementary(baseColor);
+            break;
+          case 'triadic':
+            colors = this.generateTriadic(baseColor);
+            break;
+        }
+        
+        colors.forEach(color => {
+          const div = document.createElement('div');
+          div.className = 'palette-color';
+          div.style.backgroundColor = color;
+          
+          const span = document.createElement('span');
+          span.textContent = color;
+          div.appendChild(span);
+          
+          palette.appendChild(div);
+        });
+      },
+      
+      hexToHsl(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        if (!result) return null;
+        
+        let r = parseInt(result[1], 16) / 255;
+        let g = parseInt(result[2], 16) / 255;
+        let b = parseInt(result[3], 16) / 255;
+        
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        
+        if (max === min) {
+          h = s = 0;
+        } else {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          
+          switch(max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+          }
+          
+          h /= 6;
+        }
+        
+        return [h * 360, s * 100, l * 100];
+      },
+      
+      hslToHex(h, s, l) {
+        h /= 360;
+        s /= 100;
+        l /= 100;
+        
+        let r, g, b;
+        
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+          
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          
+          r = hue2rgb(p, q, h + 1/3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1/3);
+        }
+        
+        const toHex = x => {
+          const hex = Math.round(x * 255).toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        };
+        
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      },
+      
+      rgbToHex(rgb) {
+        if (rgb.startsWith('#')) return rgb;
+        
+        const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+        if (!match) return rgb;
+        
+        const toHex = n => {
+          const hex = parseInt(n).toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        };
+        
+        return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
+      },
+      
+      getComplementary(hex) {
+        const [h, s, l] = this.hexToHsl(hex);
+        return this.hslToHex((h + 180) % 360, s, l);
+      },
+      
+      generateMonochromatic(hex, count = 5) {
+        const [h, s, l] = this.hexToHsl(hex);
+        const result = [];
+        
+        for (let i = 0; i < count; i++) {
+          const newL = Math.max(0, Math.min(100, l - 30 + i * 15));
+          result.push(this.hslToHex(h, s, newL));
+        }
+        
+        return result;
+      },
+      
+      generateAnalogous(hex, count = 5) {
+        const [h, s, l] = this.hexToHsl(hex);
+        const result = [];
+        
+        const angle = 30;
+        const start = h - (angle * (count - 1) / 2);
+        
+        for (let i = 0; i < count; i++) {
+          const newH = (start + i * angle + 360) % 360;
+          result.push(this.hslToHex(newH, s, l));
+        }
+        
+        return result;
+      },
+      
+      generateComplementary(hex) {
+        const [h, s, l] = this.hexToHsl(hex);
+        const complement = (h + 180) % 360;
+        
+        return [
+          hex,
+          this.hslToHex((h + 30) % 360, s, l),
+          this.hslToHex(complement, s, l),
+          this.hslToHex((complement + 30) % 360, s, l),
+          this.hslToHex((complement - 30) % 360, s, l)
+        ];
+      },
+      
+      generateTriadic(hex) {
+        const [h, s, l] = this.hexToHsl(hex);
+        
+        return [
+          hex,
+          this.hslToHex((h + 120) % 360, s, l),
+          this.hslToHex((h + 240) % 360, s, l),
+          this.hslToHex((h + 60) % 360, s, l),
+          this.hslToHex((h + 180) % 360, s, l)
+        ];
+      }
+    };
+    
+    document.addEventListener('DOMContentLoaded', () => c.init());
+  </script>
+</body>
+</html>

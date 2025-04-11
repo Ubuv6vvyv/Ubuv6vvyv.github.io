@@ -1,0 +1,215 @@
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <title>Rope Slider Hybrid</title>
+  <style>
+    body {
+      background: #111;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+overflow: hidden;
+    }
+
+    .slider-container {
+      position: relative;
+      width: 80%;
+      max-width: 700px;
+      height: 50px;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    input[type="range"] {
+      position: absolute;
+      top: 15px;
+      width: 100%;
+      -webkit-appearance: none;
+      background: transparent;
+      z-index: 2;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      background: #66ccff;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      margin-top: -9px;
+      cursor: pointer;
+      position: relative;
+      z-index: 3;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      background: #66ccff;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="slider-container">
+    <canvas id="rope-canvas" width="700" height="450"></canvas>
+    <input type="range" id="slider" min="0" max="100" value="50">
+  </div>
+
+  <script>
+    class Point {
+      constructor(x, y, oldx = x, oldy = y) {
+        this.x = x;
+        this.y = y;
+        this.oldx = oldx;
+        this.oldy = oldy;
+      }
+
+      update(gravity) {
+        const vx = this.x - this.oldx;
+        const vy = this.y - this.oldy;
+        this.oldx = this.x;
+        this.oldy = this.y;
+        this.x += vx;
+        this.y += vy + gravity;
+      }
+
+      constrain() {
+        if (this.y > canvas.height - 1) {
+          this.y = canvas.height - 1;
+          this.oldy = this.y;
+        }
+      }
+    }
+
+    class Stick {
+      constructor(p0, p1) {
+        this.p0 = p0;
+        this.p1 = p1;
+        this.length = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      }
+
+      update() {
+        const dx = this.p1.x - this.p0.x;
+        const dy = this.p1.y - this.p0.y;
+        const dist = Math.hypot(dx, dy);
+        const diff = this.length - dist;
+        const percent = diff / dist / 2;
+        const offsetX = dx * percent;
+        const offsetY = dy * percent;
+        this.p0.x -= offsetX;
+        this.p0.y -= offsetY;
+        this.p1.x += offsetX;
+        this.p1.y += offsetY;
+      }
+
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.moveTo(this.p0.x, this.p0.y);
+        ctx.lineTo(this.p1.x, this.p1.y);
+        ctx.stroke();
+      }
+    }
+
+    const slider = document.getElementById('slider');
+    const canvas = document.getElementById('rope-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = slider.offsetWidth;
+    let height = 450;
+    canvas.width = width;
+    canvas.height = height;
+
+    const gravity = 0.3;
+    const points = [];
+    const sticks = [];
+    const segments = 45;
+    const spacing = width / segments;
+
+    function createRope() {
+      points.length = 0;
+      sticks.length = 0;
+      for (let i = 0; i < segments; i++) {
+        const x = i * spacing;
+        const y = 20 + Math.sin(i * 0.5) * 2;
+        points.push(new Point(x, y));
+      }
+      for (let i = 0; i < segments - 1; i++) {
+        sticks.push(new Stick(points[i], points[i + 1]));
+      }
+    }
+
+    function setRopeTip() {
+      const ratio = (slider.value - slider.min) / (slider.max - slider.min);
+      const x = ratio * canvas.width;
+      const tip = points[points.length - 1];
+      tip.x = x;
+      tip.y = 20;
+    }
+
+    slider.addEventListener('input', setRopeTip);
+
+    function update() {
+      for (let i = 0; i < points.length - 1; i++) {
+        points[i].update(gravity);
+        points[i].constrain();
+      }
+      for (let i = 0; i < 4; i++) {
+        for (let stick of sticks) {
+          stick.update();
+        }
+      }
+      setRopeTip();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#66ccff';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      for (let stick of sticks) {
+        stick.draw(ctx);
+      }
+    }
+
+    function animate() {
+      update();
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    function resizeCanvas() {
+      width = slider.offsetWidth;
+      canvas.width = width;
+      createRope();
+      setRopeTip();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    resizeCanvas();
+    animate();
+  </script>
+
+
+</body></html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zip to Inline HTML Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      background: #f9f9f9;
+      color: #333;
+      font-size: 12px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    input, button, textarea {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 6px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    button {
+      background: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    textarea {
+      resize: vertical;
+    }
+    #file-tree {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    #file-tree ul {
+      list-style: none;
+      padding-left: 15px;
+      margin: 3px 0;
+    }
+    #file-tree li {
+      padding: 3px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #file-tree li.folder {
+      font-weight: bold;
+    }
+    #file-tree li.file {
+      cursor: default;
+    }
+    #file-tree li input[type="checkbox"] {
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Zip to Inline HTML Tool</h1>
+  <input type="file" id="zipFile" accept=".zip">
+  <div id="file-tree"></div>
+  <button id="convertButton">Convert to Inline HTML</button>
+  <textarea id="output" style="height:200px;"></textarea>
+  <button id="previewButton">Preview</button>
+  <button id="saveButton">Save</button>
+
+  <script>
+    const zipFileInput   = document.getElementById("zipFile"),
+          fileTreeDiv    = document.getElementById("file-tree"),
+          convertButton  = document.getElementById("convertButton"),
+          outputTextArea = document.getElementById("output"),
+          previewButton  = document.getElementById("previewButton"),
+          saveButton     = document.getElementById("saveButton");
+    let selectedFiles = [];
+    zipFileInput.addEventListener("change", async () => {
+      const zipFile = zipFileInput.files[0];
+      if (!zipFile) return;
+      try {
+        const zip = await JSZip.loadAsync(zipFile),
+              fileTree = {};
+        Object.keys(zip.files).forEach(filename => {
+          const file = zip.files[filename],
+                pathParts = filename.split("/");
+          let currentDir = fileTree;
+          for (let i = 0; i < pathParts.length - 1; i++) {
+            const dirName = pathParts[i];
+            currentDir[dirName] = currentDir[dirName] || {};
+            currentDir = currentDir[dirName];
+          }
+          const fileName = pathParts[pathParts.length - 1];
+          currentDir[fileName] = file;
+        });
+        fileTreeDiv.innerHTML = "";
+        renderFileTree(fileTree);
+      } catch (error) {
+        alert("Failed to load ZIP file: " + error);
+      }
+    });
+    function renderFileTree(fileTree, parentElement = fileTreeDiv, path = "") {
+      const ul = document.createElement("ul");
+      Object.keys(fileTree).forEach(filename => {
+        const file = fileTree[filename],
+              li  = document.createElement("li");
+        if (typeof file === "object" && !file.async) {
+          li.classList.add("folder");
+          li.textContent = filename;
+          renderFileTree(file, li, path + filename + "/");
+        } else {
+          li.classList.add("file");
+          const container = document.createElement("div");
+          container.style.display = "flex";
+          container.style.alignItems = "center";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.addEventListener("change", (e) => {
+            e.stopPropagation();
+            const filePath = path + filename;
+            if (checkbox.checked) {
+              if (!selectedFiles.includes(filePath)) {
+                selectedFiles.push(filePath);
+              }
+            } else {
+              selectedFiles = selectedFiles.filter(f => f !== filePath);
+            }
+          });
+          const label = document.createElement("span");
+          label.textContent = filename;
+          container.appendChild(checkbox);
+          container.appendChild(label);
+          li.appendChild(container);
+        }
+        ul.appendChild(li);
+      });
+      parentElement.appendChild(ul);
+    }
+    convertButton.addEventListener("click", async () => {
+      const zipFile = zipFileInput.files[0];
+      if (!zipFile) return;
+      try {
+        const zip = await JSZip.loadAsync(zipFile),
+              htmlFiles = [],
+              cssFiles  = [],
+              jsFiles   = [];
+        selectedFiles.forEach(filename => {
+          const file = zip.files[filename];
+          if (!file) return;
+          if (filename.endsWith(".html")) {
+            htmlFiles.push(file);
+          } else if (filename.endsWith(".css")) {
+            cssFiles.push(file);
+          } else if (filename.endsWith(".js")) {
+            jsFiles.push(file);
+          }
+        });
+        const htmlContent = await Promise.all(htmlFiles.map(file => file.async("text")))
+                                         .then(contents => contents.join("\n")),
+              cssContent  = await Promise.all(cssFiles.map(file => file.async("text")))
+                                         .then(contents => contents.join("\n")),
+              jsContentRaw = await Promise.all(jsFiles.map(file => file.async("text")))
+                                         .then(contents => contents.join("\n")),
+              jsContent = jsContentRaw.replace(/<\/script>/gi, '<\\/script>');
+        outputTextArea.value = `<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>${cssContent}</style>
+  </head>
+  <body>
+    ${htmlContent}
+    <script>${jsContent}<\/script>
+  </body>
+</html>`;
+      } catch (error) {
+        alert("Conversion error: " + error);
+      }
+    });
+    previewButton.addEventListener("click", () => {
+      const previewWindow = window.open("", "_blank");
+      previewWindow.document.write(outputTextArea.value);
+      previewWindow.document.close();
+    });
+    saveButton.addEventListener("click", () => {
+      const blob = new Blob([outputTextArea.value], { type: "text/html" }),
+            link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "output.html";
+      link.click();
+    });
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+</body>
+</html>
