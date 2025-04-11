@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=0.9">
+  <title>Penguin Timepass</title>
+  <style>
+    body {
+      background-color: #a2bedf;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+    
+    #c {
+      width: 100%;
+      height: 90%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      touch-action: none;
+    }
+    
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      touch-action: none;
+    }
+    
+    #d {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      display: block;
+justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="c">
+    <canvas id="p"></canvas>
+    <div id="d"><h3> oh no! Penguin fell down! touch and drag the penguin to help him get back on his feet</h3><button id="reload-button">Click Here To Restart</button>
+
+
+
+
+</div>
+  </div>
+
+  <script>
+const cv = document.getElementById('p');
+const cx = cv.getContext('2d');
+let w, h;
+let pm;
+let dd = false;
+let di = -1;
+let lp = { x: 0, y: 0 };
+let vl = { x: 0, y: 0 };
+
+// -----------------------------------------------------------------
+// --- Modified Physics Constants ----------------------------------
+// Only these values have been tweaked relative to your original:
+//   • Gravity: slightly increased from 0.4 to 0.45 for more energy.
+//   • Elasticity: raised from 0.95 to 1.0 for crisper bounces.
+//   • Damping: increased from 0.92 to 0.95 so energy loss is reduced.
+//   • Spring stiffness: increased from 0.9 to 1.0.
+// -----------------------------------------------------------------
+const G = 0.55;
+const E = 1.16;
+const F = 0.999;
+const S = 1.28;
+const D = 0.9;
+
+function sc() {
+  const dpr = window.devicePixelRatio || 1;
+  w = window.innerWidth;
+  h = window.innerHeight;
+  cv.width = w * dpr;
+  cv.height = h * dpr;
+  cv.style.width = `${w}px`;
+  cv.style.height = `${h}px`;
+  cx.scale(dpr, dpr);
+}
+
+class V2 {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  add(v) {
+    return new V2(this.x + v.x, this.y + v.y);
+  }
+  
+  sub(v) {
+    return new V2(this.x - v.x, this.y - v.y);
+  }
+  
+  mul(s) {
+    return new V2(this.x * s, this.y * s);
+  }
+  
+  div(s) {
+    if (s === 0) return new V2(0, 0);
+    return new V2(this.x / s, this.y / s);
+  }
+  
+  len() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  
+  dst(v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  nrm() {
+    const len = this.len();
+    if (len === 0) return new V2(0, 0);
+    return this.div(len);
+  }
+  
+  lrp(v, t) {
+    return new V2(
+      this.x + (v.x - this.x) * t,
+      this.y + (v.y - this.y) * t
+    );
+  }
+}
+
+class PP {
+  constructor(x, y, mv = true, m = 1) {
+    this.pos = new V2(x, y);
+    this.old = new V2(x, y);
+    this.vel = new V2(0, 0);
+    this.frc = new V2(0, 0);
+    this.mv = mv;
+    this.m = m;
+    this.a = false;
+    this.r = E;
+  }
+  
+  applyF(f) {
+    if (!this.mv) return;
+    this.frc = this.frc.add(f);
+  }
+  
+  update(dt = 1) {
+    if (!this.mv) return;
+    
+    const a = this.frc.div(this.m);
+    
+    this.vel = this.vel.add(a.mul(dt));
+    
+    this.vel.y += G * dt;
+    
+    this.old = new V2(this.pos.x, this.pos.y);
+    
+    this.pos = this.pos.add(this.vel.mul(dt));
+    
+    this.vel = this.vel.mul(F);
+    
+    this.frc = new V2(0, 0);
+    
+    this.hb();
+  }
+  
+  hb() {
+    const gl = h - 50;
+    const lw = 20;
+    const rw = w - 20;
+    const cl = 20;
+    
+    // --- Modified collision response: using a factor of 1.5 instead of 1.2 ---
+    if (this.pos.y > gl) {
+      this.pos.y = gl;
+      this.vel.y *= -this.r * 1.5;
+      this.vel.x *= 0.9;
+    }
+    
+    if (this.pos.x < lw) {
+      this.pos.x = lw;
+      this.vel.x *= -this.r * 1.5;
+    } else if (this.pos.x > rw) {
+      this.pos.x = rw;
+      this.vel.x *= -this.r * 1.5;
+    }
+    
+    if (this.pos.y < cl) {
+      this.pos.y = cl;
+      this.vel.y *= -this.r * 1.5;
+    }
+  }
+}
+
+class CS {
+  constructor(pA, pB, s = S, rl = null) {
+    this.pA = pA;
+    this.pB = pB;
+    this.s = s;
+    this.rl = rl || pA.pos.dst(pB.pos);
+    this.ms = this.rl * 3;
+  }
+  
+  solve() {
+    const d = this.pB.pos.sub(this.pA.pos);
+    const cd = d.len();
+    
+    if (cd === 0) return;
+    
+    const df = (cd - this.rl) / cd;
+    
+    let cf = df * this.s;
+    
+    const md = this.ms / cd;
+    if (df > md) {
+      cf = md * this.s;
+    }
+    
+    const c = d.mul(cf);
+    
+    if (this.pA.mv && this.pB.mv) {
+      this.pA.pos = this.pA.pos.add(c.mul(0.5));
+      this.pB.pos = this.pB.pos.sub(c.mul(0.5));
+    } else if (this.pA.mv) {
+      this.pA.pos = this.pA.pos.add(c);
+    } else if (this.pB.mv) {
+      this.pB.pos = this.pB.pos.sub(c);
+    }
+  }
+  
+  draw(cx, cl = '#ffffff', t = 2) {
+    cx.strokeStyle = cl;
+    cx.lineWidth = t;
+    cx.beginPath();
+    cx.moveTo(this.pA.pos.x, this.pA.pos.y);
+    cx.lineTo(this.pB.pos.x, this.pB.pos.y);
+    cx.stroke();
+  }
+}
+
+class PM {
+  constructor(cx, cy, s = 1) {
+    this.s = s;
+    this.ps = [];
+    this.cs = [];
+    this.bs = [];
+    this.lu = Date.now();
+    
+    this.cm(cx, cy);
+    
+    this.cl = {
+      body: '#F8F9FA',
+      belly: '#F8F9FA',
+      back: '#252425',
+      beak: '#FFCE80',
+      eye: '#000000',
+      pupil: '#FFFFFF',
+      feet: '#FFCE80',
+      wing: '#252425'
+    };
+    
+    this.bt = 0;
+    this.bi = Math.random() * 3000 + 2000;
+    this.ib = false;
+    this.bd = 150;
+  }
+  
+  cm(cx, cy) {
+    const s = this.s;
+    
+    this.ap(cx, cy - 100 * s, true, 0.6);
+    this.ap(cx - 30 * s, cy - 80 * s);
+    this.ap(cx + 30 * s, cy - 80 * s);
+    this.ap(cx, cy - 60 * s);
+    
+    this.ap(cx - 40 * s, cy - 40 * s);
+    this.ap(cx + 40 * s, cy - 40 * s);
+    this.ap(cx - 45 * s, cy);
+    this.ap(cx + 45 * s, cy);
+    this.ap(cx - 40 * s, cy + 40 * s);
+    this.ap(cx + 40 * s, cy + 40 * s);
+    this.ap(cx - 30 * s, cy + 80 * s);
+    this.ap(cx + 30 * s, cy + 80 * s);
+    this.ap(cx, cy + 100 * s, true, 1.2);
+    
+    this.ap(cx - 60 * s, cy - 30 * s);
+    this.ap(cx - 70 * s, cy);
+    this.ap(cx - 65 * s, cy + 30 * s);
+    
+    this.ap(cx + 60 * s, cy - 30 * s);
+    this.ap(cx + 70 * s, cy);
+    this.ap(cx + 65 * s, cy + 30 * s);
+    
+    this.ap(cx - 15 * s, cy - 75 * s);
+    this.ap(cx + 15 * s, cy - 75 * s);
+    this.ap(cx, cy - 65 * s);
+    
+    this.ap(cx - 25 * s, cy + 110 * s);
+    this.ap(cx + 25 * s, cy + 110 * s);
+    
+    this.ac(0, 1, 0.15);
+    this.ac(0, 2, 0.15);
+    this.ac(1, 3, 0.15);
+    this.ac(2, 3, 0.15);
+    this.ac(1, 2, 0.05);
+    
+    this.ac(3, 4, 0.1);
+    this.ac(3, 5, 0.1);
+    
+    this.ac(4, 5, 0.2);
+    this.ac(4, 6, 0.15);
+    this.ac(5, 7, 0.15);
+    this.ac(6, 7, 0.2);
+    this.ac(6, 8, 0.15);
+    this.ac(7, 9, 0.15);
+    this.ac(8, 9, 0.2);
+    this.ac(8, 10, 0.15);
+    this.ac(9, 11, 0.15);
+    this.ac(10, 11, 0.15);
+    this.ac(10, 12, 0.1);
+    this.ac(11, 12, 0.1);
+    
+    this.ac(4, 7, 0.05);
+    this.ac(5, 6, 0.05);
+    this.ac(6, 9, 0.05);
+    this.ac(7, 8, 0.05);
+    this.ac(8, 11, 0.05);
+    this.ac(9, 10, 0.05);
+    
+    this.ac(4, 13, 0.1);
+    this.ac(6, 15, 0.1);
+    this.ac(13, 14, 0.1);
+    this.ac(14, 15, 0.1);
+    this.ac(4, 14, 0.05);
+    this.ac(6, 14, 0.05);
+    
+    this.ac(5, 16, 0.1);
+    this.ac(7, 18, 0.1);
+    this.ac(16, 17, 0.1);
+    this.ac(17, 18, 0.1);
+    this.ac(5, 17, 0.05);
+    this.ac(7, 17, 0.05);
+    
+    this.ac(1, 19, 0.05);
+    this.ac(2, 20, 0.05);
+    this.ac(3, 21, 0.05);
+    this.ac(19, 21, 0.05);
+    this.ac(20, 21, 0.05);
+    
+    this.ac(12, 22, 0.1);
+    this.ac(12, 23, 0.1);
+    this.ac(10, 22, 0.08);
+    this.ac(11, 23, 0.08);
+    
+    this.bs.push([0, 1, 3, 4, 6, 8, 10, 12, 11, 9, 7, 5, 2, 0]);
+    
+    this.bs.push([4, 13, 14, 15, 6]);
+    this.bs.push([5, 16, 17, 18, 7]);
+    
+    for (let i = 0; i < this.ps.length; i++) {
+      for (let j = i + 1; j < this.ps.length; j++) {
+        if (this.cs.some(c => 
+          (c.pA === this.ps[i] && c.pB === this.ps[j]) || 
+          (c.pA === this.ps[j] && c.pB === this.ps[i])
+        )) {
+          continue;
+        }
+        
+        const d = this.ps[i].pos.dst(this.ps[j].pos);
+        
+        if (d < 50 * this.s) {
+          this.ac(i, j, 0.01, d * 1.5);
+        }
+      }
+    }
+  }
+  
+  ap(x, y, mv = true, m = 1) {
+    const p = new PP(x, y, mv, m);
+    this.ps.push(p);
+    return this.ps.length - 1;
+  }
+  
+  ac(pA, pB, s = S, rl = null) {
+    const c = new CS(
+      this.ps[pA], 
+      this.ps[pB], 
+      s, 
+      rl
+    );
+    this.cs.push(c);
+    return this.cs.length - 1;
+  }
+  
+  update() {
+    const now = Date.now();
+    const dt = (now - this.lu) / 16;
+    // Save the current time before updating the beat timer.
+    const prevTime = this.lu;
+    this.lu = now;
+    
+    this.bt += now - prevTime;
+    if (!this.ib && this.bt > this.bi) {
+      this.ib = true;
+      this.bt = 0;
+      this.bi = Math.random() * 3000 + 2000;
+    } else if (this.ib && this.bt > this.bd) {
+      this.ib = false;
+      this.bt = 0;
+    }
+    
+    // Add wing/wave force with slightly reduced multipliers for smoother effect.
+    const t = now / 1000;
+    const wm = Math.sin(t * 3) * 1.2;
+    
+    this.ps[13].vel.x -= wm * 0.2;
+    this.ps[14].vel.x -= wm * 0.3;
+    this.ps[15].vel.x -= wm * 0.2;
+    
+    this.ps[16].vel.x += wm * 0.2;
+    this.ps[17].vel.x += wm * 0.3;
+    this.ps[18].vel.x += wm * 0.2;
+    
+    const it = 5;
+    for (let i = 0; i < it; i++) {
+      for (const p of this.ps) {
+        p.update(dt / it);
+      }
+      
+      const cit = 3;
+      for (let j = 0; j < cit; j++) {
+        for (const c of this.cs) {
+          c.solve();
+        }
+      }
+    }
+  }
+  
+  draw(cx) {
+    cx.save();
+    
+    this.ds(cx);
+    
+    this.db(cx);
+    
+    this.dw(cx);
+    
+    this.df(cx);
+    
+    this.dft(cx);
+    
+    cx.restore();
+  }
+  
+  ds(cx) {
+    const ay = this.ps.reduce((s, p) => s + p.pos.y, 0) / this.ps.length;
+    const gl = h - 50;
+    const dfg = gl - ay;
+    
+    const cx2 = (this.ps[10].pos.x + this.ps[11].pos.x) / 2;
+    const sy = gl - 2;
+    const sw = 80 * this.s * (1 + dfg / 300);
+    const sh = 20 * this.s * (1 + dfg / 300);
+    const so = Math.max(0.1, Math.min(0.5, 0.5 - dfg / 500));
+    
+    cx.fillStyle = `rgba(0, 0, 0, ${so})`;
+    cx.beginPath();
+    cx.ellipse(cx2, sy, sw, sh, 0, 0, Math.PI * 2);
+    cx.fill();
+  }
+  
+  db(cx) {
+    cx.fillStyle = this.cl.body;
+    
+    cx.beginPath();
+    const bp = this.bs[0].map(i => this.ps[i].pos);
+    cx.moveTo(bp[0].x, bp[0].y);
+    
+    for (let i = 0; i < bp.length; i++) {
+      const c = bp[i];
+      const n = bp[(i + 1) % bp.length];
+      
+      const mx = (c.x + n.x) / 2;
+      const my = (c.y + n.y) / 2;
+      
+      if (i === 0) {
+        cx.moveTo(c.x, c.y);
+      } else {
+        cx.quadraticCurveTo(c.x, c.y, mx, my);
+      }
+    }
+    
+    cx.closePath();
+    cx.fill();
+    
+    cx.fillStyle = this.cl.belly;
+    cx.beginPath();
+    
+    const blp = [3, 4, 6, 8, 10, 12, 11, 9, 7, 5, 3];
+    const bl = blp.map(i => this.ps[i].pos);
+    
+    cx.moveTo(bl[0].x, bl[0].y);
+    
+    for (let i = 0; i < bl.length; i++) {
+      const c = bl[i];
+      const n = bl[(i + 1) % bl.length];
+      
+      const mx = (c.x + n.x) / 2;
+      const my = (c.y + n.y) / 2;
+      
+      if (i === 0) {
+        cx.moveTo(c.x, c.y);
+      } else {
+        cx.quadraticCurveTo(c.x, c.y, mx, my);
+      }
+    }
+    
+    cx.closePath();
+    cx.fill();
+    
+    cx.fillStyle = this.cl.back;
+    cx.beginPath();
+    
+    const bkp = [0, 1, 4, 6, 8, 10, 12, 11, 9, 7, 5, 2, 0];
+    const bk = bkp.map(i => this.ps[i].pos);
+    
+    cx.moveTo(bk[0].x, bk[0].y);
+    
+    const cp1 = new V2(
+      (bk[0].x + bk[1].x) / 2,
+      (bk[0].y + bk[1].y) / 2 - 10
+    );
+    
+    const cp2 = new V2(
+      (bk[1].x + bk[2].x) / 2,
+      (bk[1].y + bk[2].y) / 2 - 5
+    );
+    
+    cx.moveTo(bk[0].x, bk[0].y);
+    cx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, bk[2].x, bk[2].y);
+    
+    const cp3 = new V2(
+      (bk[2].x + bk[12].x) / 2 + 5,
+      (bk[2].y + bk[12].y) / 2 - 5
+    );
+    
+    const cp4 = new V2(
+      (bk[11].x + bk[12].x) / 2 + 5,
+      (bk[11].y + bk[12].y) / 2 - 5
+    );
+    
+    cx.bezierCurveTo(cp3.x, cp3.y, cp4.x, cp4.y, bk[12].x, bk[12].y);
+    cx.lineTo(bk[0].x, bk[0].y);
+    
+    cx.closePath();
+    cx.fill();
+  }
+  
+  dw(cx) {
+    cx.fillStyle = this.cl.wing;
+    cx.beginPath();
+    
+    const lw = this.bs[1].map(i => this.ps[i].pos);
+    cx.moveTo(lw[0].x, lw[0].y);
+    
+    for (let i = 0; i < lw.length; i++) {
+      const c = lw[i];
+      const n = lw[(i + 1) % lw.length];
+      
+      const mx = (c.x + n.x) / 2;
+      const my = (c.y + n.y) / 2;
+      
+      if (i === 0) {
+        cx.moveTo(c.x, c.y);
+      } else {
+        cx.quadraticCurveTo(c.x, c.y, mx, my);
+      }
+    }
+    
+    cx.closePath();
+    cx.fill();
+    
+    cx.beginPath();
+    
+    const rw = this.bs[2].map(i => this.ps[i].pos);
+    cx.moveTo(rw[0].x, rw[0].y);
+    
+    for (let i = 0; i < rw.length; i++) {
+      const c = rw[i];
+      const n = rw[(i + 1) % rw.length];
+      
+      const mx = (c.x + n.x) / 2;
+      const my = (c.y + n.y) / 2;
+      
+      if (i === 0) {
+        cx.moveTo(c.x, c.y);
+      } else {
+        cx.quadraticCurveTo(c.x, c.y, mx, my);
+      }
+    }
+    
+    cx.closePath();
+    cx.fill();
+  }
+  
+  df(cx) {
+    const ht = this.ps[0].pos;
+    const ls = this.ps[1].pos;
+    const rs = this.ps[2].pos;
+    const fc = this.ps[3].pos;
+    const le = this.ps[19].pos;
+    const re = this.ps[20].pos;
+    const bt = this.ps[21].pos;
+    
+    cx.fillStyle = this.cl.beak;
+    cx.beginPath();
+    
+    const bb = new V2(
+      fc.x,
+      fc.y + 5 * this.s
+    );
+    
+    cx.moveTo(le.x, fc.y);
+    cx.lineTo(bt.x, bt.y);
+    cx.lineTo(re.x, fc.y);
+    cx.lineTo(bb.x, bb.y);
+    cx.closePath();
+    cx.fill();
+    
+    const er = 5 * this.s;
+    
+    cx.fillStyle = this.cl.eye;
+    cx.beginPath();
+    cx.arc(le.x, le.y, er, 0, Math.PI * 2);
+    cx.fill();
+    
+    cx.beginPath();
+    cx.arc(re.x, re.y, er, 0, Math.PI * 2);
+    cx.fill();
+    
+    if (!this.ib) {
+      cx.fillStyle = this.cl.pupil;
+      const ps = er * 0.4;
+      
+      cx.beginPath();
+      cx.arc(le.x + er * 0.2, le.y - er * 0.1, ps, 0, Math.PI * 2);
+      cx.fill();
+      
+      cx.beginPath();
+      cx.arc(re.x + er * 0.2, re.y - er * 0.1, ps, 0, Math.PI * 2);
+      cx.fill();
+    } else {
+      cx.strokeStyle = this.cl.eye;
+      cx.lineWidth = 2;
+      
+      cx.beginPath();
+      cx.moveTo(le.x - er, le.y);
+      cx.lineTo(le.x + er, le.y);
+      cx.stroke();
+      
+      cx.beginPath();
+      cx.moveTo(re.x - er, re.y);
+      cx.lineTo(re.x + er, re.y);
+      cx.stroke();
+    }
+  }
+  
+  dft(cx) {
+    const lf = this.ps[22].pos;
+    const rf = this.ps[23].pos;
+    const fr = 8 * this.s;
+    
+    cx.fillStyle = this.cl.feet;
+    
+    cx.beginPath();
+    cx.ellipse(lf.x, lf.y, fr * 1.5, fr, 0, 0, Math.PI * 2);
+    cx.fill();
+    
+    cx.beginPath();
+    cx.ellipse(rf.x, rf.y, fr * 1.5, fr, 0, 0, Math.PI * 2);
+    cx.fill();
+  }
+}
+
+function an() {
+  cx.clearRect(0, 0, w, h);
+  pm.update();
+  pm.draw(cx);
+  requestAnimationFrame(an);
+}
+
+function gm(e) {
+  const r = cv.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left),
+    y: (e.clientY - r.top)
+  };
+}
+
+function gt(e) {
+  const r = cv.getBoundingClientRect();
+  return {
+    x: (e.touches[0].clientX - r.left),
+    y: (e.touches[0].clientY - r.top)
+  };
+}
+
+cv.addEventListener('mousedown', (e) => {
+  dd = true;
+  const p = gm(e);
+  lp = p;
+  for (let i = 0; i < pm.ps.length; i++) {
+    const pt = pm.ps[i];
+    if (pt.pos.dst(new V2(p.x, p.y)) < 30) {
+      di = i;
+      break;
+    }
+  }
+});
+
+cv.addEventListener('mousemove', (e) => {
+  if (!dd || di === -1) return;
+  const p = gm(e);
+  const d = new V2(p.x - lp.x, p.y - lp.y);
+  
+  // --- Adjusted drag multiplier (reduced from extreme values) ---
+  pm.ps[di].vel = d.mul(6);
+  pm.ps[di].pos = new V2(p.x, p.y);
+  lp = p;
+});
+
+cv.addEventListener('mouseup', () => {
+  dd = false;
+  di = -1;
+});
+
+cv.addEventListener('mouseleave', () => {
+  dd = false;
+  di = -1;
+});
+
+cv.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  dd = true;
+  const p = gt(e);
+  lp = p;
+  for (let i = 0; i < pm.ps.length; i++) {
+    const pt = pm.ps[i];
+    if (pt.pos.dst(new V2(p.x, p.y)) < 30) {
+      di = i;
+      break;
+    }
+  }
+});
+
+cv.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!dd || di === -1) return;
+  const p = gt(e);
+  const d = new V2(p.x - lp.x, p.y - lp.y);
+  
+  // --- Adjusted drag multiplier for touch ---
+  pm.ps[di].vel = d.mul(6);
+  pm.ps[di].pos = new V2(p.x, p.y);
+  lp = p;
+});
+
+cv.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  dd = false;
+  di = -1;
+});
+
+cv.addEventListener('touchcancel', (e) => {
+  e.preventDefault();
+  dd = false;
+  di = -1;
+});
+
+window.addEventListener('resize', () => {
+  sc();
+});
+
+sc();
+pm = new PM(w / 2, h / 2);
+an();
+  </script>
+<script>
+document.getElementById('reload-button').addEventListener('click', () => {
+  window.location.reload();
+});
+</script>
+</body>
+</html>
