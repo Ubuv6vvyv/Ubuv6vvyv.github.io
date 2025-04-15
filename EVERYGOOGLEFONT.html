@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Fonts Explorer</title>
+  <style>
+    /* Base styles */
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background-color: #fafafa;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+    
+    h1 {
+      text-align: center;
+    }
+    
+    section.category-section {
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-bottom: 20px;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    section.category-section h2 {
+      margin-top: 0;
+      text-transform: capitalize;
+    }
+    
+    .sentence {
+      font-size: 36px;
+      margin: 10px 0;
+      transition: font-family .2s ease-in-out;
+    }
+    
+    .font-number {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    
+    .code-snippet {
+      background-color: #f0f0f0;
+      padding: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin-bottom: 10px;
+    }
+    
+    .copy-btn {
+      padding: 5px 10px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    
+    input[type="range"] {
+      width: 80%;
+      margin: 10px 0;
+    }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 600px) {
+      .sentence {
+        font-size: 24px;
+      }
+      .code-snippet {
+        font-size: 14px;
+      }
+      .font-number,
+      .copy-btn {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Google Fonts Explorer</h1>
+  <div id="font-categories">
+    <!-- Dynamic sections for each category will be appended here -->
+  </div>
+
+  <script>
+    // API key and URL (sorted by popularity)
+    const apiKey = "AIzaSyAyVb6vsslD641B0CVM_hIcySiUG3heiVM";
+    const apiURL = `https://www.googleapis.com/webfonts/v1/webfonts?key=${apiKey}&sort=popularity`;
+
+    // Container for categories
+    const categoriesContainer = document.getElementById("font-categories");
+
+    // Load Google Font dynamically by creating a link element
+    function loadFont(fontFamily) {
+      const formattedFont = fontFamily.replace(/ /g, "+");
+      // Check if already loaded to avoid duplicates.
+      if (!document.querySelector(`link[href*="${formattedFont}"]`)) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = `https://fonts.googleapis.com/css2?family=${formattedFont}&display=swap`;
+        document.head.appendChild(link);
+      }
+    }
+
+    // Create the code snippet for a given font object
+    function generateCodeSnippet(font) {
+      const formattedFont = font.family.replace(/ /g, "+");
+      const className = font.family.replace(/ /g, "-").toLowerCase();
+      return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${formattedFont}&display=swap">
+<style>
+  .${className} { font-family: '${font.family}'; }
+</style>
+<div class="${className}">
+  Preview: The quick brown fox jumps over the lazy dog.
+</div>`;
+    }
+
+    // Create a category section with slider, preview text, code snippet and copy button
+    function createCategorySection(categoryName, fontsArray) {
+      // Create section container
+      const section = document.createElement("section");
+      section.className = "category-section";
+
+      // Category Heading
+      const header = document.createElement("h2");
+      header.textContent = categoryName;
+      section.appendChild(header);
+
+      // Slider to choose among fonts in this category
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = "0";
+      slider.max = (fontsArray.length - 1).toString();
+      slider.value = "0";
+      section.appendChild(slider);
+
+      // Display of current font number and name
+      const fontDisplay = document.createElement("div");
+      fontDisplay.className = "font-number";
+      section.appendChild(fontDisplay);
+
+      // Preview text element
+      const preview = document.createElement("h3");
+      preview.className = "sentence";
+      preview.textContent = "The quick brown fox jumps over the lazy dog";
+      section.appendChild(preview);
+
+      // Code snippet display
+      const codeSnippet = document.createElement("pre");
+      codeSnippet.className = "code-snippet";
+      section.appendChild(codeSnippet);
+
+      // Copy button for the code snippet
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "copy-btn";
+      copyBtn.textContent = "Copy Code Snippet";
+      section.appendChild(copyBtn);
+
+      // Function to update display based on selected font
+      function updateDisplay(selectedFont) {
+        loadFont(selectedFont.family);
+        preview.style.fontFamily = selectedFont.family;
+        fontDisplay.textContent = `Font #${currentIndex + 1} of ${fontsArray.length}: ${selectedFont.family}`;
+        codeSnippet.innerText = generateCodeSnippet(selectedFont);
+      }
+
+      // Initial state
+      let currentIndex = 0;
+      updateDisplay(fontsArray[currentIndex]);
+
+      // Listener for slider changes
+      slider.addEventListener("input", () => {
+        currentIndex = parseInt(slider.value, 10);
+        updateDisplay(fontsArray[currentIndex]);
+      });
+
+      // Listener for copy button functionality
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(codeSnippet.innerText).then(() => {
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => copyBtn.textContent = "Copy Code Snippet", 2000);
+        }).catch(err => {
+          console.error("Could not copy text: ", err);
+        });
+      });
+
+      // Append the complete section to the container
+      categoriesContainer.appendChild(section);
+    }
+
+    // Fetch fonts from the Google Fonts API and group them by category
+    fetch(apiURL)
+      .then(response => response.json())
+      .then(data => {
+        const items = data.items;
+        // Group fonts by their category (e.g., serif, sans-serif, display, handwriting, monospace)
+        const groupedFonts = items.reduce((acc, font) => {
+          const cat = font.category;
+          if (!acc[cat]) {
+            acc[cat] = [];
+          }
+          acc[cat].push(font);
+          return acc;
+        }, {});
+
+        // For each category, create a section with a slider and output areas
+        Object.keys(groupedFonts).forEach(category => {
+          createCategorySection(category, groupedFonts[category]);
+        });
+      })
+      .catch(error => console.error("Error fetching fonts:", error));
+  </script>
+</body>
+</html>
