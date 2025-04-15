@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width, shrink-to-fit=no">
+  <title>Enhanced Panorama Viewer with Touch Support</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Open Sans', sans-serif; background-color: #000; }
+    #viewer-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      background-color: #000;
+    }
+    .intro { position: fixed; top: 0; right: 0; font-size: 8px; padding: 20px; color: #fff; text-transform: uppercase; text-shadow: 0 0 2px #000; z-index: 100; }
+    #upload-container { position: fixed; top: 10px; left: 10px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+    #file-input { display: none; }
+    .btn { background: #2196F3; color: white; border: none; padding: 8px 10px; cursor: pointer; border-radius: 5px; font-size: 10px; transition: background 0.3s; }
+    .btn:hover { background: #0b7dda; }
+    .btn.active { background: #F44336; }
+    #download-btn { margin-top: 10px; }
+    .spinner { display: none; width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; margin: 10px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #controls { position: fixed; right: 10px; bottom: 120px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+    .ctrl-btn { width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; border: 1px solid rgba(255,255,255,0.3); }
+    #drawer-container { position: fixed; width: 100%; bottom: 0; left: 0; margin: 0; padding: 10px; z-index: 100; background-color: rgba(0,0,0,0.5); overflow-x: auto; }
+    #drawer { white-space: nowrap; padding: 10px; }
+    .photo { width: 80px; height: 80px; margin: 5px; display: inline-block; transition: all 0.2s ease; filter: grayscale(1); opacity: 0.5; background-position: center; background-size: cover; cursor: pointer; border: 1px solid #fff; border-radius: 5px; }
+    .photo:hover { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
+    .photo.active { filter: grayscale(0); opacity: 1; box-shadow: 0 0 10px #2196F3; }
+    #drop-zone { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,50,0.5); z-index: 999; display: none; justify-content: center; align-items: center; flex-direction: column; }
+    #drop-zone.active { display: flex; }
+    #drop-zone p { color: white; font-size: 24px; text-shadow: 0 0 10px black; }
+    #notification { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px; display: none; z-index: 100; }
+    #mode-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+    .mode-btn { background: #555; padding: 8px; font-size: 10px; flex: 1; min-width: 80px; }
+    /* Crop overlay */
+    #crop-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 200;
+      display: none;
+      background-color: rgba(0,0,0,0.7);
+    }
+    #crop-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #crop-image {
+      max-width: 90vw;
+      max-height: 70vh;
+      display: block;
+    }
+    #crop-selection {
+      position: absolute;
+      border: 2px dashed #fff;
+      background-color: rgba(255,255,255,0.2);
+      cursor: move;
+    }
+    #crop-handles {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+    }
+    .crop-handle {
+      position: absolute;
+      width: 20px; /* Increased size for better touch targets */
+      height: 20px;
+      background-color: #fff;
+      border: 1px solid #000;
+    }
+    #crop-handle-nw { top: -10px; left: -10px; cursor: nw-resize; }
+    #crop-handle-ne { top: -10px; right: -10px; cursor: ne-resize; }
+    #crop-handle-sw { bottom: -10px; left: -10px; cursor: sw-resize; }
+    #crop-handle-se { bottom: -10px; right: -10px; cursor: se-resize; }
+    #crop-buttons {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    /* Touch gesture hints */
+    #touch-hints {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0,0,0,0.7);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      z-index: 300;
+      display: none;
+    }
+    #touch-hints.visible {
+      display: block;
+      animation: fadeOut 5s forwards;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  
+  <div class="intro">Right click or use download button to save image</div>
+  
+  <div id="upload-container">
+    <label for="file-input" class="btn">Upload Image</label>
+    <input type="file" id="file-input" accept="image/*">
+    <div id="mode-buttons">
+      <button id="btn-panorama" class="btn mode-btn">Panorama</button>
+      <button id="btn-normal" class="btn mode-btn active">Normal</button>
+      <button id="btn-auto-crop" class="btn mode-btn">Auto Crop</button>
+      <button id="btn-manual-crop" class="btn mode-btn">Manual Crop</button>
+      <button id="btn-reset-crop" class="btn mode-btn">Reset Crop</button>
+    </div>
+    <button id="download-btn" class="btn">Download</button>
+    <div class="spinner" id="loading-spinner"></div>
+  </div>
+  
+  <div id="controls">
+    <div class="ctrl-btn" id="zoom-in">+</div>
+    <div class="ctrl-btn" id="zoom-out">-</div>
+    <div class="ctrl-btn" id="reset-view">↻</div>
+  </div>
+  
+  <div id="drawer-container">
+    <div id="drawer"></div>
+  </div>
+  
+  <div id="drop-zone">
+    <p>Drop image here</p>
+  </div>
+  
+  <div id="notification">Notification message</div>
+  
+  <!-- Crop overlay for manual cropping -->
+  <div id="crop-overlay">
+    <div id="crop-container">
+      <img id="crop-image" src="" alt="Image to crop">
+      <div id="crop-selection">
+        <div id="crop-handles">
+          <div id="crop-handle-nw" class="crop-handle"></div>
+          <div id="crop-handle-ne" class="crop-handle"></div>
+          <div id="crop-handle-sw" class="crop-handle"></div>
+          <div id="crop-handle-se" class="crop-handle"></div>
+        </div>
+      </div>
+    </div>
+    <div id="crop-buttons">
+      <button id="crop-apply" class="btn">Apply Crop</button>
+      <button id="crop-cancel" class="btn">Cancel</button>
+    </div>
+  </div>
+  
+  <!-- Touch gestures hint overlay -->
+  <div id="touch-hints">
+    <p><strong>Touch Controls:</strong></p>
+    <p>• Drag with one finger to look around</p>
+    <p>• Pinch with two fingers to zoom</p>
+    <p>• Double-tap to reset view</p>
+  </div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/105/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/panolens@0.11.0/build/panolens.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => setTimeout(initApp, 100));
+    
+    function initApp() {
+      // App state
+      const state = {
+        mode: 'normal', // normal, panorama, autoCrop, manualCrop
+        currentImageUrl: null,
+        originalImageUrl: null,
+        croppedImageUrl: null,
+        originalDimensions: { width: 0, height: 0 },
+        touchEnabled: 'ontouchstart' in window,
+        isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+        pinchZoomActive: false,
+        lastScale: 1
+      };
+      
+      // Elements
+      let littlePlanet, viewer, drawerElement, spinner, dropZone, notification, touchHints;
+      let cropOverlay, cropImage, cropSelection, activeHandle, isDragging = false;
+      let startX, startY, startWidth, startHeight, startLeft, startTop;
+      let hammerManager, viewerHammer, cropSelectionHammer, handles = {};
+      
+      // Sample images
+      const sampleImages = [
+        'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/field.jpg',
+        'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/tent.jpg',
+        'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/tunnel.jpg',
+        'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/planet.jpg',
+        'https://pchen66.github.io/Panolens/examples/asset/textures/equirectangular/rock.jpg'
+      ];
+      
+      // Get elements
+      drawerElement = document.querySelector('#drawer');
+      spinner = document.getElementById('loading-spinner');
+      dropZone = document.getElementById('drop-zone');
+      notification = document.getElementById('notification');
+      cropOverlay = document.getElementById('crop-overlay');
+      cropImage = document.getElementById('crop-image');
+      cropSelection = document.getElementById('crop-selection');
+      touchHints = document.getElementById('touch-hints');
+      
+      // Initialize viewer
+      try {
+        viewer = new PANOLENS.Viewer({
+          container: document.getElementById('viewer-container'),
+          controlBar: false,
+          cameraFov: 60,
+          autoRotate: true,
+          autoRotateSpeed: 0.5,
+          enableReticle: false,
+          output: 'console',
+          viewIndicator: false
+        });
+        
+        // Optimize for mobile
+        if (state.isMobile) {
+          viewer.OrbitControls.enableZoom = true;
+          viewer.OrbitControls.enablePan = true;
+          viewer.OrbitControls.enableDamping = true;
+          viewer.OrbitControls.dampingFactor = 0.2;
+        }
+      } catch(e) {
+        console.error('Error initializing viewer:', e);
+        showNotification('Error: ' + e.message);
+        return;
+      }
+      
+      // Populate sample images
+      sampleImages.forEach((url) => {
+        const photo = document.createElement('div');
+        photo.classList.add('photo');
+        photo.style.backgroundImage = `url(${url})`;
+        
+        photo.addEventListener('click', function() {
+          loadImage(url);
+          // Remove active class from all photos
+          document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+          photo.classList.add('active');
+        });
+        
+        drawerElement.appendChild(photo);
+      });
+      
+      // Event listeners
+      document.getElementById('file-input').addEventListener('change', handleFileSelect);
+      document.getElementById('download-btn').addEventListener('click', downloadImage);
+      document.getElementById('zoom-in').addEventListener('click', zoomIn);
+      document.getElementById('zoom-out').addEventListener('click', zoomOut);
+      document.getElementById('reset-view').addEventListener('click', resetView);
+      
+      // Touch events for control buttons
+      if (state.touchEnabled) {
+        document.getElementById('zoom-in').addEventListener('touchstart', zoomIn);
+        document.getElementById('zoom-out').addEventListener('touchstart', zoomOut);
+        document.getElementById('reset-view').addEventListener('touchstart', resetView);
+      }
+      
+      // Mode buttons
+      document.getElementById('btn-panorama').addEventListener('click', () => setMode('panorama'));
+      document.getElementById('btn-normal').addEventListener('click', () => setMode('normal'));
+      document.getElementById('btn-auto-crop').addEventListener('click', () => autoSmartCrop());
+      document.getElementById('btn-manual-crop').addEventListener('click', () => startManualCrop());
+      document.getElementById('btn-reset-crop').addEventListener('click', () => resetCrop());
+      
+      // Crop overlay buttons
+      document.getElementById('crop-apply').addEventListener('click', applyManualCrop);
+      document.getElementById('crop-cancel').addEventListener('click', cancelManualCrop);
+      
+      // Drag and drop functionality
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        document.body.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        document.body.addEventListener(eventName, () => dropZone.classList.add('active'), false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        document.body.addEventListener(eventName, () => dropZone.classList.remove('active'), false);
+      });
+      
+      document.body.addEventListener('drop', handleDrop, false);
+      
+      // Initialize touch events with HammerJS
+      initTouchEvents();
+      
+      // Functions
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      function initTouchEvents() {
+        if (!state.touchEnabled) return;
+        
+        // Initialize Hammer manager for viewer container
+        const viewerContainer = document.getElementById('viewer-container');
+        viewerHammer = new Hammer.Manager(viewerContainer);
+        
+        // Add recognizers
+        const pan = new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
+        const pinch = new Hammer.Pinch({ threshold: 0 });
+        const tap = new Hammer.Tap({ taps: 2 });
+        
+        viewerHammer.add([pan, pinch, tap]);
+        
+        // Pan event
+        viewerHammer.on('panstart panmove panend', handleViewerPan);
+        
+        // Pinch event for zoom
+        viewerHammer.on('pinchstart pinchmove pinchend', handleViewerPinch);
+        
+        // Double tap to reset view
+        viewerHammer.on('tap', function(e) {
+          resetView();
+        });
+        
+        // For crop selection
+        initCropTouchEvents();
+        
+        // Show touch hints on first load
+        setTimeout(function() {
+          if (state.touchEnabled) {
+            touchHints.classList.add('visible');
+            setTimeout(() => touchHints.classList.remove('visible'), 5000);
+          }
+        }, 2000);
+      }
+      
+      function handleViewerPan(ev) {
+        if (state.pinchZoomActive) return;
+        
+        if (ev.type === 'panstart') {
+          viewer.OrbitControls.autoRotate = false;
+        }
+        
+        // Calculate rotation
+        if (ev.type === 'panmove') {
+          const deltaX = ev.deltaX;
+          const deltaY = ev.deltaY;
+          
+          // Adjust camera position based on pan
+          viewer.OrbitControls.rotateLeft(deltaX * 0.003);
+          viewer.OrbitControls.rotateUp(deltaY * 0.003);
+          viewer.OrbitControls.update();
+        }
+      }
+      
+      function handleViewerPinch(ev) {
+        if (ev.type === 'pinchstart') {
+          state.pinchZoomActive = true;
+          state.lastScale = 1;
+        }
+        
+        if (ev.type === 'pinchmove') {
+          // Calculate zoom level change
+          const scaleFactor = ev.scale / state.lastScale;
+          state.lastScale = ev.scale;
+          
+          // Adjust FOV based on pinch
+          viewer.camera.fov = Math.max(30, Math.min(90, viewer.camera.fov / scaleFactor));
+          viewer.camera.updateProjectionMatrix();
+        }
+        
+        if (ev.type === 'pinchend') {
+          state.pinchZoomActive = false;
+        }
+      }
+      
+      function initCropTouchEvents() {
+        // Selection dragging
+        cropSelectionHammer = new Hammer(cropSelection);
+        cropSelectionHammer.on('panstart panmove panend', function(ev) {
+          if (activeHandle) return;
+          
+          if (ev.type === 'panstart') {
+            isDragging = true;
+            startLeft = parseInt(cropSelection.style.left) || 0;
+            startTop = parseInt(cropSelection.style.top) || 0;
+          }
+          
+          if (ev.type === 'panmove') {
+            const dx = ev.deltaX;
+            const dy = ev.deltaY;
+            
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+            
+            // Constrain to image boundaries
+            newLeft = Math.max(0, Math.min(newLeft, cropImage.offsetWidth - cropSelection.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, cropImage.offsetHeight - cropSelection.offsetHeight));
+            
+            cropSelection.style.left = newLeft + 'px';
+            cropSelection.style.top = newTop + 'px';
+          }
+          
+          if (ev.type === 'panend') {
+            isDragging = false;
+          }
+        });
+        
+        // Handle resize events with touch
+        const handleElements = ['crop-handle-nw', 'crop-handle-ne', 'crop-handle-sw', 'crop-handle-se'];
+        
+        handleElements.forEach(id => {
+          const element = document.getElementById(id);
+          const handleHammer = new Hammer(element);
+          
+          handleHammer.on('panstart panmove panend', function(ev) {
+            if (ev.type === 'panstart') {
+              activeHandle = element;
+              isDragging = true;
+              startWidth = parseInt(cropSelection.style.width);
+              startHeight = parseInt(cropSelection.style.height);
+              startLeft = parseInt(cropSelection.style.left) || 0;
+              startTop = parseInt(cropSelection.style.top) || 0;
+            }
+            
+            if (ev.type === 'panmove') {
+              const dx = ev.deltaX;
+              const dy = ev.deltaY;
+              
+              let newWidth = startWidth;
+              let newHeight = startHeight;
+              let newLeft = startLeft;
+              let newTop = startTop;
+              
+              // Different behavior based on which handle is active
+              if (element.id === 'crop-handle-se') {
+                newWidth = startWidth + dx;
+                newHeight = newWidth / 2; // Keep 2:1 ratio
+              } else if (element.id === 'crop-handle-sw') {
+                newWidth = startWidth - dx;
+                newHeight = newWidth / 2;
+                newLeft = startLeft + (startWidth - newWidth);
+              } else if (element.id === 'crop-handle-ne') {
+                newWidth = startWidth + dx;
+                newHeight = newWidth / 2;
+                newTop = startTop + (startHeight - newHeight);
+              } else if (element.id === 'crop-handle-nw') {
+                newWidth = startWidth - dx;
+                newHeight = newWidth / 2;
+                newLeft = startLeft + (startWidth - newWidth);
+                newTop = startTop + (startHeight - newHeight);
+              }
+              
+              // Enforce minimum size
+              const minSize = 50;
+              if (newWidth < minSize) {
+                newWidth = minSize;
+                newHeight = minSize / 2;
+              }
+              
+              // Constrain to image boundaries
+              if (newLeft < 0) newLeft = 0;
+              if (newTop < 0) newTop = 0;
+              if (newLeft + newWidth > cropImage.offsetWidth) newWidth = cropImage.offsetWidth - newLeft;
+              if (newTop + newHeight > cropImage.offsetHeight) newHeight = cropImage.offsetHeight - newTop;
+              
+              // Apply new dimensions and position
+              cropSelection.style.width = newWidth + 'px';
+              cropSelection.style.height = newHeight + 'px';
+              cropSelection.style.left = newLeft + 'px';
+              cropSelection.style.top = newTop + 'px';
+            }
+            
+            if (ev.type === 'panend') {
+              isDragging = false;
+              activeHandle = null;
+            }
+          });
+          
+          handles[id] = handleHammer;
+        });
+      }
+      
+      function setMode(mode) {
+        state.mode = mode;
+        
+        // Update UI
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        
+        if (mode === 'panorama') {
+          document.getElementById('btn-panorama').classList.add('active');
+        } else if (mode === 'normal') {
+          document.getElementById('btn-normal').classList.add('active');
+        }
+        
+        // Update view if we have an image
+        if (state.currentImageUrl) {
+          updateImageView();
+        }
+      }
+      
+      function loadImage(url, keep_original = true) {
+        spinner.style.display = 'block';
+        showNotification('Loading image...');
+        
+        // Store original image URL if requested
+        if (keep_original) {
+          state.originalImageUrl = url;
+        }
+        
+        state.currentImageUrl = url;
+        
+        // Create an image object to check dimensions
+        let img = new Image();
+        img.onload = function() {
+          state.originalDimensions = { width: img.naturalWidth, height: img.naturalHeight };
+          updateImageView();
+        };
+        img.src = url;
+      }
+      
+      function updateImageView() {
+        try {
+          if (littlePlanet) {
+            viewer.remove(littlePlanet);
+            littlePlanet.dispose();
+          }
+          
+          if (state.mode === 'panorama') {
+            littlePlanet = new PANOLENS.ImageLittlePlanet(state.currentImageUrl);
+          } else { // normal
+            littlePlanet = new PANOLENS.ImagePanorama(state.currentImageUrl);
+          }
+          
+          viewer.add(littlePlanet);
+          
+          // Reset viewer to default state
+          resetView();
+          
+          spinner.style.display = 'none';
+          hideNotification();
+          
+          // Enable touch controls if needed
+          if (state.touchEnabled && state.isMobile) {
+            viewer.disableControl();
+            viewer.OrbitControls.enableZoom = false;
+          }
+        } catch(e) {
+          console.error('Error updating image view:', e);
+          showNotification('Error: ' + e.message);
+          spinner.style.display = 'none';
+        }
+      }
+      
+      function handleFileSelect(evt) {
+        const file = evt.target.files[0];
+        if (file) {
+          spinner.style.display = 'block';
+          showNotification('Processing image...');
+          processFile(file);
+        }
+      }
+      
+      function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+          spinner.style.display = 'block';
+          showNotification('Processing dropped image...');
+          processFile(files[0]);
+        }
+      }
+      
+      function processFile(file) {
+        if (!file || !file.type.match('image.*')) {
+          alert('Please select an image file.');
+          spinner.style.display = 'none';
+          hideNotification();
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imageUrl = e.target.result;
+          
+          // Create thumbnail and store the image
+          createThumbnail(imageUrl);
+          
+          // Load the image
+          loadImage(imageUrl);
+        };
+        reader.readAsDataURL(file);
+      }
+      
+      function createThumbnail(imageUrl) {
+        // Create new photo thumbnail
+        const photo = document.createElement('div');
+        photo.classList.add('photo');
+        photo.style.backgroundImage = `url(${imageUrl})`;
+        
+        // Remove active class from all photos and mark new photo as active
+        document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+        photo.classList.add('active');
+        
+        // Add click handler
+        photo.addEventListener('click', function() {
+          document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+          photo.classList.add('active');
+          loadImage(imageUrl);
+        });
+        
+        // Add touch handler
+        if (state.touchEnabled) {
+          photo.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.photo').forEach(p => p.classList.remove('active'));
+            photo.classList.add('active');
+            loadImage(imageUrl);
+          });
+        }
+        
+        // Add to drawer
+        drawerElement.insertBefore(photo, drawerElement.firstChild);
+      }
+      
+      function autoSmartCrop() {
+        if (!state.originalImageUrl) {
+          showNotification('No image loaded');
+          return;
+        }
+        
+        spinner.style.display = 'block';
+        showNotification('Auto cropping...');
+        
+        let img = new Image();
+        img.onload = function() {
+          let naturalWidth = img.naturalWidth;
+          let naturalHeight = img.naturalHeight;
+          let aspect = naturalWidth / naturalHeight;
+          
+          // If image is not 2:1 (equirectangular), perform auto crop
+          if (Math.abs(aspect - 2) > 0.01) {
+            let newWidth, newHeight, offsetX, offsetY;
+            
+            if (aspect > 2) {
+              // Image is too wide: crop horizontally
+              newHeight = naturalHeight;
+              newWidth = naturalHeight * 2;
+              offsetX = (naturalWidth - newWidth) / 2;
+              offsetY = 0;
+            } else {
+              // Image is too tall: crop vertically
+              newWidth = naturalWidth;
+              newHeight = naturalWidth / 2;
+              offsetX = 0;
+              offsetY = (naturalHeight - newHeight) / 2;
+            }
+            
+            // Create canvas for cropping
+            let canvas = document.createElement('canvas');
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            let ctx = canvas.getContext('2d');
+            ctx.drawImage(img, offsetX, offsetY, newWidth, newHeight, 0, 0, newWidth, newHeight);
+            
+            // Update current image and view
+            state.currentImageUrl = canvas.toDataURL();
+            state.croppedImageUrl = state.currentImageUrl;
+            updateImageView();
+            
+            showNotification('Auto crop applied');
+          } else {
+            showNotification('Image already has optimal ratio');
+          }
+          
+          spinner.style.display = 'none';
+        };
+        
+        img.src = state.originalImageUrl;
+      }
+      
+      function startManualCrop() {
+        if (!state.originalImageUrl) {
+          showNotification('No image loaded');
+          return;
+        }
+        
+        // Set crop image source
+        cropImage.src = state.originalImageUrl;
+        
+        // Wait for image to load before showing crop overlay
+        cropImage.onload = function() {
+          // Initialize crop selection to default size (center 80%)
+          const width = cropImage.offsetWidth * 0.8;
+          const height = width / 2; // 2:1 ratio for equirectangular
+          
+          cropSelection.style.width = width + 'px';
+          cropSelection.style.height = height + 'px';
+          cropSelection.style.left = (cropImage.offsetWidth - width) / 2 + 'px';
+          cropSelection.style.top = (cropImage.offsetHeight - height) / 2 + 'px';
+          
+          // Show crop overlay
+          cropOverlay.style.display = 'block';
+        };
+      }
+      
+      function applyManualCrop() {
+        // Get crop coordinates relative to image
+        const imageRect = cropImage.getBoundingClientRect();
+        const selectionRect = cropSelection.getBoundingClientRect();
+        
+        // Calculate crop area ratios (for original image dimensions)
+        const scaleX = state.originalDimensions.width / cropImage.offsetWidth;
+        const scaleY = state.originalDimensions.height / cropImage.offsetHeight;
+        
+        // Calculate crop coordinates
+        const cropX = (parseInt(cropSelection.style.left) || 0) * scaleX;
+        const cropY = (parseInt(cropSelection.style.top) || 0) * scaleY;
+        const cropWidth = cropSelection.offsetWidth * scaleX;
+        const cropHeight = cropSelection.offsetHeight * scaleY;
+        
+        // Create canvas for cropping
+        const canvas = document.createElement('canvas');
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+        
+        // Load original image for cropping
+        const img = new Image();
+        img.onload = function() {
+          // Crop image
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+          
+          // Update current image and view
+          state.currentImageUrl = canvas.toDataURL();
+          state.croppedImageUrl = state.currentImageUrl;
+          updateImageView();
+          
+          // Hide crop overlay
+          cropOverlay.style.display = 'none';
+          
+          showNotification('Manual crop applied');
+        };
+        
+        img.src = state.originalImageUrl;
+      }
+      
+      function cancelManualCrop() {
+        cropOverlay.style.display = 'none';
+      }
+      
+      function resetCrop() {
+        if (!state.originalImageUrl) {
+          showNotification('No image loaded');
+          return;
+        }
+        
+        showNotification('Resetting to original image...');
+        state.currentImageUrl = state.originalImageUrl;
+        state.croppedImageUrl = null;
+        updateImageView();
+      }
+      
+      function downloadImage() {
+        if (!state.currentImageUrl) {
+          showNotification('No image to download');
+          return;
+        }
+        
+        const link = document.createElement('a');
+        link.href = state.currentImageUrl;
+        link.download = 'panorama_' + new Date().getTime() + '.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification('Image downloaded');
+      }
+      
+      function zoomIn() {
+        if (!viewer) return;
+        
+        // Reduce FOV for zoom in
+        viewer.camera.fov = Math.max(30, viewer.camera.fov - 5);
+        viewer.camera.updateProjectionMatrix();
+      }
+      
+      function zoomOut() {
+        if (!viewer) return;
+        
+        // Increase FOV for zoom out
+        viewer.camera.fov = Math.min(90, viewer.camera.fov + 5);
+        viewer.camera.updateProjectionMatrix();
+      }
+      
+      function resetView() {
+        if (!viewer) return;
+        
+        // Reset camera to initial position
+        viewer.camera.position.set(0, 0, 0);
+        viewer.camera.fov = 60;
+        viewer.camera.updateProjectionMatrix();
+        
+        // Reset controls
+        viewer.OrbitControls.target.set(0, 0, -1);
+        viewer.OrbitControls.update();
+        
+        // Enable auto rotation
+        viewer.OrbitControls.autoRotate = true;
+      }
+      
+      function showNotification(message) {
+        notification.textContent = message;
+        notification.style.display = 'block';
+        setTimeout(() => {
+          notification.style.display = 'none';
+        }, 3000);
+      }
+      
+      function hideNotification() {
+        notification.style.display = 'none';
+      }
+      
+      // Load the first sample image
+      if (sampleImages.length > 0) {
+        loadImage(sampleImages[0]);
+        document.querySelector('.photo').classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>
