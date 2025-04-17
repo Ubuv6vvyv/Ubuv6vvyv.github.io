@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Great Ocean Road Itinerary</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #f7f7f7;
+    }
+    #map {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Great Ocean Road: 1‑Day Itinerary</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Stop</th>
+        <th>Distance (km)</th>
+        <th>Duration</th>
+        <th>Highlights</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Melbourne</td>
+        <td>—</td>
+        <td>—</td>
+        <td>Start point</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Bells Beach</td>
+        <td>100</td>
+        <td>1 h 20 m</td>
+        <td>World‑famous surf spot</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Memorial Arch</td>
+        <td>48</td>
+        <td>40 m</td>
+        <td>Historic Great Ocean Road gateway</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Erskine Falls</td>
+        <td>29</td>
+        <td>30 m</td>
+        <td>Scenic waterfall in rainforest</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Apollo Bay</td>
+        <td>34</td>
+        <td>50 m</td>
+        <td>Charming coastal town & seafood</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Cape Otway Lighthouse</td>
+        <td>27</td>
+        <td>40 m</td>
+        <td>Historic lighthouse & whale‑watching</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Port Campbell National Park</td>
+        <td>104</td>
+        <td>1 h 30 m</td>
+        <td>Coastal cliffs & lookouts</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Loch Ard Gorge</td>
+        <td>6</td>
+        <td>5 m</td>
+        <td>Dramatic beach & shipwreck history</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>12 Apostles</td>
+        <td>5</td>
+        <td>10 m</td>
+        <td>Iconic limestone stacks</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Gibson Steps</td>
+        <td>1</td>
+        <td>2 m</td>
+        <td>Beach access & up‑close views</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Return to Melbourne</td>
+        <td>250</td>
+        <td>3 h</td>
+        <td>End point</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div id="map"></div>
+
+  <!-- Load Google Maps JavaScript API with Places library -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places"></script>
+  <script>
+    // Initialize map and plot all stops using Places API
+    async function initMap() {
+      const melbourne = { lat: -37.8136, lng: 144.9631 };
+
+      const map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 7,
+        center: melbourne
+      });
+
+      const service = new google.maps.places.PlacesService(map);
+
+      // Include Melbourne at start and end to close the loop
+      const stopQueries = [
+        'Melbourne, Victoria, Australia',
+        'Bells Beach, Victoria, Australia',
+        'Great Ocean Road Memorial Arch, Victoria, Australia',
+        'Erskine Falls, Victoria, Australia',
+        'Apollo Bay, Victoria, Australia',
+        'Cape Otway Lighthouse, Victoria, Australia',
+        'Port Campbell National Park, Victoria, Australia',
+        'Loch Ard Gorge, Victoria, Australia',
+        'Twelve Apostles, Port Campbell Victoria, Australia',
+        'Gibson Steps, Port Campbell Victoria, Australia',
+        'Melbourne, Victoria, Australia'
+      ];
+
+      const stopResults = [];
+
+      // Lookup each stop via PlacesService
+      for (let i = 0; i < stopQueries.length; i++) {
+        const place = await new Promise((resolve) => {
+          service.findPlaceFromQuery({
+            query: stopQueries[i],
+            fields: ['name','geometry']
+          }, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+              resolve(results[0]);
+            } else {
+              console.warn('Place not found:', stopQueries[i], status);
+              resolve(null);
+            }
+          });
+        });
+        if (place) stopResults.push(place);
+      }
+
+      // Plot markers and build path
+      const pathCoords = [];
+      stopResults.forEach((place, idx) => {
+        const loc = place.geometry.location;
+        pathCoords.push(loc);
+
+        new google.maps.Marker({
+          position: loc,
+          map: map,
+          label: String(idx + 1),
+          title: place.name
+        });
+      });
+
+      // Draw the route polyline
+      new google.maps.Polyline({
+        path: pathCoords,
+        geodesic: true,
+        strokeColor: '#FF0000',
+        strokeOpacity: 0.8,
+        strokeWeight: 4,
+        map: map
+      });
+    }
+
+    // Kick off map creation once page loads
+    window.addEventListener('load', initMap);
+  </script>
+
+</body>
+</html>
