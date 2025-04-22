@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Clip Shuffler</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
+    body { background: #f0f2f5; color: #333; line-height: 1.6; padding: 20px; max-width: 100%; }
+    h1 { text-align: center; margin-bottom: 20px; color: #2c3e50; font-size: 28px; }
+    .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .upload-area { border: 3px dashed #ddd; border-radius: 10px; padding: 30px; text-align: center; margin-bottom: 20px; transition: all 0.3s; position: relative; }
+    .upload-area.highlight { border-color: #3498db; background: rgba(52,152,219,0.05); }
+    .upload-btn { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; transition: background 0.3s; }
+    .upload-btn:hover { background: #2980b9; }
+    .settings { background: #f9f9f9; padding: 15px; border-radius: 10px; margin: 20px 0; }
+    .settings label { display: block; margin-bottom: 10px; font-weight: bold; }
+    .settings input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px; }
+    .checkbox-group { display: flex; align-items: center; margin-bottom: 10px; }
+    .checkbox-group input { width: auto; margin-right: 10px; margin-bottom: 0; }
+    .video-container { margin: 20px 0; text-align: center; display: none; }
+    video { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #000; }
+    .action-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+    .action-btn { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.3s; flex: 1; min-width: 120px; max-width: 200px; }
+    .process-btn { background: #2ecc71; color: white; }
+    .process-btn:hover { background: #27ae60; }
+    .reshuffle-btn { background: #9b59b6; color: white; }
+    .reshuffle-btn:hover { background: #8e44ad; }
+    .download-btn { background: #e74c3c; color: white; }
+    .download-btn:hover { background: #c0392b; }
+    .progress-container { margin-top: 20px; display: none; }
+    .progress-bar { height: 10px; background: #f0f0f0; border-radius: 5px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #3498db; width: 0%; transition: width 0.3s; }
+    .progress-text { margin-top: 5px; text-align: center; font-size: 14px; color: #666; }
+    .file-info { margin-top: 10px; font-size: 14px; color: #666; }
+    .status { margin-top: 10px; font-size: 14px; color: #666; text-align: center; }
+    .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none; }
+    .debug-info { margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px; color: #666; display: none; max-height: 200px; overflow-y: auto; }
+    @media (max-width:600px) {
+      .container{padding:15px;} .upload-area{padding:20px 10px;} h1{font-size:24px;}
+      .action-buttons{flex-direction:column;} .action-btn{max-width:100%;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Video Clip Shuffler</h1>
+
+    <div id="upload-area" class="upload-area">
+      <p>Drag & drop video file here or</p>
+      <input type="file" id="file-input" accept="video/*" style="display:none">
+      <button id="upload-btn" class="upload-btn">Select Video</button>
+      <div class="file-info" id="file-info"></div>
+    </div>
+
+    <div class="settings">
+      <label for="segment-duration">Segment Duration (seconds):</label>
+      <input type="number" id="segment-duration" min="1" max="60" value="5">
+      <div class="checkbox-group">
+        <input type="checkbox" id="debug-mode">
+        <label for="debug-mode">Show Debug Info</label>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button id="process-btn" class="action-btn process-btn" disabled>
+        <span class="btn-text">Process Video</span>
+        <span class="spinner hidden"></span>
+      </button>
+      <button id="reshuffle-btn" class="action-btn reshuffle-btn" disabled>Reshuffle</button>
+      <button id="download-btn" class="action-btn download-btn" disabled>Download</button>
+    </div>
+
+    <div class="progress-container" id="progress-container">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-text" id="progress-text">Processing: 0%</div>
+    </div>
+
+    <div class="status" id="status">Ready to process video</div>
+
+    <div class="video-container" id="video-container">
+      <video id="output-video" controls></video>
+    </div>
+
+    <div class="debug-info" id="debug-info"></div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // -- Constants & Elements --
+    const FPS         = 30,
+          frameDelay  = 1000 / FPS,
+          uploadArea  = document.getElementById('upload-area'),
+          fileInput   = document.getElementById('file-input'),
+          uploadBtn   = document.getElementById('upload-btn'),
+          fileInfo    = document.getElementById('file-info'),
+          segmentInp  = document.getElementById('segment-duration'),
+          processBtn  = document.getElementById('process-btn'),
+          reshuffleBtn= document.getElementById('reshuffle-btn'),
+          downloadBtn = document.getElementById('download-btn'),
+          progressBar = document.getElementById('progress-fill'),
+          progressTxt = document.getElementById('progress-text'),
+          progressCtr = document.getElementById('progress-container'),
+          statusEl    = document.getElementById('status'),
+          videoCtr    = document.getElementById('video-container'),
+          outputVideo = document.getElementById('output-video'),
+          btnText     = processBtn.querySelector('.btn-text'),
+          spinner     = processBtn.querySelector('.spinner'),
+          debugChk    = document.getElementById('debug-mode'),
+          debugBox    = document.getElementById('debug-info');
+
+    let videoFile = null, segments = [], outputBlob = null;
+
+    // -- Debug Logging --
+    debugChk.addEventListener('change', () => {
+      debugBox.style.display = debugChk.checked ? 'block' : 'none';
+    });
+    function log(msg) {
+      console.log(msg);
+      if (debugChk.checked) {
+        const d = document.createElement('div');
+        d.textContent = new Date().toLocaleTimeString() + ' – ' + msg;
+        debugBox.appendChild(d);
+        debugBox.scrollTop = debugBox.scrollHeight;
+      }
+    }
+
+    // -- File Selection & Drag/Drop --
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => handleFileSelect(e.target.files));
+
+    ['dragenter','dragover','dragleave','drop'].forEach(evt =>
+      uploadArea.addEventListener(evt, e => (e.preventDefault(), e.stopPropagation()))
+    );
+    ['dragenter','dragover'].forEach(evt =>
+      uploadArea.addEventListener(evt, () => uploadArea.classList.add('highlight'))
+    );
+    ['dragleave','drop'].forEach(evt =>
+      uploadArea.addEventListener(evt, () => uploadArea.classList.remove('highlight'))
+    );
+    uploadArea.addEventListener('drop', e =>
+      handleFileSelect(e.dataTransfer.files)
+    );
+
+    function handleFileSelect(fileList) {
+      const files = Array.from(fileList),
+            vids  = files.filter(f => f.type.startsWith('video/'));
+      if (!vids.length) {
+        fileInfo.textContent = 'No valid video file selected';
+        processBtn.disabled = true;
+        return;
+      }
+      videoFile = vids[0];
+      fileInfo.textContent = `Selected: ${videoFile.name} (${formatBytes(videoFile.size)})`;
+      processBtn.disabled = false;
+      log(`File selected: ${videoFile.name}`);
+    }
+
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+      return (b/1048576).toFixed(1) + ' MB';
+    }
+
+    // -- Process / Reshuffle / Download Buttons --
+    processBtn.addEventListener('click', () => runProcess(false));
+    reshuffleBtn.addEventListener('click', () => runProcess(true));
+    downloadBtn.addEventListener('click', downloadOutput);
+
+    async function runProcess(isReshuffle) {
+      if (!videoFile) return statusEl.textContent = 'Select a video first';
+      btnText.textContent = isReshuffle ? 'Reshuffling…' : 'Processing…';
+      spinner.classList.remove('hidden');
+      processBtn.disabled = true;
+      reshuffleBtn.disabled = true;
+      downloadBtn.disabled = true;
+      progressCtr.style.display = 'block';
+      if (!isReshuffle) debugBox.innerHTML = '';
+
+      try {
+        if (!isReshuffle) await prepSegments();
+        updateProgress(40, isReshuffle ? 'Re-recording…' : 'Recording…');
+        await recordShuffledVideo();
+        statusEl.textContent = isReshuffle ? 'Reshuffled!' : 'Done!';
+        videoCtr.style.display = 'block';
+        reshuffleBtn.disabled = false;
+        downloadBtn.disabled = false;
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        log('Error: ' + err.message);
+      } finally {
+        btnText.textContent = 'Process Video';
+        spinner.classList.add('hidden');
+        processBtn.disabled = false;
+      }
+    }
+
+    async function prepSegments() {
+      segments = [];
+      const segDur = parseInt(segmentInp.value) || 5;
+      updateProgress(10, 'Analyzing…');
+      const dur = await getVideoDuration(videoFile);
+      log(`Video duration: ${dur.toFixed(2)}s`);
+      const count = Math.floor(dur / segDur);
+      for (let i=0; i<count; i++) segments.push({ startTime: i*segDur, duration: segDur });
+      const rem = dur % segDur;
+      if (rem > 0.5) segments.push({ startTime: count*segDur, duration: rem });
+      if (!segments.length) throw new Error('No segments created');
+      log(`Created ${segments.length} segments`);
+      updateProgress(30, 'Shuffling…');
+      shuffleArray(segments);
+    }
+
+    function getVideoDuration(file) {
+      return new Promise((res, rej) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => (URL.revokeObjectURL(v.src), res(v.duration));
+        v.onerror = () => (URL.revokeObjectURL(v.src), rej(new Error('Metadata load failed')));
+        v.src = URL.createObjectURL(file);
+      });
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      log('Segments shuffled');
+    }
+
+    function updateProgress(pct, msg) {
+      progressBar.style.width = pct + '%';
+      progressTxt.textContent = msg || `Processing: ${pct}%`;
+      log(msg || `Progress ${pct}%`);
+    }
+
+    async function recordShuffledVideo() {
+      // cleanup previous output URL
+      if (outputVideo.src) URL.revokeObjectURL(outputVideo.src);
+
+      const tempVid = document.createElement('video');
+      tempVid.src = URL.createObjectURL(videoFile);
+      await new Promise((r, e) => (tempVid.onloadedmetadata = r, tempVid.onerror = e));
+
+      const w = tempVid.videoWidth, h = tempVid.videoHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      const stream = canvas.captureStream(FPS);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp8',
+        videoBitsPerSecond: 2_500_000
+      });
+
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      recorder.start(1000);
+      recorder.pause();
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        updateProgress(40 + (i/segments.length)*60, `Segment ${i+1}/${segments.length}…`);
+        log(`Seg ${i+1}: start ${seg.startTime.toFixed(2)}s, dur ${seg.duration.toFixed(2)}s`);
+
+        tempVid.currentTime = seg.startTime;
+        await new Promise(r => tempVid.onseeked = r);
+        recorder.resume();
+        await tempVid.play();
+
+        const endT = seg.startTime + seg.duration;
+        while (tempVid.currentTime < endT && !tempVid.ended) {
+          ctx.drawImage(tempVid, 0, 0, w, h);
+          await new Promise(r => setTimeout(r, frameDelay));
+        }
+
+        tempVid.pause();
+        recorder.pause();
+      }
+
+      recorder.stop();
+      await new Promise(r => recorder.onstop = r);
+
+      log(`Recording done — ${chunks.length} chunks`);
+      outputBlob = new Blob(chunks, { type: 'video/webm' });
+      outputVideo.src = URL.createObjectURL(outputBlob);
+      URL.revokeObjectURL(tempVid.src);
+    }
+
+    function downloadOutput() {
+      if (!outputBlob) return statusEl.textContent = 'No video to download';
+      const name = `shuffled-${new Date().toISOString().slice(0,10)}.webm`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(outputBlob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      }, 100);
+      log(`Downloaded ${name}`);
+      statusEl.textContent = `Saved as ${name}`;
+    }
+
+    // Compatibility check
+    (() => {
+      const probs = [];
+      if (!window.MediaRecorder) probs.push('MediaRecorder missing');
+      if (!HTMLCanvasElement.prototype.captureStream) probs.push('captureStream missing');
+      if (probs.length) {
+        statusEl.textContent = 'Warning: Some features may not work.';
+        log('Compat: ' + probs.join(', '));
+      }
+    })();
+  });
+  </script>
+</body>
+</html>
