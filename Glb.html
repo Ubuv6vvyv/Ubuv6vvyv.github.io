@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Enhanced GLB Viewer (Stable + Safeguarded + Light Binding Fix)</title>
+
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box }
+    html, body { width:100%; height:100%; overflow:hidden }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a1a;
+      touch-action: none;
+    }
+    #canvas-container {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+    }
+    #controls {
+      position: fixed;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 10px;
+      z-index: 100;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 20px;
+      backdrop-filter: blur(5px);
+    }
+    .control-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      color: white; font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .3s;
+    }
+    .control-btn:active {
+      transform: scale(.95);
+      background: rgba(255,255,255,0.3);
+    }
+    .control-btn.active {
+      background: rgba(100,149,237,0.8);
+    }
+    #file-input { display: none }
+    #status {
+      position: fixed; top:20px; left:50%;
+      transform: translateX(-50%);
+      padding:10px 20px;
+      border-radius:20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      z-index:1000;
+      display:none;
+      font-size:14px;
+      text-align:center;
+      max-width:90%;
+    }
+    #loading-indicator {
+      position: fixed; top:50%; left:50%;
+      transform: translate(-50%,-50%);
+      width:50px; height:50px;
+      border:3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius:50%;
+      animation: spin 1s linear infinite;
+      display:none;
+      z-index:1000;
+    }
+    @keyframes spin {
+      to { transform: translate(-50%,-50%) rotate(360deg) }
+    }
+    .slider-panel {
+      position: fixed;
+      bottom: 80px; left:50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      border-radius:15px;
+      padding:15px;
+      width:90%; max-width:320px;
+      display:none;
+      z-index:200;
+    }
+    .slider-container { margin:10px 0 }
+    .slider-label {
+      color:white; font-size:8px;
+      margin-bottom:5px;
+      display:flex; justify-content:space-between;
+      align-items:center;
+    }
+    .slider {
+      -webkit-appearance:none;
+      width:100%; height:6px;
+      border-radius:3px;
+      background:rgba(255,255,255,0.2);
+      outline:none;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance:none;
+      width:16px; height:16px;
+      border-radius:50%;
+      background:#6495ED;
+      cursor:pointer;
+    }
+    .panel-title {
+      color:white; font-size:10px;
+      font-weight:bold; margin-bottom:10px;
+      text-align:center;
+    }
+    #orientation-overlay {
+      position: fixed; top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(26,26,26,0.95);
+      z-index:2000;
+      display:none;
+      justify-content:center; align-items:center;
+      text-align:center; color:white;
+      padding:20px;
+    }
+    input[type="color"] {
+      width:100%; height:10px;
+      border:none; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="loading-indicator"></div>
+  <div id="status"></div>
+
+  <div id="controls">
+    <button class="control-btn" id="upload-btn"  title="Upload GLB">📁</button>
+    <button class="control-btn" id="reset-btn"   title="Reset view">⟳</button>
+    <button class="control-btn" id="light-btn"   title="Lighting">💡</button>
+    <button class="control-btn" id="material-btn"title="Materials">🎨</button>
+    <button class="control-btn" id="anim-btn"    title="Animation">✨</button>
+    <button class="control-btn" id="rotate-btn" title="Auto-rotate">🔄</button>
+  </div>
+
+  <!-- Lighting Controls Panel -->
+  <div id="light-panel" class="slider-panel">
+    <div class="panel-title">Lighting Controls</div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Main Light</span><span id="main-light-value">1.0</span></div>
+      <input type="range" id="main-light-slider" class="slider" min="0" max="3" step="0.1" value="1">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Ambient Light</span><span id="ambient-light-value">0.5</span></div>
+      <input type="range" id="ambient-light-slider" class="slider" min="0" max="2" step="0.1" value="0.5">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Fill Light</span><span id="fill-light-value">0.3</span></div>
+      <input type="range" id="fill-light-slider" class="slider" min="0" max="2" step="0.1" value="0.3">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Light Position</span><span id="light-position-value">5.0</span></div>
+      <input type="range" id="light-position-slider" class="slider" min="1" max="10" step="0.5" value="5">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label">Main Light Color</div>
+      <input type="color" id="main-light-color" value="#ffffff">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label">Ambient Light Color</div>
+      <input type="color" id="ambient-light-color" value="#ffffff">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label">Fill Light Color</div>
+      <input type="color" id="fill-light-color" value="#ffffff">
+    </div>
+  </div>
+
+  <!-- Material Controls Panel -->
+  <div id="material-panel" class="slider-panel">
+    <div class="panel-title">Material Controls</div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Metalness</span><span id="metalness-value">0.0</span></div>
+      <input type="range" id="metalness-slider" class="slider" min="0" max="1" step="0.1" value="0">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Roughness</span><span id="roughness-value">0.5</span></div>
+      <input type="range" id="roughness-slider" class="slider" min="0" max="1" step="0.1" value="0.5">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Environment</span><span id="env-value">1.0</span></div>
+      <input type="range" id="env-slider" class="slider" min="0" max="3" step="0.1" value="1">
+    </div>
+  </div>
+
+  <!-- Animation Controls Panel -->
+  <div id="anim-panel" class="slider-panel">
+    <div class="panel-title">Animation Controls</div>
+    <div class="slider-container">
+      <label><input type="checkbox" id="jump-enable"> Jump</label>
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Jump Amp</span><span id="jump-amp-value">0.2</span></div>
+      <input type="range" id="jump-amp-slider" class="slider" min="0" max="1" step="0.05" value="0.2">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Jump Freq</span><span id="jump-freq-value">1.0</span></div>
+      <input type="range" id="jump-freq-slider" class="slider" min="0" max="5" step="0.1" value="1.0">
+    </div>
+    <div class="slider-container">
+      <label><input type="checkbox" id="stretch-enable"> Stretch</label>
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Stretch Amp</span><span id="stretch-amp-value">0.2</span></div>
+      <input type="range" id="stretch-amp-slider" class="slider" min="0" max="1" step="0.05" value="0.2">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Stretch Freq</span><span id="stretch-freq-value">1.0</span></div>
+      <input type="range" id="stretch-freq-slider" class="slider" min="0" max="5" step="0.1" value="1.0">
+    </div>
+    <div class="slider-container">
+      <label><input type="checkbox" id="wobble-enable"> Wobble</label>
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Wobble Amp</span><span id="wobble-amp-value">0.05</span></div>
+      <input type="range" id="wobble-amp-slider" class="slider" min="0" max="0.5" step="0.01" value="0.05">
+    </div>
+    <div class="slider-container">
+      <div class="slider-label"><span>Wobble Freq</span><span id="wobble-freq-value">2.0</span></div>
+      <input type="range" id="wobble-freq-slider" class="slider" min="0" max="10" step="0.1" value="2.0">
+    </div>
+  </div>
+
+  <div id="orientation-overlay">
+    <div>Please rotate your device to portrait mode for the best experience</div>
+  </div>
+
+  <input type="file" id="file-input" accept=".glb,.gltf">
+
+  <script>
+  // GLOBAL ERROR HANDLING
+  window.onerror = (m,s,l,c,e) => { showStatus(`Error: ${m}`,5000); console.error(e); return true; };
+  window.onunhandledrejection = e => { showStatus(`Promise: ${e.reason}`,5000); console.error(e.reason); };
+
+  // DEBOUNCE HELPER
+  function debounce(fn,ms=200){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}};
+
+  // STATE & THREE CORE
+  const state = {
+    isPortrait: window.innerHeight > window.innerWidth,
+    autoRotate: false,
+    modelLoaded: false,
+    currentModel: null,
+    panelOpen: null
+  };
+  let scene, camera, renderer, controls, loader;
+  let mainLight, ambientLight, fillLight;
+  const clock = new THREE.Clock();
+  let basePosition = new THREE.Vector3(), baseScale = new THREE.Vector3();
+
+  // UI ENABLE / DISABLE
+  function setUIEnabled(en){
+    document.querySelectorAll(
+      '.slider, input[type="color"], input[type="checkbox"], #reset-btn, #light-btn, #material-btn, #anim-btn, #rotate-btn'
+    ).forEach(el=> el.disabled = !en);
+  }
+
+  // SHOW STATUS
+  function showStatus(msg,d=2000){
+    const s = document.getElementById('status');
+    s.textContent = msg; s.style.display = 'block';
+    if(d>0) setTimeout(()=>s.style.display='none', d);
+  }
+
+  // INIT RENDERER & CONTEXT HANDLERS
+  function initRenderer(){
+    try {
+      if(renderer){
+        renderer.forceContextLoss();
+        renderer.domElement.remove();
+      }
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+        failIfMajorPerformanceCaveat: false
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+      renderer.setSize(window.innerWidth,window.innerHeight);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1;
+      renderer.physicallyCorrectLights = true;
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      renderer.domElement.addEventListener('webglcontextlost', e=>{
+        e.preventDefault();
+        showStatus('WebGL context lost',3000);
+      });
+      renderer.domElement.addEventListener('webglcontextrestored', ()=>{
+        showStatus('WebGL context restored',3000);
+        initScene();
+      });
+
+      return true;
+    } catch(e){
+      console.error('Renderer init failed',e);
+      showStatus('Renderer init error',3000);
+      return false;
+    }
+  }
+
+  // INIT SCENE, CAMERA, LIGHTS, CONTROLS
+  function initScene(){
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
+    camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth/window.innerHeight,
+      0.1, 1000
+    );
+    camera.position.set(0,1,3);
+
+    if(!initRenderer()) return false;
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 1;
+    controls.maxDistance = 10;
+    controls.autoRotate = state.autoRotate;
+    controls.autoRotateSpeed = 2.0;
+    if('ontouchstart' in window){
+      controls.rotateSpeed = 0.5;
+      controls.zoomSpeed   = 0.8;
+      controls.panSpeed    = 0.8;
+    }
+
+    ambientLight = new THREE.AmbientLight(0xffffff,0.7);
+    mainLight    = new THREE.DirectionalLight(0xffffff,1);
+    fillLight    = new THREE.DirectionalLight(0xffffff,0.3);
+    mainLight.position.set(5,5,5);
+    fillLight.position.set(-5,0,-5);
+    scene.add(ambientLight, mainLight, fillLight);
+
+    loader = new THREE.GLTFLoader();
+    return true;
+  }
+
+  // UPDATE MATERIALS
+  function updateMaterials(){
+    if(!state.currentModel) return;
+    const m = parseFloat(document.getElementById('metalness-slider').value);
+    const r = parseFloat(document.getElementById('roughness-slider').value);
+    const e = parseFloat(document.getElementById('env-slider').value);
+    state.currentModel.traverse(n=>{
+      if(n.isMesh && n.material &&
+         (n.material.isMeshStandardMaterial || n.material.isMeshPhysicalMaterial)){
+        n.material.metalness      = m;
+        n.material.roughness      = r;
+        n.material.envMapIntensity= e;
+        n.material.needsUpdate    = true;
+      }
+    });
+  }
+
+  // SETUP LIGHT CONTROLS (called after load)
+  function setupLightControls(){
+    const lights = { main: mainLight, ambient: ambientLight, fill: fillLight };
+    ['main','ambient','fill'].forEach(type=>{
+      const slider = document.getElementById(`${type}-light-slider`);
+      const picker = document.getElementById(`${type}-light-color`);
+      const valueEl= document.getElementById(`${type}-light-value`);
+
+      slider.oninput = e => {
+        const v = parseFloat(e.target.value);
+        lights[type].intensity = v;
+        valueEl.textContent = v.toFixed(1);
+      };
+      picker.oninput = e => {
+        lights[type].color.set(e.target.value);
+      };
+    });
+
+    document.getElementById('light-position-slider').oninput = e => {
+      const v = parseFloat(e.target.value);
+      mainLight.position.set(v,v,v);
+      fillLight.position.set(-v,0,-v);
+      document.getElementById('light-position-value').textContent = v.toFixed(1);
+    };
+  }
+
+  // LOAD MODEL WITH SAFEGUARDS
+  function loadModel(file){
+    setUIEnabled(false);
+    const li = document.getElementById('loading-indicator');
+    showStatus('Loading model...',0);
+    li.style.display='block';
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        loader.parse(e.target.result,'',
+          gltf=>{
+            try {
+              if(state.currentModel){
+                scene.remove(state.currentModel);
+                state.currentModel.traverse(n=>{
+                  if(n.isMesh){
+                    n.geometry.dispose();
+                    if(n.material.map) n.material.map.dispose();
+                    n.material.dispose();
+                  }
+                });
+              }
+            } catch(dispErr){
+              console.warn('Dispose error',dispErr);
+            }
+
+            state.currentModel = gltf.scene;
+            const box = new THREE.Box3().setFromObject(gltf.scene);
+            const cen = box.getCenter(new THREE.Vector3());
+            const sz  = box.getSize(new THREE.Vector3());
+            const s   = 2/Math.max(sz.x,sz.y,sz.z);
+            gltf.scene.scale.multiplyScalar(s);
+            gltf.scene.position.sub(cen.multiplyScalar(s));
+            basePosition.copy(gltf.scene.position);
+            baseScale.copy(gltf.scene.scale);
+            scene.add(gltf.scene);
+
+            state.modelLoaded = true;
+            li.style.display='none';
+            showStatus('Model loaded',2000);
+
+            camera.position.set(0,1,3);
+            controls.target.set(0,0,0);
+            controls.update();
+
+            updateMaterials();
+            setupLightControls();
+            setUIEnabled(true);
+          },
+          err=>{
+            console.error('Parse error',err);
+            showStatus('Error parsing model',3000);
+            li.style.display='none';
+          }
+        );
+      } catch(parseErr){
+        console.error('Unexpected parse exception',parseErr);
+        showStatus('Model parse crashed',3000);
+        li.style.display='none';
+      }
+    };
+    reader.onerror = e => {
+      console.error('Read error',e);
+      showStatus('File read error',3000);
+      li.style.display='none';
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // APPLY ANIMATIONS
+  function applyAnimations(t){
+    if(!state.currentModel) return;
+    if(document.getElementById('jump-enable').checked){
+      const amp  = parseFloat(document.getElementById('jump-amp-slider').value);
+      const freq = parseFloat(document.getElementById('jump-freq-slider').value);
+      state.currentModel.position.y = basePosition.y + Math.abs(Math.sin(t*freq))*amp;
+    } else {
+      state.currentModel.position.y = basePosition.y;
+    }
+    if(document.getElementById('stretch-enable').checked){
+      const amp  = parseFloat(document.getElementById('stretch-amp-slider').value);
+      const freq = parseFloat(document.getElementById('stretch-freq-slider').value);
+      const sc   = 1 + Math.abs(Math.sin(t*freq))*amp;
+      state.currentModel.scale.set(baseScale.x, baseScale.y*sc, baseScale.z);
+    } else {
+      state.currentModel.scale.copy(baseScale);
+    }
+    if(document.getElementById('wobble-enable').checked){
+      const amp  = parseFloat(document.getElementById('wobble-amp-slider').value);
+      const freq = parseFloat(document.getElementById('wobble-freq-slider').value);
+      state.currentModel.rotation.y = Math.sin(t*freq)*amp;
+    } else {
+      state.currentModel.rotation.y = 0;
+    }
+  }
+
+  // MAIN RENDER LOOP
+  function animate(){
+    requestAnimationFrame(animate);
+    try {
+      controls && controls.update();
+      const elapsed = clock.getElapsedTime();
+      applyAnimations(elapsed);
+      renderer && renderer.render(scene, camera);
+    } catch(err){
+      console.error('Render loop error',err);
+      showStatus('Render error—reinitializing',3000);
+      initScene();
+    }
+  }
+
+  // TOGGLE PANEL
+  function togglePanel(id){
+    document.querySelectorAll('.slider-panel').forEach(p=>{
+      p.style.display = (p.id===id && state.panelOpen!==id)?'block':'none';
+    });
+    document.querySelectorAll('.control-btn').forEach(btn=>{
+      const tgt = btn.id.replace('-btn','-panel');
+      btn.classList.toggle('active', tgt===id && state.panelOpen!==id);
+    });
+    state.panelOpen = (state.panelOpen===id?null:id);
+  }
+
+  // EVENT WIRING
+  document.getElementById('upload-btn').addEventListener('click', ()=>document.getElementById('file-input').click());
+  document.getElementById('file-input').addEventListener('change', e=>{ if(e.target.files[0]) loadModel(e.target.files[0]); });
+  document.getElementById('reset-btn').addEventListener('click', ()=>{
+    camera.position.set(0,1,3);
+    controls.target.set(0,0,0);
+    controls.update();
+  });
+  document.getElementById('light-btn').addEventListener('click', ()=>togglePanel('light-panel'));
+  document.getElementById('material-btn').addEventListener('click', ()=>togglePanel('material-panel'));
+  document.getElementById('anim-btn').addEventListener('click', ()=>togglePanel('anim-panel'));
+  document.getElementById('rotate-btn').addEventListener('click', ()=>{
+    state.autoRotate = !state.autoRotate;
+    controls.autoRotate = state.autoRotate;
+    document.getElementById('rotate-btn').classList.toggle('active', state.autoRotate);
+  });
+
+  // MATERIAL HANDLERS
+  ['metalness','roughness','env'].forEach(prop=>{
+    document.getElementById(`${prop}-slider`).addEventListener('input', e=>{
+      if(!state.modelLoaded) return;
+      document.getElementById(`${prop}-value`).textContent = parseFloat(e.target.value).toFixed(1);
+      updateMaterials();
+    });
+  });
+
+  // ANIMATION HANDLERS (labels only)
+  ['jump','stretch','wobble'].forEach(effect=>{
+    document.getElementById(`${effect}-enable`).addEventListener('change', ()=>{});
+    ['amp','freq'].forEach(param=>{
+      document.getElementById(`${effect}-${param}-slider`).addEventListener('input', e=>{
+        if(!state.modelLoaded) return;
+        document.getElementById(`${effect}-${param}-value`).textContent =
+          parseFloat(e.target.value).toFixed(param==='amp'?2:1);
+      });
+    });
+  });
+
+  // RESIZE & ORIENTATION
+  const safeResize = debounce(()=>{
+    state.isPortrait = window.innerHeight > window.innerWidth;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('orientation-overlay').style.display =
+      state.isPortrait ? 'none' : 'flex';
+  }, 200);
+  window.addEventListener('resize', safeResize);
+  window.addEventListener('orientationchange', safeResize);
+
+  // BOOTSTRAP
+  setUIEnabled(false);
+  if(initScene()){
+    animate();
+    safeResize();
+  } else {
+    showStatus('Initialization failed', 0);
+  }
+  </script>
+</body>
+</html>
