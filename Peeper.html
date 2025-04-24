@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stream Viewer w/ Anti-Stutter</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#181818;color:#e0e0e0;font-family:sans-serif;text-align:center;padding:8px;height:100vh;display:flex;flex-direction:column;justify-content:center}
+.container{width:100%;max-width:800px;margin:0 auto}
+video{width:100%;max-height:70vh;border-radius:8px;background:#000;display:block;margin:0 auto 16px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:16px auto}
+.control-button{background:#202020;border:none;border-radius:6px;color:#e0e0e0;padding:8px 4px;font-size:12px;display:flex;flex-direction:column;align-items:center;cursor:pointer;width:68px;transition:background .2s}
+.control-button:hover{background:#303030}
+.control-button:active{transform:scale(.98)}
+.control-label{font-size:10px;margin-top:4px}
+#status{font-size:11px;color:#888;margin:8px 0}
+#settings-toggle{position:fixed;bottom:20px;right:20px;background:#202020;border:none;border-radius:50%;width:36px;height:36px;color:#e0e0e0;font-size:18px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:100;display:flex;align-items:center;justify-content:center}
+#settings-panel{position:fixed;bottom:0;left:0;right:0;max-height:40%;background:#101010;border-top:1px solid #333;transform:translateY(100%);transition:transform .3s ease;font-family:monospace;font-size:11px;color:#aaa;padding:12px 16px;overflow-y:auto;z-index:99;box-shadow:0 -2px 10px rgba(0,0,0,.5)}
+#settings-panel.open{transform:translateY(0)}
+.setting-line{display:flex;justify-content:space-between;margin:4px 0}
+hr{border-color:#333;margin:8px 0}
+#toggle-reconnect,.settings-button{background:#303030;color:#e0e0e0;border:none;border-radius:4px;margin-top:8px;font-size:11px;padding:6px 12px;cursor:pointer}
+.settings-controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+@media(max-width:600px){video{max-height:50vh}.controls{gap:6px;margin:12px auto}.control-button{width:60px;padding:6px 4px}}
+</style>
+</head>
+<body>
+<div class="container">
+<video id="player" controls playsinline></video>
+<div id="status">Idle</div>
+<div class="controls">
+<button class="control-button" id="screenshot-btn">📸<span class="control-label">Screenshot</span></button>
+<button class="control-button" id="rewind-btn">⏪<span class="control-label">Rewind</span></button>
+<button class="control-button" id="forward-btn">⏩<span class="control-label">Forward</span></button>
+<button class="control-button" id="pip-btn">📺<span class="control-label">PiP</span></button>
+<button class="control-button" id="fullscreen-btn">🖵<span class="control-label">Full</span></button>
+</div>
+</div>
+<button id="settings-toggle">⚙️</button>
+<div id="settings-panel">
+<div class="setting-line"><span>Auto-Reconnect</span><span id="reconnect-status">Off</span></div>
+<div class="setting-line"><span>Player Mode</span><span id="player-mode">Steady</span></div>
+<div class="setting-line"><span>Anti-Stutter</span><span id="anti-stutter-status">On</span></div>
+<hr>
+<div class="setting-line"><span>Bitrate kbps</span><span id="bitrate">–</span></div>
+<div class="setting-line"><span>Level</span><span id="level">–</span></div>
+<div class="setting-line"><span>FPS</span><span id="fps">–</span></div>
+<div class="setting-line"><span>Dropped</span><span id="dropped">–</span></div>
+<div class="setting-line"><span>Buffer s</span><span id="buffer-length">–</span></div>
+<div class="setting-line"><span>Latency s</span><span id="latency">–</span></div>
+<div class="settings-controls">
+<button id="toggle-reconnect" class="settings-button">Toggle Reconnect</button>
+<button id="switch-mode" class="settings-button">Switch Mode</button>
+<button id="toggle-anti-stutter" class="settings-button">Toggle Anti-Stutter</button>
+<button id="force-level" class="settings-button">Force Low Quality</button>
+</div>
+</div>
+  
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+<script>
+const video=document.getElementById("player"),status=document.getElementById("status"),settingsToggle=document.getElementById("settings-toggle"),panel=document.getElementById("settings-panel"),reconnectStatus=document.getElementById("reconnect-status"),playerModeEl=document.getElementById("player-mode"),antiStutterStatusEl=document.getElementById("anti-stutter-status"),bitrateEl=document.getElementById("bitrate"),levelEl=document.getElementById("level"),fpsEl=document.getElementById("fps"),droppedEl=document.getElementById("dropped"),bufEl=document.getElementById("buffer-length"),latEl=document.getElementById("latency"),toggleReconnectBtn=document.getElementById("toggle-reconnect"),switchModeBtn=document.getElementById("switch-mode"),toggleAntiStutterBtn=document.getElementById("toggle-anti-stutter"),forceLevelBtn=document.getElementById("force-level");
+const streamURL="https://sn.rtsp.me/AnunkvV8kGNxjrjQ-rKlBA/1745463843/hls/BsQZa96R.m3u8?ip=1.145.137.185";
+let hls,autoReconnect=!1,lastBitrate="–",statsInterval=null,bufferingEvents=0,lastBufferingTime=0,playerMode="steady",antiStutterEnabled=!0;
+let segmentTiming={lastSegmentTime:0,segmentDuration:3,segmentHistory:[],nextExpectedTransition:0,stutterPatternDetected:!1,adjustmentActive:!1};
+let mediaTimingStats={lastTimeUpdate:0,timeUpdateIntervals:[],playbackRateHistory:[],stutterPoints:[],mediaTimeJumps:[]};
+
+const steadyConfig={debug:!1,startLevel:0,autoStartLoad:!0,capLevelToPlayerSize:!0,maxBufferLength:60,maxMaxBufferLength:90,maxBufferSize:6e7,maxBufferHole:.5,highBufferWatchdogPeriod:5,manifestLoadingTimeOut:15e3,manifestLoadingMaxRetry:4,levelLoadingTimeOut:15e3,fragLoadingTimeOut:3e4,enableWorker:!0,lowLatencyMode:!1,backBufferLength:90,nudgeOffset:.3,nudgeMaxRetry:5,fragLoadingMaxRetry:6,liveSyncDurationCount:5,liveMaxLatencyDurationCount:25,liveDurationInfinity:!1,abrEwmaDefaultEstimate:1e6,abrBandWidthFactor:.9,abrBandWidthUpFactor:.7,abrMaxWithRealBitrate:!0,maxStarvationDelay:6,maxLoadingDelay:6,stretchShortVideoTrack:!0,forceKeyFrameOnDiscontinuity:!0,appendErrorMaxRetry:5};
+
+const lowLatencyConfig={debug:!1,startLevel:-1,autoStartLoad:!0,capLevelToPlayerSize:!0,maxBufferLength:10,maxMaxBufferLength:20,maxBufferSize:2e7,maxBufferHole:.2,highBufferWatchdogPeriod:2,manifestLoadingTimeOut:8e3,manifestLoadingMaxRetry:2,levelLoadingTimeOut:8e3,fragLoadingTimeOut:15e3,enableWorker:!0,lowLatencyMode:!0,backBufferLength:15,nudgeOffset:.2,nudgeMaxRetry:3,fragLoadingMaxRetry:2,liveSyncDurationCount:1,liveMaxLatencyDurationCount:5,liveDurationInfinity:!1,abrEwmaDefaultEstimate:5e5,abrBandWidthFactor:.95,abrBandWidthUpFactor:.85,abrMaxWithRealBitrate:!0,maxStarvationDelay:3,maxLoadingDelay:3,stretchShortVideoTrack:!0,forceKeyFrameOnDiscontinuity:!0,appendErrorMaxRetry:3};
+
+function switchPlayerMode(){playerMode="steady"===playerMode?"lowLatency":"steady",playerModeEl.textContent="steady"===playerMode?"Steady":"Low Latency",initStream()}
+
+function initStream(){hls&&hls.destroy(),status.textContent="Initializing...",segmentTiming={lastSegmentTime:0,segmentDuration:3,segmentHistory:[],nextExpectedTransition:0,stutterPatternDetected:!1,adjustmentActive:!1},mediaTimingStats={lastTimeUpdate:0,timeUpdateIntervals:[],playbackRateHistory:[],stutterPoints:[],mediaTimeJumps:[]};
+const e="steady"===playerMode?steadyConfig:lowLatencyConfig;
+hls=new Hls(e),streamURL.startsWith("http")?hls.loadSource(streamURL):(a=document.createElement("a"),a.href=streamURL,hls.loadSource(a.href)),hls.attachMedia(video),hls.on(Hls.Events.MANIFEST_PARSED,(e,t)=>{status.textContent="Stream ready",t.levels&&t.levels.length>0&&t.levels[0].details&&t.levels[0].details.targetduration&&(segmentTiming.segmentDuration=t.levels[0].details.targetduration,console.log(`Detected segment duration: ${segmentTiming.segmentDuration}s`)),"steady"===playerMode&&hls.levels&&hls.levels.length>0&&(hls.currentLevel=0,setTimeout(()=>{hls.nextLevel=-1},8e3)),video.play().catch(()=>{status.textContent="Autoplay blocked - tap to play"})}),hls.on(Hls.Events.MEDIA_ATTACHED,()=>{status.textContent="Media attached"}),hls.on(Hls.Events.FRAG_LOADING,()=>{status.textContent="Loading fragment..."}),hls.on(Hls.Events.FRAG_LOADED,(e,t)=>{const n=t.stats.tload-t.stats.tfirst||1;if(lastBitrate=Math.round(8*t.stats.total/n/1e3),status.textContent="Playing",t.frag){const e=t.frag.duration;if(e>0){segmentTiming.segmentHistory.push(e),segmentTiming.segmentHistory.length>10&&segmentTiming.segmentHistory.shift();const n=segmentTiming.segmentHistory.reduce((e,t)=>e+t,0)/segmentTiming.segmentHistory.length;segmentTiming.segmentDuration=n;const a=performance.now()/1e3;segmentTiming.lastSegmentTime=a,segmentTiming.nextExpectedTransition=a+e-.1,segmentTiming.stutterPatternDetected&&antiStutterEnabled&&prepareForSegmentTransition(e)}}panel.classList.contains("open")&&updateStats()}),hls.on(Hls.Events.BUFFER_APPENDING,(e,t)=>{if(antiStutterEnabled&&segmentTiming.stutterPatternDetected){const e=video.currentTime,n=video.buffered.length?video.buffered.end(video.buffered.length-1):0;Math.abs(e%segmentTiming.segmentDuration)>segmentTiming.segmentDuration-.5&&smoothSegmentTransition()}}),hls.on(Hls.Events.BUFFER_APPENDED,(e,t)=>{if(antiStutterEnabled&&segmentTiming.stutterPatternDetected&&"video"===t.type){const e=video.currentTime,t=e%segmentTiming.segmentDuration;t>segmentTiming.segmentDuration-.3&&!video.paused&&!segmentTiming.adjustmentActive&&microAdjustPlayback()}}),hls.on(Hls.Events.ERROR,(e,t)=>{if(console.error("HLS Error:",t.type,t.details),t.fatal)switch(t.type){case Hls.ErrorTypes.NETWORK_ERROR:status.textContent="Network error - ",autoReconnect?(status.textContent+="reconnecting...",reconnectStatus.textContent="Reconnecting…",setTimeout(()=>initStream(),2e3)):(status.textContent+="reconnect off",setTimeout(()=>{autoReconnect||(status.textContent+=" - trying once...",setTimeout(()=>initStream(),500))},1e3));break;case Hls.ErrorTypes.MEDIA_ERROR:status.textContent="Media error - recovering",hls.recoverMediaError(),video.currentTime=video.currentTime+.1;break;default:autoReconnect?(status.textContent="Fatal error - reconnecting",setTimeout(()=>initStream(),2e3)):(status.textContent="Fatal error - reconnect off",setTimeout(()=>{autoReconnect||(status.textContent+=" - trying once...",setTimeout(()=>initStream(),500))},1e3))}else switch(t.details){case Hls.ErrorDetails.BUFFER_STALLED_ERROR:antiStutterEnabled?tryRecoverFromStutter():video.currentTime+=.1;break;case Hls.ErrorDetails.BUFFER_FULL_ERROR:if("lowLatency"===playerMode){const e=hls.liveSyncPosition;e&&video.currentTime<e-1&&(video.currentTime=e-.5)}break;case Hls.ErrorDetails.BUFFER_SEEK_OVER_HOLE:case Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL:antiStutterEnabled&&(segmentTiming.stutterPatternDetected=!0,mediaTimingStats.stutterPoints.push({time:video.currentTime,realTime:performance.now()/1e3}))}}),hls.on(Hls.Events.LEVEL_SWITCHING,(e,t)=>{levelEl.textContent=`${t.level} → `,antiStutterEnabled&&segmentTiming.stutterPatternDetected&&prepareForSegmentTransition(segmentTiming.segmentDuration)}),hls.on(Hls.Events.LEVEL_SWITCHED,(e,t)=>{levelEl.textContent=t.level})
+
+let antiStutterWatchdog=setInterval(()=>{if(!antiStutterEnabled||video.paused)return;
+const e=performance.now()/1e3,t=video.currentTime,n=segmentTiming.segmentDuration-t%segmentTiming.segmentDuration;
+if(!segmentTiming.stutterPatternDetected&&mediaTimingStats.timeUpdateIntervals.length>=15){const e=mediaTimingStats.timeUpdateIntervals.slice(-10);let t=!1;for(let n=1;n<e.length;n++)if(e[n]>.06&&e[n]<.12&&Math.abs(e[n]-e[n-1])<.03){t=!0;break}t&&(console.log("🎬 Stutter pattern detected - enabling anti-stutter system"),segmentTiming.stutterPatternDetected=!0,analyzeSegmentDuration())}
+segmentTiming.stutterPatternDetected&&n<.3&&!segmentTiming.adjustmentActive&&smoothSegmentTransition(),segmentTiming.stutterPatternDetected&&n<1?hls&&hls.config&&(hls.config.highBufferWatchdogPeriod="steady"===playerMode?1:.5):hls&&hls.config&&(hls.config.highBufferWatchdogPeriod="steady"===playerMode?5:2)},200);
+
+video.addEventListener("pause",()=>{antiStutterWatchdog&&(clearInterval(antiStutterWatchdog),antiStutterWatchdog=null)}),video.addEventListener("play",()=>{antiStutterWatchdog||(antiStutterWatchdog=setInterval(()=>{if(!antiStutterEnabled||video.paused)return;
+const e=performance.now()/1e3,t=video.currentTime,n=segmentTiming.segmentDuration-t%segmentTiming.segmentDuration;
+if(!segmentTiming.stutterPatternDetected&&mediaTimingStats.timeUpdateIntervals.length>=15){const e=mediaTimingStats.timeUpdateIntervals.slice(-10);let t=!1;for(let n=1;n<e.length;n++)if(e[n]>.06&&e[n]<.12&&Math.abs(e[n]-e[n-1])<.03){t=!0;break}t&&(console.log("🎬 Stutter pattern detected - enabling anti-stutter system"),segmentTiming.stutterPatternDetected=!0,analyzeSegmentDuration())}
+segmentTiming.stutterPatternDetected&&n<.3&&!segmentTiming.adjustmentActive&&smoothSegmentTransition(),segmentTiming.stutterPatternDetected&&n<1?hls&&hls.config&&(hls.config.highBufferWatchdogPeriod="steady"===playerMode?1:.5):hls&&hls.config&&(hls.config.highBufferWatchdogPeriod="steady"===playerMode?5:2)},200))})}
+
+function analyzeSegmentDuration(){if(!video.paused&&mediaTimingStats.stutterPoints.length>=2){const e=[];for(let t=1;t<mediaTimingStats.stutterPoints.length;t++){const n=mediaTimingStats.stutterPoints[t].realTime-mediaTimingStats.stutterPoints[t-1].realTime;n>1&&n<5&&e.push(n)}e.length>0&&(segmentTiming.segmentDuration=e.reduce((e,t)=>e+t,0)/e.length)}}
+
+function updateStats(){if(hls&&video){const e=video.videoWidth?""+video.videoWidth+"x"+video.videoHeight:"–",t=hls.media?Math.round(hls.media.duration):"–",n=video.buffered.length?Math.round(100*(video.buffered.end(video.buffered.length-1)-video.currentTime))/100:"–",a=hls.latency?Math.round(10*hls.latency)/10:"–";bitrateEl.textContent=lastBitrate,fpsEl.textContent=e,droppedEl.textContent=t,bufEl.textContent=n,latEl.textContent=a}}
+
+function prepareForSegmentTransition(e){if(video.paused||segmentTiming.adjustmentActive)return;const t=video.currentTime%segmentTiming.segmentDuration;t>segmentTiming.segmentDuration-.5&&(segmentTiming.adjustmentActive=!0,setTimeout(()=>{segmentTiming.adjustmentActive=!1},300),video.playbackRate=.95,mediaTimingStats.playbackRateHistory.push({time:performance.now()/1e3,rate:.95}),setTimeout(()=>{video.playbackRate=1,mediaTimingStats.playbackRateHistory.push({time:performance.now()/1e3,rate:1})},200))}
+
+function smoothSegmentTransition(){if(video.paused||segmentTiming.adjustmentActive)return;segmentTiming.adjustmentActive=!0;const e=performance.now();video.playbackRate=.95,setTimeout(()=>{video.playbackRate=1,setTimeout(()=>{segmentTiming.adjustmentActive=!1},100)},150)}
+
+function microAdjustPlayback(){if(video.paused||segmentTiming.adjustmentActive)return;segmentTiming.adjustmentActive=!0;const e=performance.now();video.playbackRate=.98,setTimeout(()=>{video.playbackRate=1,segmentTiming.adjustmentActive=!1},100)}
+
+function tryRecoverFromStutter(){if(video.paused)return;const e=video.currentTime%segmentTiming.segmentDuration;e>.7&&e<.9&&(video.currentTime+=.1)}
+
+function updateBufferStats(){if(!video||!hls)return;const e=[];for(let t=0;t<video.buffered.length;t++)e.push(`${Math.round(10*video.buffered.start(t))/10}-${Math.round(10*video.buffered.end(t))/10}`);const t=e.join(", "),n=video.buffered.length?Math.round(100*(video.buffered.end(video.buffered.length-1)-video.currentTime))/100:"–";bufEl.textContent=n}
+
+function takeScreenshot(){const e=document.createElement("canvas");e.width=video.videoWidth,e.height=video.videoHeight;const t=e.getContext("2d");t.drawImage(video,0,0,e.width,e.height);const n=document.createElement("a");n.href=e.toDataURL("image/png"),n.download=`screenshot-${Date.now()}.png`,n.click()}
+
+function toggleFullscreen(){document.fullscreenElement?document.exitFullscreen():video.requestFullscreen()}
+
+function togglePiP(){document.pictureInPictureElement?document.exitPictureInPicture():video.requestPictureInPicture()}
+
+function toggleReconnect(){autoReconnect=!autoReconnect,reconnectStatus.textContent=autoReconnect?"On":"Off"}
+
+function toggleAntiStutter(){antiStutterEnabled=!antiStutterEnabled,antiStutterStatusEl.textContent=antiStutterEnabled?"On":"Off"}
+
+function seekForward(){video.currentTime+=10}
+
+function seekBackward(){video.currentTime-=10}
+
+function forceLowestQuality(){hls&&hls.levels&&hls.levels.length>0&&(hls.nextLevel=0,hls.loadLevel=0,hls.currentLevel=0)}
+
+function collectHlsInfo(){const e={};try{e.version=hls.version,e.levels=hls.levels?hls.levels.length:0;const t=hls.levels?hls.levels.map(e=>{return{bitrate:e.bitrate,width:e.width,height:e.height,attrs:e.attrs}}):"–";e.levelInfo=t,e.currentLevel=hls.currentLevel,e.latency=hls.latency?Math.round(10*hls.latency)/10:"–",e.media=hls.media?{duration:Math.round(hls.media.duration),currentTime:Math.round(hls.media.currentTime)}:"–",e.stats=hls.stats||{}}catch(e){console.error("Error collecting HLS info:",e)}return e}
+
+function initUI(){document.getElementById("screenshot-btn").addEventListener("click",takeScreenshot),document.getElementById("fullscreen-btn").addEventListener("click",toggleFullscreen),document.getElementById("pip-btn").addEventListener("click",togglePiP),document.getElementById("forward-btn").addEventListener("click",seekForward),document.getElementById("rewind-btn").addEventListener("click",seekBackward),settingsToggle.addEventListener("click",()=>{panel.classList.toggle("open"),panel.classList.contains("open")&&(statsInterval||(statsInterval=setInterval(updateStats,1e3)),updateStats())}),toggleReconnectBtn.addEventListener("click",toggleReconnect),switchModeBtn.addEventListener("click",switchPlayerMode),toggleAntiStutterBtn.addEventListener("click",toggleAntiStutter),forceLevelBtn.addEventListener("click",forceLowestQuality),video.addEventListener("waiting",()=>{bufferingEvents++,lastBufferingTime=performance.now()/1e3,status.textContent="Buffering..."}),video.addEventListener("playing",()=>{status.textContent="Playing"}),video.addEventListener("timeupdate",()=>{const e=performance.now()/1e3;if(mediaTimingStats.lastTimeUpdate){const t=e-mediaTimingStats.lastTimeUpdate;t>0&&t<1&&mediaTimingStats.timeUpdateIntervals.push(t),mediaTimingStats.timeUpdateIntervals.length>60&&mediaTimingStats.timeUpdateIntervals.shift()}mediaTimingStats.lastTimeUpdate=e,panel.classList.contains("open")&&updateBufferStats()})}
+
+document.addEventListener("DOMContentLoaded",()=>{Hls.isSupported()?(initUI(),initStream()):status.textContent="HLS not supported in this browser"});
+</script>
+  <script>
+  document.querySelectorAll('.accordion-header').forEach(h=>h.addEventListener('click',()=>{h.nextElementSibling.classList.toggle('show');h.style.background=h.nextElementSibling.classList.contains('show')?'#666':'#333'}))
+</script>
+
+</body>
+</html>
