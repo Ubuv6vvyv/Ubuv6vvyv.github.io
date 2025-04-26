@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+    <meta charset="UTF-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>Bird Song Generator</title>
+    <style>
+        :root {
+            --primary-color: #4caf50;
+            --background-color: #f5f5f5;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #333;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: var(--background-color)
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M75,40 C85,37 85,20 75,20 C70,20 65,25 65,30 C65,20 55,15 45,20 C35,25 40,37 45,40 Z" fill="%23e0f7fa" /></svg>')
+                fixed;
+            background-size: 300px;
+            color: var(--text-color);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            font-size: 1.4rem;
+        }
+        .control-group {
+            margin-bottom: 5px;
+        }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 0.8rem;
+        }
+        .control-label span {
+            font-weight: 700;
+        }
+        .value-display {
+            background: rgba(76, 175, 80, 0.1);
+            padding: 1px 4px;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+        .slider {
+            width: 100%;
+            height: 5px;
+            border-radius: 2.5px;
+            background: #ddd;
+            outline: 0;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .slider::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        .slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            background-color: var(--primary-color);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(76, 175, 80, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(76, 175, 80, 0.2);
+        }
+        button#stop {
+            background-color: #f44336;
+            box-shadow: 0 4px 10px rgba(244, 67, 54, 0.3);
+        }
+        button#stop:hover {
+            box-shadow: 0 6px 14px rgba(244, 67, 54, 0.4);
+        }
+        .visualizer {
+            margin-top: 20px;
+            width: 100%;
+            height: 60px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .visualizer-inner {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            width: 100%;
+            padding: 0 5px;
+        }
+        .bar {
+            background-color: var(--primary-color);
+            margin: 0 1px;
+            border-radius: 2px 2px 0 0;
+            flex: 1;
+            max-width: 10px;
+            transition: height 0.1s ease;
+        }
+        .bird-indicator {
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 5px;
+        }
+        .bird-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ccc;
+            transition: all 0.3s ease;
+        }
+        .bird-dot.active {
+            background-color: var(--primary-color);
+            transform: scale(1.3);
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 1.1rem;
+            }
+            button {
+                padding: 10px 20px;
+            }
+        }
+    </style>
+    <div class="container">
+        <h1>Bird Song Generator</h1>
+        <div class="button-container"><button id="start">Start Birdsong</button> <button id="stop">Stop</button></div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Number of Birds</span>
+                <div class="value-display" id="birds-value">5</div>
+            </div>
+            <input class="slider" id="birds" max="10" min="1" type="range" value="5" />
+        </div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Complexity</span>
+                <div class="value-display" id="complexity-value">5</div>
+            </div>
+            <input class="slider" id="complexity" max="10" min="1" type="range" value="5" />
+        </div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Volume</span>
+                <div class="value-display" id="volume-value">0.5</div>
+            </div>
+            <input class="slider" id="volume" max="1" min="0" type="range" value="0.5" step="0.01" />
+        </div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Density</span>
+                <div class="value-display" id="density-value">5</div>
+            </div>
+            <input class="slider" id="density" max="10" min="1" type="range" value="5" />
+        </div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Reverb</span>
+                <div class="value-display" id="reverb-value">3</div>
+            </div>
+            <input class="slider" id="reverb" max="10" min="0" type="range" value="3" />
+        </div>
+        <div class="control-group">
+            <div class="control-label">
+                <span>Chaos</span>
+                <div class="value-display" id="chaos-value">2</div>
+            </div>
+            <input class="slider" id="chaos" max="10" min="0" type="range" value="2" />
+        </div>
+        <div class="visualizer">
+            <div class="bird-indicator" id="bird-indicator"></div>
+            <div class="visualizer-inner" id="visualizer"></div>
+        </div>
+    </div>
+    <script>
+        let audioContext,
+            masterGainNode,
+            convolver,
+            analyser,
+            dataArray,
+            frameId,
+            isPlaying = !1,
+            birds = [],
+            backgroundNoises = [],
+            visualizerBars = [],
+            birdDots = [];
+        const settings = { birds: 5, complexity: 5, volume: 0.5, density: 5, reverb: 3, chaos: 2 },
+            birdSpecies = [
+                { baseFreq: [3e3, 4500], duration: [0.05, 0.2], interval: [0.1, 0.4], pattern: "chirp", chirpCount: [1, 4], chirpInterval: [0.05, 0.2] },
+                { baseFreq: [2e3, 3200], duration: [0.2, 0.5], interval: [0.3, 1.2], pattern: "trill", trillSpeed: [15, 30], trillDepth: [100, 300] },
+                { baseFreq: [4e3, 6e3], duration: [0.3, 0.8], interval: [0.5, 2], pattern: "melody", noteCount: [3, 8], noteInterval: [0.08, 0.15] },
+                { baseFreq: [300, 600], duration: [0.5, 1.2], interval: [1, 3], pattern: "coo", cooCount: [2, 4], cooInterval: [0.3, 0.6] },
+                { baseFreq: [2500, 4e3], duration: [0.2, 0.6], interval: [0.4, 1.5], pattern: "complex", phraseCount: [2, 5], phraseInterval: [0.1, 0.3] },
+                { baseFreq: [3500, 5e3], duration: [0.1, 0.3], interval: [0.2, 0.7], pattern: "melody", noteCount: [5, 12], noteInterval: [0.05, 0.1] },
+                { baseFreq: [400, 800], duration: [0.2, 0.4], interval: [0.5, 1.5], pattern: "chirp", chirpCount: [1, 2], chirpInterval: [0.2, 0.4] },
+                { baseFreq: [1e3, 2e3], duration: [0.05, 0.15], interval: [0.2, 0.5], pattern: "trill", trillSpeed: [30, 50], trillDepth: [50, 150] },
+                { baseFreq: [1500, 3500], duration: [0.1, 0.4], interval: [0.3, 1], pattern: "complex", phraseCount: [3, 7], phraseInterval: [0.08, 0.2] },
+                { baseFreq: [3e3, 5500], duration: [0.15, 0.5], interval: [0.4, 1.2], pattern: "melody", noteCount: [4, 9], noteInterval: [0.07, 0.12] },
+            ];
+        function initUI() {
+            (document.getElementById("birds-value").textContent = settings.birds),
+                (document.getElementById("complexity-value").textContent = settings.complexity),
+                (document.getElementById("volume-value").textContent = settings.volume.toFixed(2)),
+                (document.getElementById("density-value").textContent = settings.density),
+                (document.getElementById("reverb-value").textContent = settings.reverb),
+                (document.getElementById("chaos-value").textContent = settings.chaos);
+            const e = document.getElementById("visualizer");
+            for (let t = 0; t < 30; t++) {
+                const t = document.createElement("div");
+                (t.className = "bar"), e.appendChild(t), visualizerBars.push(t);
+            }
+            updateBirdIndicators();
+        }
+        function updateBirdIndicators() {
+            const e = document.getElementById("bird-indicator");
+            (e.innerHTML = ""), (birdDots = []);
+            for (let t = 0; t < settings.birds; t++) {
+                const t = document.createElement("div");
+                (t.className = "bird-dot"), e.appendChild(t), birdDots.push(t);
+            }
+        }
+        function random(e, t) {
+            return Math.random() * (t - e) + e;
+        }
+        function randomInt(e, t) {
+            return Math.floor(random(e, t + 1));
+        }
+        function createImpulseResponse(e, t, n = !1) {
+            const a = audioContext.sampleRate,
+                o = a * e,
+                i = audioContext.createBuffer(2, o, a);
+            for (let e = 0; e < 2; e++) {
+                const a = i.getChannelData(e);
+                for (let e = 0; e < o; e++) {
+                    const i = n ? o - e : e;
+                    a[e] = (2 * Math.random() - 1) * Math.pow(1 - i / o, t);
+                }
+            }
+            return i;
+        }
+        function updateReverb() {
+            if (!convolver || !audioContext) return;
+            const e = settings.reverb / 10,
+                t = createImpulseResponse(1.5 + 2 * e, 2 + 5 * e, !1);
+            convolver.buffer = t;
+        }
+        function startVisualization() {
+            frameId = requestAnimationFrame(function e() {
+                if (isPlaying) {
+                    analyser.getByteFrequencyData(dataArray);
+                    for (let e = 0; e < visualizerBars.length; e++) {
+                        const t = ((dataArray[e] || 0) / 255) * 100;
+                        visualizerBars[e].style.height = `${t}%`;
+                        const n = 100 + (e / visualizerBars.length) * 60;
+                        visualizerBars[e].style.backgroundColor = `hsl(${n}, 70%, 50%)`;
+                    }
+                    frameId = requestAnimationFrame(e);
+                }
+            });
+        }
+        function startBirdSounds() {
+            updateBirds();
+        }
+        function updateBirds() {
+            birds.forEach((e) => clearTimeout(e.timeout)), (birds = []);
+            for (let e = 0; e < settings.birds; e++) createBird(e);
+        }
+        function createBird(e) {
+            const t = Math.floor(random(0, birdSpecies.length)),
+                n = birdSpecies[t],
+                a = settings.complexity / 5,
+                o = 1 - 0.5 * a,
+                i = random(n.baseFreq[0] * o, n.baseFreq[1] / o),
+                r = (settings.chaos, settings.density, { species: t, baseFreq: i, variation: random(0.8, 1.2) * a, activityLevel: random(0.5, 1.5) * (settings.density / 5), index: e, timeout: null }),
+                s = random(0, 2e3);
+            (r.timeout = setTimeout(() => {
+                playSingleBirdSequence(r);
+            }, s)),
+                birds.push(r);
+        }
+        function playSingleBirdSequence(e) {
+            if (!isPlaying) return;
+            const t = birdSpecies[e.species],
+                n = settings.complexity / 5,
+                a = 1 - (settings.density / 10) * 0.8,
+                o = settings.chaos / 10;
+            switch (
+                (birdDots[e.index] &&
+                    (birdDots[e.index].classList.add("active"),
+                    setTimeout(() => {
+                        birdDots[e.index] && birdDots[e.index].classList.remove("active");
+                    }, 300)),
+                t.pattern)
+            ) {
+                case "chirp":
+                    const a = randomInt(t.chirpCount[0], t.chirpCount[1] + Math.floor(3 * n));
+                    for (let n = 0; n < a; n++) {
+                        const a = n * random(t.chirpInterval[0], t.chirpInterval[1]) * 1e3;
+                        setTimeout(() => {
+                            playBirdChirp(e);
+                        }, a);
+                    }
+                    break;
+                case "trill":
+                    playBirdTrill(e);
+                    break;
+                case "melody":
+                    playBirdMelody(e);
+                    break;
+                case "coo":
+                    playBirdCoo(e);
+                    break;
+                case "complex":
+                    playComplexSong(e);
+            }
+            const i = ((1e3 * random(t.interval[0], t.interval[1]) * a) / e.activityLevel) * (1 + random(-o, o));
+            e.timeout = setTimeout(() => {
+                playSingleBirdSequence(e);
+            }, i);
+        }
+        function playBirdChirp(e) {
+            if (!isPlaying || !audioContext) return;
+            const t = birdSpecies[e.species],
+                n = settings.chaos / 10,
+                a = audioContext.createOscillator(),
+                o = audioContext.createGain(),
+                i = e.baseFreq * (1 + random(-0.05, 0.05) * n);
+            (a.type = "sine"),
+                a.frequency.setValueAtTime(i, audioContext.currentTime),
+                a.frequency.exponentialRampToValueAtTime(i * (1.2 + random(0, 0.3) * n), audioContext.currentTime + 0.02),
+                a.frequency.exponentialRampToValueAtTime(i * (0.8 - random(0, 0.2) * n), audioContext.currentTime + random(t.duration[0], t.duration[1])),
+                o.gain.setValueAtTime(0, audioContext.currentTime),
+                o.gain.linearRampToValueAtTime(0.1 * random(0.8, 1.2), audioContext.currentTime + 0.01),
+                o.gain.linearRampToValueAtTime(0, audioContext.currentTime + random(t.duration[0], t.duration[1])),
+                a.connect(o),
+                o.connect(masterGainNode),
+                a.start(),
+                a.stop(audioContext.currentTime + random(t.duration[0], t.duration[1]) + 0.05);
+        }
+        function playBirdTrill(e) {
+            if (!isPlaying || !audioContext) return;
+            const t = birdSpecies[e.species],
+                n = random(t.duration[0], t.duration[1]),
+                a = randomInt(t.trillSpeed[0], t.trillSpeed[1]),
+                o = random(t.trillDepth[0], t.trillDepth[1]),
+                i = settings.chaos / 10,
+                r = audioContext.createOscillator(),
+                s = audioContext.createGain();
+            r.type = "sine";
+            const d = e.baseFreq * (1 + random(-0.1, 0.1) * i);
+            r.frequency.setValueAtTime(d, audioContext.currentTime);
+            let u = audioContext.currentTime;
+            const l = 1 / a;
+            for (let e = 0; e < Math.floor(n * a); e++) {
+                const t = e % 2 == 0 ? 1 : -1;
+                (u += l), r.frequency.linearRampToValueAtTime(d + t * o, u);
+            }
+            s.gain.setValueAtTime(0, audioContext.currentTime),
+                s.gain.linearRampToValueAtTime(0.15 * random(0.7, 1.3), audioContext.currentTime + 0.05),
+                s.gain.linearRampToValueAtTime(0.1 * random(0.8, 1.2), audioContext.currentTime + 0.5 * n),
+                s.gain.linearRampToValueAtTime(0, audioContext.currentTime + n),
+                r.connect(s),
+                s.connect(masterGainNode),
+                r.start(),
+                r.stop(audioContext.currentTime + n + 0.05);
+        }
+        function playBirdMelody(e) {
+            if (!isPlaying || !audioContext) return;
+            const t = birdSpecies[e.species],
+                n = randomInt(t.noteCount[0], t.noteCount[1]),
+                a = random(t.noteInterval[0], t.noteInterval[1]),
+                o = (random(0.1, 0.3), settings.complexity / 10),
+                i = settings.chaos / 10,
+                r = [];
+            let s = 0;
+            for (let e = 0; e < n; e++) {
+                const e = 1 + Math.floor(random(0, 3) * o);
+                let t = s + (Math.random() > 0.5 ? 1 : -1) * e;
+                (t = Math.max(-5, Math.min(5, t))), r.push(t), (s = t);
+            }
+            for (let t = 0; t < n; t++) {
+                setTimeout(() => {
+                    const n = Math.pow(2, r[t] / 12),
+                        a = e.baseFreq * n * (1 + random(-0.05, 0.05) * i),
+                        s = audioContext.createOscillator(),
+                        d = audioContext.createGain();
+                    if (((s.type = "sine"), s.frequency.setValueAtTime(a, audioContext.currentTime), random(0, 1) < 0.5 * o)) {
+                        const e = random(5, 20),
+                            t = random(20, 40);
+                        for (let n = 0; n < 10; n++) {
+                            const o = audioContext.currentTime + n * (1 / t),
+                                i = n % 2 == 0 ? 1 : -1;
+                            s.frequency.linearRampToValueAtTime(a + i * e, o);
+                        }
+                    }
+                    const u = random(0.08, 0.2);
+                    d.gain.setValueAtTime(0, audioContext.currentTime),
+                        d.gain.linearRampToValueAtTime(0.15 * random(0.7, 1.3), audioContext.currentTime + 0.01),
+                        d.gain.linearRampToValueAtTime(0, audioContext.currentTime + u),
+                        s.connect(d),
+                        d.connect(masterGainNode),
+                        s.start(),
+                        s.stop(audioContext.currentTime + u + 0.05);
+                }, t * a * 1e3);
+            }
+        }
+        function playBirdCoo(e) {
+            if (!isPlaying || !audioContext) return;
+            const t = birdSpecies[e.species],
+                n = randomInt(t.cooCount[0], t.cooCount[1]),
+                a = random(t.cooInterval[0], t.cooInterval[1]),
+                o = settings.chaos / 10;
+            for (let t = 0; t < n; t++) {
+                setTimeout(() => {
+                    const t = audioContext.createOscillator(),
+                        n = audioContext.createGain(),
+                        a = e.baseFreq * (1 + random(-0.05, 0.05) * o);
+                    (t.type = "sine"),
+                        t.frequency.setValueAtTime(a, audioContext.currentTime),
+                        t.frequency.linearRampToValueAtTime(1.1 * a, audioContext.currentTime + 0.2),
+                        t.frequency.linearRampToValueAtTime(0.9 * a, audioContext.currentTime + 0.5);
+                    const i = random(0.4, 0.8);
+                    n.gain.setValueAtTime(0, audioContext.currentTime),
+                        n.gain.linearRampToValueAtTime(0.2 * random(0.8, 1.2), audioContext.currentTime + 0.1),
+                        n.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.3),
+                        n.gain.linearRampToValueAtTime(0, audioContext.currentTime + i),
+                        t.connect(n),
+                        n.connect(masterGainNode),
+                        t.start(),
+                        t.stop(audioContext.currentTime + i + 0.05);
+                }, t * a * 1e3);
+            }
+        }
+        function playComplexSong(e) {
+            if (!isPlaying || !audioContext) return;
+            const t = birdSpecies[e.species],
+                n = randomInt(t.phraseCount[0], t.phraseCount[1] + Math.floor(settings.complexity / 5)),
+                a = random(t.phraseInterval[0], t.phraseInterval[1]);
+            settings.complexity;
+            for (let t = 0; t < n; t++) {
+                setTimeout(() => {
+                    const t = random(0, 1);
+                    t < 0.3 ? playBirdChirp(e) : t < 0.6 ? playBirdTrill({ ...e, baseFreq: e.baseFreq * random(0.9, 1.1) }) : playBirdMelody({ ...e, baseFreq: e.baseFreq * random(0.9, 1.1) });
+                }, t * a * 1e3);
+            }
+        }
+        function startAmbientSounds() {
+            isPlaying && audioContext && (addWindNoise(), addRustlingNoise(), addDistantBirdCalls());
+        }
+        function addWindNoise() {
+            if (!isPlaying || !audioContext) return;
+            const e = audioContext.createBufferSource(),
+                t = audioContext.createBiquadFilter(),
+                n = audioContext.createGain(),
+                a = 2 * audioContext.sampleRate,
+                o = audioContext.createBuffer(1, a, audioContext.sampleRate),
+                i = o.getChannelData(0);
+            for (let e = 0; e < a; e++) i[e] = 2 * Math.random() - 1;
+            (t.type = "lowpass"),
+                (t.frequency.value = 300),
+                (t.Q.value = 1),
+                (n.gain.value = 0.005 * (1 + settings.reverb / 20)),
+                (e.buffer = o),
+                (e.loop = !0),
+                e.connect(t),
+                t.connect(n),
+                n.connect(masterGainNode),
+                e.start(),
+                backgroundNoises.push({ source: e, type: "wind" });
+        }
+        function addRustlingNoise() {
+            isPlaying &&
+                audioContext &&
+                (function e() {
+                    if (!isPlaying) return;
+                    const t = audioContext.createGain(),
+                        n = audioContext.createBiquadFilter(),
+                        a = 0.5 * audioContext.sampleRate,
+                        o = audioContext.createBuffer(1, a, audioContext.sampleRate),
+                        i = o.getChannelData(0);
+                    for (let e = 0; e < a; e++) {
+                        const t = e / a,
+                            n = 0.1 + 0.1 * Math.sin(t * Math.PI * 10);
+                        i[e] = (2 * Math.random() - 1) * n;
+                    }
+                    const r = audioContext.createBufferSource();
+                    (r.buffer = o), (n.type = "bandpass"), (n.frequency.value = 2e3), (n.Q.value = 1), (t.gain.value = 0.03 * random(0.5, 1.5)), r.connect(n), n.connect(t), t.connect(masterGainNode), r.start();
+                    const s = (random(3, 10) * (11 - settings.density)) / 5,
+                        d = setTimeout(() => {
+                            e();
+                        }, 1e3 * s);
+                    backgroundNoises.push({ source: r, timeout: d, type: "rustle" });
+                })();
+        }
+        function addDistantBirdCalls() {
+            if (!isPlaying || !audioContext) return;
+            function e() {
+                if (!isPlaying) return;
+                const t = Math.floor(random(0, birdSpecies.length)),
+                    n = birdSpecies[t],
+                    a = audioContext.createOscillator(),
+                    o = audioContext.createGain(),
+                    i = audioContext.createBiquadFilter();
+                (a.type = "sine"), (i.type = "lowpass"), (i.frequency.value = 1500), (o.gain.value = 0.01 * random(0.7, 1.3));
+                const r = random(n.baseFreq[0], n.baseFreq[1]);
+                a.frequency.setValueAtTime(r, audioContext.currentTime);
+                const s = random(0.1, 0.3),
+                    d = randomInt(2, 4);
+                for (let e = 0; e < d; e++) {
+                    const t = audioContext.currentTime + e * s,
+                        n = [0, 2, 4, 7, 9][Math.floor(random(0, 5))],
+                        i = Math.pow(2, n / 12);
+                    a.frequency.linearRampToValueAtTime(r * i, t), 0 === e && (o.gain.setValueAtTime(0, t), o.gain.linearRampToValueAtTime(0.03 * random(0.7, 1.3), t + 0.05)), e === d - 1 && o.gain.linearRampToValueAtTime(0, t + s);
+                }
+                a.connect(i), i.connect(o), o.connect(masterGainNode), a.start(), a.stop(audioContext.currentTime + d * s + 0.1);
+                const u = (random(5, 15) * (11 - settings.density)) / 5,
+                    l = setTimeout(() => {
+                        e();
+                    }, 1e3 * u);
+                backgroundNoises.push({ source: a, timeout: l, type: "distant" });
+            }
+            const t = 1e3 * random(1, 5),
+                n = setTimeout(() => {
+                    e();
+                }, t);
+            backgroundNoises.push({ timeout: n, type: "distant" });
+        }
+        document.getElementById("birds").addEventListener("input", (e) => {
+            (settings.birds = parseInt(e.target.value)), (document.getElementById("birds-value").textContent = settings.birds), isPlaying && updateBirds(), updateBirdIndicators();
+        }),
+            document.getElementById("complexity").addEventListener("input", (e) => {
+                (settings.complexity = parseInt(e.target.value)), (document.getElementById("complexity-value").textContent = settings.complexity), isPlaying && updateBirds();
+            }),
+            document.getElementById("volume").addEventListener("input", (e) => {
+                (settings.volume = parseFloat(e.target.value)),
+                    (document.getElementById("volume-value").textContent = settings.volume.toFixed(2)),
+                    masterGainNode && masterGainNode.gain.setValueAtTime(settings.volume, audioContext.currentTime);
+            }),
+            document.getElementById("density").addEventListener("input", (e) => {
+                (settings.density = parseInt(e.target.value)), (document.getElementById("density-value").textContent = settings.density), isPlaying && updateBirds();
+            }),
+            document.getElementById("reverb").addEventListener("input", (e) => {
+                (settings.reverb = parseInt(e.target.value)), (document.getElementById("reverb-value").textContent = settings.reverb), isPlaying && updateReverb();
+            }),
+            document.getElementById("chaos").addEventListener("input", (e) => {
+                (settings.chaos = parseInt(e.target.value)), (document.getElementById("chaos-value").textContent = settings.chaos), isPlaying && updateBirds();
+            }),
+            document.getElementById("start").addEventListener("click", async () => {
+                if (!isPlaying)
+                    try {
+                        audioContext
+                            ? "suspended" === audioContext.state && (await audioContext.resume())
+                            : ((audioContext = new (window.AudioContext || window.webkitAudioContext)()),
+                              (masterGainNode = audioContext.createGain()),
+                              (masterGainNode.gain.value = settings.volume),
+                              (analyser = audioContext.createAnalyser()),
+                              (analyser.fftSize = 64),
+                              (analyser.smoothingTimeConstant = 0.8),
+                              (dataArray = new Uint8Array(analyser.frequencyBinCount)),
+                              (convolver = audioContext.createConvolver()),
+                              updateReverb(),
+                              masterGainNode.connect(convolver),
+                              convolver.connect(analyser),
+                              analyser.connect(audioContext.destination)),
+                            (isPlaying = !0),
+                            startBirdSounds(),
+                            startAmbientSounds(),
+                            startVisualization();
+                    } catch (e) {
+                        console.error("Error starting audio:", e), alert("Failed to start audio. Please try again or check if your browser supports Web Audio API.");
+                    }
+            }),
+            document.getElementById("stop").addEventListener("click", () => {
+                isPlaying &&
+                    ((isPlaying = !1),
+                    birds.forEach((e) => clearTimeout(e.timeout)),
+                    (birds = []),
+                    backgroundNoises.forEach((e) => {
+                        e.source && e.source.stop(), e.timeout && clearTimeout(e.timeout);
+                    }),
+                    (backgroundNoises = []),
+                    frameId && (cancelAnimationFrame(frameId), (frameId = null)),
+                    visualizerBars.forEach((e) => {
+                        e.style.height = "0px";
+                    }),
+                    birdDots.forEach((e) => {
+                        e.classList.remove("active");
+                    }));
+            }),
+            document.addEventListener("DOMContentLoaded", initUI);
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const e = document.querySelector(".container");
+            if (!e) return;
+            const t = document.createElement("button");
+            (t.textContent = "Show Advanced Controls"),
+                Object.assign(t.style, { margin: "15px auto", display: "block", background: "#FF9800", borderRadius: "20px", padding: "8px 16px", color: "white", cursor: "pointer" }),
+                e.appendChild(t);
+            const n = document.createElement("div");
+            Object.assign(n.style, { display: "none", marginTop: "10px", padding: "12px", background: "rgba(255,152,0,0.1)", borderRadius: "12px" }), e.appendChild(n);
+            const a = [
+                { key: "pitchVariance", label: "Pitch Variance", min: 0, max: 0.2, step: 0.005, default: 0.05 },
+                { key: "playbackRate", label: "Playback Rate", min: 0.01, max: 2, step: 0.01, default: 1 },
+                { key: "fftSize", label: "FFT Size", min: 32, max: 2048, step: 32, default: 64 },
+                { key: "smoothConst", label: "Smoothing Time", min: 0, max: 1, step: 0.01, default: 0.8 },
+                { key: "revDuration", label: "Reverb Duration", min: 0.5, max: 5, step: 0.1, default: 1.5 },
+                { key: "revDecay", label: "Reverb Decay", min: 1, max: 10, step: 0.5, default: 2 },
+            ];
+            function o(e) {
+                const t = document.createElement("div");
+                t.className = "control-group";
+                const n = document.createElement("div");
+                (n.className = "control-label"), (n.innerHTML = `\n      <span>${e.label}</span>\n      <div class="value-display" id="${e.key}-val">\n        ${settings[e.key].toFixed(2)}\n      </div>`), t.appendChild(n);
+                const a = document.createElement("input");
+                return (
+                    (a.type = "range"),
+                    (a.className = "slider"),
+                    (a.min = e.min),
+                    (a.max = e.max),
+                    (a.step = e.step),
+                    (a.value = settings[e.key]),
+                    t.appendChild(a),
+                    a.addEventListener("input", () => {
+                        const t = parseFloat(a.value);
+                        (settings[e.key] = t),
+                            (document.getElementById(e.key + "-val").textContent = t.toFixed(2)),
+                            (function (e, t) {
+                                switch (e) {
+                                    case "pitchVariance":
+                                    case "playbackRate":
+                                        break;
+                                    case "fftSize":
+                                        window.analyser && (analyser.fftSize = t);
+                                        break;
+                                    case "smoothConst":
+                                        window.analyser && (analyser.smoothingTimeConstant = t);
+                                        break;
+                                    case "revDuration":
+                                    case "revDecay":
+                                        window.convolver && window.audioContext && (convolver.buffer = createImpulseResponse(settings.revDuration, settings.revDecay, !1));
+                                }
+                            })(e.key, t);
+                    }),
+                    t
+                );
+            }
+            (window.settings = window.settings || {}),
+                a.forEach((e) => {
+                    void 0 === settings[e.key] && (settings[e.key] = e.default);
+                }),
+                a.forEach((e) => n.appendChild(o(e))),
+                t.addEventListener("click", () => {
+                    const e = "block" === n.style.display;
+                    (n.style.display = e ? "none" : "block"), (t.textContent = e ? "Show Advanced Controls" : "Hide Advanced Controls");
+                });
+        });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.querySelector(".container");
+            const panel = document.createElement("div");
+            panel.className = "control-group";
+            panel.innerHTML = `
+    <div class="control-label">
+      <span>Background Volume</span>
+      <div class="value-display" id="bg-volume-val">0.5</div>
+    </div>
+    <input type="range" id="bg-volume" class="slider"
+           min="0" max="1" step="0.01" value="0.5">
+  `;
+            container.insertBefore(panel, container.querySelector(".visualizer"));
+
+            // Track this new setting
+            settings.bgVolume = 0.5;
+
+            // Whenever it changes...
+            document.getElementById("bg-volume").addEventListener("input", (e) => {
+                const v = parseFloat(e.target.value);
+                settings.bgVolume = v;
+                document.getElementById("bg-volume-val").textContent = v.toFixed(2);
+
+                // Update any existing background noises immediately
+                backgroundNoises.forEach((noise) => {
+                    if (noise.type === "wind" && noise.source) {
+                        // noiseGain is one hop up from source (noise.source → filter → gain)
+                        noise.source.disconnect();
+                        const noiseFilter = audioContext.createBiquadFilter();
+                        const noiseGain = audioContext.createGain();
+                        noiseGain.gain.value = v * 0.015 * (1 + settings.reverb / 20);
+                        noiseFilter.type = "lowpass";
+                        noiseFilter.frequency.value = 300;
+                        noise.source.connect(noiseFilter);
+                        noiseFilter.connect(noiseGain);
+                        noiseGain.connect(masterGainNode);
+                    }
+                    if (noise.type === "rustle" && noise.gainNode) {
+                        noise.gainNode.gain.value = v * ((0.03 * noise.gainNode.gain.value) / noise.gainNode.gain.value);
+                    }
+                });
+            });
+        });
+    </script>
+</html>
