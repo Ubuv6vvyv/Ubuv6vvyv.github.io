@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Text Formatting Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --secondary: #2ecc71;
+            --bg: #f8f9fa;
+            --text: #333;
+            --border: #ddd;
+            --radius: 8px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.3;
+            color: var(--text);
+            background-color: var(--bg);
+            padding: 10px;
+            max-width: 100%;
+font-size: 10px;
+        }
+        
+        h1, h2 {
+            color: var(--primary-dark);
+            margin-bottom: 10px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 5px;
+font-size: 10px;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px;
+            margin-bottom: 15px;
+font-size: 1px;
+        }
+        
+        .tools-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        @media (min-width: 768px) {
+            .tools-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            resize: vertical;
+        }
+        
+        textarea {
+            min-height: 200px;
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            transition: background-color 0.2s;
+font-size: 10px;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        button.secondary {
+            background-color: var(--secondary);
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+        
+        .tab {
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        #preview {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            background: white;
+            min-height: 200px;
+        }
+        
+        .highlight {
+            background-color: yellow;
+        }
+        
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(46, 204, 113, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: var(--radius);
+            display: none;
+            z-index: 100;
+        }
+        
+        #preview table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        #preview th, #preview td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        #preview th {
+            background-color: #f2f2f2;
+        }
+        
+        @media (max-width: 767px) {
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Text Formatting Tool</h1>
+        
+        <div class="panel">
+            <textarea id="input" placeholder="Paste your text here (plain text, HTML, CSV, etc.)"></textarea>
+            
+            <div class="button-group">
+                <button id="detectBtn">Auto-Detect & Format</button>
+                <button id="clearBtn">Clear</button>
+                <button id="copyBtn">Copy Output</button>
+                <button id="downloadBtn">Download</button>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" data-tab="markdown">Markdown</div>
+                <div class="tab" data-tab="preview">Preview</div>
+                <div class="tab" data-tab="tools">Advanced Tools</div>
+            </div>
+            
+            <div id="markdown-tab" class="tab-content active">
+                <textarea id="output" placeholder="Markdown output will appear here" readonly></textarea>
+            </div>
+            
+            <div id="preview-tab" class="tab-content">
+                <div id="preview"></div>
+            </div>
+            
+            <div id="tools-tab" class="tab-content">
+                <div class="tools-grid">
+                    <div class="tool-section">
+                        <h2>Regex Tools</h2>
+                        <input type="text" id="regexPattern" placeholder="Regular Expression Pattern">
+                        <input type="text" id="regexReplace" placeholder="Replace with (for Regex Replace)">
+                        <div class="button-group">
+                            <button id="regexExtractBtn">Extract</button>
+                            <button id="regexReplaceBtn">Replace</button>
+                            <button id="regexHighlightBtn">Highlight</button>
+                        </div>
+                    </div>
+                    
+                    <div class="tool-section">
+                        <h2>Find & Replace</h2>
+                        <input type="text" id="findText" placeholder="Find text">
+                        <input type="text" id="replaceText" placeholder="Replace with">
+                        <div class="button-group">
+                            <button id="findHighlightBtn">Find & Highlight</button>
+                            <button id="findReplaceBtn">Find & Replace</button>
+                            <button id="replaceAllBtn">Replace All</button>
+                        </div>
+                    </div>
+                    
+                    <div class="tool-section">
+                        <h2>Text Tools</h2>
+                        <div class="button-group">
+                            <button id="trimBtn">Trim Whitespace</button>
+                            <button id="fixCasingBtn">Fix Casing</button>
+                        </div>
+                        <input type="text" id="newlineChar" placeholder="Character to add newlines after">
+                        <button id="addNewlinesBtn">Add Newlines</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification">Text copied to clipboard!</div>
+    
+    <script>
+        // DOM Elements
+        const inputEl = document.getElementById('input');
+        const outputEl = document.getElementById('output');
+        const previewEl = document.getElementById('preview');
+        const detectBtn = document.getElementById('detectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const notification = document.getElementById('notification');
+        
+        // Advanced Tools Elements
+        const regexPattern = document.getElementById('regexPattern');
+     // const regexReplace = document.getElementById('regexReplace');
+        const regexExtractBtn = document.getElementById('regexExtractBtn');
+        const regexReplaceBtn = document.getElementById('regexReplaceBtn');
+        const regexHighlightBtn = document.getElementById('regexHighlightBtn');
+        const findText = document.getElementById('findText');
+        const replaceText = document.getElementById('replaceText');
+        const findHighlightBtn = document.getElementById('findHighlightBtn');
+        const findReplaceBtn = document.getElementById('findReplaceBtn');
+        const replaceAllBtn = document.getElementById('replaceAllBtn');
+        const trimBtn = document.getElementById('trimBtn');
+        const fixCasingBtn = document.getElementById('fixCasingBtn');
+        const newlineChar = document.getElementById('newlineChar');
+        const addNewlinesBtn = document.getElementById('addNewlinesBtn');
+        
+        // Event Listeners
+        detectBtn.addEventListener('click', autoDetectAndFormat);
+        clearBtn.addEventListener('click', clearAll);
+        copyBtn.addEventListener('click', copyOutput);
+        downloadBtn.addEventListener('click', downloadOutput);
+        
+        // Tab Navigation
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+                
+                if (tab.dataset.tab === 'preview') {
+                    updatePreview();
+                }
+            });
+        });
+        
+        // Advanced Tools Event Listeners
+        regexExtractBtn.addEventListener('click', regexExtract);
+        regexReplaceBtn.addEventListener('click', regexReplace);
+        regexHighlightBtn.addEventListener('click', regexHighlight);
+        findHighlightBtn.addEventListener('click', findAndHighlight);
+        findReplaceBtn.addEventListener('click', findAndReplace);
+        replaceAllBtn.addEventListener('click', replaceAll);
+        trimBtn.addEventListener('click', trimWhitespace);
+        fixCasingBtn.addEventListener('click', fixCasing);
+        addNewlinesBtn.addEventListener('click', addNewlines);
+        
+        // Core Functions
+        function autoDetectAndFormat() {
+            const text = inputEl.value.trim();
+            if (!text) return;
+            
+            let result;
+            
+            // Detect type and convert
+            if (isHTML(text)) {
+                result = convertHTMLToMarkdown(text);
+            } else if (isCSV(text)) {
+                result = convertCSVToMarkdown(text);
+            } else {
+                result = intelligentTextToMarkdown(text);
+            }
+            
+            outputEl.value = result;
+            updatePreview();
+        }
+        
+        function clearAll() {
+            inputEl.value = '';
+            outputEl.value = '';
+            previewEl.innerHTML = '';
+        }
+        
+        function copyOutput() {
+            outputEl.select();
+            document.execCommand('copy');
+            showNotification('Text copied to clipboard!');
+        }
+        
+        function downloadOutput() {
+            const text = outputEl.value;
+            if (!text) return;
+            
+            const blob = new Blob([text], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'formatted-text.md';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function updatePreview() {
+            const markdown = outputEl.value;
+            if (!markdown) {
+                previewEl.innerHTML = '';
+                return;
+            }
+            
+            // Use DOMPurify to sanitize the HTML generated by marked
+            const html = DOMPurify.sanitize(marked.parse(markdown));
+            previewEl.innerHTML = html;
+        }
+        
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+        
+        // Type Detection Functions
+        function isHTML(text) {
+            return /<[a-z][\s\S]*>/i.test(text);
+        }
+        
+        function isCSV(text) {
+            // Basic CSV detection - checks for commas and line breaks in a pattern
+            const lines = text.split('\n');
+            if (lines.length < 2) return false;
+            
+            const firstLineCommas = (lines[0].match(/,/g) || []).length;
+            if (firstLineCommas === 0) return false;
+            
+            // Check if at least 80% of the lines have the same number of commas
+            let matchingLines = 0;
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const commas = (lines[i].match(/,/g) || []).length;
+                if (commas === firstLineCommas) matchingLines++;
+            }
+            
+            return (matchingLines / (lines.length - 1)) >= 0.8;
+        }
+        
+        // Conversion Functions
+        function convertHTMLToMarkdown(html) {
+            // Process HTML tables specifically
+            html = html.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (match) => {
+                return convertHTMLTableToMarkdown(match);
+            });
+            
+            // Basic HTML to Markdown conversion
+            let markdown = html;
+            
+            // Headings
+            markdown = markdown.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_, level, content) => {
+                return '\n' + '#'.repeat(parseInt(level)) + ' ' + content.trim() + '\n';
+            });
+            
+            // Bold
+            markdown = markdown.replace(/<(strong|b)>([\s\S]*?)<\/\1>/gi, '**$2**');
+            
+            // Italic
+            markdown = markdown.replace(/<(em|i)>([\s\S]*?)<\/\1>/gi, '*$2*');
+            
+            // Links
+            markdown = markdown.replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)');
+            
+            // Images
+            markdown = markdown.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)');
+            markdown = markdown.replace(/<img[^>]*alt="([^"]*)"[^>]*src="([^"]*)"[^>]*\/?>/gi, '![$1]($2)');
+            markdown = markdown.replace(/<img[^>]*src="([^"]*)"[^>]*\/?>/gi, '![]($1)');
+            
+            // Unordered Lists
+            markdown = markdown.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, content) => {
+                return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n');
+            });
+            
+            // Ordered Lists
+            markdown = markdown.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_, content) => {
+                let index = 1;
+                return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, item) => {
+                    return `${index++}. ${item}\n`;
+                });
+            });
+            
+            // Blockquotes
+            markdown = markdown.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, content) => {
+                return content.split('\n').map(line => '> ' + line).join('\n');
+            });
+            
+            // Code blocks
+            markdown = markdown.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '```\n$1\n```');
+            
+            // Inline code
+            markdown = markdown.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+            
+            // Line breaks
+            markdown = markdown.replace(/<br\s*\/?>/gi, '\n');
+            
+            // Paragraphs
+            markdown = markdown.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
+            
+            // Strip remaining HTML tags
+            markdown = markdown.replace(/<[^>]*>/g, '');
+            
+            // Clean up extra line breaks and spaces
+            markdown = markdown.replace(/\n{3,}/g, '\n\n');
+            markdown = markdown.trim();
+            
+            return markdown;
+        }
+        
+        function convertHTMLTableToMarkdown(htmlTable) {
+            // This is a simplified approach - complex tables might need more processing
+            const tableRows = htmlTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+            if (tableRows.length === 0) return htmlTable;
+            
+            let mdTable = '';
+            let headerProcessed = false;
+            
+            tableRows.forEach((row, index) => {
+                const cells = row.match(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi) || [];
+                if (cells.length === 0) return;
+                
+                // Extract cell content
+                const cellContents = cells.map(cell => {
+                    // Extract the text content and trim whitespace
+                    let content = cell.replace(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/i, '$1');
+                    // Remove any nested HTML tags
+                    content = content.replace(/<[^>]*>/g, '');
+                    // Replace multiple spaces with a single space
+                    content = content.replace(/\s+/g, ' ').trim();
+                    // Escape pipe characters
+                    content = content.replace(/\|/g, '\\|');
+                    return content || ' ';
+                });
+                
+                // Add row to markdown table
+                mdTable += '| ' + cellContents.join(' | ') + ' |\n';
+                
+                // Add header separator after first row
+                if (index === 0 && !headerProcessed) {
+                    mdTable += '| ' + cellContents.map(() => '---').join(' | ') + ' |\n';
+                    headerProcessed = true;
+                }
+            });
+            
+            return mdTable;
+        }
+        
+        function convertCSVToMarkdown(csv) {
+            const lines = csv.split('\n').filter(line => line.trim() !== '');
+            if (lines.length === 0) return '';
+            
+            // Parse CSV accounting for quoted fields
+            function parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    
+                    if (char === '"') {
+                        // Toggle quote state
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        // End of field
+                        result.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                // Add the last field
+                result.push(current);
+                
+                // Clean up fields
+                return result.map(field => {
+                    // Remove wrapping quotes and trim
+                    field = field.trim();
+                    if (field.startsWith('"') && field.endsWith('"')) {
+                        field = field.substring(1, field.length - 1);
+                    }
+                    // Escape pipe characters
+                    field = field.replace(/\|/g, '\\|');
+                    return field || ' ';
+                });
+            }
+            
+            let mdTable = '';
+            
+            // Process header
+            const headers = parseCSVLine(lines[0]);
+            mdTable += '| ' + headers.join(' | ') + ' |\n';
+            mdTable += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+            
+            // Process data rows
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const fields = parseCSVLine(lines[i]);
+                mdTable += '| ' + fields.join(' | ') + ' |\n';
+            }
+            
+            return mdTable;
+        }
+        
+        function intelligentTextToMarkdown(text) {
+            // Split text into lines for processing
+            const lines = text.split('\n');
+            let markdown = '';
+            let inList = false;
+            let inCodeBlock = false;
+            let listType = null;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+                const prevLine = i > 0 ? lines[i - 1] : '';
+                
+                // Detect headings
+                if (line.match(/^#{1,6}\s/)) {
+                    // Already in markdown format
+                    markdown += line + '\n';
+                } else if (line.match(/^[A-Z0-9][\w\s:,-]+$/) && line.length < 100 && nextLine === '') {
+                    // Possible heading: all caps/title case line followed by empty line
+                    markdown += '## ' + line + '\n\n';
+                } else if (line.match(/^[A-Z0-9][\w\s:,-]+$/) && nextLine && nextLine.match(/^[=]+$/)) {
+                    // Heading with === underline
+                    markdown += '# ' + line + '\n';
+                    i++; // Skip the underline
+                } else if (line.match(/^[A-Z0-9][\w\s:,-]+$/) && nextLine && nextLine.match(/^[-]+$/)) {
+                    // Heading with --- underline
+                    markdown += '## ' + line + '\n';
+                    i++; // Skip the underline
+                }
+                // Detect code blocks
+                else if (line.match(/^```/) || line.match(/^    [\w\s]+/) || line.match(/^\t[\w\s]+/)) {
+                    if (line.match(/^```/)) {
+                        // Already in markdown format
+                        inCodeBlock = !inCodeBlock;
+                        markdown += line + '\n';
+                    } else {
+                        // Indented code
+                        if (!inCodeBlock) {
+                            markdown += '```\n';
+                            inCodeBlock = true;
+                        }
+                        markdown += line.replace(/^    /, '').replace(/^\t/, '') + '\n';
+                        
+                        // Check if next line is not indented code
+                        if (!nextLine.match(/^    [\w\s]+/) && !nextLine.match(/^\t[\w\s]+/)) {
+                            markdown += '```\n';
+                            inCodeBlock = false;
+                        }
+                    }
+                }
+                // Detect lists
+                else if (line.match(/^\s*[-*•]\s+/)) {
+                    // Unordered list
+                    const trimmedLine = line.trim().replace(/^[-*•]\s+/, '- ');
+                    markdown += trimmedLine + '\n';
+                    inList = true;
+                    listType = 'unordered';
+                } else if (line.match(/^\s*\d+[.)]\s+/)) {
+                    // Ordered list
+                    const trimmedLine = line.trim().replace(/^\d+[.)]\s+/, (match) => {
+                        const num = match.match(/^\d+/)[0];
+                        return `${num}. `;
+                    });
+                    markdown += trimmedLine + '\n';
+                    inList = true;
+                    listType = 'ordered';
+                }
+                // Detect blockquotes
+                else if (line.match(/^\s*>/)) {
+                    // Already in markdown format
+                    markdown += line + '\n';
+                } else if (line.match(/^\s*["'][\s\S]+["']\s*-\s*[\w\s]+$/)) {
+                    // Possible quote format: "Text" - Author
+                    const quoteParts = line.match(/^\s*["']([\s\S]+)["']\s*-\s*([\w\s]+)$/);
+                    if (quoteParts) {
+                        markdown += '> ' + quoteParts[1] + '\n';
+                        markdown += '> — ' + quoteParts[2] + '\n\n';
+                    } else {
+                        markdown += line + '\n';
+                    }
+                }
+                // Detect links
+                else if (line.match(/https?:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+/)) {
+                    // Convert URLs to markdown links
+                    let processedLine = line;
+                    const urlMatches = line.match(/https?:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+/g) || [];
+                    
+                    urlMatches.forEach(url => {
+                        // Check if the URL is already part of a markdown link
+                        const prevChar = processedLine.charAt(processedLine.indexOf(url) - 1);
+                        const nextChar = processedLine.charAt(processedLine.indexOf(url) + url.length);
+                        
+                        if (prevChar !== '(' || nextChar !== ')') {
+                            // Simple heuristic to extract title from URL
+                            let title = url.replace(/^https?:\/\//, '').replace(/^www\./, '');
+                            title = title.split('/')[0]; // Use domain as title
+                            processedLine = processedLine.replace(url, `[${title}](${url})`);
+                        }
+                    });
+                    
+                    markdown += processedLine + '\n';
+                }
+                // Detect tables (simple detection for aligned text that looks like a table)
+                else if (line.match(/\|\s+[\w\s]+\s+\|/) || 
+                         (line.match(/\s+\S+\s+\S+\s+\S+\s+/) && nextLine && nextLine.match(/\s+[-:]+\s+[-:]+\s+[-:]+\s+/))) {
+                    // Already pipe-separated or looks like a space-aligned table
+                    if (line.match(/\|\s+[\w\s]+\s+\|/)) {
+                        markdown += line + '\n';
+                    } else {
+                        // Convert space-aligned table to markdown table
+                        const items = line.trim().split(/\s{2,}/);
+                        markdown += '| ' + items.join(' | ') + ' |\n';
+                        
+                        if (nextLine && nextLine.match(/\s+[-:]+\s+[-:]+\s+[-:]+\s+/)) {
+                            const separators = nextLine.trim().split(/\s{2,}/);
+                            markdown += '| ' + separators.map(() => '---').join(' | ') + ' |\n';
+                            i++; // Skip the separator line
+                        } else {
+                            // Add a separator row if this is the first row
+                            markdown += '| ' + items.map(() => '---').join(' | ') + ' |\n';
+                        }
+                    }
+                }
+                // Regular paragraph text
+                else {
+                    // End list if we were in one
+                    if (inList && line.trim() === '') {
+                        inList = false;
+                        listType = null;
+                        markdown += '\n';
+                    } else {
+                        // Check for bold/italic text patterns
+                        let processedLine = line;
+                        
+                        // Bold (uppercase words, surrounded by asterisks or wrapped in HTML strong/b tags)
+                        processedLine = processedLine.replace(/\*\*([^*]+)\*\*/g, '**$1**'); // Already markdown
+                        processedLine = processedLine.replace(/<(strong|b)>([^<]+)<\/\1>/gi, '**$2**');
+                        
+                        // Italic (surrounded by underscores or wrapped in HTML em/i tags)
+                        processedLine = processedLine.replace(/\_([^_]+)\_/g, '*$1*'); // Convert to markdown
+                        processedLine = processedLine.replace(/<(em|i)>([^<]+)<\/\1>/gi, '*$2*');
+                        
+                        // Detect inline code
+                        processedLine = processedLine.replace(/`([^`]+)`/g, '`$1`'); // Already markdown
+                        processedLine = processedLine.replace(/<code>([^<]+)<\/code>/gi, '`$1`');
+                        
+                        markdown += processedLine + '\n';
+                        
+                        // Add extra line break after paragraphs
+                        if (line.trim() !== '' && nextLine.trim() === '') {
+                            markdown += '\n';
+                        }
+                    }
+                }
+            }
+            
+            return markdown.trim();
+        }
+        
+        // Advanced Text Tools Functions
+        function regexExtract() {
+            try {
+                const text = inputEl.value;
+                const pattern = regexPattern.value;
+                if (!text || !pattern) return;
+                
+                const regex = new RegExp(pattern, 'g');
+                const matches = text.match(regex) || [];
+                
+                if (matches.length > 0) {
+                    outputEl.value = matches.join('\n');
+                    updatePreview();
+                    showNotification(`Extracted ${matches.length} matches`);
+                } else {
+                    showNotification('No matches found');
+                }
+            } catch (error) {
+                showNotification('Invalid regex pattern');
+            }
+        }
+        
+        function regexReplace() {
+            try {
+                const text = inputEl.value;
+                const pattern = regexPattern.value;
+                const replace = regexReplace.value;
+                if (!text || !pattern) return;
+                
+                const regex = new RegExp(pattern, 'g');
+                const result = text.replace(regex, replace);
+                
+                inputEl.value = result;
+                showNotification('Regex replace applied');
+            } catch (error) {
+                showNotification('Invalid regex pattern');
+            }
+        }
+        
+        function regexHighlight() {
+    try {
+        const text = inputEl.value;
+        const pattern = regexPattern.value;
+        if (!text || !pattern) return;
+        
+        const regex = new RegExp(pattern, 'g');
+        
+        // Create a temporary div to hold the text with highlights
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = DOMPurify.sanitize(
+            text.replace(regex, match => `<span class="highlight">${match}</span>`)
+        );
+        
+        // Set the output as HTML
+        previewEl.innerHTML = '';
+        previewEl.appendChild(tempDiv);
+        
+        // Switch to preview tab
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        document.querySelector('.tab[data-tab="preview"]').classList.add('active');
+        document.getElementById('preview-tab').classList.add('active');
+        
+        showNotification('Matches highlighted in preview');
+    } catch (error) {
+        showNotification('Invalid regex pattern');
+    }
+}
+
+function findAndHighlight() {
+    const text = inputEl.value;
+    const searchText = findText.value;
+    if (!text || !searchText) return;
+    
+    // Escape special regex characters
+    const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedSearchText, 'gi');
+    
+    // Create a temporary div to hold the text with highlights
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = DOMPurify.sanitize(
+        text.replace(regex, match => `<span class="highlight">${match}</span>`)
+    );
+    
+    // Set the output as HTML
+    previewEl.innerHTML = '';
+    previewEl.appendChild(tempDiv);
+    
+    // Switch to preview tab
+    tabs.forEach(t => t.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+    
+    document.querySelector('.tab[data-tab="preview"]').classList.add('active');
+    document.getElementById('preview-tab').classList.add('active');
+    
+    const matches = (text.match(regex) || []).length;
+    showNotification(`Found ${matches} match${matches === 1 ? '' : 'es'}`);
+}
+
+function findAndReplace() {
+    const text = inputEl.value;
+    const searchText = findText.value;
+    const replacement = replaceText.value;
+    if (!text || !searchText) return;
+    
+    // Find the first occurrence
+    const index = text.toLowerCase().indexOf(searchText.toLowerCase());
+    if (index === -1) {
+        showNotification('No matches found');
+        return;
+    }
+    
+    // Replace only the first occurrence
+    const result = text.substring(0, index) + replacement + text.substring(index + searchText.length);
+    inputEl.value = result;
+    
+    showNotification('Replaced first occurrence');
+}
+
+function replaceAll() {
+    const text = inputEl.value;
+    const searchText = findText.value;
+    const replacement = replaceText.value;
+    if (!text || !searchText) return;
+    
+    // Escape special regex characters
+    const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedSearchText, 'gi');
+    
+    const result = text.replace(regex, replacement);
+    const count = (text.match(regex) || []).length;
+    
+    inputEl.value = result;
+    showNotification(`Replaced ${count} occurrence${count === 1 ? '' : 's'}`);
+}
+
+function trimWhitespace() {
+    const text = inputEl.value;
+    if (!text) return;
+    
+    // Trim leading and trailing whitespace from each line
+    const lines = text.split('\n');
+    const trimmedLines = lines.map(line => line.trim());
+    
+    // Remove empty lines at the beginning and end
+    let start = 0;
+    while (start < trimmedLines.length && trimmedLines[start] === '') start++;
+    
+    let end = trimmedLines.length - 1;
+    while (end >= 0 && trimmedLines[end] === '') end--;
+    
+    const result = trimmedLines.slice(start, end + 1).join('\n');
+    inputEl.value = result;
+    
+    showNotification('Text trimmed');
+}
+
+function fixCasing() {
+    const text = inputEl.value;
+    if (!text) return;
+    
+    const lines = text.split('\n');
+    const fixedLines = lines.map(line => {
+        if (!line.trim()) return line;
+        
+        // Fix sentence casing - capitalize first letter of sentences
+        return line.replace(/(^|[.!?]\s+)([a-z])/g, (match, p1, p2) => {
+            return p1 + p2.toUpperCase();
+        });
+    });
+    
+    inputEl.value = fixedLines.join('\n');
+    showNotification('Casing fixed');
+}
+
+function addNewlines() {
+    const text = inputEl.value;
+    const char = newlineChar.value;
+    if (!text || !char) return;
+    
+    // Add newlines after specified character
+    const result = text.replace(new RegExp(`\\${char}\\s*`, 'g'), `${char}\n`);
+    inputEl.value = result;
+    
+    showNotification('Newlines added');
+}
+
+// Initialize with event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Link input and output for live preview
+    inputEl.addEventListener('input', () => {
+        if (document.querySelector('.tab.active').dataset.tab === 'preview') {
+            updatePreview();
+        }
+    });
+    
+    // Handle file drag and drop
+    const container = document.querySelector('.container');
+    
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        container.classList.add('drag-over');
+    });
+    
+    container.addEventListener('dragleave', () => {
+        container.classList.remove('drag-over');
+    });
+    
+    container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        container.classList.remove('drag-over');
+        
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            inputEl.value = event.target.result;
+        };
+        reader.readAsText(file);
+    });
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+Enter or Cmd+Enter to detect and format
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            autoDetectAndFormat();
+        }
+        
+        // Ctrl+S or Cmd+S to download
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            downloadOutput();
+        }
+    });
+    
+    // Add a "Share" button functionality
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = 'Share';
+    shareBtn.addEventListener('click', () => {
+        if (!navigator.clipboard) {
+            showNotification('Clipboard API not available in your browser');
+            return;
+        }
+        
+        const shareUrl = window.location.href.split('?')[0] + 
+                         '?text=' + encodeURIComponent(outputEl.value);
+        
+        navigator.clipboard.writeText(shareUrl)
+            .then(() => showNotification('Share link copied to clipboard'))
+            .catch(() => showNotification('Failed to copy share link'));
+    });
+    
+    document.querySelector('.button-group').appendChild(shareBtn);
+    
+    // Check for shared text in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedText = urlParams.get('text');
+    if (sharedText) {
+        outputEl.value = sharedText;
+        updatePreview();
+    }
+    
+    // Add "Open in New Tab" button
+    const openTabBtn = document.createElement('button');
+    openTabBtn.textContent = 'Open in New Tab';
+    openTabBtn.addEventListener('click', () => {
+        const markdown = outputEl.value;
+        if (!markdown) return;
+        
+        const html = DOMPurify.sanitize(marked.parse(markdown));
+        const newTab = window.open();
+        newTab.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Markdown Preview</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body {
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    
+                    pre {
+                        background-color: #f5f5f5;
+                        padding: 10px;
+                        border-radius: 5px;
+                        overflow-x: auto;
+                    }
+                    
+                    code {
+                        background-color: #f5f5f5;
+                        padding: 2px 4px;
+                        border-radius: 3px;
+                    }
+                    
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin-bottom: 20px;
+                    }
+                    
+                    th, td {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }
+                    
+                    th {
+                        background-color: #f2f2f2;
+                    }
+                    
+                    blockquote {
+                        border-left: 4px solid #ddd;
+                        padding-left: 10px;
+                        color: #555;
+                    }
+                    
+                    img {
+                        max-width: 100%;
+                        height: auto;
+                    }
+                    
+                    @media print {
+                        body {
+                            font-size: 12pt;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                ${html}
+            </body>
+            </html>
+        `);
+        newTab.document.close();
+    });
+    
+    document.querySelector('.button-group').appendChild(openTabBtn);
+});
+
+// Initialize the application
+updatePreview();
+</script>
+</body>
+</html>
