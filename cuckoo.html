@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Enhanced Bird Sound Playground</title>
+	<style>
+		body {
+			font-family: Arial,sans-serif;
+			max-width: 600px;
+			margin: 0 auto;
+			padding: 15px;
+			background-color: #f0f8ff;
+			touch-action: manipulation
+		}
+		.container {
+			background-color: #fff;
+			border-radius: 16px;
+			padding: 20px;
+			box-shadow: 0 6px 18px rgba(0,0,0,.1)
+		}
+		h1 {
+			text-align: center;
+			color: #333;
+			margin-top: 0;
+			font-size: 12px
+		}
+		.controls {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			margin-bottom: 16px
+		}
+		.slider-container {
+			margin-bottom: 8px
+		}
+		label {
+			display: block;
+			margin-bottom: 4px;
+			font-weight: 700;
+			color: #555;
+			font-size: 10px
+		}
+		.slider-value {
+			display: inline-block;
+			width: 40px;
+			text-align: right;
+			margin-left: 8px;
+			font-size: 10px
+		}
+		.buttons {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 10px;
+			margin-top: 10px
+		}
+		button {
+			background-color: #4CAF50;
+			border: none;
+			color: #fff;
+			padding: 12px 0;
+			text-align: center;
+			text-decoration: none;
+			display: inline-block;
+			font-size: 11px;
+			cursor: pointer;
+			border-radius: 50px;
+			transition: all .3s;
+			font-weight: 700;
+			box-shadow: 0 4px 8px rgba(0,0,0,.1)
+		}
+		button:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 6px 12px rgba(0,0,0,.15)
+		}
+		button:active {
+			transform: translateY(1px)
+		}
+		#stopButton {
+			background-color: #f44336
+		}
+		input[type=range] {
+			width: 100%;
+			height: 12px;
+			-webkit-appearance: none;
+			background: #d3d3d3;
+			border-radius: 12px;
+			outline: none
+		}
+		input[type=range]::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			appearance: none;
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			background: #4CAF50;
+			cursor: pointer
+		}
+		.playing {
+			animation: pulse 1.5s infinite
+		}
+		@keyframes pulse {
+			0% {
+				box-shadow: 0 0 0 0 rgba(76,175,80,.7)
+			}
+
+			70% {
+				box-shadow: 0 0 0 10px rgba(76,175,80,0)
+			}
+
+			100% {
+				box-shadow: 0 0 0 0 rgba(76,175,80,0)
+			}}
+		#birdCounter {
+			text-align: center;
+			font-size: 15px;
+			font-weight: 700;
+			margin: 10px 0;
+			color: #333
+		}
+		.birds-container {
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+			margin-bottom: 20px
+		}
+		.bird-type {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			background: #f9f9f9;
+			padding: 8px 12px;
+			border-radius: 12px
+		}
+		.bird-label {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			width: 30%
+		}
+		.bird-icon {
+			width: 24px;
+			height: 24px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 11px
+		}
+		.sound-debug {
+			font-size: 12px;
+			color: #777;
+			margin-top: 10px;
+			padding: 8px;
+			background: #f5f5f5;
+			border-radius: 8px;
+			display: none
+		}
+		.bird-slider-container {
+			width: 70%;
+			display: flex;
+			align-items: center
+		}
+		.advanced-toggle {
+			background-color: #3f51b5;
+			color: #fff;
+			padding: 10px;
+			text-align: center;
+			border-radius: 8px;
+			margin: 15px 0;
+			cursor: pointer;
+			user-select: none
+		}
+		.advanced-controls {
+			height: 0;
+			overflow: hidden;
+			transition: height .3s ease-out;
+			margin-bottom: 0
+		}
+		.advanced-controls.show {
+			height: auto;
+			border: 1px solid #000;
+			border-radius: 8px;
+			padding: 15px;
+			margin: 15px 0;
+			background: #f8f8f8
+		}
+		.variant-info {
+			text-align: center;
+			font-size: 10px;
+			color: #777;
+			margin-top: 15px
+		}
+		.presets {
+			display: grid;
+			gap: 8px;
+			margin: 10px 0;
+			flex-wrap: wrap
+		}
+		.preset-btn {
+			background: #e0e0e0;
+			color: #333;
+			border: none;
+			padding: 8px 12px;
+			border-radius: 20px;
+			font-size: 12px;
+			cursor: pointer
+		}
+		.preset-btn:hover {
+			background: #d0d0d0
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>Enhanced Bird Sound Playground 🐦</h1>
+
+		<div id="birdCounter">
+			Birds: 0 cuckoos, 0 owls
+		</div>
+
+		<div class="birds-container">
+			<div class="bird-type">
+				<div class="bird-label">
+					<div class="bird-icon" style="background-color:#ffeb3b;color:#333">
+						C
+					</div>
+					<span>Cuckoos</span>
+				</div>
+				<div class="bird-slider-container">
+					<input type="range" min="0" max="10" value="0" class="slider" id="cuckooSlider">
+					<span id="cuckooValue" class="slider-value">0</span>
+				</div>
+			</div>
+
+			<div class="bird-type">
+				<div class="bird-label">
+					<div class="bird-icon" style="background-color:#673ab7;color:white">
+						O
+					</div>
+					<span>Owls</span>
+				</div>
+				<div class="bird-slider-container">
+					<input type="range" min="0" max="10" value="0" class="slider" id="owlSlider">
+					<span id="owlValue" class="slider-value">0</span>
+				</div>
+			</div>
+		</div>
+
+		<div class="controls">
+			<div class="slider-container">
+				<label for="minInterval">Min Interval (ms) <span id="minIntervalValue" class="slider-value">1000</span></label>
+				<input type="range" min="500" max="3000" value="1000" class="slider" id="minInterval">
+			</div>
+
+			<div class="slider-container">
+				<label for="maxInterval">Max Interval (ms) <span id="maxIntervalValue" class="slider-value">3000</span></label>
+				<input type="range" min="1000" max="8000" value="3000" class="slider" id="maxInterval">
+			</div>
+
+			<div class="chaos-slider">
+				<label for="chaosSlider">Cartoon Level <span id="chaosSliderValue" class="slider-value">30</span>%</label>
+				<input type="range" min="0" max="100" value="30" class="slider" id="chaosSlider">
+			</div>
+		</div>
+
+		<div class="advanced-toggle">
+			▼ Advanced Controls ▼
+		</div>
+
+		<div class="advanced-controls">
+			<div class="presets">
+				<button class="preset-btn" data-preset="forest">Forest</button>
+				<button class="preset-btn" data-preset="morning">Morning</button>
+				<button class="preset-btn" data-preset="night">Night</button>
+				<button class="preset-btn" data-preset="cartoon">Cartoon</button>
+				<button class="preset-btn" data-preset="chaos">Chaos</button>
+			</div>
+
+			<h3>Cuckoo Settings</h3>
+			<div class="slider-container">
+				<label for="cuckooVariety">Cuckoo Variety <span id="cuckooVarietyValue" class="slider-value">4</span></label>
+				<input type="range" min="1" max="5" value="4" class="slider" id="cuckooVariety">
+			</div>
+			<div class="slider-container">
+				<label for="cuckooFreqRange">Frequency Range <span id="cuckooFreqRangeValue" class="slider-value">20</span>%</label>
+				<input type="range" min="0" max="60" value="20" class="slider" id="cuckooFreqRange">
+			</div>
+			<div class="slider-container">
+				<label for="cuckooTimingVar">Timing Variation <span id="cuckooTimingVarValue" class="slider-value">15</span>%</label>
+				<input type="range" min="0" max="50" value="15" class="slider" id="cuckooTimingVar">
+			</div>
+
+			<h3>Owl Settings</h3>
+			<div class="slider-container">
+				<label for="owlVariety">Owl Variety <span id="owlVarietyValue" class="slider-value">4</span></label>
+				<input type="range" min="1" max="5" value="4" class="slider" id="owlVariety">
+			</div>
+			<div class="slider-container">
+				<label for="owlVibratoRate">Vibrato Rate <span id="owlVibratoRateValue" class="slider-value">5</span></label>
+				<input type="range" min="2" max="10" value="5" class="slider" id="owlVibratoRate">
+			</div>
+			<div class="slider-container">
+				<label for="owlVibratoDepth">Vibrato Depth <span id="owlVibratoDepthValue" class="slider-value">3</span></label>
+				<input type="range" min="1" max="10" value="3" class="slider" id="owlVibratoDepth">
+			</div>
+			<div class="slider-container">
+				<label for="owlHoots">Hoots Count <span id="owlHootsValue" class="slider-value">2</span></label>
+				<input type="range" min="1" max="4" value="2" class="slider" id="owlHoots">
+			</div>
+			<div class="slider-container">
+				<label for="owlReverb">Reverb <span id="owlReverbValue" class="slider-value">40</span>%</label>
+				<input type="range" min="0" max="100" value="40" class="slider" id="owlReverb">
+			</div>
+		</div>
+
+		<div class="buttons">
+			<button id="startButton">Start Birds</button>
+			<button id="stopButton">Stop Birds</button>
+		</div>
+
+		<div id="soundDebug" class="sound-debug"></div>
+		<div class="variant-info" id="variantInfo"></div>
+	</div>
+
+	<script>
+		let ac = null, isPlaying = false, birdTimers = [], activeCuckoos = 0, activeOwls = 0, activeBirds = 0, semaphore = false, debug = false, advancedMode = false;
+
+	
+	
+			
+              
+              //  f1: 800, // First syllable frequency
+              //  d1: 180, // First syllable duration
+           //     f2: 640, // Second syllable frequency
+            //    d2: 250, // Second syllable duration
+           //     g: 100,  // Gap between syllables
+           //     e: {a:0.01, d:0.05, s:0.8, r:0.1} // Envelope (attack, decay, sustain, release)
+           
+	
+	
+	
+	
+		// Bird variants with improved parameters
+		const cuckooVariants = [{
+			name: "Classic",
+			f1: 800,
+			d1: 180,
+			f2: 640,
+			d2: 250,
+			g: 100,
+			e: {
+				a: .01,
+				d: .05,
+				s: .8,
+				r: .1
+			}},
+			{
+				name: "High-pitched",
+				f1: 950,
+				d1: 160,
+				f2: 720,
+				d2: 280,
+				g: 80,
+				e: {
+					a: .01,
+					d: .04,
+					s: .9,
+					r: .08
+				}},
+			{
+				name: "Deep",
+				f1: 680,
+				d1: 210,
+				f2: 540,
+				d2: 300,
+				g: 120,
+				e: {
+					a: .02,
+					d: .06,
+					s: .75,
+					r: .12
+				}},
+			{
+				name: "Quick",
+				f1: 850,
+				d1: 130,
+				f2: 660,
+				d2: 180,
+				g: 60,
+				e: {
+					a: .005,
+					d: .03,
+					s: .85,
+					r: .08
+				}},
+			{
+				name: "Melodic",
+				f1: 820,
+				d1: 200,
+				f2: 600,
+				d2: 320,
+				g: 90,
+				e: {
+					a: .03,
+					d: .08,
+					s: .7,
+					r: .15
+				}}];
+
+		// Improved owl variants with longer duration and better resonance
+		const owlVariants = [{
+			name: "Classic",
+			f: 450,
+			d: 400,
+			vr: 5,
+			vd: 1.5,
+			r: 2,
+			g: 450,
+			e: {
+				a: .1,
+				d: .2,
+				s: .8,
+				r: .35
+			}},
+			{
+				name: "Deep Woods",
+				f: 500,
+				d: 450,
+				vr: 4,
+				vd: 1.5,
+				r: 2,
+				g: 500,
+				e: {
+					a: .15,
+					d: .25,
+					s: .75,
+					r: .4
+				}},
+			{
+				name: "Screech",
+				f: 520,
+				d: 400,
+				vr: 6,
+				vd: 1.5,
+				r: 2,
+				g: 350,
+				e: {
+					a: .08,
+					d: .15,
+					s: .85,
+					r: .3
+				}},
+			{
+				name: "Great Horned",
+				f: 680,
+				d: 400,
+				vr: 3.5,
+				vd: 1.5,
+				r: 3,
+				g: 550,
+				e: {
+					a: .18,
+					d: .25,
+					s: .7,
+					r: .45
+				}},
+			{
+				name: "Barn",
+				f: 580,
+				d: 300,
+				vr: 5.5,
+				vd: 1.5,
+				r: 2,
+				g: 400,
+				e: {
+					a: .12,
+					d: .2,
+					s: .8,
+					r: .35
+				}}];
+
+		const presets = {
+			forest: {
+				cuckoos: 3,
+				owls: 2,
+				minInterval: 1500,
+				maxInterval: 5000,
+				cartoon: 20,
+				cuckooVariety: 3,
+				cuckooFreq: 15,
+				cuckooTiming: 10,
+				owlVariety: 3,
+				owlVibRate: 4,
+				owlVibDepth: 1,
+				owlHoots: 2,
+				owlReverb: 40
+			},
+			morning: {
+				cuckoos: 5,
+				owls: 1,
+				minInterval: 1200,
+				maxInterval: 3000,
+				cartoon: 15,
+				cuckooVariety: 4,
+				cuckooFreq: 10,
+				cuckooTiming: 5,
+				owlVariety: 2,
+				owlVibRate: 4,
+				owlVibDepth: 1,
+				owlHoots: 1,
+				owlReverb: 30
+			},
+			night: {
+				cuckoos: 1,
+				owls: 4,
+				minInterval: 2000,
+				maxInterval: 6000,
+				cartoon: 10,
+				cuckooVariety: 2,
+				cuckooFreq: 5,
+				cuckooTiming: 5,
+				owlVariety: 5,
+				owlVibRate: 3,
+				owlVibDepth: 1,
+				owlHoots: 3,
+				owlReverb: 60
+			},
+			cartoon: {
+				cuckoos: 4,
+				owls: 4,
+				minInterval: 800,
+				maxInterval: 2000,
+				cartoon: 70,
+				cuckooVariety: 5,
+				cuckooFreq: 30,
+				cuckooTiming: 25,
+				owlVariety: 5,
+				owlVibRate: 7,
+				owlVibDepth: 1,
+				owlHoots: 2,
+				owlReverb: 50
+			},
+			chaos: {
+				cuckoos: 7,
+				owls: 7,
+				minInterval: 600,
+				maxInterval: 1500,
+				cartoon: 100,
+				cuckooVariety: 5,
+				cuckooFreq: 40,
+				cuckooTiming: 50,
+				owlVariety: 5,
+				owlVibRate: 10,
+				owlVibDepth: 1,
+				owlHoots: 4,
+				owlReverb: 70
+			}
+		};
+
+		function initAudio() {
+			if (!ac)ac = new(window.AudioContext || window.webkitAudioContext)(); return ac
+		}
+
+		function setupSliders() {
+			document.querySelectorAll('input[type="range"]').forEach(s => {
+				const v = document.getElementById(s.id+'Value'); if (v) {
+					v.textContent = s.value; s.addEventListener('input', ()=> {
+						v.textContent = s.value; if (s.id === 'cuckooSlider' || s.id === 'owlSlider') {
+							if (s.id === 'cuckooSlider')activeCuckoos = parseInt(s.value); if (s.id === 'owlSlider')activeOwls = parseInt(s.value); updateBirdCounter(); if (isPlaying) {
+								stopBirds(); startBirds()}}})}})}
+
+		function logDebug(m) {
+			if (debug) {
+				const d = document.getElementById('soundDebug'); d.style.display = 'block'; d.textContent = m; console.log(m)}}
+
+		function getAdvSettings() {
+			return {
+				cuckooVariety: parseInt(document.getElementById('cuckooVariety').value),
+				cuckooFreqRange: parseInt(document.getElementById('cuckooFreqRange').value)/100,
+				cuckooTimingVar: parseInt(document.getElementById('cuckooTimingVar').value)/100,
+				owlVariety: parseInt(document.getElementById('owlVariety').value),
+				owlVibratoRate: parseFloat(document.getElementById('owlVibratoRate').value),
+				owlVibratoDepth: parseFloat(document.getElementById('owlVibratoDepth').value),
+				owlHoots: parseInt(document.getElementById('owlHoots').value),
+				owlReverb: parseInt(document.getElementById('owlReverb')?.value || 40)/100
+			}}
+
+		// Create convolver for reverb effect
+		function createReverb(ctx, duration = 2, decay = 2, reverse = false) {
+			const sampleRate = ctx.sampleRate;
+			const length = sampleRate*duration;
+			const impulse = ctx.createBuffer(2, length, sampleRate);
+			const impulseL = impulse.getChannelData(0);
+			const impulseR = impulse.getChannelData(1);
+
+			for (let i = 0; i < length; i++) {
+				const n = reverse?(length-i): i;
+				impulseL[i] = (Math.random()*2-1)*Math.pow(1-n/length, decay);
+				impulseR[i] = (Math.random()*2-1)*Math.pow(1-n/length, decay);
+			}
+
+			const convolver = ctx.createConvolver();
+			convolver.buffer = impulse;
+			return convolver;
+		}
+
+		// Enhanced cuckoo sound - improved clarity
+		function playCuckoo() {
+			if (semaphore) {
+				logDebug('Skip cuckoo - sound playing'); return
+			}
+			semaphore = true;
+
+			if (!ac)initAudio();
+			const ctx = ac;
+			const now = ctx.currentTime;
+			const cl = parseInt(document.getElementById('chaosSlider').value)/100;
+			const as = getAdvSettings();
+
+			const vIdx = Math.floor(Math.random()*Math.min(as.cuckooVariety, cuckooVariants.length));
+			const variant = cuckooVariants[vIdx];
+			document.getElementById('variantInfo').textContent = `Playing: ${variant.name} Cuckoo`;
+
+			const freqVar = as.cuckooFreqRange;
+			const rfFactor = 1+(Math.random()*freqVar*2-freqVar);
+			const rFreqMod = 1+(Math.random()*0.15-0.075)*cl;
+			const rDurMod = 1+(Math.random()*0.25-0.125)*cl;
+			const tVar = as.cuckooTimingVar;
+			const tModify = 1+(Math.random()*tVar*2-tVar);
+
+			const f1 = variant.f1*rfFactor*rFreqMod;
+			const d1 = variant.d1*rDurMod*tModify;
+			const f2 = variant.f2*rfFactor*rFreqMod;
+			const d2 = variant.d2*rDurMod*tModify;
+			const gap = variant.g*tModify;
+			const env = variant.e;
+
+			// First syllable: "Cuck" - Enhanced with slight pitch movement
+			const o1 = ctx.createOscillator();
+			const g1 = ctx.createGain();
+			const compressor = ctx.createDynamicsCompressor();
+
+			o1.type = 'sine';
+			o1.frequency.setValueAtTime(f1*1.02, now);
+			o1.frequency.exponentialRampToValueAtTime(f1, now+0.05);
+
+			g1.gain.setValueAtTime(0, now);
+			g1.gain.linearRampToValueAtTime(env.s, now+env.a);
+			g1.gain.linearRampToValueAtTime(env.s*0.8, now+env.a+env.d);
+			g1.gain.linearRampToValueAtTime(env.s*0.75, now+(d1/1000)-env.r);
+			g1.gain.linearRampToValueAtTime(0, now+(d1/1000));
+
+			compressor.threshold.value=-24;
+			compressor.knee.value = 30;
+			compressor.ratio.value = 12;
+			compressor.attack.value = 0.003;
+			compressor.release.value = 0.25;
+
+			o1.connect(g1);
+			g1.connect(compressor);
+			compressor.connect(ctx.destination);
+			o1.start(now);
+			o1.stop(now+(d1/1000));
+
+			// Second syllable: "oo" - Improved glide for natural sound
+			setTimeout(()=> {
+				const o2 = ctx.createOscillator();
+				const g2 = ctx.createGain();
+				const compressor2 = ctx.createDynamicsCompressor();
+				const now2 = ctx.currentTime;
+
+				o2.type = 'sine';
+				o2.frequency.setValueAtTime(f2*1.03, now2);
+				o2.frequency.exponentialRampToValueAtTime(f2, now2+0.05);
+				o2.frequency.exponentialRampToValueAtTime(f2*0.92, now2+(d2/1000));
+
+				g2.gain.setValueAtTime(0, now2);
+				g2.gain.linearRampToValueAtTime(env.s*0.95, now2+env.a);
+				g2.gain.linearRampToValueAtTime(env.s*0.8, now2+env.a+env.d);
+				g2.gain.linearRampToValueAtTime(env.s*0.7, now2+(d2/1000)*0.6);
+				g2.gain.linearRampToValueAtTime(env.s*0.2, now2+(d2/1000)*0.9);
+				g2.gain.linearRampToValueAtTime(0, now2+(d2/1000));
+
+				compressor2.threshold.value=-24;
+				compressor2.knee.value = 30;
+				compressor2.ratio.value = 12;
+				compressor2.attack.value = 0.003;
+				compressor2.release.value = 0.25;
+
+				o2.connect(g2);
+				g2.connect(compressor2);
+				compressor2.connect(ctx.destination);
+				o2.start(now2);
+				o2.stop(now2+(d2/1000));
+
+				setTimeout(()=> {
+					semaphore = false; logDebug('Cuckoo sound completed')}, d2+50);
+			}, d1+gap);
+
+			logDebug(`Cuckoo: ${variant.name}, ${f1.toFixed(1)}Hz → ${f2.toFixed(1)}Hz`);
+		}
+
+		// Dramatically improved owl sound with reverb
+		function playOwl() {
+			if (semaphore) {
+				logDebug('Skip owl - sound playing'); return
+			}
+			semaphore = true;
+
+			if (!ac)initAudio();
+			const ctx = ac;
+			const now = ctx.currentTime;
+			const cl = parseInt(document.getElementById('chaosSlider').value)/100;
+			const as = getAdvSettings();
+
+			const vIdx = Math.floor(Math.random()*Math.min(as.owlVariety, owlVariants.length));
+			const variant = owlVariants[vIdx];
+			document.getElementById('variantInfo').textContent = `Playing: ${variant.name} Owl`;
+
+			const rFreqMod = 1+(Math.random()*0.12-0.06)*cl;
+			const rDurMod = 1+(Math.random()*0.25-0.125)*cl;
+
+			const f = variant.f*rFreqMod;
+			const d = variant.d*rDurMod;
+
+			const vr = as.owlVibratoRate*(1+(Math.random()-0.5)*cl*0.3);
+			const vd = as.owlVibratoDepth*(1+(Math.random()-0.2)*cl*0.1);
+
+			const hoots = Math.min(as.owlHoots, 4);
+			const reverbAmount = as.owlReverb || 0.4;
+
+			// Create reverb effect (larger for owls)
+			const reverb = createReverb(ctx, 2.5, 4);
+			const dryGain = ctx.createGain();
+			const wetGain = ctx.createGain();
+
+			dryGain.gain.value = 1-reverbAmount*0.7;
+			wetGain.gain.value = reverbAmount*0.8;
+
+			dryGain.connect(ctx.destination);
+			wetGain.connect(reverb);
+			reverb.connect(ctx.destination);
+
+			let hootDelay = 0;
+			for (let i = 0; i < hoots; i++) {
+				// More variation for subsequent hoots
+				const pitchMod = i === 0?1: 0.97+Math.random()*0.06;
+				const pitch = f*pitchMod;
+				const hooter = ()=>playHoot(pitch, d, vr, vd, variant.e, dryGain, wetGain, i === hoots-1);
+
+				setTimeout(hooter, hootDelay);
+				hootDelay += d+variant.g;
+			}
+
+			setTimeout(()=> {
+				semaphore = false; logDebug('Owl sound completed')}, hootDelay+d);
+
+			logDebug(`Owl: ${variant.name}, ${f.toFixed(1)}Hz × ${hoots}, vib: ${vr.toFixed(1)}Hz, reverb: ${reverbAmount.toFixed(2)}`);
+		}
+
+		// Enhanced hoot with better resonance and shape
+		function playHoot(f, d, vr, vd, env, dryGain, wetGain, isLast) {
+			const ctx = ac;
+			const now = ctx.currentTime;
+			const ds = d/1000;
+
+			// Create richer sound with multiple oscillators
+			const mainOsc = ctx.createOscillator();
+			const subOsc = ctx.createOscillator();
+			const mainGain = ctx.createGain();
+			const subGain = ctx.createGain();
+			const masterGain = ctx.createGain();
+
+			// Main oscillator - the fundamental
+			mainOsc.type = 'sine';
+			mainOsc.frequency.setValueAtTime(f, now);
+			mainGain.gain.value = 0.7;
+
+			// Sub oscillator for depth
+			subOsc.type = 'triangle';
+			subOsc.frequency.setValueAtTime(f/2, now);
+			subGain.gain.value = 0.02;
+
+			// Create vibrato effect
+			const vOsc = ctx.createOscillator();
+			vOsc.type = 'sine';
+			vOsc.frequency.value = vr;
+
+			const vGain = ctx.createGain();
+			vGain.gain.value = vd;
+
+			vOsc.connect(vGain);
+			vGain.connect(mainOsc.frequency);
+			vGain.connect(subOsc.frequency);
+
+			// Classic owl envelope with much better shape
+			mainGain.gain.setValueAtTime(0, now);
+			mainGain.gain.linearRampToValueAtTime(env.s, now+env.a);
+
+			// The signature owl hoot shape
+			mainGain.gain.linearRampToValueAtTime(env.s*0.9, now+env.a+env.d);
+			mainGain.gain.linearRampToValueAtTime(env.s*0.5, now+(ds*0.4));
+			mainGain.gain.linearRampToValueAtTime(env.s*0.9, now+(ds*0.65));
+
+			// Natural trailing decay
+			mainGain.gain.linearRampToValueAtTime(env.s*0.4, now+ds-env.r);
+			mainGain.gain.exponentialRampToValueAtTime(0.001, now+ds);
+
+			// Sub oscillator follows similar pattern
+			subGain.gain.setValueAtTime(0, now);
+			subGain.gain.linearRampToValueAtTime(0.2, now+env.a);
+			subGain.gain.linearRampToValueAtTime(0.15, now+env.a+env.d);
+			subGain.gain.linearRampToValueAtTime(0.1, now+(ds*0.4));
+			subGain.gain.linearRampToValueAtTime(0.2, now+(ds*0.65));
+			subGain.gain.linearRampToValueAtTime(0.1, now+ds-env.r);
+			subGain.gain.exponentialRampToValueAtTime(0.001, now+ds);
+
+			// Pitch bend down - more for final hoot
+			const pitchBendAmount = isLast?0.90: 0.95;
+			mainOsc.frequency.linearRampToValueAtTime(f*pitchBendAmount, now+ds);
+			subOsc.frequency.linearRampToValueAtTime((f/2)*pitchBendAmount, now+ds);
+
+			// Apply filter for warmth
+			const filter = ctx.createBiquadFilter();
+			filter.type = 'lowpass';
+			filter.frequency.value = 1200;
+			filter.Q.value = 0.7;
+
+			// Connect everything
+			mainOsc.connect(mainGain);
+			subOsc.connect(subGain);
+			mainGain.connect(filter);
+			subGain.connect(filter);
+			filter.connect(masterGain);
+
+			// Connect to both dry and wet paths for reverb
+			masterGain.connect(dryGain);
+			masterGain.connect(wetGain);
+
+			// Start oscillators
+			mainOsc.start(now);
+			subOsc.start(now);
+			vOsc.start(now);
+
+			// Stop oscillators
+			mainOsc.stop(now+ds+0.1);
+			subOsc.stop(now+ds+0.1);
+			vOsc.stop(now+ds+0.1);
+		}
+
+		function scheduleBird(type) {
+			if (activeBirds <= 0)return;
+
+			const minInterval = parseInt(document.getElementById('minInterval').value);
+			const maxInterval = parseInt(document.getElementById('maxInterval').value);
+			const interval = Math.floor(minInterval+Math.random()*(maxInterval-minInterval));
+
+			if ((type === 'cuckoo' && activeCuckoos > 0) || (type === 'owl' && activeOwls > 0)) {
+				const timer = setTimeout(()=> {
+					if (isPlaying) {
+						if (type === 'cuckoo') {
+							playCuckoo();
+						} else {
+							playOwl();
+						}
+						scheduleBird(type);
+					}
+				},
+					interval);
+				birdTimers.push(timer);
+			}
+		}
+
+
+
+		function startBirds() {
+			if (isPlaying)return;
+			initAudio();
+			isPlaying = true;
+			activeBirds = activeCuckoos+activeOwls;
+			document.getElementById('startButton').classList.add('playing');
+			document.getElementById('stopButton').classList.remove('playing');
+
+			if (activeCuckoos > 0)scheduleBird('cuckoo');
+			if (activeOwls > 0)scheduleBird('owl');
+			logDebug(`Starting birds: ${activeCuckoos} cuckoos, ${activeOwls} owls`);
+		}
+
+		function stopBirds() {
+			isPlaying = false;
+			birdTimers.forEach(timer => clearTimeout(timer));
+			birdTimers = [];
+			document.getElementById('startButton').classList.remove('playing');
+			document.getElementById('stopButton').classList.add('playing');
+			setTimeout(()=>document.getElementById('stopButton').classList.remove('playing'), 500);
+			logDebug('Stopping all birds');
+		}
+
+		function updateBirdCounter() {
+			document.getElementById('birdCounter').textContent = `Birds: ${activeCuckoos} cuckoos, ${activeOwls} owls`;
+		}
+
+		function applyPreset(name) {
+			const p = presets[name];
+			if (!p)return;
+
+			document.getElementById('cuckooSlider').value = p.cuckoos;
+			document.getElementById('cuckooValue').textContent = p.cuckoos;
+			activeCuckoos = p.cuckoos;
+
+			document.getElementById('owlSlider').value = p.owls;
+			document.getElementById('owlValue').textContent = p.owls;
+			activeOwls = p.owls;
+
+			document.getElementById('minInterval').value = p.minInterval;
+			document.getElementById('minIntervalValue').textContent = p.minInterval;
+
+			document.getElementById('maxInterval').value = p.maxInterval;
+			document.getElementById('maxIntervalValue').textContent = p.maxInterval;
+
+			document.getElementById('chaosSlider').value = p.cartoon;
+			document.getElementById('chaosSliderValue').textContent = p.cartoon;
+
+			document.getElementById('cuckooVariety').value = p.cuckooVariety;
+			document.getElementById('cuckooVarietyValue').textContent = p.cuckooVariety;
+
+			document.getElementById('cuckooFreqRange').value = p.cuckooFreq;
+			document.getElementById('cuckooFreqRangeValue').textContent = p.cuckooFreq;
+
+			document.getElementById('cuckooTimingVar').value = p.cuckooTiming;
+			document.getElementById('cuckooTimingVarValue').textContent = p.cuckooTiming;
+
+			document.getElementById('owlVariety').value = p.owlVariety;
+			document.getElementById('owlVarietyValue').textContent = p.owlVariety;
+
+			document.getElementById('owlVibratoRate').value = p.owlVibRate;
+			document.getElementById('owlVibratoRateValue').textContent = p.owlVibRate;
+
+			document.getElementById('owlVibratoDepth').value = p.owlVibDepth;
+			document.getElementById('owlVibratoDepthValue').textContent = p.owlVibDepth;
+
+			document.getElementById('owlHoots').value = p.owlHoots;
+			document.getElementById('owlHootsValue').textContent = p.owlHoots;
+
+			document.getElementById('owlReverb').value = p.owlReverb;
+			document.getElementById('owlReverbValue').textContent = p.owlReverb;
+
+			updateBirdCounter();
+
+			if (isPlaying) {
+				stopBirds();
+				startBirds();
+			}
+		}
+
+		// Initialize the app
+		document.addEventListener('DOMContentLoaded', ()=> {
+			setupSliders();
+			updateBirdCounter();
+
+			document.getElementById('startButton').addEventListener('click', ()=> {
+				startBirds();
+				// Fix for mobile Safari audio context
+				if (ac && ac.state === 'suspended') {
+					ac.resume();
+				}
+			});
+
+			document.getElementById('stopButton').addEventListener('click',
+				stopBirds);
+
+			// Advanced controls toggle
+			const advToggle = document.querySelector('.advanced-toggle');
+			const advControls = document.querySelector('.advanced-controls');
+			advToggle.addEventListener('click',
+				()=> {
+					advancedMode=!advancedMode;
+					if (advancedMode) {
+						advControls.classList.add('show');
+						advToggle.textContent = '▲ Advanced Controls ▲';
+					} else {
+						advControls.classList.remove('show');
+						advToggle.textContent = '▼ Advanced Controls ▼';
+					}
+				});
+
+			// Preset buttons
+			document.querySelectorAll('.preset-btn').forEach(btn => {
+				btn.addEventListener('click', ()=> {
+					const preset = btn.getAttribute('data-preset');
+					applyPreset(preset);
+				});
+			});
+
+			// Enable touch events for mobile
+			document.querySelectorAll('button').forEach(btn => {
+				btn.addEventListener('touchstart', e=> {
+					e.preventDefault();
+					btn.click();
+				});
+			});
+
+			// Fix audio context for mobile on first interaction
+			document.body.addEventListener('touchstart',
+				()=> {
+					if (ac && ac.state === 'suspended') {
+						ac.resume();
+					}
+				},
+				{
+					once: true
+				});
+
+			// Detect audio context issues
+			window.addEventListener('load',
+				()=> {
+					if (!window.AudioContext && !window.webkitAudioContext) {
+						alert('Your browser does not support the Web Audio API. Please try a different browser.');
+					}
+				});
+		});
+	</script>
+</body>
+</html>
