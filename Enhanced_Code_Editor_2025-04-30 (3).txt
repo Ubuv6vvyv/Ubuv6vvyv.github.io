@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Query Tool</title>
+<style>
+/* Styles from previous version... */
+body{font-family:sans-serif;line-height:1.6;margin:0;padding:0.5rem;display:flex;flex-direction:column;min-height:100vh;gap:0.5rem}
+.panel{display:flex;flex-direction:column;flex:1;border:1px solid #ccc;border-radius:4px;overflow:hidden}
+.panel-header{padding:0.5rem;background-color:#f1f5f9;border-bottom:1px solid #ccc;font-weight:500}
+.panel-body{flex:1;padding:0.5rem;overflow:auto}
+.editor,.result{width:100%;height:100%;min-height: 150px; font-family:monospace;resize:none;border:none;outline:none;padding:0.5rem;white-space:pre;overflow:auto}
+.query-bar, .filter-helper, .extract-helper { /* Added extract-helper */
+    display:flex;gap:0.5rem;padding:0.5rem;border:1px solid #ccc;border-radius:4px;align-items:center; flex-wrap: wrap; /* Allow wrapping */
+}
+.filter-helper { background-color: #f9fafb; border-top: none; border-radius: 0 0 0 0;} /* Adjusted radius */
+.extract-helper { background-color: #f9fafb; border-top: none; border-radius: 0 0 4px 4px;} /* New Style */
+.query-input, .filter-helper select, .filter-helper input, .extract-helper select, .extract-helper button { /* Added extract */
+    padding:0.5rem;border:1px solid #ccc;border-radius:4px;font-family:monospace;
+}
+.query-input {flex:1; min-width: 200px;} /* Ensure query input has space */
+.filter-helper select, .filter-helper input, .extract-helper select {flex-grow: 1;}
+.extract-helper select { height: 80px; } /* Style for multi-select */
+.filter-helper label, .extract-helper label { font-size: 0.875rem; margin-right: 0.25rem; white-space: nowrap;}
+.btn{padding:0.5rem 1rem;border:none;border-radius:4px;background-color:#2563eb;color:white;cursor:pointer}
+.btn:hover{background-color:#1e40af}
+.file-input{display:none}
+@media(min-width:768px){.main{flex-direction:row}}
+.main{display:flex;flex:1;gap:0.5rem;overflow:hidden}
+.json-string{color:#b91c1c}
+.json-number{color:#1d4ed8}
+.json-boolean,.json-null{color:#9333ea}
+.json-key{color:#059669}
+.examples-section { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; background-color: #f9fafb; }
+.examples-section h3 { margin-top: 0; }
+.examples-section pre { background-color: #e5e7eb; padding: 0.5rem; border-radius: 4px; overflow-x: auto; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="header" style="padding:0.5rem">
+    <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem">JSON Query Tool</div>
+    <div style="display:flex;gap:0.5rem;padding:0.5rem 0">
+        <button class="btn" id="loadBtn">Load JSON</button>
+        <input type="file" id="fileInput" class="file-input" accept=".json,.txt">
+        <button class="btn" id="formatBtn">Format</button>
+        <button class="btn" id="compressBtn">Compress</button>
+    </div>
+</div>
+
+<div class="main">
+    <div class="panel">
+        <div class="panel-header">JSON Data</div>
+        <div class="panel-body">
+            <textarea id="jsonEditor" class="editor" placeholder="Paste JSON here or load a file..."></textarea>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">Query Result</div>
+        <div class="panel-body">
+            <div id="jsonResult" class="result"></div>
+        </div>
+    </div>
+</div>
+
+<div class="query-bar">
+    <input id="queryInput" class="query-input" placeholder="e.g., filter(.age >= 18) | extract('name', 'cost')">
+    <button class="btn" id="runQueryBtn">Run Query</button>
+</div>
+
+<div class="filter-helper" id="filterHelper">
+    <label for="filterKey">Filter Key:</label>
+    <select id="filterKey" disabled><option value="">--Select Key--</option></select>
+    <label for="filterOp">Op:</label>
+    <select id="filterOp" disabled><option value="">--Op--</option></select>
+    <label for="filterValue">Value:</label>
+    <input type="text" id="filterValue" placeholder="Enter value" disabled>
+    <button class="btn" id="addFilterBtn" disabled>Add Filter</button>
+</div>
+
+<div class="extract-helper" id="extractHelper">
+     <label for="extractKeys">Extract Keys (Ctrl+Click for multiple):</label>
+     <select id="extractKeys" multiple disabled style="min-width: 200px; flex-basis: 300px;">
+         <option value="">--Load JSON to see keys--</option>
+     </select>
+     <button class="btn" id="addExtractBtn" disabled>Generate Extract Query</button>
+</div>
+<div id="statusMessage" style="padding:0.5rem;font-size:0.875rem;border:1px solid #ccc;border-radius:4px;margin-top:0.5rem">Ready</div>
+
+<div class="examples-section">
+    <h3>Query Syntax Examples</h3>
+    <p>Use the query input bar above. Pipe multiple operations using <code>|</code>.</p>
+    <ul>
+        <li><strong>Select specific fields (creates new objects):</strong>
+            <pre>extract('name', 'email')</pre>
+            <pre>extract('id', '.details.price')</pre>
+            <pre>map({ product: .name, price: .cost })</pre>
+        </li>
+        <li><strong>Filter data (based on conditions):</strong>
+            <pre>filter(.isActive == true)</pre>
+            <pre>filter(.age >= 30)</pre>
+            <pre>filter(.tags in ["tech", "news"])</pre>
+        </li>
+        <li><strong>Get a specific nested value:</strong>
+            <pre>map(.address.city)</pre>
+        </li>
+        <li><strong>Find all values for a key anywhere (recursive):</strong>
+            <pre>findAll('id')</pre>
+            <pre>findAll('cost') | average()</pre>
+        </li>
+         <li><strong>Sort data:</strong>
+            <pre>sort(.name)</pre>
+            <pre>sort(.price, 'desc')</pre>
+        </li>
+         <li><strong>Group data by a key:</strong>
+            <pre>group(.category)</pre>
+        </li>
+         <li><strong>Get size (array length or object keys):</strong>
+            <pre>size()</pre>
+            <pre>filter(...) | size()</pre>
+        </li>
+         <li><strong>Combine operations using pipe (|):</strong>
+            <pre>filter(.category == "electronics") | sort(.price, 'desc') | extract('name', 'price')</pre>
+        </li>
+    </ul>
+    <p><strong>Note:</strong> For <code>filter</code> conditions and <code>extract/findAll</code> key names, use quotes for string values/key names (e.g., <code>filter(.name == "Alice")</code>, <code>extract('user_id')</code>). Paths start with <code>.</code> (e.g., <code>.address.street</code>).</p>
+</div>
+
+<script>
+class JSONQuery {
+    // JSONQuery class definition remains the same as the previous version
+    // including: constructor, findAllRecursive, searchForKey, findKeysInItem,
+    // parse, parseCondition, parseProperty, parseMapObject, parseObject,
+    // splitCommas, execute, evaluateCondition, getValue
+    constructor() {
+        this.operators = { /* ... operators ... */ };
+        this.operators = { '==': 'eq', '!=': 'neq', '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte', 'and': 'and', 'or': 'or', 'in': 'in', 'not in': 'notIn' };
+    }
+    findAllRecursive(data, keyToFind) { /* ... */
+        let results = []; if (Array.isArray(data)) { data.forEach(item => { results = results.concat(this.findAllRecursive(item, keyToFind)); }); } else if (typeof data === 'object' && data !== null) { for (const key in data) { if (data.hasOwnProperty(key)) { if (key === keyToFind) { results.push(data[key]); } results = results.concat(this.findAllRecursive(data[key], keyToFind)); } } } return results;
+    }
+    searchForKey(data, keyName) { /* ... */
+        if (typeof data !== 'object' || data === null) { return undefined; } if (!Array.isArray(data)) { if (data.hasOwnProperty(keyName)) { return data[keyName]; } } for (const key in data) { if (data.hasOwnProperty(key)) { const found = this.searchForKey(data[key], keyName); if (found !== undefined) { return found; } } } return undefined;
+    }
+    findKeysInItem(item, keysToFind) { /* ... */
+        const result = {}; let foundAny = false; for (const keyOrPath of keysToFind) { if (typeof keyOrPath === 'string') { const value = this.searchForKey(item, keyOrPath); if (value !== undefined) { result[keyOrPath] = value; foundAny = true; } } else if (Array.isArray(keyOrPath) && keyOrPath[0] === 'get') { const pathKey = keyOrPath[keyOrPath.length - 1]; const value = this.getValue(item, keyOrPath); if (value !== undefined) { result[pathKey] = value; foundAny = true; } } } return foundAny ? result : null;
+    }
+    parse(q) { /* ... same robust parse ... */
+        try { q = q.trim(); if (q.includes('|')) { const p = q.split('|').map(t => t.trim()).filter(t => t !== ''); return ['pipe', ...p.map(t => this.parse(t))]; } const funcMatch = q.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/); if (funcMatch) { const funcName = funcMatch[1]; const argsString = funcMatch[2].trim(); let args = []; if (argsString) { if (funcName === 'extract') { args = this.splitCommas(argsString).map(arg => { arg = arg.trim(); if (arg.startsWith('.')) { return this.parseProperty(arg); } else if ((arg.startsWith("'") && arg.endsWith("'")) || (arg.startsWith('"') && arg.endsWith('"'))) { return arg.substring(1, arg.length - 1); } else { throw new Error(`Invalid argument in extract: ${arg}. Use quotes for key names ('key') or dot for paths (.path.key)`); } }); } else if (funcName === 'findAll') { if ((argsString.startsWith("'") && argsString.endsWith("'")) || (argsString.startsWith('"') && argsString.endsWith('"'))) { args = [argsString.substring(1, argsString.length - 1)]; } else { throw new Error(`Invalid key argument for findAll: ${argsString}. Key name must be enclosed in single or double quotes.`); } } else if (funcName === 'filter') { args = [this.parseCondition(argsString)]; } else if (funcName === 'sort') { const sortArgs = this.splitCommas(argsString).map(t => t.trim()); args.push(this.parseProperty(sortArgs[0])); if (sortArgs.length > 1) { args.push(sortArgs[1].replace(/['"]/g, '')); } } else if (funcName === 'group') { args = [this.parseProperty(argsString)]; } else if (funcName === 'pick') { args = this.splitCommas(argsString).map(t => this.parseProperty(t.trim())); } } if (funcName === 'map') { if (argsString.startsWith('{') && argsString.endsWith('}')) { return ['map', ['object', this.parseMapObject(argsString)]]; } else if (argsString.startsWith('.')) { return ['map', this.parseProperty(argsString)]; } else { throw new Error(`Invalid map argument: ${argsString}`); } } else if (funcName === 'size' || funcName === 'average') { return [funcName]; } else if (args.length > 0 || ['findAll', 'extract', 'filter', 'sort', 'group', 'pick'].includes(funcName)) { return [funcName, ...args]; } else { throw new Error(`Unrecognized function or arguments: ${q}`); } } if (q.startsWith('.')) { return this.parseProperty(q); } if (q.startsWith('{') && q.endsWith('}')) { return ['object', this.parseObject(q)]; } throw new Error(`Unrecognized query segment: ${q}`); } catch (e) { const message = e.message || String(e); throw new Error(`${message} (in query segment: "${q}")`); }
+    }
+    parseCondition(c) { /* ... */
+        for (const opStr in this.operators) { const opRegex = new RegExp(`\\s${opStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`); if (opRegex.test(` ${c} `)) { let parts = c.split(opRegex); if (parts.length === 2) { let [l, r] = parts.map(t => t.trim()); const parseSide = (side) => { if (side.startsWith('.')) { return this.parseProperty(side); } if (side === 'true' || side === 'false') { return side === 'true'; } if (side === 'null') { return null; } if (!isNaN(Number(side)) && side.trim() !== '') { return Number(side); } if ((side.startsWith("'") && side.endsWith("'")) || (side.startsWith('"') && side.endsWith('"'))) { return side.substring(1, side.length - 1); } throw new Error(`Invalid value in condition: ${side}. Use quotes for strings.`); }; l = parseSide(l); r = parseSide(r); return [this.operators[opStr], l, r]; } } } throw new Error(`Invalid condition structure or unsupported operator: ${c}`);
+    }
+    parseProperty(p) { /* ... */
+        if (!p.startsWith('.')) { throw new Error(`Invalid property access: ${p}. Must start with '.'`); } const tokens = p.substring(1).split('.'); return ['get', ...tokens.filter(t => t)];
+    }
+    parseMapObject(o) { /* ... */
+        try { if (!o.startsWith('{') || !o.endsWith('}')) throw new Error("Map object must be enclosed in {}"); const content = o.substring(1, o.length - 1).trim(); if (content === '') return {}; const result = {}; const pairs = this.splitCommas(content); for (const pair of pairs) { const colonIndex = pair.indexOf(':'); if (colonIndex === -1) throw new Error(`Invalid key-value pair in map object: ${pair}`); let key = pair.substring(0, colonIndex).trim(); const valueString = pair.substring(colonIndex + 1).trim(); if ((key.startsWith("'") && key.endsWith("'")) || (key.startsWith('"') && key.endsWith('"'))) { key = key.substring(1, key.length - 1); } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) { throw new Error(`Invalid key format in map object: ${key}. Use quotes if needed.`); } result[key] = this.parse(valueString); } return result; } catch (e) { throw new Error(`Map object parse error: ${e.message || e} in "${o}"`); }
+    }
+    parseObject(o) { /* ... */
+        try { const content = o.substring(1, o.length - 1).trim(); if (content === '') return {}; const result = {}; const pairs = this.splitCommas(content); for (const pair of pairs) { const colonIndex = pair.indexOf(':'); if (colonIndex === -1) throw new Error(`Invalid key-value pair in object literal: ${pair}`); let key = pair.substring(0, colonIndex).trim(); const valueString = pair.substring(colonIndex + 1).trim(); if ((key.startsWith("'") && key.endsWith("'")) || (key.startsWith('"') && key.endsWith('"'))) { key = key.substring(1, key.length - 1); } result[key] = this.parse(valueString); } return result; } catch (e) { throw new Error(`Object literal parse error: ${e.message} in "${o}"`); }
+    }
+    splitCommas(s) { /* ... */
+        const r = []; let current = ''; let braceDepth = 0; let bracketDepth = 0; let parenDepth = 0; let inSingleQuotes = false; let inDoubleQuotes = false; for (let i = 0; i < s.length; i++) { const char = s[i]; current += char; if (char === "'" && s[i - 1] !== '\\') inSingleQuotes = !inSingleQuotes; if (char === '"' && s[i - 1] !== '\\') inDoubleQuotes = !inDoubleQuotes; if (!inSingleQuotes && !inDoubleQuotes) { if (char === '{') braceDepth++; else if (char === '}') braceDepth--; else if (char === '[') bracketDepth++; else if (char === ']') bracketDepth--; else if (char === '(') parenDepth++; else if (char === ')') parenDepth--; else if (char === ',' && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) { r.push(current.substring(0, current.length - 1).trim()); current = ''; } } } if (current.trim()) { r.push(current.trim()); } return r;
+    }
+    execute(d, q) { /* ... same robust execute including 'extract' case ... */
+         try { const p = typeof q === 'string' ? this.parse(q) : q; if (Array.isArray(p)) { const [op, ...args] = p; switch (op) { case 'pipe': return args.reduce((currentData, queryPart) => this.execute(currentData, queryPart), d); case 'extract': { const keysToFind = args; if (!Array.isArray(keysToFind) || keysToFind.length === 0) { throw new Error("Extract requires at least one key name or path argument."); } if (Array.isArray(d)) { return d.map(item => this.findKeysInItem(item, keysToFind)).filter(result => result !== null); } else if (typeof d === 'object' && d !== null) { const result = this.findKeysInItem(d, keysToFind); return result === null ? {} : result; } else { throw new Error("Extract can only be applied to objects or arrays of objects."); } } case 'filter': if (!Array.isArray(d)) throw new Error("Filter can only be applied to arrays."); return d.filter(item => this.evaluateCondition(item, args[0])); case 'sort': { if (!Array.isArray(d)) throw new Error("Sort can only be applied to arrays."); const [propGetter, direction = 'asc'] = args; if (typeof propGetter !== 'object' || propGetter[0] !== 'get') { throw new Error("Sort requires a property path (e.g., .name)"); } return [...d].sort((a, b) => { const valA = this.getValue(a, propGetter); const valB = this.getValue(b, propGetter); const comparison = (valA < valB) ? -1 : ((valA > valB) ? 1 : 0); if (valA === undefined || valA === null) return 1; if (valB === undefined || valB === null) return -1; return direction.toLowerCase() === 'desc' ? (comparison * -1) : comparison; }); } case 'map': { if (!Array.isArray(d)) throw new Error("Map can only be applied to arrays."); const mapper = args[0]; if (mapper[0] === 'object') { const objTemplate = mapper[1]; return d.map(item => { const newItem = {}; for (const key in objTemplate) { newItem[key] = this.execute(item, objTemplate[key]); } return newItem; }); } else { return d.map(item => this.getValue(item, mapper)); } } case 'findAll': { const keyName = args[0]; if (typeof keyName !== 'string') throw new Error("findAll requires a key name string."); return this.findAllRecursive(d, keyName); } case 'pick': { if (!Array.isArray(d)) throw new Error("Pick can only be applied to arrays."); return d.map(item => { const newItem = {}; args.forEach(propGetter => { if (typeof propGetter === 'object' && propGetter[0] === 'get' && propGetter.length > 1) { const key = propGetter[propGetter.length - 1]; newItem[key] = this.getValue(item, propGetter); } }); return newItem; }); } case 'group': { if (!Array.isArray(d)) throw new Error("Group can only be applied to arrays."); const propGetter = args[0]; if (typeof propGetter !== 'object' || propGetter[0] !== 'get') { throw new Error("Group requires a property path (e.g., .category)"); } const groups = {}; d.forEach(item => { const key = this.getValue(item, propGetter); const keyStr = typeof key === 'object' ? JSON.stringify(key) : String(key); if (!groups[keyStr]) { groups[keyStr] = { key: key, group: [] }; } groups[keyStr].group.push(item); }); return Object.values(groups); } case 'size': return Array.isArray(d) ? d.length : (typeof d === 'object' && d !== null ? Object.keys(d).length : 0); case 'average': if (!Array.isArray(d)) throw new Error("Average requires an array of numbers."); const numbers = d.filter(n => typeof n === 'number'); return numbers.length === 0 ? 0 : numbers.reduce((sum, val) => sum + val, 0) / numbers.length; case 'object': const newObj = {}; const template = args[0]; for (const key in template) { newObj[key] = this.execute(d, template[key]); } return newObj; case 'get': return this.getValue(d, p); default: throw new Error(`Unknown operation: ${op}`); } } else { return p; } } catch (e) { throw new Error(`Execution error: ${e.message || e}`); }
+    }
+    evaluateCondition(item, condition) { /* ... */
+        if (!Array.isArray(condition)) return !!condition; const [op, left, right] = condition; const valLeft = this.getValue(item, left); const valRight = this.getValue(item, right); switch (op) { case 'eq': return valLeft === valRight; case 'neq': return valLeft !== valRight; case 'gt': return valLeft > valRight; case 'gte': return valLeft >= valRight; case 'lt': return valLeft < valRight; case 'lte': return valLeft <= valRight; case 'and': return this.evaluateCondition(item, left) && this.evaluateCondition(item, right); case 'or': return this.evaluateCondition(item, left) || this.evaluateCondition(item, right); case 'in': return Array.isArray(valRight) && valRight.some(el => el === valLeft); case 'notIn': return Array.isArray(valRight) && !valRight.some(el => el === valLeft); default: return false; }
+    }
+    getValue(data, getter) { /* ... */
+        if (!Array.isArray(getter)) { return getter; } const [op, ...args] = getter; if (op === 'get') { let current = data; for (const prop of args) { if (current === null || typeof current !== 'object') return undefined; current = current[prop]; } return current; } else { return this.execute(data, getter); }
+    }
+} // End Class
+
+// --- UI Setup & Event Handlers ---
+const jsonEditor = document.getElementById('jsonEditor');
+const jsonResult = document.getElementById('jsonResult');
+const queryInput = document.getElementById('queryInput');
+const runQueryBtn = document.getElementById('runQueryBtn');
+const loadBtn = document.getElementById('loadBtn');
+const formatBtn = document.getElementById('formatBtn');
+const compressBtn = document.getElementById('compressBtn');
+const fileInput = document.getElementById('fileInput');
+const statusMessage = document.getElementById('statusMessage');
+const jsonQuery = new JSONQuery();
+let currentData = null;
+let currentResult = null;
+
+// Filter Helper Elements
+const filterHelperDiv = document.getElementById('filterHelper');
+const filterKeySelect = document.getElementById('filterKey');
+const filterOpSelect = document.getElementById('filterOp');
+const filterValueInput = document.getElementById('filterValue');
+const addFilterBtn = document.getElementById('addFilterBtn');
+
+// Extract Helper Elements
+const extractHelperDiv = document.getElementById('extractHelper');
+const extractKeysSelect = document.getElementById('extractKeys');
+const addExtractBtn = document.getElementById('addExtractBtn');
+
+
+// --- Helper Functions (updateStatus, parseJSON, highlightJSON, showResult) ---
+function updateStatus(msg, isError = false) { /* ... same ... */ statusMessage.textContent = msg; statusMessage.style.color = isError ? '#dc2626' : '#059669'; }
+function parseJSON(txt) { /* ... same ... */ if (!txt.trim()) return null; try { return JSON.parse(txt); } catch(e) { throw new Error(`Invalid JSON: ${e.message}`); }}
+function highlightJSON(json) { /* ... same ... */ return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (m) { let c = 'json-number'; if (/^"/.test(m)) { c = /:$/.test(m) ? 'json-key' : 'json-string' } else if (/true|false/.test(m)) { c = 'json-boolean' } else if (/null/.test(m)) { c = 'json-null' } return '<span class="' + c + '">' + m + '</span>' }).replace(/\n/g, '<br>').replace(/\s{2}/g, '&nbsp;&nbsp;'); }
+function showResult(data) { /* ... same ... */ try { const f = JSON.stringify(data, null, 2); jsonResult.innerHTML = highlightJSON(f); jsonResult.style.color = '';} catch (e) { jsonResult.textContent = 'Result format error: ' + e.message; updateStatus(e.message, true); jsonResult.style.color = '#dc2626';}}
+
+
+// --- Filter Helper UI Functions (updateFilterHelper, updateOperatorOptions, addFilterToQuery) ---
+function updateFilterHelper() { /* ... same: updates filter dropdown based on top-level keys ... */
+    filterKeySelect.innerHTML = '<option value="">--Select Key--</option>'; filterOpSelect.innerHTML = '<option value="">--Op--</option>'; filterValueInput.value = ''; filterKeySelect.disabled = true; filterOpSelect.disabled = true; filterValueInput.disabled = true; addFilterBtn.disabled = true; if (!currentData) return; let sampleItem = null; if (Array.isArray(currentData) && currentData.length > 0) { sampleItem = currentData[0]; } else if (typeof currentData === 'object' && currentData !== null && !Array.isArray(currentData)) { sampleItem = currentData; } if (!sampleItem || typeof sampleItem !== 'object') return; const keys = Object.keys(sampleItem); if (keys.length > 0) { keys.sort().forEach(key => { const option = document.createElement('option'); option.value = key; option.textContent = key; filterKeySelect.appendChild(option); }); filterKeySelect.disabled = false; }
+}
+function updateOperatorOptions() { /* ... same ... */
+    const selectedKey = filterKeySelect.value; filterOpSelect.innerHTML = '<option value="">--Op--</option>'; filterOpSelect.disabled = true; filterValueInput.disabled = true; addFilterBtn.disabled = true; if (!selectedKey || !currentData) return; let sampleValue = undefined; if (Array.isArray(currentData) && currentData.length > 0 && currentData[0] !== null && typeof currentData[0] === 'object') { sampleValue = currentData[0][selectedKey]; } else if (typeof currentData === 'object' && currentData !== null && !Array.isArray(currentData)) { sampleValue = currentData[selectedKey]; } let operators = []; const valueType = typeof sampleValue; if (valueType === 'string') { operators = ['==', '!=', 'in', 'not in']; } else if (valueType === 'number') { operators = ['==', '!=', '>', '>=', '<', '<=']; } else if (valueType === 'boolean') { operators = ['==', '!=']; } else { operators = ['==', '!=']; } if(operators.length > 0) { operators.forEach(op => { const option = document.createElement('option'); option.value = op; option.textContent = op; filterOpSelect.appendChild(option); }); filterOpSelect.disabled = false; filterValueInput.disabled = false; addFilterBtn.disabled = false; }
+}
+function addFilterToQuery() { /* ... same ... */
+    const key = filterKeySelect.value; const op = filterOpSelect.value; let value = filterValueInput.value.trim(); if (!key || !op || value === '') { updateStatus('Please select key, operator, and enter a value for the filter.', true); return; } let sampleValue = undefined; if (Array.isArray(currentData) && currentData.length > 0 && currentData[0] !== null && typeof currentData[0] === 'object') { sampleValue = currentData[0][key]; } else if (typeof currentData === 'object' && currentData !== null && !Array.isArray(currentData)) { sampleValue = currentData[key]; } const valueType = typeof sampleValue; let formattedValue = value; if (valueType === 'string') { if (!((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) { formattedValue = `"${value.replace(/"/g, '\\"')}"`; } } else if (valueType !== 'number' && (value === 'true' || value === 'false' || value === 'null' || (!isNaN(Number(value)) && value.trim() !== ''))) { /* keep as is */ } else if (valueType !== 'number' && valueType !== 'boolean' && sampleValue !== null) { if (!((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) { formattedValue = `"${value.replace(/"/g, '\\"')}"`; } } else { formattedValue = value; } const filterPart = `filter(.${key} ${op} ${formattedValue})`; const currentQuery = queryInput.value.trim(); if (currentQuery === '' || currentQuery.endsWith('|')) { queryInput.value = currentQuery + (currentQuery ? ' ' : '') + filterPart; } else { queryInput.value = currentQuery + ' | ' + filterPart; } updateStatus('Filter added to query input.', false);
+}
+
+
+// --- NEW: Extract Helper UI Functions ---
+function findAllUniqueKeysRecursive(data, uniqueKeysSet) {
+    if (Array.isArray(data)) {
+        data.forEach(item => findAllUniqueKeysRecursive(item, uniqueKeysSet));
+    } else if (typeof data === 'object' && data !== null) {
+        for (const key in data) {
+            if (data.hasOwnProperty(key)) {
+                uniqueKeysSet.add(key); // Add the key itself
+                findAllUniqueKeysRecursive(data[key], uniqueKeysSet); // Recurse into value
+            }
+        }
+    }
+    // Ignore primitives
+}
+
+function populateExtractKeysSelector() {
+    extractKeysSelect.innerHTML = ''; // Clear previous options
+    extractKeysSelect.disabled = true;
+    addExtractBtn.disabled = true;
+
+    if (!currentData) {
+         extractKeysSelect.innerHTML = '<option value="">--Load JSON first--</option>';
+        return;
+    }
+
+    const uniqueKeysSet = new Set();
+    findAllUniqueKeysRecursive(currentData, uniqueKeysSet);
+
+    const sortedKeys = Array.from(uniqueKeysSet).sort();
+
+    if (sortedKeys.length > 0) {
+        sortedKeys.forEach(key => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = key;
+            extractKeysSelect.appendChild(option);
+        });
+        extractKeysSelect.disabled = false;
+        addExtractBtn.disabled = false;
+    } else {
+        extractKeysSelect.innerHTML = '<option value="">--No keys found--</option>';
+    }
+}
+
+function addExtractToQuery() {
+    const selectedOptions = Array.from(extractKeysSelect.selectedOptions);
+    if (selectedOptions.length === 0) {
+        updateStatus('Please select at least one key to extract.', true);
+        return;
+    }
+
+    const keysToExtract = selectedOptions.map(option => `'${option.value.replace(/'/g, "\\'")}'`); // Get value and quote it safely
+    const extractPart = `extract(${keysToExtract.join(', ')})`;
+
+    const currentQuery = queryInput.value.trim();
+    if (currentQuery === '' || currentQuery.endsWith('|')) {
+        queryInput.value = currentQuery + (currentQuery ? ' ' : '') + extractPart;
+    } else {
+        queryInput.value = currentQuery + ' | ' + extractPart;
+    }
+    updateStatus('Extract operation added to query input.', false);
+}
+// --- END NEW ---
+
+
+// --- Main Event Listeners ---
+runQueryBtn.addEventListener('click', () => { /* ... same ... */
+    try { const q = queryInput.value.trim(); if (!q && currentData) { showResult(currentData); updateStatus('Displaying current data (no query).'); return; } if (!q && !currentData) { updateStatus('Load or paste JSON data first.', true); return; } if (!currentData) { try { currentData = parseJSON(jsonEditor.value); if (!currentData && jsonEditor.value.trim() !== '') { updateStatus('JSON data appears invalid. Please check syntax.', true); return; } else if (!currentData) { updateStatus('Load or paste JSON data first.', true); return; } } catch (e) { updateStatus('JSON parse error: ' + e.message, true); return; } } updateStatus('Running query...'); setTimeout(() => { try { currentResult = jsonQuery.execute(currentData, q); showResult(currentResult); updateStatus('Query executed successfully.'); } catch (e) { updateStatus('Query Error: ' + e.message, true); jsonResult.textContent = 'Error: ' + e.message; jsonResult.style.color = '#dc2626'; } }, 10); } catch (outerError) { updateStatus('Error: ' + outerError.message, true); }
+});
+loadBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { /* ... updated to call populateExtractKeysSelector ... */
+    const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const c = ev.target.result; jsonEditor.value = c; currentData = parseJSON(c);
+            updateStatus(`Loaded ${f.name}`);
+            updateFilterHelper(); // Update filter helper
+            populateExtractKeysSelector(); // <-- NEW: Populate extract helper
+            fileInput.value = ''; jsonResult.innerHTML = '';
+        } catch (e) { updateStatus('Load Error: ' + e.message, true); currentData = null; updateFilterHelper(); populateExtractKeysSelector(); jsonResult.innerHTML = ''; }
+    };
+    r.onerror = () => updateStatus('File read error', true); r.readAsText(f);
+ });
+formatBtn.addEventListener('click', () => { /* ... updated ... */
+    try { const d = parseJSON(jsonEditor.value); jsonEditor.value = JSON.stringify(d, null, 2); currentData = d; updateStatus('Formatted'); updateFilterHelper(); populateExtractKeysSelector(); } // <-- Update extract keys
+    catch (e) { updateStatus('Format Error: ' + e.message, true); }
+});
+compressBtn.addEventListener('click', () => { /* ... updated ... */
+    try { const d = parseJSON(jsonEditor.value); jsonEditor.value = JSON.stringify(d); currentData = d; updateStatus('Compressed'); updateFilterHelper(); populateExtractKeysSelector(); } // <-- Update extract keys
+    catch (e) { updateStatus('Compress Error: ' + e.message, true); }
+ });
+queryInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runQueryBtn.click(); } });
+
+// Filter Helper Listeners
+filterKeySelect.addEventListener('change', updateOperatorOptions);
+addFilterBtn.addEventListener('click', addFilterToQuery);
+
+// --- NEW: Extract Helper Listener ---
+addExtractBtn.addEventListener('click', addExtractToQuery);
+// --- END NEW ---
+
+
+// Initial setup
+updateStatus('Ready');
+updateFilterHelper();
+populateExtractKeysSelector(); // Initial population (might be empty)
+
+</script>
+</body>
+</html>

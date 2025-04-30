@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enhanced Dog Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.8.0/p5.min.js"></script>
+    <style>
+        /* Enhanced & Responsive Styling */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #f0f8ff; 
+            font-family: system-ui, -apple-system, sans-serif; 
+            touch-action: none;
+        }
+        canvas { 
+            display: block; 
+            touch-action: none; 
+        }
+        .ui-container { 
+            position: fixed; 
+            bottom: 10px; 
+            left: 10px; 
+            right: 10px; 
+            background: rgba(255,255,255,0.9); 
+            padding: 10px; 
+            border-radius: 8px; 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); 
+            gap: 10px; 
+            z-index: 10; 
+            max-height: 40vh; 
+            overflow-y: auto; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+        }
+        .control-group { 
+            min-width: 100px; 
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(255,255,255,0.7);
+        }
+        .control-group h3 { 
+            font-size: 0.8em; 
+            margin: 0 0 5px 0; 
+            padding-bottom: 3px; 
+            border-bottom: 1px solid #ddd; 
+            color: #333;
+            text-align: center;
+        }
+        .control-item { 
+            margin-bottom: 8px;
+        }
+        .control-item label, .control-item span { 
+            font-size: 0.75em; 
+            display: block; 
+            margin-bottom: 2px; 
+            color: #444;
+        }
+        .control-item input[type="range"] { 
+            width: 100%; 
+            height: 8px;
+            accent-color: #4d84e2;
+        }
+        .control-item input[type="color"] { 
+            width: 25px; 
+            height: 25px; 
+            padding: 0; 
+            border: 1px solid #ccc; 
+            vertical-align: middle; 
+            border-radius: 3px;
+        }
+        .button-container { 
+            position: fixed; 
+            top: 10px; 
+            right: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px; 
+            z-index: 10; 
+        }
+        .button-container button { 
+            padding: 8px 12px; 
+            border: none; 
+            background: #4d84e2; 
+            color: white;
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+        .button-container button:hover { 
+            background: #3a6ac0; 
+            transform: translateY(-1px);
+        }
+        .instructions { 
+            position: fixed; 
+            top: 10px; 
+            left: 10px; 
+            font-size: 0.8em; 
+            background: rgba(255,255,255,0.9); 
+            padding: 8px; 
+            border-radius: 5px; 
+            z-index: 9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        /* Mobile optimization */
+        @media (max-width: 768px) {
+            .ui-container {
+                grid-template-columns: repeat(2, 1fr);
+                max-height: 50vh;
+            }
+            .instructions {
+                font-size: 0.7em;
+            }
+        }
+        /* Value display for sliders */
+        .value-display {
+            float: right;
+            font-size: 0.7em;
+            color: #666;
+            background: rgba(255,255,255,0.7);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        /* Toggle button for UI */
+        .toggle-ui {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 11;
+            background: #4d84e2;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">Drag: Rotate | Pinch: Zoom | Double-tap: Toggle Auto-rotate</div>
+    <div class="ui-container" id="controls"></div>
+    <div class="button-container">
+        <button id="randomize-btn">Randomize</button>
+        <button id="save-btn">Save Dog</button>
+        <button id="reset-view-btn">Reset View</button>
+    </div>
+    <button class="toggle-ui" id="toggle-ui">≡</button>
+
+    <script>
+        // ----- Globals -----
+        let s = {}; // Sliders
+        let c = {}; // Colors
+        let rotX = -0.3, rotY = -0.5; // Rotation state
+        let cameraDistance = 400; // Variable camera distance for zoom
+        let canvasElement; // To attach listeners reliably
+        let autoRotate = false; // Auto-rotation toggle
+        let uiVisible = true; // UI visibility state
+        
+        // Touch tracking variables
+        let isDragging = false;
+        let lastTouchX, lastTouchY;
+        let lastPinchDist = null;
+        
+        // Dog preset colors
+        const dogPresets = [
+            { body: '#8B5A2B', ears: '#6B4226', tongue: '#FF69B4', bg: '#E6F7FF' }, // Brown
+            { body: '#D2B48C', ears: '#A58F65', tongue: '#FF69B4', bg: '#F0F8FF' }, // Tan
+            { body: '#696969', ears: '#505050', tongue: '#FF69B4', bg: '#F5F5F5' }, // Gray
+            { body: '#FFEBCD', ears: '#DEB887', tongue: '#FF69B4', bg: '#F0FFF0' }, // Golden
+            { body: '#FFFFFF', ears: '#F0F0F0', tongue: '#FF69B4', bg: '#E6E6FA' }, // White
+            { body: '#000000', ears: '#1A1A1A', tongue: '#FF69B4', bg: '#F8F8FF' }  // Black
+        ];
+
+        // ----- Core p5 Functions -----
+        function setup() {
+            canvasElement = createCanvas(windowWidth, windowHeight, WEBGL);
+            angleMode(DEGREES);
+
+            // Initial Camera Settings
+            perspective(60, width / height, 0.1, 3000);
+            updateCameraPosition();
+
+            setupControls(); // Create UI controls
+            setupInteractions(); // Setup touch and mouse events
+            
+            // Apply a random dog preset
+            applyDogPreset(random(dogPresets));
+        }
+
+        function draw() {
+            // Wait for controls to be initialized
+            if (!c.bgColor || !s.bodyLength || !c.tongueColor) return; 
+
+            background(p5_color(c.bgColor.value()));
+
+            // Simple directional light for all scenarios
+            ambientLight(120);
+            directionalLight(255, 255, 255, 0, -0.5, -1);
+
+            // Auto-rotation if enabled
+            if (autoRotate) {
+                rotY += 0.5;
+            }
+
+            // Automatically adjust scale to fit large dogs in view
+            let totalSize = s.bodyLength.value() + s.legHeight.value() + s.headSize.value();
+            let scaleFactor = map(totalSize, 100, 1000, 1, 0.3, true);
+            scale(scaleFactor);
+
+            // Rotation
+            rotateX(rotX);
+            rotateY(rotY);
+
+            // Drawing
+            noStroke();
+            drawDog();
+        }
+
+        // ----- Drawing -----
+        function drawDog() {
+            push(); // Isolate dog transforms
+
+            // --- Body ---
+            ambientMaterial(c.bodyColor.color());
+            let bodyW = s.bodyWidth.value();
+            let bodyH = s.bodyHeight.value();
+            let bodyL = s.bodyLength.value();
+            
+            // Apply roundness to body if slider exists
+            let bodyRoundness = s.bodyRoundness ? s.bodyRoundness.value() : 0;
+            
+            push();
+            // Position body center slightly above origin Y=0 so legs attach below
+            translate(0, -bodyH * 0.5, 0);
+            
+            // Draw rounded box if roundness > 0, otherwise regular box
+            if (bodyRoundness > 0) {
+                drawRoundedBox(bodyW, bodyH, bodyL, bodyRoundness);
+            } else {
+                box(bodyW, bodyH, bodyL);
+            }
+            pop();
+
+            // --- Attachment points (relative to origin) ---
+            // Legs attach near corners of the body's bottom plane (Y=0)
+            let legX = bodyW * 0.45;
+            let legZ = bodyL * 0.45;
+            let legTopY = 0; // Legs start from origin Y=0
+
+            // Head attaches centered X, above body top (-bodyH), at front (bodyL/2)
+            let headBaseY = -bodyH; // Top surface of the body
+            let headZ = bodyL * 0.5; // Front surface of the body
+
+            // Tail attaches centered X, near body top, at back (-bodyL/2)
+            let tailBaseY = -bodyH * 0.9; // Slightly below the very top
+            let tailZ = -bodyL * 0.5; // Back surface of the body
+
+            // --- Legs ---
+            let legH = s.legHeight.value();
+            // Make leg thickness relative to average body dimension for better scaling
+            let legThickness = (bodyW + bodyH + bodyL) / 3 * 0.15;
+            let legTaper = s.legTaper ? s.legTaper.value() : 1; // Default no taper if slider doesn't exist
+            
+            drawLimb(-legX, legTopY, legZ, legThickness, legH, legTaper); // Front Left
+            drawLimb(legX, legTopY, legZ, legThickness, legH, legTaper); // Front Right
+            drawLimb(-legX, legTopY, -legZ, legThickness, legH, legTaper); // Back Left
+            drawLimb(legX, legTopY, -legZ, legThickness, legH, legTaper); // Back Right
+
+            // --- Head ---
+            ambientMaterial(c.bodyColor.color());
+            let headS = s.headSize.value();
+            push(); // Head group
+            // Position head relative to body top-front
+            translate(0, headBaseY - headS * 0.5, headZ); // Center sphere above body front
+            sphere(headS); // Head base
+
+                // --- Snout ---
+                let snoutL = s.snoutLength.value();
+                let snoutBaseY = headS * 0.1; // Relative Y position on head sphere
+                let snoutBaseZ = headS * 0.4; // Relative Z position on head sphere
+                push(); // Snout group
+                translate(0, snoutBaseY, snoutBaseZ);
+                rotateX(-10); // Slight downward angle
+                ambientMaterial(c.earColor.color());
+                cone(headS * 0.3, snoutL, 6); // Snout cone
+                 // Nose Ball
+                 translate(0, 0, snoutL * 0.5 + headS * 0.05); // Position at tip of cone
+                 ambientMaterial(c.noseColor ? c.noseColor.color() : color(0)); // Use nose color if exists
+                 sphere(headS * 0.15); // Slightly larger nose
+                pop(); // End Snout group
+
+                // --- Mouth ---
+                let mouthOpen = s.mouthOpenness.value();
+                if (mouthOpen > 0.1) { // Use a small threshold
+                    push(); // Mouth group
+                    // Position below snout base on the head sphere
+                    translate(0, snoutBaseY + headS * 0.25, snoutBaseZ + snoutL * 0.1);
+                    ambientMaterial(0); // Dark inside mouth
+                    let mouthW = headS * 0.4;
+                    let mouthH = mouthOpen; // Height from slider
+                    let mouthD = headS * 0.3;
+                    // Translate down half height so it opens downwards from position
+                    translate(0, mouthH * 0.5, 0);
+                    box(mouthW, mouthH, mouthD);
+
+                    // --- Tongue ---
+                    let tongueLength = s.tongueOut.value();
+                    if (tongueLength > 1) { // Use a small threshold
+                        push(); // Tongue group
+                        ambientMaterial(c.tongueColor.color());
+                         // Emerge from bottom-front of mouth cavity
+                         translate(0, mouthH * 0.4, mouthD * 0.5); // Start slightly inside mouth bottom-front
+                         rotateX(20); // Angle down
+                         translate(0, 0, tongueLength * 0.5); // Move forward half its length
+                         // Make tongue thinner
+                        box(mouthW * 0.7, mouthH * 0.15, tongueLength);
+                        pop(); // End Tongue group
+                    }
+                    pop(); // End Mouth group
+                }
+
+                 // --- Eyes (Cartoon Style) ---
+                 let eyeDist = headS * 0.4;
+                 let eyeZPos = headS * 0.6;
+                 let eyeYPos = -headS * 0.2;
+                 let eyeHeight = s.headSize.value() * 0.3; // Base height/depth, slightly larger
+                 // Make width relative to height via slider
+                 let eyeWidth = eyeHeight * s.eyeWidth.value();
+                 let pupilSize = eyeHeight * 0.4; // Pupil size relative to eye height
+                 
+                 // Eye color (use sclera color if available)
+                 let scleraColor = c.scleraColor ? c.scleraColor.color() : color(255);
+                 let pupilColor = c.pupilColor ? c.pupilColor.color() : color(0);
+                 
+                 // Left Eye
+                 push();
+                 translate(-eyeDist, eyeYPos, eyeZPos);
+                 ambientMaterial(scleraColor); // Eye white using sclera color
+                 ellipsoid(eyeWidth, eyeHeight, eyeHeight); // Goofy shape
+                 ambientMaterial(pupilColor); // Pupil using pupil color
+                 // Position pupil slightly forward on the surface
+                 translate(0, 0, eyeHeight * 0.45); // Adjust Z based on eyeHeight
+                 sphere(pupilSize);
+                 pop();
+                 
+                 // Right Eye
+                 push();
+                 translate(eyeDist, eyeYPos, eyeZPos);
+                 ambientMaterial(scleraColor); // Eye white
+                 ellipsoid(eyeWidth, eyeHeight, eyeHeight); // Goofy shape
+                 ambientMaterial(pupilColor); // Pupil
+                 translate(0, 0, eyeHeight * 0.45);
+                 sphere(pupilSize);
+                 pop();
+
+                // --- Ears ---
+                ambientMaterial(c.earColor.color());
+                let earSize = headS * 0.9; // Slightly larger ears relative to head
+                let earThickness = s.earThickness ? s.earThickness.value() : 1; // Default 1 if not available
+                
+                // Left Ear
+                push();
+                translate(-headS * 0.7, -headS * 0.5, 0);
+                rotateZ(30);
+                rotateX(s.earAngle.value());
+                drawEar(earSize, earThickness);
+                pop();
+                
+                // Right Ear
+                push();
+                translate(headS * 0.7, -headS * 0.5, 0);
+                rotateZ(-30);
+                rotateX(s.earAngle.value());
+                drawEar(earSize, earThickness);
+                pop();
+
+            pop(); // End Head group
+
+            // --- Tail ---
+            ambientMaterial(c.bodyColor.color());
+            let tailL = s.tailLength.value();
+            // Make tail thickness relative to average body dim like legs
+            let tailThickness = (bodyW + bodyH + bodyL) / 3 * 0.1;
+            push();
+            translate(0, tailBaseY, tailZ); // Position relative to body back/top
+            rotateX(s.tailAngle.value() - 20); // Angle up/down + base angle
+            
+            // Add tail wag if available
+            if (s.tailWag) {
+                rotateY(sin(frameCount * s.tailWag.value()) * 20);
+            }
+            
+            // Draw cylinder along its own Z axis after rotation
+            translate(0, 0, -tailL * 0.5); // Move to center before drawing length
+            cylinder(tailThickness, tailL);
+            pop();
+
+            pop(); // End dog transforms
+        }
+
+        // Helper function to draw a leg with optional taper
+        function drawLimb(x, y, z, thickness, height, taperFactor = 1) {
+            push();
+            // Position at top of leg
+            translate(x, y, z);
+            
+            if (taperFactor < 0.99) {
+                // Draw tapered leg using multiple cylinders
+                let segments = 8;
+                let segHeight = height / segments;
+                
+                for (let i = 0; i < segments; i++) {
+                    let t = i / (segments - 1); // 0 to 1
+                    let currentThickness = lerp(thickness, thickness * taperFactor, t);
+                    push();
+                    translate(0, segHeight * (i + 0.5), 0);
+                    cylinder(currentThickness, segHeight);
+                    pop();
+                }
+            } else {
+                // Draw regular cylinder
+                translate(0, height * 0.5, 0);
+                cylinder(thickness, height);
+            }
+            pop();
+        }
+
+        // Helper function to draw an ear with thickness
+        function drawEar(size, thickness = 1) {
+            if (thickness > 1.1) {
+                // 3D ear using ellipsoid when thickness > 1
+                push();
+                translate(0, size * 0.5, 0);
+                ellipsoid(size * 0.4, size * 0.5, size * 0.4 * thickness);
+                pop();
+            } else {
+                // Original triangle ear
+                beginShape();
+                vertex(0, 0, 0);          // Point attached to head
+                vertex(-size * 0.4, size, 0); // Wider base
+                vertex(size * 0.4, size, 0);  // Wider base
+                endShape(CLOSE);
+            }
+        }
+        
+        // Helper function to draw a rounded box
+        function drawRoundedBox(w, h, d, r) {
+            // Simple implementation with sphere at corners and boxes for sides
+            // Corners
+            let hw = w/2 - r;
+            let hh = h/2 - r;
+            let hd = d/2 - r;
+            
+            // Corners (8 spheres)
+            for (let x = -1; x <= 1; x += 2) {
+                for (let y = -1; y <= 1; y += 2) {
+                    for (let z = -1; z <= 1; z += 2) {
+                        push();
+                        translate(x * hw, y * hh, z * hd);
+                        sphere(r);
+                        pop();
+                    }
+                }
+            }
+            
+            // Edges (12 cylinders)
+            // X-direction edges (4)
+            for (let y = -1; y <= 1; y += 2) {
+                for (let z = -1; z <= 1; z += 2) {
+                    push();
+                    translate(0, y * hh, z * hd);
+                    rotateZ(90);
+                    cylinder(r, w - 2*r);
+                    pop();
+                }
+            }
+            
+            // Y-direction edges (4)
+            for (let x = -1; x <= 1; x += 2) {
+                for (let z = -1; z <= 1; z += 2) {
+                    push();
+                    translate(x * hw, 0, z * hd);
+                    cylinder(r, h - 2*r);
+                    pop();
+                }
+            }
+            
+            // Z-direction edges (4)
+            for (let x = -1; x <= 1; x += 2) {
+                for (let y = -1; y <= 1; y += 2) {
+                    push();
+                    translate(x * hw, y * hh, 0);
+                    rotateX(90);
+                    cylinder(r, d - 2*r);
+                    pop();
+                }
+            }
+            
+            // Faces (6 boxes)
+            // XY planes (front/back)
+            push();
+            translate(0, 0, hd);
+            box(w - 2*r, h - 2*r, 0.1);
+            pop();
+            
+            push();
+            translate(0, 0, -hd);
+            box(w - 2*r, h - 2*r, 0.1);
+            pop();
+            
+            // XZ planes (top/bottom)
+            push();
+            translate(0, hh, 0);
+            box(w - 2*r, 0.1, d - 2*r);
+            pop();
+            
+            push();
+            translate(0, -hh, 0);
+            box(w - 2*r, 0.1, d - 2*r);
+            pop();
+            
+            // YZ planes (left/right)
+            push();
+            translate(hw, 0, 0);
+            box(0.1, h - 2*r, d - 2*r);
+            pop();
+            
+            push();
+            translate(-hw, 0, 0);
+            box(0.1, h - 2*r, d - 2*r);
+            pop();
+            
+            // Center
+            box(w - 2*r, h - 2*r, d - 2*r);
+        }
+
+        // ----- UI & Interaction -----
+        function setupControls() {
+            const controlsContainer = document.getElementById('controls');
+            controlsContainer.innerHTML = ''; // Clear
+
+            const controlConfig = [
+                { group: 'Body Shape', items: [
+                    // Individual body dimensions with wider ranges
+                    { id: 'bodyLength', label: 'Body Length', min: 5, max: 350, value: 80, step: 1 },
+                    { id: 'bodyWidth', label: 'Body Width', min: 5, max: 300, value: 50, step: 1 },
+                    { id: 'bodyHeight', label: 'Body Height', min: 5, max: 300, value: 35, step: 1 },
+                    { id: 'bodyRoundness', label: 'Body Roundness', min: 0, max: 20, value: 5, step: 1 },
+                    { id: 'legHeight', label: 'Leg Height', min: 5, max: 320, value: 45, step: 1 },
+                    { id: 'legTaper', label: 'Leg Taper', min: 0.3, max: 1, value: 0.7, step: 0.05 },
+                ]},
+                { group: 'Head Features', items: [
+                    { id: 'headSize', label: 'Head Size', min: 5, max: 80, value: 25, step: 1 },
+                    { id: 'snoutLength', label: 'Snout Length', min: 1, max: 100, value: 20, step: 1 },
+                    { id: 'eyeWidth', label: 'Eye Width', min: 0.2, max: 2, value: 1.3, step: 0.1 },
+                    { id: 'mouthOpenness', label: 'Mouth Open', min: 0, max: 70, value: 10, step: 0.5 },
+                    { id: 'tongueOut', label: 'Tongue Out', min: 0, max: 300, value: 15, step: 0.5 },
+                    { id: 'earAngle', label: 'Ear Angle', min: -30, max: 120, value: 40, step: 1 },
+                    { id: 'earThickness', label: 'Ear Thickness', min: 1, max: 3, value: 2, step: 0.1 },
+                ]},
+                { group: 'Tail', items: [
+                    { id: 'tailLength', label: 'Tail Length', min: 1, max: 220, value: 40, step: 1 },
+                    { id: 'tailAngle', label: 'Tail Angle', min: -90, max: 120, value: 30, step: 1 },
+                    { id: 'tailWag', label: 'Tail Wag', min: 0, max: 5, value: 0, step: 0.1 },
+                ]},
+                { group: 'Colors', items: [
+                    { id: 'bodyColor', label: 'Body', type: 'color', value: '#8B5A2B' },
+                    { id: 'earColor', label: 'Ears/Snout', type: 'color', value: '#6B4226' },
+                    { id: 'tongueColor', label: 'Tongue', type: 'color', value: '#FF69B4' },
+                    { id: 'noseColor', label: 'Nose', type: 'color', value: '#000000' },
+                    { id: 'scleraColor', label: 'Eye White', type: 'color', value: '#FFFFFF' },
+                    { id: 'pupilColor', label: 'Pupil', type: 'color', value: '#000000' },
+                    { id: 'bgColor', label: 'Background', type: 'color', value: '#E6F7FF' }
+                ]}
+            ];
+
+            // Create DOM elements with improved layout
+            controlConfig.forEach(groupData => {
+                const groupDiv = createDiv().addClass('control-group').parent(controlsContainer);
+                createElement('h3', groupData.group).parent(groupDiv);
+
+                groupData.items.forEach(item => {
+                    const itemDiv = createDiv().addClass('control-item').parent(groupDiv);
+                    if (item.type === 'color') {
+                        const labelSpan = createSpan(item.label).parent(itemDiv);
+                        c[item.id] = createColorPicker(item.value).parent(itemDiv);
+                        c[item.id].style('margin-left', '5px');
+                    } else { // Slider
+                        const labelContainer = createDiv().parent(itemDiv);
+                        const labelSpan = createSpan(item.label).parent(labelContainer).style('float', 'left');
+                        const valueSpan = createSpan(item.value).addClass('value-display').parent(labelContainer);
+                        
+                        // Create slider
+                        s[item.id] = createSlider(item.min, item.max, item.value, item.step).parent(itemDiv);
+                        
+                        // Update value display when slider changes
+                        s[item.id].input(() => {
+                            valueSpan.html(s[item.id].value());
+                        });
+                    }
+                });
+            });
+        }
+
+        function setupInteractions() {
+            // Set up button controls
+            document.getElementById('randomize-btn').onclick = randomizeDog;
+            document.getElementById('save-btn').onclick = () => saveCanvas('my_funny_dog', 'png');
+            document.getElementById('reset-view-btn').onclick = resetView;
+            
+            // Toggle UI button
+            const toggleBtn = document.getElementById('toggle-ui');
+            toggleBtn.style.display = 'block';
+            toggleBtn.onclick = toggleUI;
+
+            // ===== SIMPLIFIED TOUCH HANDLING =====
+            
+            // Touch events - more robust implementation for mobile
+            canvasElement.elt.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvasElement.elt.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvasElement.elt.addEventListener('touchend', handleTouchEnd);
+            
+            // Double-tap detection for auto-rotate toggle
+            let lastTapTime = 0;
+            canvasElement.elt.addEventListener('touchend', (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                
+                if (tapLength < 300 && tapLength > 0) {
+                    // Double tap detected
+                    autoRotate = !autoRotate;
+                    e.preventDefault();
+                }
+                lastTapTime = currentTime;
+            });
+            
+            // Mouse events for desktop
+            canvasElement.elt.addEventListener('mousedown', (e) => {
+                if (e.target === canvasElement.elt) {
+                    isDragging = true;
+                    lastTouchX = e.clientX;
+                    lastTouchY = e.clientY;
+                    e.preventDefault();
+                }
+            });
+            
+            canvasElement.elt.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - lastTouchX;
+                    const deltaY = e.clientY - lastTouchY;
+                    
+                    rotY += deltaX * 0.5;
+                    rotX += deltaY * 0.5;
+                    
+                    lastTouchX = e.clientX;
+                    lastTouchY = e.clientY;
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            // Mousewheel zoom
+            canvasElement.elt.addEventListener('wheel', (e) => {
+                cameraDistance += e.deltaY * 0.5;
+                cameraDistance = constrain(cameraDistance, 100, 1000);
+                updateCameraPosition();
+                e.preventDefault();
+            });
+        }
+        
+        // Touch handlers with better pinch-zoom support
+        function handleTouchStart(e) {
+            if (e.touches.length === 1) {
+                // Single touch - start rotation
+                isDragging = true;
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+            } 
+            else if (e.touches.length === 2) {
+                // Double touch - start pinch zoom
+                isDragging = false;
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastPinchDist = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+            }
+            e.preventDefault();
+        }
+        
+        function handleTouchMove(e) {
+            if (isDragging && e.touches.length === 1) {
+                // Single touch - handle rotation
+                const deltaX = e.touches[0].clientX - lastTouchX;
+                const deltaY = e.touches[0].clientY - lastTouchY;
+                
+                rotY += deltaX * 0.5;
+                rotX += deltaY * 0.5;
+                
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+            } 
+            else if (e.touches.length === 2) {
+                // Double touch - handle pinch zoom
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentPinchDist = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                
+                if (lastPinchDist !== null) {
+                    const pinchDelta = currentPinchDist - lastPinchDist;
+                    cameraDistance -= pinchDelta * 1.5;
+                    cameraDistance = constrain(cameraDistance, 100, 1000);
+                    updateCameraPosition();
+                }
+                
+                lastPinchDist = currentPinchDist;
+            }
+            e.preventDefault();
+        }
+        
+        function handleTouchEnd(e) {
+            if (e.touches.length === 0) {
+                isDragging = false;
+                lastPinchDist = null;
+            }
+        }
+        
+        // Update camera distance for zoom effect
+        function updateCameraPosition() {
+            camera(0, 0, cameraDistance, 0, 0, 0, 0, 1, 0);
+        }
+        
+        // Toggle UI visibility
+        function toggleUI() {
+            const uiContainer = document.querySelector('.ui-container');
+            const instructions = document.querySelector('.instructions');
+            
+            uiVisible = !uiVisible;
+            
+            uiContainer.style.display = uiVisible ? 'grid' : 'none';
+            instructions.style.display = uiVisible ? 'block' : 'none';
+        }
+        
+        // Reset rotation and zoom
+        function resetView() {
+            rotX = -0.3;
+            rotY = -0.5;
+            cameraDistance = 400;
+            autoRotate = false;
+            updateCameraPosition();
+        }
+        
+        // Apply a preset color theme
+        function applyDogPreset(preset) {
+            c.bodyColor.value(preset.body);
+            c.earColor.value(preset.ears);
+            c.tongueColor.value(preset.tongue);
+            c.bgColor.value(preset.bg);
+        }
+        
+        // Generate random dog
+        function randomizeDog() {
+            // Apply a random preset first for good color coordination
+            applyDogPreset(random(dogPresets));
+            
+            // Randomly adjust nose color sometimes
+            if (random() > 0.7) {
+                c.noseColor.value(random() > 0.7 ? '#FF9999' : '#000000');
+            }
+            
+            // Randomize all sliders with some constraints for better results
+            Object.keys(s).forEach(key => {
+                const slider = s[key];
+                
+                // Special cases for more sensible results
+                if (key === 'bodyRoundness') {
+                    slider.value(random(0, slider.attribute('max')));
+                }
+                else if (key === 'eyeWidth') {
+                    // Avoid too narrow eyes for better look
+                    slider.value(random(0.8, slider.attribute('max')));
+                }
+                else if (key === 'tailWag') {
+                    // 50% chance of wagging tail
+                    slider.value(random() > 0.5 ? random(0.5, 3) : 0);
+                }
+                else if (key === 'mouthOpenness') {
+                    // Sometimes closed mouth
+                    slider.value(random() > 0.3 ? random(5, 30) : 0);
+                }
+                else if (key === 'tongueOut') {
+                    // Tongue only if mouth open enough
+                    slider.value(s.mouthOpenness.value() > 10 ? random(5, 70) : 0);
+                }
+                else if (key === 'legTaper') {
+                    // More tapered legs look better
+                    slider.value(random(0.4, 0.9));
+                }
+                else if (key === 'earThickness') {
+                    // Prefer thicker 3D ears
+                    slider.value(random(1.2, 3));
+                }
+                else {
+                    // General randomization between min-max
+                    const min = parseFloat(slider.attribute('min'));
+                    const max = parseFloat(slider.attribute('max'));
+                    slider.value(random(min, max));
+                }
+                
+                // Update display values
+                const valueSpan = slider.elt.parentNode.querySelectorAll('.value-display')[0];
+                if (valueSpan) {
+                    valueSpan.innerText = slider.value();
+                }
+            });
+        }
+        
+        // Convert a hex string to p5 color object
+        function p5_color(hex) {
+            // Strip the # if present
+            hex = hex.replace('#', '');
+            
+            // Parse the hex values
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            
+            return color(r, g, b);
+        }
+        
+        // p5.js built-in function to handle window resizing
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            perspective(60, width / height, 0.1, 3000);
+            updateCameraPosition();
+        }
+        
+        // Mobile detection helper
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // When page loads, check if mobile and adjust UI accordingly
+        window.addEventListener('load', () => {
+            if (isMobile()) {
+                // Auto-hide UI on mobile after 3 seconds to make more screen space
+                setTimeout(() => {
+                    toggleUI();
+                    document.getElementById('toggle-ui').style.display = 'block';
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
