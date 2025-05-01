@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chaotic Cuckoo Clock 🕰️</title>
+  <style>
+    body { font-family:'Comic Sans MS','Chalkboard SE',Arial,sans-serif; max-width:500px; margin:15px auto; padding:15px; background:#f3e9d7; border:5px solid #8b4513; border-radius:20px; touch-action:manipulation; }
+    .container { background:#fff; border-radius:16px; padding:20px; box-shadow:0 6px 18px rgba(0,0,0,.1); text-align:center; background-image:url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h50v50H0z' fill='%23f9f5e9' fill-opacity='0.4'/%3E%3C/svg%3E"); }
+    h1 { color:#8b4513; margin:0 0 15px; font-size:28px; text-shadow:2px 2px 3px #deb887; }
+    .clock-face { width:180px; height:180px; background:#ffe0b2; border-radius:50%; margin:0 auto 20px; border:8px solid #8b4513; position:relative; box-shadow:inset 0 0 20px rgba(0,0,0,0.2); }
+    .clock-hand { position:absolute; top:50%; left:50%; width:4px; height:70px; background:#8b4513; transform-origin:50% 0; transform:translateX(-50%) rotate(0deg); }
+    .clock-center { position:absolute; width:16px; height:16px; background:#8b4513; border-radius:50%; top:50%; left:50%; transform:translate(-50%, -50%); }
+    .slider-container, .bird-type { display:flex; justify-content:space-between; align-items:center; background:#fffacd; padding:10px; border:1px solid #deb887; border-radius:10px; margin-bottom:15px; }
+    .collapsible { margin:15px 0; background:#f3e9d7; border:2px solid #deb887; border-radius:10px; overflow:hidden; }
+    .collapsible-header { padding:10px; cursor:pointer; background:#deb887; color:#8b4513; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
+    .collapsible-header:after { content:"▼"; font-size:12px; }
+    .collapsible-header.collapsed:after { content:"►"; }
+    .collapsible-content { padding:15px; max-height:0; overflow:hidden; transition:max-height 0.3s ease-out; }
+    .collapsible-content.expanded { max-height:500px; }
+    label, span, .bird-icon { font-size:14px; font-weight:700; color:#555; }
+    input[type=range] { flex:1; margin:0 10px; cursor:pointer; -webkit-appearance:none; background:linear-gradient(90deg,#deb887,#cd853f,#8b4513); height:8px; border-radius:4px; }
+    input[type=range]::-webkit-slider-thumb, input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#8b4513; border:2px solid #fff; }
+    .bird-icon { width:30px; height:30px; border-radius:50%; background:#deb887; color:#8b4513; display:flex; align-items:center; justify-content:center; border:2px solid #8b4513; }
+    .buttons { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px; }
+    button { padding:12px; border:none; border-radius:15px; background:#8b4513; color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:transform .2s; box-shadow:0 4px 8px rgba(0,0,0,.1); text-transform:uppercase; }
+    button:hover { transform:translateY(-3px) scale(1.03); }
+    #stopButton { background:#a52a2a; }
+    button.playing { animation:wiggle .5s infinite alternate; }
+    @keyframes wiggle { from{transform:rotate(-3deg);} to{transform:rotate(3deg);} }
+    .variant-info { font-size:12px; color:#8b4513; margin-top:15px; font-style:italic; min-height:1.2em; }
+    #birdCounter { font-size:18px; color:#8b4513; margin:10px 0; background:#ffe0b2; padding:8px; border-radius:8px; border:1px dashed #8b4513; }
+    @media(max-width:500px){ body{padding:10px;margin:0} .container{padding:15px} }
+    
+    /* Bird animation */
+    .bird-container { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:999; overflow:hidden; }
+    .bird-emoji { position:absolute; font-size:20px; animation:fly-in-out 0.5s forwards; opacity:0; }
+    @keyframes fly-in-out { 
+      0% { transform:translate(-50px, 100px) scale(0.2); opacity:0; }
+      10% { transform:translate(0, 50px) scale(1.2); opacity:1; }
+      20% { transform:translate(20px, 30px) scale(1.5); opacity:1; }
+      80% { transform:translate(30px, 20px); opacity:1; }
+      100% { transform:translate(150px, -100px) scale(0.2); opacity:0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Chaotic Cuckoo Clock 🕰️</h1>
+    
+    <div class="clock-face">
+      <div class="clock-hand"></div>
+      <div class="clock-center"></div>
+    </div>
+
+    <div id="birdCounter">Cuckoos: 4</div>
+
+    <div class="bird-type">
+      <div>
+        <div class="bird-icon">C</div>
+        <span>Cuckoos</span>
+      </div>
+      <input id="cuckooSlider" type="range" min="0" max="25" value="3">
+      <span id="cuckooValue">4</span>
+    </div>
+
+    <div class="slider-container">
+      <label for="chaosSlider">Chaos 💥 <span id="chaosValue">30%</span></label>
+      <input id="chaosSlider" type="range" min="0" max="100" value="30">
+    </div>
+    <div class="slider-container">
+      <label for="minI">Min ms <span id="minValue">200</span></label>
+      <input id="minI" type="range" min="50" max="1000" value="200">
+    </div>
+    <div class="slider-container">
+      <label for="maxI">Max ms <span id="maxValue">800</span></label>
+      <input id="maxI" type="range" min="100" max="3000" value="800">
+    </div>
+    <div class="slider-container">
+      <label for="reverbSlider">Reverb 🔊 <span id="reverbValue">30%</span></label>
+      <input id="reverbSlider" type="range" min="0" max="100" value="30">
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header collapsed">Advanced Settings</div>
+      <div class="collapsible-content">
+        <div class="slider-container">
+          <label for="freqMultiplierSlider">Freq Multiplier <span id="freqMultiplierValue">1.0</span></label>
+          <input id="freqMultiplierSlider" type="range" min="0.5" max="1.5" step="0.05" value="1">
+        </div>
+        <div class="slider-container">
+          <label for="durationMultiplierSlider">Duration <span id="durationMultiplierValue">1.0</span></label>
+          <input id="durationMultiplierSlider" type="range" min="0.5" max="1.5" step="0.05" value="1">
+        </div>
+        <div class="slider-container">
+          <label for="vibratoSlider">Vibrato <span id="vibratoValue">40%</span></label>
+          <input id="vibratoSlider" type="range" min="0" max="100" value="40">
+        </div>
+        <div class="slider-container">
+          <label for="volumeSlider">Volume <span id="volumeValue">80%</span></label>
+          <input id="volumeSlider" type="range" min="0" max="100" value="80">
+        </div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button id="startButton">Go Cuckoo!</button>
+      <button id="stopButton">Make it Stop!</button>
+    </div>
+
+    <div id="variantInfo" class="variant-info"></div>
+  </div>
+
+  <div class="bird-container" id="birdContainer"></div>
+
+  <script>
+    // state/controller
+    const AC = { ctx:null, playing:false, timers:[], active:4, queue:[], max:25, convolver:null };
+
+    // Bird emojis array for animation
+    const birdEmojis = ["🐦", "🦉", "🦜", "🐦", "🐦‍⬛"];
+
+    // expanded cuckoo variants with different frequency, duration, and gap parameters
+    const variants = [
+      { name:"Classic", f1:600,d1:200,f2:500,d2:300,g:100,v:0.6,a:0.01,r:0.2,w:"sine" },
+      { name:"Cartoon", f1:680,d1:150,f2:520,d2:280,g:120,v:0.7,a:0.02,r:0.15,w:"sine" },
+      { name:"Deep", f1:450,d1:240,f2:380,d2:320,g:150,v:0.8,a:0.03,r:0.25,w:"sine" },
+      { name:"Wobble", f1:620,d1:180,f2:490,d2:250,g:110,v:0.65,a:0.015,r:0.18,w:"sine" },
+      { name:"Tiny", f1:720,d1:120,f2:600,d2:200,g:90,v:0.5,a:0.005,r:0.12,w:"sine" },
+      { name:"Echo", f1:580,d1:220,f2:480,d2:320,g:130,v:0.7,a:0.02,r:0.3,w:"sine" },
+      { name:"Distant", f1:550,d1:230,f2:460,d2:340,g:160,v:0.5,a:0.04,r:0.35,w:"sine" },
+      { name:"Sharp", f1:540,d1:260,f2:440,d2:320,g:160,v:0.6,a:0.05,r:0.1,w:"sine" },
+      { name:"Forest", f1:590,d1:210,f2:470,d2:290,g:140,v:0.65,a:0.025,r:0.22,w:"sine" },
+      { name:"Sleepy", f1:520,d1:250,f2:440,d2:350,g:180,v:0.5,a:0.035,r:0.28,w:"sine" },
+      { name:"Mountain", f1:530,d1:230,f2:420,d2:340,g:160,v:0.55,a:0.03,r:0.3,w:"sine" },
+      { name:"Wooden", f1:480,d1:260,f2:420,d2:330,g:140,v:0.6,a:0.04,r:0.2,w:"sine" },
+      { name:"Antique", f1:560,d1:200,f2:460,d2:300,g:120,v:0.55,a:0.02,r:0.24,w:"sine" },
+      { name:"Swiss", f1:630,d1:190,f2:510,d2:270,g:100,v:0.7,a:0.015,r:0.18,w:"sine" },
+      { name:"Grandfather", f1:420,d1:280,f2:350,d2:350,g:170,v:0.8,a:0.045,r:0.3,w:"sine" },
+      { name:"Musical", f1:640,d1:170,f2:540,d2:250,g:90,v:0.65,a:0.01,r:0.15,w:"sine" },
+      { name:"Charm", f1:610,d1:210,f2:490,d2:310,g:110,v:0.6,a:0.02,r:0.25,w:"sine" },
+      { name:"Mellow", f1:500,d1:240,f2:420,d2:320,g:150,v:0.5,a:0.03,r:0.28,w:"sine" }
+    ];
+
+    // create impulse response for reverb
+    function createImpulseResponse(duration, decay, reverse) {
+      const sampleRate = 44100;
+      const length = sampleRate * duration;
+      const impulse = AC.ctx.createBuffer(2, length, sampleRate);
+      const left = impulse.getChannelData(0);
+      const right = impulse.getChannelData(1);
+      
+      for (let i = 0; i < length; i++) {
+        const n = reverse ? length - i : i;
+        left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+        right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+      }
+      
+      return impulse;
+    }
+
+    // Clock animation
+    function animateClock() {
+      const hand = document.querySelector('.clock-hand');
+      let rotation = 0;
+      
+      function rotate() {
+        rotation = (rotation + 6) % 360;
+        hand.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+        if (AC.playing) {
+          requestAnimationFrame(rotate);
+        }
+      }
+      
+      requestAnimationFrame(rotate);
+    }
+
+    // Bird animation
+    function spawnBirdEmoji() {
+      const birdContainer = document.getElementById('birdContainer');
+      const bird = document.createElement('div');
+      bird.className = 'bird-emoji';
+      bird.textContent = birdEmojis[Math.floor(Math.random() * birdEmojis.length)];
+      
+      // Random position
+      const x = Math.random() * window.innerWidth * 0.7;
+      const y = Math.random() * window.innerHeight * 0.7;
+      
+      bird.style.left = `${x}px`;
+      bird.style.top = `${y}px`;
+      
+      // Random animation delay
+      bird.style.animationDelay = `${Math.random() * 0.5}s`;
+      
+      birdContainer.appendChild(bird);
+      
+      // Remove after animation completes
+      setTimeout(() => {
+        birdContainer.removeChild(bird);
+      }, 3100);
+    }
+
+    // update UI values
+    function upd(){
+      AC.active = +cuckooSlider.value + 1;
+      cuckooValue.textContent = AC.active;
+      birdCounter.textContent = `Cuckoos: ${AC.active}`;
+      chaosValue.textContent = chaosSlider.value + '%';
+      minValue.textContent = minI.value;
+      maxValue.textContent = maxI.value;
+      reverbValue.textContent = reverbSlider.value + '%';
+      
+      // Update advanced settings UI
+      if (document.getElementById('freqMultiplierValue')) {
+        freqMultiplierValue.textContent = freqMultiplierSlider.value;
+        durationMultiplierValue.textContent = durationMultiplierSlider.value;
+        vibratoValue.textContent = vibratoSlider.value + '%';
+        volumeValue.textContent = volumeSlider.value + '%';
+      }
+    }
+
+    // initialize collapsible menu
+    function initCollapsible() {
+      const headers = document.querySelectorAll('.collapsible-header');
+      headers.forEach(header => {
+        header.addEventListener('click', function() {
+          this.classList.toggle('collapsed');
+          const content = this.nextElementSibling;
+          if (this.classList.contains('collapsed')) {
+            content.classList.remove('expanded');
+          } else {
+            content.classList.add('expanded');
+          }
+        });
+      });
+    }
+
+    // initialize bindings
+    function init(){
+      [cuckooSlider,chaosSlider,minI,maxI,reverbSlider].forEach(el=>el.oninput=upd);
+      if (document.getElementById('freqMultiplierSlider')) {
+        [freqMultiplierSlider,durationMultiplierSlider,vibratoSlider,volumeSlider].forEach(el=>el.oninput=upd);
+      }
+      startButton.onclick=startBirds;
+      stopButton.onclick=stopBirds;
+      initCollapsible();
+      upd();
+    }
+
+    // lazy create audio context & effects chain
+    function initAudio(){
+      if(AC.ctx)return;
+      AC.ctx=new(window.AudioContext||webkitAudioContext)();
+      
+      // Create compressor/limiter
+      const comp=AC.ctx.createDynamicsCompressor();
+      comp.threshold.value=-10; comp.knee.value=5; comp.ratio.value=12;
+      comp.attack.value=0.003; comp.release.value=0.25;
+      
+      // Create reverb
+      AC.convolver = AC.ctx.createConvolver();
+      AC.convolver.buffer = createImpulseResponse(2, 3, false);
+      
+      // Create master gain
+      const mg=AC.ctx.createGain(); 
+      mg.gain.value=0.8;
+      
+      // Create reverb blend
+      const dry=AC.ctx.createGain();
+      const wet=AC.ctx.createGain();
+      
+      // Connect signal chain
+      comp.connect(dry);
+      comp.connect(AC.convolver);
+      AC.convolver.connect(wet);
+      dry.connect(mg);
+      wet.connect(mg);
+      mg.connect(AC.ctx.destination);
+      
+      // Store nodes for later adjustment
+      AC.output=comp;
+      AC.dry=dry;
+      AC.wet=wet;
+    }
+
+    // Build complex cuckoo sound
+    function playCuckoo(){
+      const ctx=AC.ctx, now=ctx.currentTime;
+      const chaos=+chaosSlider.value/100;
+      const reverbAmount=+reverbSlider.value/100;
+      
+      // Get advanced settings (if they exist)
+      const freqMult = document.getElementById('freqMultiplierSlider') ? 
+        +freqMultiplierSlider.value : 1.0;
+      const durationMult = document.getElementById('durationMultiplierSlider') ? 
+        +durationMultiplierSlider.value : 1.0;
+      const vibratoAmount = document.getElementById('vibratoSlider') ? 
+        +vibratoSlider.value/100 : 0.4;
+      const volumeLevel = document.getElementById('volumeSlider') ? 
+        +volumeSlider.value/100 : 0.8;
+      
+      // Update reverb mix
+      if(AC.dry && AC.wet) {
+        AC.dry.gain.value = 1 - reverbAmount * 0.5;
+        AC.wet.gain.value = reverbAmount * 0.7;
+      }
+      
+      // Select random variant and apply chaos
+      const v=variants[Math.floor(Math.random()*variants.length)];
+      const freq1=v.f1 * freqMult * (1+(Math.random()-.5)*chaos*0.2);
+      const freq2=v.f2 * freqMult * (1+(Math.random()-.5)*chaos*0.2);
+      const dur1=v.d1/1000 * durationMult, dur2=v.d2/1000 * durationMult;
+      const gap=v.g/1000 * durationMult * (1+(Math.random()-.5)*chaos*0.15);
+      
+      // Create master gain for this cuckoo
+      const masterGain=ctx.createGain();
+      masterGain.gain.value=v.v * volumeLevel * (1+(Math.random()-.5)*chaos*0.15);
+      masterGain.connect(AC.output||ctx.destination);
+
+      // Select waveform based on chaos and variant preference
+      const waveType = chaos > 0.6 ? ['sine','triangle','sawtooth'][Math.floor(Math.random()*3)] : v.w;
+      
+      // First syllable (Cu)
+      const o1=ctx.createOscillator(), g1=ctx.createGain();
+      o1.type=waveType;
+      o1.frequency.setValueAtTime(freq1,now);
+      g1.gain.setValueAtTime(0,now);
+      g1.gain.linearRampToValueAtTime(1,now+v.a);
+      g1.gain.exponentialRampToValueAtTime(0.001,now+dur1);
+      o1.connect(g1); g1.connect(masterGain);
+      o1.start(now); o1.stop(now+dur1);
+
+      // Add vibrato or pitch bending for first syllable if enabled
+      if(vibratoAmount > 0.1 || chaos > 0.2){
+        const vib=ctx.createOscillator(), vg=ctx.createGain();
+        vib.frequency.value=4 + Math.min(chaos, vibratoAmount) * 10;
+        vg.gain.value=freq1 * 0.01 * Math.max(chaos*0.5, vibratoAmount);
+        vib.connect(vg); vg.connect(o1.frequency);
+        vib.start(now); vib.stop(now+dur1);
+        
+        // Add slight pitch bend
+        o1.frequency.linearRampToValueAtTime(freq1*(0.98 + chaos*0.03), now+dur1);
+      }
+
+      // Second syllable (ckoo)
+      const o2=ctx.createOscillator(), g2=ctx.createGain();
+      o2.type=waveType;
+      o2.frequency.setValueAtTime(freq2,now+dur1+gap);
+      g2.gain.setValueAtTime(0,now+dur1+gap);
+      g2.gain.linearRampToValueAtTime(1,now+dur1+gap+v.a);
+      g2.gain.exponentialRampToValueAtTime(0.001,now+dur1+gap+dur2);
+      o2.connect(g2); g2.connect(masterGain);
+      o2.start(now+dur1+gap); o2.stop(now+dur1+gap+dur2);
+
+      // Add vibrato or pitch bending for second syllable
+      if(vibratoAmount > 0.1 || chaos > 0.2){
+        const vib2=ctx.createOscillator(), vg2=ctx.createGain();
+        vib2.frequency.value=5 + Math.min(chaos, vibratoAmount) * 8;
+        vg2.gain.value=freq2 * 0.01 * Math.max(chaos*0.5, vibratoAmount);
+        vib2.connect(vg2); vg2.connect(o2.frequency);
+        vib2.start(now+dur1+gap); vib2.stop(now+dur1+gap+dur2);
+        
+        // Add slight downward pitch bend
+        o2.frequency.linearRampToValueAtTime(freq2*0.94, now+dur1+gap+dur2);
+      }
+      
+      // Add harmonics for rich timbre if chaos is medium-high
+      if(chaos > 0.4) {
+        const h1 = ctx.createOscillator(), hg1 = ctx.createGain();
+        h1.type = 'sine';
+        h1.frequency.value = freq1 * 2;
+        hg1.gain.value = 0.15 * chaos;
+        h1.connect(hg1); hg1.connect(masterGain);
+        h1.start(now); h1.stop(now+dur1);
+        
+        const h2 = ctx.createOscillator(), hg2 = ctx.createGain();
+        h2.type = 'sine';
+        h2.frequency.value = freq2 * 2;
+        hg2.gain.value = 0.1 * chaos;
+        h2.connect(hg2); hg2.connect(masterGain);
+        h2.start(now+dur1+gap); h2.stop(now+dur1+gap+dur2);
+      }
+
+      // Spawn bird emoji animation
+      spawnBirdEmoji();
+
+      variantInfo.textContent=`${v.name} (Chaos: ${Math.round(chaos*100)}%, Freq: ${Math.round(freq1)}Hz)`;
+    }
+
+    // scheduling with multiple cuckoos
+    function schedule(){
+      if(!AC.playing) return;
+      
+      // Play cuckoo
+      playCuckoo();
+      
+      // Schedule more cuckoos for parallel playback
+      if(AC.timers.length < AC.active-1) {
+        for(let i=0; i < Math.min(3, AC.active-1-AC.timers.length); i++) {
+          const min=+minI.value, max=+maxI.value;
+          const delay=min+Math.random()*(max-min);
+          AC.timers.push(setTimeout(schedule, delay/2));
+        }
+      }
+      
+      // Schedule next cuckoo
+      const min=+minI.value, max=+maxI.value;
+      const delay=min+Math.random()*(max-min);
+      AC.timers.push(setTimeout(schedule, delay));
+    }
+
+    // start
+    function startBirds(){
+      if(AC.playing) return;
+      initAudio();
+      AC.playing=true;
+      startButton.classList.add('playing');
+      // Resume context if suspended (for mobile)
+      if(AC.ctx.state === 'suspended') AC.ctx.resume();
+      schedule();
+      animateClock();
+    }
+
+    // stop
+    function stopBirds(){
+      AC.playing=false;
+      AC.timers.forEach(c=>clearTimeout(c));
+      AC.timers=[];
+      startButton.classList.remove('playing');
+      stopButton.classList.add('playing');
+      setTimeout(()=>stopButton.classList.remove('playing'),500);
+    }
+
+    window.onload=init;
+  </script>
+</body>
+</html>
