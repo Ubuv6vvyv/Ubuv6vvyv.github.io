@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" name="viewport" content="width=device-width,initial-scale=1">
+<title>Audio Processor Pro</title>
+<style>
+* { margin: 0; box-sizing: border-box; }
+body {
+    font: 14px system-ui;
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+    background: #f0f0f0;
+    color: #333;
+}
+.container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.waveform {
+    height: 160px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 15px 0;
+    cursor: pointer;
+    position: relative;
+}
+.waveform-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(0,123,255,0.1);
+    pointer-events: none;
+}
+.control-group {
+    margin: 16px 0;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+.control-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+.control {
+    flex: 1;
+}
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #444;
+}
+input[type="range"] {
+    width: 100%;
+    margin: 8px 0;
+    accent-color: #007bff;
+}
+input[type="range"].fine {
+    accent-color: #28a745;
+}
+.value {
+    font-size: 12px;
+    color: #666;
+    float: right;
+}
+.button-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+button {
+    background: #007bff;
+    color: #fff;
+    border: 0;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: 500;
+}
+button:hover {
+    background: #0056b3;
+}
+button:disabled {
+    background: #ccc;
+}
+button.secondary {
+    background: #6c757d;
+}
+button.secondary:hover {
+    background: #545b62;
+}
+.file-input {
+    margin-bottom: 15px;
+}
+.fine-tune {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.clip-warning {
+    color: #dc3545;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 8px;
+    display: none;
+}
+.meter {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin-top: 8px;
+    position: relative;
+    overflow: hidden;
+}
+.meter-fill {
+    height: 100%;
+    background: #28a745;
+    width: 0%;
+    transition: width 0.1s, background-color 0.2s;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <input type="file" id="fileInput" accept="audio/*" class="file-input">
+    <div class="waveform">
+        <canvas id="waveformCanvas"></canvas>
+        <div id="progress" class="waveform-progress"></div>
+    </div>
+    
+    <div class="meter">
+        <div id="levelMeter" class="meter-fill"></div>
+    </div>
+    <div id="clipWarning" class="clip-warning">⚠️ Audio is clipping!</div>
+    
+    <div class="button-group">
+        <button id="playButton">Play</button>
+        <button id="resetButton">Reset</button>
+        <button id="reverseButton">Reverse</button>
+        <button id="downloadButton" disabled>Download</button>
+        <button id="saveButton" disabled>Save Preset</button>
+    </div>
+    
+    <div class="fine-tune">
+        <input type="checkbox" id="fineTuneToggle">
+        <label for="fineTuneToggle">Fine-tune Mode</label>
+    </div>
+    
+    <div class="control-group">
+        <div class="control-row">
+            <div class="control">
+                <label>Pitch <span id="pitchValue" class="value">1.0x</span></label>
+                <input type="range" id="pitch" min="0.5" max="2" step="0.01" value="1">
+            </div>
+            <div class="control">
+                <label>Speed <span id="speedValue" class="value">1.0x</span></label>
+                <input type="range" id="speed" min="0.25" max="4" step="0.05" value="1">
+            </div>
+        </div>
+        
+        <div class="control-row">
+            <div class="control">
+                <label>Bass <span id="bassValue" class="value">0dB</span></label>
+                <input type="range" id="bass" min="-12" max="12" step="0.5" value="0">
+            </div>
+            <div class="control">
+                <label>Voice <span id="voiceValue" class="value">0dB</span></label>
+                <input type="range" id="voice" min="-12" max="12" step="0.5" value="0">
+            </div>
+        </div>
+
+        <div class="control-row">
+            <div class="control">
+                <label>Echo Delay <span id="echoDelayValue" class="value">0s</span></label>
+                <input type="range" id="echoDelay" min="0" max="1" step="0.01" value="0">
+            </div>
+            <div class="control">
+                <label>Echo Feedback <span id="echoFeedbackValue" class="value">0%</span></label>
+                <input type="range" id="echoFeedback" min="0" max="75" step="1" value="0">
+            </div>
+        </div>
+        
+        <div class="control-row">
+            <div class="control">
+                <label>Main Volume <span id="volumeValue" class="value">100%</span></label>
+                <input type="range" id="volume" min="0" max="100" step="1" value="100">
+            </div>
+            <div class="control">
+                <label>Mix <span id="mixValue" class="value">100%</span></label>
+                <input type="range" id="mix" min="0" max="100" step="1" value="100">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let audioContext, audioBuffer, sourceNode, analyser, gainNode, 
+    bassFilter, voiceFilter, delayNode, feedbackGain, dryGain, wetGain,
+    isPlaying = false, startTime = 0, currentTime = 0, isReversed = false;
+
+const canvas = document.getElementById('waveformCanvas');
+const ctx = canvas.getContext('2d');
+const progress = document.getElementById('progress');
+const levelMeter = document.getElementById('levelMeter');
+const clipWarning = document.getElementById('clipWarning');
+
+// Initialize audio context and nodes
+const initAudio = () => {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    gainNode = audioContext.createGain();
+    
+    // Create dry/wet mix nodes
+    dryGain = audioContext.createGain();
+    wetGain = audioContext.createGain();
+    
+    bassFilter = audioContext.createBiquadFilter();
+    bassFilter.type = "lowshelf";
+    bassFilter.frequency.value = 100;
+    
+    voiceFilter = audioContext.createBiquadFilter();
+    voiceFilter.type = "peaking";
+    voiceFilter.frequency.value = 2500;
+    voiceFilter.Q.value = 1;
+    
+    delayNode = audioContext.createDelay(1.0);
+    feedbackGain = audioContext.createGain();
+    feedbackGain.gain.value = 0;
+    
+    // Set up analyzer for clipping detection
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.3;
+};
+
+// Handle fine-tune mode toggle
+document.getElementById('fineTuneToggle').onchange = (e) => {
+    const inputs = document.querySelectorAll('input[type="range"]');
+    inputs.forEach(input => {
+        const step = parseFloat(input.step);
+        if (e.target.checked) {
+            input.step = step / 10;
+            input.classList.add('fine');
+        } else {
+            input.step = step * 10;
+            input.classList.remove('fine');
+        }
+    });
+};
+
+// Update audio parameters
+const updateParams = (e) => {
+    const value = parseFloat(e.target.value);
+    const id = e.target.id;
+    
+    document.getElementById(id + 'Value').textContent = 
+        value + (id === 'pitch' || id === 'speed' ? 'x' : 
+                id.includes('echo') ? (id === 'echoDelay' ? 's' : '%') : 
+                id === 'volume' || id === 'mix' ? '%' : 'dB');
+    
+    if (sourceNode && isPlaying) {
+        switch(id) {
+            case 'pitch':
+                sourceNode.detune.value = (value - 1) * 1200;
+                break;
+            case 'speed':
+                sourceNode.playbackRate.value = value;
+                break;
+            case 'bass':
+                bassFilter.gain.value = value;
+                break;
+            case 'voice':
+                voiceFilter.gain.value = value;
+                break;
+            case 'echoDelay':
+                delayNode.delayTime.value = value;
+                break;
+            case 'echoFeedback':
+                feedbackGain.gain.value = value / 100;
+                break;
+            case 'volume':
+                gainNode.gain.value = value / 100;
+                break;
+            case 'mix':
+                const wetAmount = value / 100;
+                wetGain.gain.value = wetAmount;
+                dryGain.gain.value = 1 - wetAmount;
+                break;
+        }
+    }
+};
+
+// Monitor audio levels and detect clipping
+const monitorLevels = () => {
+    const dataArray = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatTimeDomainData(dataArray);
+    
+    let maxLevel = 0;
+    let isClipping = false;
+    
+    for (let i = 0; i < dataArray.length; i++) {
+        const absValue = Math.abs(dataArray[i]);
+        maxLevel = Math.max(maxLevel, absValue);
+        if (absValue >= 0.99) {
+            isClipping = true;
+        }
+    }
+    
+    levelMeter.style.width = `${maxLevel * 100}%`;
+    levelMeter.style.backgroundColor = isClipping ? '#dc3545' : 
+                                     maxLevel > 0.85 ? '#ffc107' : '#28a745';
+    clipWarning.style.display = isClipping ? 'block' : 'none';
+    
+    if (isPlaying) {
+        requestAnimationFrame(monitorLevels);
+    }
+};
+
+// Play audio from current position
+const playAudio = () => {
+    if (!audioBuffer) return;
+    
+    stopAudio();
+    
+    sourceNode = audioContext.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    
+    // Apply current parameters
+    sourceNode.playbackRate.value = parseFloat(document.getElementById('speed').value);
+    sourceNode.detune.value = (parseFloat(document.getElementById('pitch').value) - 1) * 1200;
+    bassFilter.gain.value = parseFloat(document.getElementById('bass').value);
+    voiceFilter.gain.value = parseFloat(document.getElementById('voice').value);
+    delayNode.delayTime.value = parseFloat(document.getElementById('echoDelay').value);
+    feedbackGain.gain.value = parseFloat(document.getElementById('echoFeedback').value) / 100;
+    gainNode.gain.value = parseFloat(document.getElementById('volume').value) / 100;
+    
+    const wetAmount = parseFloat(document.getElementById('mix').value) / 100;
+    wetGain.gain.value = wetAmount;
+    dryGain.gain.value = 1 - wetAmount;
+    
+    // Connect audio processing chain with dry/wet mix
+    sourceNode.connect(dryGain);
+    dryGain.connect(gainNode);
+    
+    sourceNode.connect(bassFilter);
+    bassFilter.connect(voiceFilter);
+    voiceFilter.connect(delayNode);
+    delayNode.connect(feedbackGain);
+    feedbackGain.connect(delayNode);
+    delayNode.connect(wetGain);
+    wetGain.connect(gainNode);
+    
+    gainNode.connect(analyser);
+    analyser.connect(audioContext.destination);
+    
+    sourceNode.start(0, currentTime);
+    startTime = audioContext.currentTime - currentTime;
+    isPlaying = true;
+    document.getElementById('playButton').textContent = 'Pause';
+    
+    drawWaveform();
+    monitorLevels();
+};
+
+// Download processed audio
+document.getElementById('downloadButton').onclick = async () => {
+    if (!audioBuffer) return;
+    
+    const offlineContext = new OfflineAudioContext(
+        audioBuffer.numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+    );
+    
+    // Recreate processing chain in offline context
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    
+    // ... (recreate and connect all audio nodes)
+    
+    source.start();
+    const renderedBuffer = await offlineContext.startRendering();
+    
+    const blob = new Blob([renderedBuffer], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'processed_audio.wav';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// Save current preset
+document.getElementById('saveButton').onclick = () => {
+    const preset = {};
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+        preset[input.id] = input.value;
+    });
+    localStorage.setItem('audioPreset', JSON.stringify(preset));
+    alert('Preset saved!');
+};
+
+// Load preset on startup
+const loadPreset = () => {
+    const preset = localStorage.getItem('audioPreset');
+    if (preset) {
+        const values = JSON.parse(preset);
+        for (const [id, value] of Object.entries(values)) {
+            const input = document.getElementById(id);
+            if (input) {
+                input.value = value;
+                updateParams({target: input});
+            }
+        }
+    }
+};
+
+// Stop audio playback
+const stopAudio = () => {
+    if (sourceNode) {
+        sourceNode.stop();
+        sourceNode.disconnect();
+    }
+    isPlaying = false;
+    document.getElementById('playButton').textContent = 'Play';
+    currentTime = audioContext.currentTime - startTime;
+    levelMeter.style.width = '0%';
+    clipWarning.style.display = 'none';
+};
+
+// Reset all parameters
+const resetParams = () => {
+    document.querySelectorAll('input[type=range]').forEach(input => {
+        input.value = input.getAttribute('value');
+        updateParams({target: input});
+    });
+    currentTime = 0;
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+};
+
+// Draw waveform with clipping indication
+const drawWaveform = () => {
+    if (!audioBuffer) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(dataArray);
+    
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineWidth = 2;
+    const sliceWidth = canvas.width / bufferLength;
+    let x = 0;
+    
+    for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i];
+        const y = (v + 1) * canvas.height / 2;
+        
+        // Change color to red when amplitude is close to clipping
+        ctx.strokeStyle = Math.abs(v) > 0.9 ? '#dc3545' : '#007bff';
+        
+        if (i === 0) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+        
+        x += sliceWidth;
+    }
+    
+    ctx.stroke();
+    
+    // Update progress bar
+    if (isPlaying && audioBuffer) {
+        const progress = (audioContext.currentTime - startTime) / audioBuffer.duration;
+        document.getElementById('progress').style.width = `${progress * 100}%`;
+    }
+    
+    if (isPlaying) {
+        requestAnimationFrame(drawWaveform);
+    }
+};
+
+// Reverse audio
+const reverseAudio = () => {
+    if (!audioBuffer) return;
+    
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const reversedBuffer = audioContext.createBuffer(
+        numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+    );
+    
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+        const channelData = audioBuffer.getChannelData(channel);
+        const reversedData = reversedBuffer.getChannelData(channel);
+        for (let i = 0; i < channelData.length; i++) {
+            reversedData[i] = channelData[channelData.length - 1 - i];
+        }
+    }
+    
+    audioBuffer = reversedBuffer;
+    isReversed = !isReversed;
+    document.getElementById('reverseButton').textContent = isReversed ? 'Unreverse' : 'Reverse';
+    
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+    drawWaveform();
+};
+
+// Handle file input
+document.getElementById('fileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const arrayBuffer = e.target.result;
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            document.getElementById('downloadButton').disabled = false;
+            document.getElementById('saveButton').disabled = false;
+            drawWaveform();
+            
+            // Load any saved preset
+            loadPreset();
+        } catch (error) {
+            console.error('Error loading audio file:', error);
+            alert('Error loading audio file. Please try a different file.');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+// Handle canvas click for seeking
+canvas.onclick = (e) => {
+    if (!audioBuffer) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    currentTime = (x / canvas.width) * audioBuffer.duration;
+    if (isPlaying) {
+        stopAudio();
+        playAudio();
+    }
+};
+
+// Initialize canvas size
+const resizeCanvas = () => {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    drawWaveform();
+};
+
+// Toggle play/pause
+const togglePlay = () => {
+    if (isPlaying) {
+        stopAudio();
+    } else {
+        playAudio();
+    }
+};
+
+// Event listeners
+document.getElementById('playButton').onclick = togglePlay;
+document.getElementById('resetButton').onclick = resetParams;
+document.getElementById('reverseButton').onclick = reverseAudio;
+document.querySelectorAll('input[type=range]').forEach(input => {
+    input.oninput = updateParams;
+});
+
+// Initialize audio context on first user interaction
+document.addEventListener('click', initAudio, {once: true});
+
+// Handle window resize
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Draw initial empty waveform
+ctx.fillStyle = '#f8f9fa';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+</script>
+</body>
+</html>
