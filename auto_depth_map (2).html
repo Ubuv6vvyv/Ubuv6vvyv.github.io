@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Depth Map Effect</title>
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    canvas { 
+      width: 100vw; 
+      height: 100vh; 
+      display: block; 
+      touch-action: none;
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      z-index: 100;
+      max-width: 300px;
+    }
+    #ui label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    #ui input {
+      margin-bottom: 10px;
+      width: 100%;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+    }
+    .mobile-notice {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <label>Upload Image:</label>
+    <input type="file" id="imageInput" accept="image/*">
+    
+    <div class="slider-label">
+      <label>Effect Strength:</label>
+      <span id="strengthValue">0.05</span>
+    </div>
+    <input type="range" id="effectStrength" min="0.01" max="0.2" step="0.01" value="0.05">
+    
+    <div class="slider-label">
+      <label>Depth Contrast:</label>
+      <span id="contrastValue">1.5</span>
+    </div>
+    <input type="range" id="depthContrast" min="0.5" max="3" step="0.1" value="1.5">
+    
+    <div class="slider-label">
+      <label>Blur Level:</label>
+      <span id="blurValue">5</span>
+    </div>
+    <input type="range" id="blurLevel" min="1" max="15" step="1" value="5">
+    
+    <div class="mobile-notice" id="mobileNotice"></div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <!-- Depth map generation shader -->
+  <script id="depthVs" type="x-shader/x-vertex">
+    attribute vec2 position;
+    attribute vec2 texcoord;
+    varying vec2 v_texcoord;
+    void main() {
+      gl_Position = vec4(position, 0, 1);
+      v_texcoord = texcoord;
+    }
+  </script>
+
+  <script id="depthFs" type="x-shader/x-fragment">
+    precision mediump float;
+    uniform sampler2D u_image;
+    uniform float u_contrast;
+    varying vec2 v_texcoord;
+    
+    void main() {
+      vec4 color = texture2D(u_image, v_texcoord);
+      float luminance = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+      
+      // Apply contrast adjustment
+      luminance = (luminance - 0.5) * u_contrast + 0.5;
+      luminance = clamp(luminance, 0.0, 1.0);
+      
+      // Invert for depth (brighter areas appear closer)
+      float depth = 1.0 - luminance;
+      
+      gl_FragColor = vec4(depth, depth, depth, 1.0);
+    }
+  </script>
+
+  <!-- Gaussian blur shader -->
+  <script id="blurFs" type="x-shader/x-fragment">
+    precision mediump float;
+    uniform sampler2D u_image;
+    uniform vec2 u_textureSize;
+    uniform vec2 u_direction;
+    uniform float u_radius;
+    varying vec2 v_texcoord;
+    
+    float gaussian(float x, float sigma) {
+      return exp(-(x * x) / (2.0 * sigma * sigma));
+    }
+    
+    void main() {
+      vec2 pixel = 1.0 / u_textureSize;
+      float sigma = u_radius / 3.0;
+      float weightSum = gaussian(0.0, sigma);
+      vec4 result = texture2D(u_image, v_texcoord) * weightSum;
+      
+      // Use a fixed loop with conditional to stay within the radius
+      // WebGL 1.0 requires loop conditions to use constant expressions
+      for (int i = 1; i <= 15; i++) {
+        if (float(i) > u_radius) break;
+        float fi = float(i);
+        float weight = gaussian(fi, sigma);
+        weightSum += 2.0 * weight;
+        result += texture2D(u_image, v_texcoord + pixel * fi * u_direction) * weight;
+        result += texture2D(u_image, v_texcoord - pixel * fi * u_direction) * weight;
+      }
+      
+      gl_FragColor = result / weightSum;
+    }
+  </script>
+
+  <!-- 3D effect shader -->
+  <script id="effectVs" type="x-shader/x-vertex">
+    attribute vec2 position;
+    attribute vec2 texcoord;
+    uniform mat3 u_matrix;
+    varying vec2 v_texcoord;
+    void main() {
+      gl_Position = vec4(u_matrix * vec3(position, 1), 1);
+      v_texcoord = texcoord;
+    }
+  </script>
+
+  <script id="effectFs" type="x-shader/x-fragment">
+    precision mediump float;
+    uniform vec2 u_mouse;
+    uniform float u_strength;
+    uniform sampler2D u_originalImage;
+    uniform sampler2D u_depthMap;
+    varying vec2 v_texcoord;
+    void main() {
+      vec4 depthDistortion = texture2D(u_depthMap, v_texcoord);
+      float parallaxMult = depthDistortion.r;
+      vec2 parallax = (u_mouse) * parallaxMult * u_strength;
+      vec4 original = texture2D(u_originalImage, (v_texcoord + parallax));
+      gl_FragColor = original;
+    }
+  </script>
+
+  <script src='https://cdn.jsdelivr.net/npm/twgl.js@4.21.2/dist/4.x/twgl-full.min.js'></script>
+  <script>
+  "use strict";
+
+  function main() {
+    // Get WebGL context
+    const canvas = document.getElementById("canvas");
+    const gl = canvas.getContext("webgl");
+    if (!gl) {
+      alert("WebGL not supported in your browser");
+      return;
+    }
+
+    // Create framebuffers for depth map processing
+    const depthMapSize = 512;
+    const fbTextures = twgl.createFramebufferInfo(gl, null, depthMapSize, depthMapSize);
+    const blurFbTextures = twgl.createFramebufferInfo(gl, null, depthMapSize, depthMapSize);
+    
+    // Compile shader programs
+    const depthProgramInfo = twgl.createProgramInfo(gl, ["depthVs", "depthFs"]);
+    const blurProgramInfo = twgl.createProgramInfo(gl, ["depthVs", "blurFs"]);
+    const effectProgramInfo = twgl.createProgramInfo(gl, ["effectVs", "effectFs"]);
+    const bufferInfo = twgl.primitives.createXYQuadBufferInfo(gl);
+
+    // Default image
+    let originalImage = { width: 1, height: 1 };
+    let originalTexture = twgl.createTexture(gl, {
+      src: "https://robindelaporte.fr/codepen/dog1.jpg",
+      crossOrigin: '',
+    }, (err, texture, source) => {
+      originalImage = source;
+      generateDepthMap();
+    });
+    
+    // Create depth map texture
+    let depthMapTexture = twgl.createTexture(gl, {
+      width: depthMapSize,
+      height: depthMapSize,
+      min: gl.LINEAR,
+      mag: gl.LINEAR,
+    });
+
+    // Tracking variables
+    const mouse = [0, 0];
+    const nMouse = [0, 0];
+    let effectStrength = 0.05;
+    let depthContrast = 1.5;
+    let blurLevel = 5;
+    let isMoving = false;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let gyroEnabled = false;
+    
+    // UI Controls
+    const imageInput = document.getElementById('imageInput');
+    const strengthSlider = document.getElementById('effectStrength');
+    const strengthValue = document.getElementById('strengthValue');
+    const contrastSlider = document.getElementById('depthContrast');
+    const contrastValue = document.getElementById('contrastValue');
+    const blurSlider = document.getElementById('blurLevel');
+    const blurValue = document.getElementById('blurValue');
+    const mobileNotice = document.getElementById('mobileNotice');
+    
+    // Check if mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      mobileNotice.textContent = "Tilt your device or use touch to see the 3D effect";
+    } else {
+      mobileNotice.textContent = "Move your mouse to see the 3D effect";
+    }
+    
+    // File upload handler
+    imageInput.addEventListener('change', function(e) {
+      loadImageFromFile(e.target.files[0], (texture, source) => {
+        originalTexture = texture;
+        originalImage = source;
+        generateDepthMap();
+      });
+    });
+    
+    // Control listeners
+    strengthSlider.addEventListener('input', function() {
+      effectStrength = parseFloat(this.value);
+      strengthValue.textContent = effectStrength.toFixed(2);
+    });
+    
+    contrastSlider.addEventListener('input', function() {
+      depthContrast = parseFloat(this.value);
+      contrastValue.textContent = depthContrast.toFixed(1);
+      generateDepthMap();
+    });
+    
+    blurSlider.addEventListener('input', function() {
+      blurLevel = parseFloat(this.value);
+      blurValue.textContent = blurLevel.toFixed(0);
+      generateDepthMap();
+    });
+
+    // Load image from file
+    function loadImageFromFile(file, callback) {
+      if (!file || !file.type.match(/image.*/)) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const texture = twgl.createTexture(gl, { 
+            src: img, 
+            flipY: true 
+          });
+          callback(texture, img);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Generate depth map from original image
+    function generateDepthMap() {
+      // Step 1: Generate basic depth map
+      twgl.bindFramebufferInfo(gl, fbTextures);
+      gl.viewport(0, 0, depthMapSize, depthMapSize);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+      gl.useProgram(depthProgramInfo.program);
+      twgl.setBuffersAndAttributes(gl, depthProgramInfo, bufferInfo);
+      twgl.setUniforms(depthProgramInfo, {
+        u_image: originalTexture,
+        u_contrast: depthContrast
+      });
+      twgl.drawBufferInfo(gl, bufferInfo);
+      
+      // Step 2: Apply horizontal blur
+      twgl.bindFramebufferInfo(gl, blurFbTextures);
+      gl.viewport(0, 0, depthMapSize, depthMapSize);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+      gl.useProgram(blurProgramInfo.program);
+      twgl.setBuffersAndAttributes(gl, blurProgramInfo, bufferInfo);
+      twgl.setUniforms(blurProgramInfo, {
+        u_image: fbTextures.attachments[0],
+        u_textureSize: [depthMapSize, depthMapSize],
+        u_direction: [1, 0],
+        u_radius: Math.min(blurLevel, 15.0) // Ensure radius doesn't exceed shader limit
+      });
+      twgl.drawBufferInfo(gl, bufferInfo);
+      
+      // Step 3: Apply vertical blur
+      twgl.bindFramebufferInfo(gl, null);
+      gl.bindTexture(gl.TEXTURE_2D, depthMapTexture);
+      gl.viewport(0, 0, depthMapSize, depthMapSize);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+      gl.useProgram(blurProgramInfo.program);
+      twgl.setBuffersAndAttributes(gl, blurProgramInfo, bufferInfo);
+      twgl.setUniforms(blurProgramInfo, {
+        u_image: blurFbTextures.attachments[0],
+        u_textureSize: [depthMapSize, depthMapSize],
+        u_direction: [0, 1],
+        u_radius: Math.min(blurLevel, 15.0) // Ensure radius doesn't exceed shader limit
+      });
+      twgl.drawBufferInfo(gl, bufferInfo);
+      
+      // Copy result to depth map texture
+      gl.bindTexture(gl.TEXTURE_2D, depthMapTexture);
+      gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, depthMapSize, depthMapSize, 0);
+    }
+
+    // Mouse and touch event handlers
+    function updateMousePosition(clientX, clientY, multiplier = 1) {
+      mouse[0] = (clientX / gl.canvas.clientWidth * 2 - 1) * -0.1 * multiplier;
+      mouse[1] = (clientY / gl.canvas.clientHeight * 2 - 1) * -0.1 * multiplier;
+      isMoving = true;
+      resetMovingTimeout();
+    }
+    
+    function resetMovingTimeout() {
+      if (window.moveTimeout) clearTimeout(window.moveTimeout);
+      window.moveTimeout = setTimeout(() => {
+        isMoving = false;
+      }, 100);
+    }
+
+    document.addEventListener('mousemove', (event) => {
+      updateMousePosition(event.clientX, event.clientY);
+    });
+    
+    document.addEventListener('touchstart', (event) => {
+      if (event.touches.length > 0) {
+        lastTouchX = event.touches[0].clientX;
+        lastTouchY = event.touches[0].clientY;
+      }
+    });
+    
+    document.addEventListener('touchmove', (event) => {
+      if (event.touches.length > 0) {
+        const touchX = event.touches[0].clientX;
+        const touchY = event.touches[0].clientY;
+        
+        // Calculate the delta from last position for stronger effect
+        const deltaX = touchX - lastTouchX;
+        const deltaY = touchY - lastTouchY;
+        
+        updateMousePosition(touchX, touchY, 2); // Enhanced multiplier for touch
+        
+        lastTouchX = touchX;
+        lastTouchY = touchY;
+      }
+      event.preventDefault();
+    });
+    
+    document.addEventListener('touchend', () => {
+      // Gently reset mouse position
+      setTimeout(() => {
+        mouse[0] = 0;
+        mouse[1] = 0;
+      }, 300);
+    });
+    
+    // Use device orientation if available
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', (event) => {
+        if (!isMoving && event.beta !== null && event.gamma !== null) {
+          gyroEnabled = true;
+          const tiltLR = event.gamma / 45; // Left-right tilt in degrees (-90 to 90)
+          const tiltFB = event.beta / 45;  // Front-back tilt in degrees (-180 to 180)
+          
+          mouse[0] = -tiltLR * 0.1;
+          mouse[1] = -tiltFB * 0.1;
+        }
+      });
+    }
+    
+    // Animation loop
+    requestAnimationFrame(render);
+    
+    function render() {
+      // Resize canvas
+      twgl.resizeCanvasToDisplaySize(gl.canvas);
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+      // Use the 3D effect shader program
+      gl.useProgram(effectProgramInfo.program);
+      twgl.setBuffersAndAttributes(gl, effectProgramInfo, bufferInfo);
+
+      // Calculate aspect ratio
+      const canvasAspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+      const imageAspect = originalImage.width / originalImage.height;
+      const mat = m3.scaling(imageAspect / canvasAspect, -1);
+      
+      // Smoother mouse movement with enhanced response
+      const damping = isMoving ? 0.2 : 0.05; // Faster response when actively moving
+      nMouse[0] += (mouse[0] - nMouse[0]) * damping;
+      nMouse[1] += (mouse[1] - nMouse[1]) * damping;
+      
+      // Set uniforms for the effect shader
+      twgl.setUniforms(effectProgramInfo, {
+        u_matrix: mat,
+        u_originalImage: originalTexture,
+        u_depthMap: depthMapTexture,
+        u_mouse: nMouse,
+        u_strength: effectStrength,
+      });
+      
+      // Draw
+      twgl.drawBufferInfo(gl, bufferInfo);
+      requestAnimationFrame(render);
+    }
+  }
+
+  // Simple matrix functions
+  const m3 = {
+    scaling: function(sx, sy) {
+      return [
+        sx, 0, 0,
+        0, sy, 0,
+        0, 0, 1,
+      ];
+    }
+  };
+
+  // Start the app
+  window.onload = main;
+  </script>
+</body>
+</html>
