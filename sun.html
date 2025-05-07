@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sun & Moon Finder</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #f59e0b;
+      --primary-dark: #d97706;
+      --primary-light: #fef3c7;
+      --secondary: #3b82f6;
+      --secondary-dark: #1e40af;
+      --secondary-light: #dbeafe;
+      --dark: #1f2937;
+      --light: #f9fafb;
+      --gray: #6b7280;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    
+    body {
+      background-color: var(--light);
+      color: var(--dark);
+      line-height: 1.5;
+    }
+    
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+    
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 1rem 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    header h1 {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .search-container {
+      margin: 1rem 0;
+      position: relative;
+    }
+    
+    .search-box {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .search-box:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+    }
+    
+    .gps-button {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--gray);
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    
+    .gps-button:hover {
+      color: var(--primary);
+    }
+    
+    .tabs {
+      display: flex;
+      margin: 1rem 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .tab {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-weight: 500;
+      color: var(--gray);
+      transition: all 0.2s;
+      flex: 1;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 1rem 0;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .card {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    
+    .now-card {
+      background: linear-gradient(to right, var(--primary-light), var(--secondary-light));
+      color: var(--dark);
+      text-align: center;
+      padding: 1.5rem 1rem;
+    }
+    
+    .now-card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .time-row:last-child {
+      border-bottom: none;
+    }
+    
+    .time-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .time-value {
+      font-weight: 500;
+    }
+    
+    .quality-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      justify-content: center;
+    }
+    
+    .quality-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .quality-excellent {
+      background-color: var(--success);
+    }
+    
+    .quality-good {
+      background-color: var(--primary);
+    }
+    
+    .quality-poor {
+      background-color: var(--danger);
+    }
+    
+    .compass-container {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      margin: 0 auto;
+    }
+    
+    .compass {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: var(--primary-light);
+      border: 2px solid var(--primary-dark);
+      position: relative;
+    }
+    
+    .direction-marker {
+      position: absolute;
+      font-weight: bold;
+      color: var(--primary-dark);
+    }
+    
+    .direction-n {
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    
+    .direction-e {
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    
+    .direction-s {
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    
+    .direction-w {
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    
+    .sun-marker {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #f59e0b 60%, rgba(245, 158, 11, 0.3) 100%);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+    }
+    
+    .moon-marker {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #d1d5db 60%, rgba(209, 213, 219, 0.3) 100%);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px rgba(209, 213, 219, 0.8);
+    }
+    
+    .center-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--dark);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    
+    .sun-line, .moon-line {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      height: 2px;
+      transform-origin: left center;
+      z-index: 1;
+    }
+    
+    .sun-line {
+      background-color: var(--primary-dark);
+    }
+    
+    .moon-line {
+      background-color: var(--gray);
+    }
+    
+    .compass-note {
+      text-align: center;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--gray);
+    }
+    
+    .flex-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .moon-phase-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    
+    .moon-phase {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      position: relative;
+      background-color: #d1d5db;
+      overflow: hidden;
+    }
+    
+    .moon-phase-shadow {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: var(--dark);
+      top: 0;
+      left: 0;
+      transform-origin: center center;
+    }
+    
+    .moon-info {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    
+    .phase-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .phase-percent {
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+    
+    .weather-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .weather-info {
+      flex: 1;
+    }
+    
+    .weather-icon {
+      font-size: 2.5rem;
+      color: var(--primary);
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--gray);
+    }
+    
+    .error-message {
+      color: var(--danger);
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .location-suggestions {
+      position: absolute;
+      width: 100%;
+      background: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 10;
+      display: none;
+    }
+    
+    .location-suggestion {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+    }
+    
+    .location-suggestion:last-child {
+      border-bottom: none;
+    }
+    
+    .location-suggestion:hover {
+      background-color: #f9fafb;
+    }
+    
+    .current-location {
+      font-size: 0.9rem;
+      color: var(--gray);
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    
+    .golden-hour-status {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .golden-hour-countdown {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    
+    .golden-hour-happening {
+      color: var(--success);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        opacity: 0.7;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0.7;
+      }
+    }
+    
+    .notification-banner {
+      background-color: var(--primary);
+      color: white;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      display: none;
+    }
+    
+    .notification-banner.show {
+      display: flex;
+    }
+    
+    .notification-close {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    
+    .map-container {
+      height: 200px;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+    
+    @media (max-width: 480px) {
+      .card {
+        border-radius: 0;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        width: calc(100% + 2rem);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><i class="fas fa-sun"></i> Sun & Moon Finder</h1>
+    </div>
+  </header>
+  
+  <div class="container">
+    <div class="search-container">
+      <input type="text" class="search-box" id="location-search" placeholder="Search location...">
+      <button class="gps-button" id="gps-button">
+        <i class="fas fa-crosshairs"></i>
+      </button>
+      <div class="location-suggestions" id="location-suggestions"></div>
+    </div>
+    
+    <div class="current-location" id="current-location">
+      Getting your location...
+    </div>
+    
+    <div class="notification-banner" id="golden-hour-notification">
+      <div>
+        <i class="fas fa-bell"></i>
+        Golden hour is happening now!
+      </div>
+      <button class="notification-close" id="notification-close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="now-card card" id="now-card">
+      <div class="loading">Loading data...</div>
+    </div>
+    
+    <div class="tabs">
+      <div class="tab active" data-tab="golden-hour">
+        <i class="fas fa-sun"></i> Golden Hour
+      </div>
+      <div class="tab" data-tab="sun-moon">
+        <i class="fas fa-moon"></i> Sun & Moon
+      </div>
+      <div class="tab" data-tab="compass">
+        <i class="fas fa-compass"></i> Compass
+      </div>
+    </div>
+    
+    <div class="tab-content active" id="golden-hour-tab">
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-clock"></i> Today's Golden Hours
+        </div>
+        <div id="golden-hour-times">
+          <div class="loading">Loading times...</div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-cloud-sun"></i> Weather Conditions
+        </div>
+        <div id="weather-container">
+          <div class="loading">Loading weather...</div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-camera"></i> Golden Hour Quality
+        </div>
+        <div id="quality-container">
+          <div class="loading">Analyzing conditions...</div>
+        </div>
+      </div>
+      
+      <div class="map-container" id="map"></div>
+    </div>
+    
+    <div class="tab-content" id="sun-moon-tab">
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-sun"></i> Sun Times
+        </div>
+        <div id="sun-times">
+          <div class="loading">Loading sun data...</div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-moon"></i> Moon Times
+        </div>
+        <div id="moon-times">
+          <div class="loading">Loading moon data...</div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-star-half-alt"></i> Moon Phase
+        </div>
+        <div class="moon-phase-container">
+          <div class="moon-phase" id="moon-phase">
+            <div class="moon-phase-shadow" id="moon-phase-shadow"></div>
+          </div>
+          <div class="moon-info">
+            <div class="phase-name" id="phase-name">Loading phase...</div>
+            <div class="phase-percent" id="phase-percent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tab-content" id="compass-tab">
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-compass"></i> Sun Direction
+        </div>
+        <div class="compass-container">
+          <div class="compass" id="sun-compass">
+            <div class="direction-marker direction-n">N</div>
+            <div class="direction-marker direction-e">E</div>
+            <div class="direction-marker direction-s">S</div>
+            <div class="direction-marker direction-w">W</div>
+            <div class="center-dot"></div>
+            <div class="sun-line" id="sun-line"></div>
+            <div class="sun-marker" id="sun-marker"></div>
+          </div>
+        </div>
+        <div class="compass-note" id="compass-note">
+          For accurate direction, allow compass access or rotate your device.
+        </div>
+        <div class="flex-center" style="margin-top: 1rem;">
+          <div>
+            <p>Sun azimuth: <span id="sun-azimuth">--°</span></p>
+            <p>Sun altitude: <span id="sun-altitude">--°</span></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-moon"></i> Moon Direction
+        </div>
+        <div class="compass-container">
+          <div class="compass" id="moon-compass">
+            <div class="direction-marker direction-n">N</div>
+            <div class="direction-marker direction-e">E</div>
+            <div class="direction-marker direction-s">S</div>
+            <div class="direction-marker direction-w">W</div>
+            <div class="center-dot"></div>
+            <div class="moon-line" id="moon-line"></div>
+            <div class="moon-marker" id="moon-marker"></div>
+          </div>
+        </div>
+        <div class="flex-center" style="margin-top: 1rem;">
+          <div>
+            <p>Moon azimuth: <span id="moon-azimuth">--°</span></p>
+            <p>Moon altitude: <span id="moon-altitude">--°</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SunCalc Library - Already included from the provided document -->
+  <script>!function(){"use strict";var n=Math.PI,t=Math.sin,e=Math.cos,r=Math.tan,a=Math.asin,u=Math.atan2,o=Math.acos,i=n/180,c=864e5,d=2440588,s=2451545;function f(n){return new Date((n+.5-d)*c)}function l(n){return function(n){return n.valueOf()/c-.5+d}(n)-s}var h=23.4397*i;function M(n,a){return u(t(n)*e(h)-r(a)*t(h),e(n))}function v(n,r){return a(t(r)*e(h)+e(r)*t(h)*t(n))}function g(n,a,o){return u(t(n),e(n)*t(a)-r(o)*e(a))}function w(n,r,u){return a(t(r)*t(u)+e(r)*e(u)*e(n))}function m(n,t){return i*(280.16+360.9856235*n)-t}function p(n){return i*(357.5291+.98560028*n)}function D(e){return e+i*(1.9148*t(e)+.02*t(2*e)+3e-4*t(3*e))+102.9372*i+n}function P(n){var t=D(p(n));return{dec:v(t,0),ra:M(t,0)}}var y={getPosition:function(n,t,e){var r=i*-e,a=i*t,u=l(n),o=P(u),c=m(u,r)-o.ra;return{azimuth:g(c,a,o.dec),altitude:w(c,a,o.dec)}}},b=y.times=[[-.833,"sunrise","sunset"],[-.3,"sunriseEnd","sunsetStart"],[-6,"dawn","dusk"],[-12,"nauticalDawn","nauticalDusk"],[-18,"nightEnd","night"],[6,"goldenHourEnd","goldenHour"]];y.addTime=function(n,t,e){b.push([n,t,e])};var H=9e-4;function T(t,e,r){return H+(t+e)/(2*n)+r}function E(n,e,r){return s+n+.0053*t(e)-.0069*t(2*r)}function I(n,r,a,u,i,c,d){var s=function(n,r,a){return o((t(n)-t(r)*t(a))/(e(r)*e(a)))}(n,a,u);return E(T(s,r,i),c,d)}function k(n){var r=i*(134.963+13.064993*n),a=i*(93.272+13.22935*n),u=i*(218.316+13.176396*n)+6.289*i*t(r),o=5.128*i*t(a),c=385001-20905*e(r);return{ra:M(u,o),dec:v(u,o),dist:c}}function q(n,t){return new Date(n.valueOf()+t*c/24)}y.getTimes=function(t,e,r,a){var u,o,c,d,s,h=i*-r,M=i*e,g=function(n){return-2.076*Math.sqrt(n)/60}(a=a||0),w=function(t,e){return Math.round(t-H-e/(2*n))}(l(t),h),m=T(0,h,w),P=p(m),y=D(P),k=v(y,0),q=E(m,P,y),x={solarNoon:f(q),nadir:f(q-.5)};for(u=0,o=b.length;u<o;u+=1)s=q-((d=I(((c=b[u])[0]+g)*i,h,M,k,w,P,y))-q),x[c[1]]=f(s),x[c[2]]=f(d);return x},y.getMoonPosition=function(n,a,o){var c=i*-o,d=i*a,s=l(n),f=k(s),h=m(s,c)-f.ra,M=w(h,d,f.dec),v=u(t(h),r(d)*e(f.dec)-t(f.dec)*e(h));return M+=function(n){return n<0&&(n=0),2967e-7/Math.tan(n+.00312536/(n+.08901179))}(M),{azimuth:g(h,d,f.dec),altitude:M,distance:f.dist,parallacticAngle:v}},y.getMoonIllumination=function(n){var r=l(n||new Date),a=P(r),i=k(r),c=149598e3,d=o(t(a.dec)*t(i.dec)+e(a.dec)*e(i.dec)*e(a.ra-i.ra)),s=u(c*t(d),i.dist-c*e(d)),f=u(e(a.dec)*t(a.ra-i.ra),t(a.dec)*e(i.dec)-e(a.dec)*t(i.dec)*e(a.ra-i.ra));return{fraction:(1+e(s))/2,phase:.5+.5*s*(f<0?-1:1)/Math.PI,angle:f}},y.getMoonTimes=function(n,t,e,r){var a=new Date(n);r?a.setUTCHours(0,0,0,0):a.setHours(0,0,0,0);for(var u,o,c,d,s,f,l,h,M,v,g,w,m,p=.133*i,D=y.getMoonPosition(a,t,e).altitude-p,P=1;P<=24&&(u=y.getMoonPosition(q(a,P),t,e).altitude-p,h=((s=(D+(o=y.getMoonPosition(q(a,P+1),t,e).altitude-p))/2-u)*(l=-(f=(o-D)/2)/(2*s))+f)*l+u,v=0,(M=f*f-4*s*u)>=0&&(g=l-(m=Math.sqrt(M)/(2*Math.abs(s))),w=l+m,Math.abs(g)<=1&&v++,Math.abs(w)<=1&&v++,g<-1&&(g=w)),1===v?D<0?c=P+g:d=P+g:2===v&&(c=P+(h<0?w:g),d=P+(h<0?g:w)),!c||!d);P+=2)D=o;var b={};return c&&(b.rise=q(a,c)),d&&(b.set=q(a,d)),c||d||(b[h>0?"alwaysUp":"alwaysDown"]=!0),b},"object"==typeof exports&&"undefined"!=typeof module?module.exports=y:"function"==typeof define&&define.amd?define(y):window.SunCalc=y}()</script>
+  
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places"></script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // App state
+      const state = {
+        lat: null,
+        lng: null,
+        locationName: '',
+        sunTimes: null,
+        moonTimes: null,
+        moonIllumination: null,
+        weather: null,
+        deviceOrientation: null,
+        map: null,
+        compassAvailable: false,
+        autocompleteService: null,
+        placesService: null,
+        geocoder: null
+      };
+      
+      // DOM Elements
+      const elements = {
+        tabs: document.querySelectorAll('.tab'),
+        tabContents: document.querySelectorAll('.tab-content'),
+        locationSearch: document.getElementById('location-search'),
+        gpsButton: document.getElementById('gps-button'),
+        currentLocation: document.getElementById('current-location'),
+        nowCard: document.getElementById('now-card'),
+        goldenHourTimes: document.getElementById('golden-hour-times'),
+        weatherContainer: document.getElementById('weather-container'),
+        qualityContainer: document.getElementById('quality-container'),
+        sunTimes: document.getElementById('sun-times'),
+        moonTimes: document.getElementById('moon-times'),
+        moonPhase: document.getElementById('moon-phase'),
+        moonPhaseShadow: document.getElementById('moon-phase-shadow'),
+        phaseName: document.getElementById('phase-name'),
+        phasePercent: document.getElementById('phase-percent'),
+        sunCompass: document.getElementById('sun-compass'),
+        moonCompass: document.getElementById('moon-compass'),
+        sunMarker: document.getElementById('sun-marker'),
+        moonMarker: document.getElementById('moon-marker'),
+        sunLine: document.getElementById('sun-line'),
+        moonLine: document.getElementById('moon-line'),
+        compassNote: document.getElementById('compass-note'),
+        sunAzimuth: document.getElementById('sun-azimuth'),
+        sunAltitude: document.getElementById('sun-altitude'),
+        moonAzimuth: document.getElementById('moon-azimuth'),
+        moonAltitude: document.getElementById('moon-altitude'),
+        locationSuggestions: document.getElementById('location-suggestions'),
+        goldenHourNotification: document.getElementById('golden-hour-notification'),
+        notificationClose: document.getElementById('notification-close'),
+        mapContainer: document.getElementById('map')
+      };
+      
+      // Initialize Google Maps services
+      state.autocompleteService = new google.maps.places.AutocompleteService();
+      state.placesService = new google.maps.places.PlacesService(document.createElement('div'));
+      state.geocoder = new google.maps.Geocoder();
+      
+      // Initialize map
+      function initMap(lat, lng) {
+        if (state.map) {
+          state.map.setCenter({ lat, lng });
+          return;
+        }
+        
+        state.map = new google.maps.Map(elements.mapContainer, {
+          center: { lat, lng },
+          zoom: 13,
+          mapTypeId: 'terrain',
+          streetViewControl: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          zoomControl: true,
+          styles: [
+            {
+              featureType: 'landscape',
+              elementType: 'geometry',
+              stylers: [{ color: '#f9f9f9' }]
+            },
+            {
+              featureType: 'water',
+              elementType: 'geometry',
+              stylers: [{ color: '#a3ccff' }]
+            }
+          ]
+        });
+        
+        // Add a marker for the current location
+        new google.maps.Marker({
+          position: { lat, lng },
+          map: state.map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#f59e0b',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 8
+          }
+        });
+      }
+      
+      // Tab navigation
+      elements.tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          const tabId = this.getAttribute('data-tab');
+          
+          // Remove active class from all tabs and contents
+          elements.tabs.forEach(t => t.classList.remove('active'));
+          elements.tabContents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to current tab and content
+          this.classList.add('active');
+          document.getElementById(`${tabId}-tab`).classList.add('active');
+        });
+      });
+      
+      // Get current location
+      elements.gpsButton.addEventListener('click', getCurrentLocation);
+      
+      function getCurrentLocation() {
+        if (navigator.geolocation) {
+          elements.currentLocation.textContent = 'Getting your location...';
+          navigator.geolocation.getCurrentPosition(
+            position => {
+              state.lat = position.coords.latitude;
+              state.lng = position.coords.longitude;
+              
+              // Reverse geocode to get location name
+              state.geocoder.geocode({ location: { lat: state.lat, lng: state.lng } }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                  state.locationName = results[0].formatted_address;
+                  elements.currentLocation.textContent = state.locationName;
+                  elements.locationSearch.value = '';
+                } else {
+                  elements.currentLocation.textContent = `${state.lat.toFixed(4)}, ${state.lng.toFixed(4)}`;
+                }
+              });
+              
+              // Initialize app with current location
+              initApp();
+            },
+            error => {
+              console.error('Error getting location:', error);
+              elements.currentLocation.textContent = 'Location access denied. Please search for a location.';
+              
+              // Default to a location (New York)
+              state.lat = 40.7128;
+              state.lng = -74.0060;
+              state.locationName = 'New York, NY, USA';
+              initApp();
+            }
+          );
+        } else {
+          elements.currentLocation.textContent = 'Geolocation not supported. Please search for a location.';
+        }
+      }
+      
+      // Location search
+      elements.locationSearch.addEventListener('input', debounce(function() {
+        const query = this.value.trim();
+        
+        if (query.length > 2) {
+          state.autocompleteService.getPlacePredictions(
+            { input: query },
+            (predictions, status) => {
+              if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+                elements.locationSuggestions.style.display = 'none';
+                return;
+              }
+              
+              elements.locationSuggestions.innerHTML = '';
+              predictions.forEach(prediction => {
+                const item = document.createElement('div');
+                item.className = 'location-suggestion';
+                item.textContent = prediction.description;
+                item.addEventListener('click', () => {
+                  elements.locationSearch.value = prediction.description;
+                  elements.locationSuggestions.style.display = 'none';
+                  
+                  // Get place details
+                  state.placesService.getDetails(
+                    { placeId: prediction.place_id, fields: ['geometry', 'formatted_address'] },
+                    (place, status) => {
+                      if (status === google.maps.places.PlacesServiceStatus.OK && place && place.geometry && place.geometry.location) {
+                        state.lat = place.geometry.location.lat();
+                        state.lng = place.geometry.location.lng();
+                        state.locationName = place.formatted_address;
+                        elements.currentLocation.textContent = state.locationName;
+                        
+                        // Update app with new location
+                        initApp();
+                      }
+                    }
+                  );
+                });
+                elements.locationSuggestions.appendChild(item);
+              });
+              
+              elements.locationSuggestions.style.display = 'block';
+            }
+          );
+        } else {
+          elements.locationSuggestions.style.display = 'none';
+        }
+      }, 300));
+      
+      // Hide suggestions when clicking outside
+      document.addEventListener('click', function(e) {
+        if (e.target !== elements.locationSearch && e.target !== elements.locationSuggestions) {
+          elements.locationSuggestions.style.display = 'none';
+        }
+      });
+      
+      // Close notification
+      elements.notificationClose.addEventListener('click', function() {
+        elements.goldenHourNotification.classList.remove('show');
+      });
+      
+      // Initialize app
+      function initApp() {
+        if (!state.lat || !state.lng) {
+          getCurrentLocation();
+          return;
+        }
+        
+        // Update map
+        initMap(state.lat, state.lng);
+        
+        // Get sun and moon data
+        updateSunMoonData();
+        
+        // Get weather data
+        getWeatherData();
+        
+        // Setup compass if available
+        setupCompass();
+        
+        // Set up interval to update data
+        setInterval(updateSunMoonData, 60000); // Update every minute
+      }
+      
+      // Update sun and moon data
+      function updateSunMoonData() {
+        const now = new Date();
+        const sunTimes = SunCalc.getTimes(now, state.lat, state.lng);
+        const moonTimes = SunCalc.getMoonTimes(now, state.lat, state.lng);
+        const moonIllumination = SunCalc.getMoonIllumination(now);
+        const sunPosition = SunCalc.getPosition(now, state.lat, state.lng);
+        const moonPosition = SunCalc.getMoonPosition(now, state.lat, state.lng);
+        
+        state.sunTimes = sunTimes;
+        state.moonTimes = moonTimes;
+        state.moonIllumination = moonIllumination;
+        state.sunPosition = sunPosition;
+        state.moonPosition = moonPosition;
+        
+        // Update UI
+        updateNowCard();
+        updateGoldenHourTimes();
+        updateSunTimesCard();
+        updateMoonTimesCard();
+        updateMoonPhase();
+        updateCompass();
+      }
+      
+      // Update now card
+      function updateNowCard() {
+        const now = new Date();
+        const sunPosition = state.sunPosition;
+        const isDay = sunPosition.altitude > 0;
+        
+        let status = '';
+        let nextEvent = '';
+        let timeUntil = '';
+        let isGoldenHour = false;
+        
+        // Check if it's currently golden hour
+        if (isInGoldenHour(now)) {
+          status = 'Golden hour is happening now!';
+          isGoldenHour = true;
+          
+          // Show notification
+          elements.goldenHourNotification.classList.add('show');
+          
+          // Calculate time remaining in golden hour
+          if (now < state.sunTimes.sunset) {
+            const minutesRemaining = Math.round((state.sunTimes.sunset - now) / 60000);
+            timeUntil = `${minutesRemaining} minutes remaining`;
+          } else {
+            const minutesRemaining = Math.round((state.sunTimes.goldenHourEnd - now) / 60000);
+            timeUntil = `${minutesRemaining} minutes remaining`;
+          }
+        } else {
+          // Find next golden hour
+          let nextGoldenHour;
+          
+          if (now < state.sunTimes.goldenHourEnd) {
+            nextGoldenHour = state.sunTimes.goldenHourEnd;
+            nextEvent = 'Morning golden hour ending';
+          } else if (now < state.sunTimes.goldenHour) {
+            nextGoldenHour = state.sunTimes.goldenHour;
+            nextEvent = 'Evening golden hour starting';
+          } else {
+            // Get tomorrow's sunrise
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowTimes = SunCalc.getTimes(tomorrow, state.lat, state.lng);
+            nextGoldenHour = tomorrowTimes.sunrise;
+            nextEvent = 'Tomorrow morning golden hour';
+          }
+          
+          const timeDiff = nextGoldenHour - now;
+          const hours = Math.floor(timeDiff / 3600000);
+          const minutes = Math.floor((timeDiff % 3600000) / 60000);
+          
+          timeUntil = `${hours}h ${minutes}m`;
+          status = `Next golden hour in ${timeUntil}`;
+        }
+        
+        elements.nowCard.innerHTML = `
+          <h2>${isDay ? 'Day' : 'Night'}</h2>
+          <div class="golden-hour-status ${isGoldenHour ? 'golden-hour-happening' : ''}">${status}</div>
+          ${nextEvent ? `<div class="golden-hour-countdown">${nextEvent}: ${timeUntil}</div>` : ''}
+          <div class="quality-indicator">
+            ${state.weather ? getQualityIndicator(state.weather) : ''}
+          </div>
+        `;
+      }
+      
+      // Check if current time is during golden hour
+      function isInGoldenHour(date) {
+        if (!state.sunTimes) return false;
+        
+        const morning = date >= state.sunTimes.sunrise && date <= state.sunTimes.goldenHourEnd;
+        const evening = date >= state.sunTimes.goldenHour && date <= state.sunTimes.sunset;
+        
+        return morning || evening;
+      }
+      
+      // Update golden hour times
+      function updateGoldenHourTimes() {
+        if (!state.sunTimes) return;
+        
+        const morningStart = formatTime(state.sunTimes.sunrise);
+        const morningEnd = formatTime(state.sunTimes.goldenHourEnd);
+        const eveningStart = formatTime(state.sunTimes.goldenHour);
+        const eveningEnd = formatTime(state.sunTimes.sunset);
+        
+        const morningDuration = Math.round((state.sunTimes.goldenHourEnd - state.sunTimes.sunrise) / 60000);
+        const eveningDuration = Math.round((state.sunTimes.sunset - state.sunTimes.goldenHour) / 60000);
+        
+        elements.goldenHourTimes.innerHTML = `
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary);"></i> Morning Start
+            </div>
+            <div class="time-value">${morningStart}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary-dark);"></i> Morning End
+            </div>
+            <div class="time-value">${morningEnd}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-hourglass-half"></i> Morning Duration
+            </div>
+            <div class="time-value">${morningDuration} minutes</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary-dark);"></i> Evening Start
+            </div>
+            <div class="time-value">${eveningStart}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary);"></i> Evening End
+            </div>
+            <div class="time-value">${eveningEnd}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-hourglass-half"></i> Evening Duration
+            </div>
+            <div class="time-value">${eveningDuration} minutes</div>
+          </div>
+        `;
+      }
+      
+      // Update sun times card
+      function updateSunTimesCard() {
+        if (!state.sunTimes) return;
+        
+        elements.sunTimes.innerHTML = `
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary);"></i> Sunrise
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.sunrise)}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--secondary);"></i> Solar Noon
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.solarNoon)}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-sun" style="color: var(--primary);"></i> Sunset
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.sunset)}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-moon" style="color: var(--gray);"></i> Nadir
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.nadir)}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-cloud-sun" style="color: var(--primary-light);"></i> Dawn
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.dawn)}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-cloud-sun" style="color: var(--primary-dark);"></i> Dusk
+            </div>
+            <div class="time-value">${formatTime(state.sunTimes.dusk)}</div>
+          </div>
+        `;
+      }
+      
+      // Update moon times card
+      function updateMoonTimesCard() {
+        if (!state.moonTimes) return;
+        
+        let moonriseTime = '---';
+        let moonsetTime = '---';
+        let moonStatus = '';
+        
+        if (state.moonTimes.rise) {
+          moonriseTime = formatTime(state.moonTimes.rise);
+        }
+        
+        if (state.moonTimes.set) {
+          moonsetTime = formatTime(state.moonTimes.set);
+        }
+        
+        if (state.moonTimes.alwaysUp) {
+          moonStatus = 'Moon is always up today';
+        } else if (state.moonTimes.alwaysDown) {
+          moonStatus = 'Moon is always down today';
+        }
+        
+        elements.moonTimes.innerHTML = `
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-moon" style="color: var(--gray);"></i> Moonrise
+            </div>
+            <div class="time-value">${moonriseTime}</div>
+          </div>
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-moon" style="color: var(--dark);"></i> Moonset
+            </div>
+            <div class="time-value">${moonsetTime}</div>
+          </div>
+          ${moonStatus ? `
+          <div class="time-row">
+            <div class="time-label">
+              <i class="fas fa-info-circle"></i> Status
+            </div>
+            <div class="time-value">${moonStatus}</div>
+          </div>
+          ` : ''}
+        `;
+      }
+      
+      // Update moon phase
+      function updateMoonPhase() {
+        if (!state.moonIllumination) return;
+        
+        const phase = state.moonIllumination.phase;
+        const fraction = state.moonIllumination.fraction;
+        let phaseName = '';
+        
+        // Determine phase name
+        if (phase < 0.03 || phase > 0.97) {
+          phaseName = 'New Moon';
+        } else if (phase < 0.23) {
+          phaseName = 'Waxing Crescent';
+        } else if (phase < 0.27) {
+          phaseName = 'First Quarter';
+        } else if (phase < 0.48) {
+          phaseName = 'Waxing Gibbous';
+        } else if (phase < 0.52) {
+          phaseName = 'Full Moon';
+        } else if (phase < 0.73) {
+          phaseName = 'Waning Gibbous';
+        } else if (phase < 0.77) {
+          phaseName = 'Last Quarter';
+        } else {
+          phaseName = 'Waning Crescent';
+        }
+        
+        // Update moon phase visualization
+        let shadowAngle = 90;
+        let shadowWidth = '50%';
+        
+        if (phase <= 0.5) {
+          // Waxing - shadow from right
+          shadowAngle = -90;
+          shadowWidth = (1 - 2 * phase) * 100 + '%';
+        } else {
+          // Waning - shadow from left
+          shadowAngle = 90;
+          shadowWidth = (2 * phase - 1) * 100 + '%';
+        }
+        
+        elements.moonPhaseShadow.style.width = shadowWidth;
+        elements.moonPhaseShadow.style.left = phase <= 0.5 ? '50%' : '0';
+        elements.moonPhaseShadow.style.transform = `rotate(${shadowAngle}deg)`;
+        
+        elements.phaseName.textContent = phaseName;
+        elements.phasePercent.textContent = `${Math.round(fraction * 100)}% illuminated`;
+      }
+      
+      // Get weather data
+      function getWeatherData() {
+        const apiKey = '2c7be934d4b79d1ff8dc09e4de01f4df'; // Free OpenWeatherMap API key
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${state.lat}&lon=${state.lng}&units=metric&appid=${apiKey}`;
+        
+        fetch(url)
+          .then(response => response.json())
+          .then(data => {
+            state.weather = data;
+            updateWeatherCard();
+            updateQualityCard();
+            updateNowCard(); // Update now card with weather quality
+          })
+          .catch(error => {
+            console.error('Error fetching weather:', error);
+            elements.weatherContainer.innerHTML = `
+              <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i> Could not fetch weather data
+              </div>
+            `;
+          });
+      }
+      
+      // Update weather card
+      function updateWeatherCard() {
+        if (!state.weather) return;
+        
+        const weather = state.weather;
+        const temp = Math.round(weather.main.temp);
+        const description = weather.weather[0].description;
+        const iconCode = weather.weather[0].icon;
+        const windSpeed = weather.wind.speed;
+        const clouds = weather.clouds.all;
+        const humidity = weather.main.humidity;
+        
+        // Map OpenWeatherMap icon to Font Awesome
+        const iconMap = {
+          '01d': 'fas fa-sun',
+          '01n': 'fas fa-moon',
+          '02d': 'fas fa-cloud-sun',
+          '02n': 'fas fa-cloud-moon',
+          '03d': 'fas fa-cloud',
+          '03n': 'fas fa-cloud',
+          '04d': 'fas fa-cloud',
+          '04n': 'fas fa-cloud',
+          '09d': 'fas fa-cloud-rain',
+          '09n': 'fas fa-cloud-rain',
+          '10d': 'fas fa-cloud-sun-rain',
+          '10n': 'fas fa-cloud-moon-rain',
+          '11d': 'fas fa-bolt',
+          '11n': 'fas fa-bolt',
+          '13d': 'fas fa-snowflake',
+          '13n': 'fas fa-snowflake',
+          '50d': 'fas fa-smog',
+          '50n': 'fas fa-smog'
+        };
+        
+        const iconClass = iconMap[iconCode] || 'fas fa-cloud';
+        
+        elements.weatherContainer.innerHTML = `
+          <div class="weather-card">
+            <div class="weather-info">
+              <div style="font-size: 1.5rem; font-weight: 600;">${temp}°C</div>
+              <div style="text-transform: capitalize;">${description}</div>
+              <div>Wind: ${windSpeed} m/s</div>
+              <div>Clouds: ${clouds}%</div>
+              <div>Humidity: ${humidity}%</div>
+            </div>
+            <div class="weather-icon">
+              <i class="${iconClass}"></i>
+            </div>
+          </div>
+        `;
+      }
+      
+      // Update quality card
+      function updateQualityCard() {
+        if (!state.weather) return;
+        
+        const weather = state.weather;
+        const clouds = weather.clouds.all;
+        const weatherCode = weather.weather[0].id;
+        
+        // Calculate golden hour quality
+        let quality = 'Excellent';
+        let qualityClass = 'quality-excellent';
+        let qualityDescription = 'Perfect conditions for golden hour photography';
+        
+        if (clouds > 80 || weatherCode >= 500) {
+          quality = 'Poor';
+          qualityClass = 'quality-poor';
+          qualityDescription = 'Heavy clouds or rain may obscure the golden light';
+        } else if (clouds > 30 || (weatherCode >= 700 && weatherCode < 800)) {
+          quality = 'Good';
+          qualityClass = 'quality-good';
+          qualityDescription = 'Some clouds or haze may filter the golden light';
+        }
+        
+        elements.qualityContainer.innerHTML = `
+          <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem;">
+              <span class="quality-dot ${qualityClass}"></span> ${quality}
+            </div>
+            <div>${qualityDescription}</div>
+            <div style="margin-top: 1rem;">
+              <div style="font-weight: 500;">Tips:</div>
+              <ul style="text-align: left; padding-left: 1rem; margin-top: 0.5rem;">
+                ${getQualityTips(quality)}
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+      
+      // Get quality indicator html
+      function getQualityIndicator(weather) {
+        const clouds = weather.clouds.all;
+        const weatherCode = weather.weather[0].id;
+        
+        let qualityClass = 'quality-excellent';
+        let qualityText = 'Excellent conditions';
+        
+        if (clouds > 80 || weatherCode >= 500) {
+          qualityClass = 'quality-poor';
+          qualityText = 'Poor conditions';
+        } else if (clouds > 30 || (weatherCode >= 700 && weatherCode < 800)) {
+          qualityClass = 'quality-good';
+          qualityText = 'Good conditions';
+        }
+        
+        return `<span class="quality-dot ${qualityClass}"></span> ${qualityText}`;
+      }
+      
+      // Get quality tips based on quality
+      function getQualityTips(quality) {
+        if (quality === 'Excellent') {
+          return `
+            <li>Look for clear foregrounds and interesting silhouettes</li>
+            <li>Use a polarizing filter to enhance colors</li>
+            <li>Shoot towards the sun for dramatic backlighting</li>
+          `;
+        } else if (quality === 'Good') {
+          return `
+            <li>Clouds can add drama to your shots</li>
+            <li>Look for gaps in clouds where light can break through</li>
+            <li>Try both wide-angle and telephoto compositions</li>
+          `;
+        } else {
+          return `
+            <li>Focus on close-up subjects where lighting is more controlled</li>
+            <li>Consider black and white photography</li>
+            <li>Use the diffused light for portrait photography</li>
+          `;
+        }
+      }
+      
+      // Setup compass
+      function setupCompass() {
+        // Check if device orientation is available
+        if (window.DeviceOrientationEvent) {
+          window.addEventListener('deviceorientation', handleOrientation);
+          state.compassAvailable = true;
+        } else {
+          elements.compassNote.textContent = 'Compass not available on this device or browser';
+          state.compassAvailable = false;
+        }
+        
+        // Initial compass update
+        updateCompass();
+      }
+      
+      // Handle device orientation
+      function handleOrientation(event) {
+        if (event.alpha !== null) {
+          state.deviceOrientation = 360 - event.alpha; // Convert to clockwise degrees
+          updateCompass();
+        }
+      }
+      
+      // Update compass
+      function updateCompass() {
+        if (!state.sunPosition || !state.moonPosition) return;
+        
+        const sunAzimuth = state.sunPosition.azimuth * (180 / Math.PI);
+        const sunAltitude = state.sunPosition.altitude * (180 / Math.PI);
+        const moonAzimuth = state.moonPosition.azimuth * (180 / Math.PI);
+        const moonAltitude = state.moonPosition.altitude * (180 / Math.PI);
+        
+        // Calculate positions on compass
+        const compassRadius = 130; // Half the compass width
+        const centerX = compassRadius;
+        const centerY = compassRadius;
+        
+        // Adjust for device orientation if available
+        let adjustedSunAzimuth = sunAzimuth;
+        let adjustedMoonAzimuth = moonAzimuth;
+        
+        if (state.deviceOrientation !== null) {
+          adjustedSunAzimuth = (sunAzimuth - state.deviceOrientation + 360) % 360;
+          adjustedMoonAzimuth = (moonAzimuth - state.deviceOrientation + 360) % 360;
+        }
+        
+        // Convert to radians for position calculation
+        const sunRad = (adjustedSunAzimuth * Math.PI) / 180;
+        const moonRad = (adjustedMoonAzimuth * Math.PI) / 180;
+        
+        // Calculate altitude factor (0-1) to adjust distance from center
+        const sunAltitudeFactor = Math.max(0, Math.min(1, (90 - Math.abs(sunAltitude)) / 90));
+        const moonAltitudeFactor = Math.max(0, Math.min(1, (90 - Math.abs(moonAltitude)) / 90));
+        
+        // Calculate positions
+        const sunX = centerX + sunAltitudeFactor * compassRadius * Math.sin(sunRad);
+        const sunY = centerY - sunAltitudeFactor * compassRadius * Math.cos(sunRad);
+        const moonX = centerX + moonAltitudeFactor * compassRadius * Math.sin(moonRad);
+        const moonY = centerY - moonAltitudeFactor * compassRadius * Math.cos(moonRad);
+        
+        // Update markers
+        if (sunAltitude > 0) {
+          elements.sunMarker.style.left = `${sunX}px`;
+          elements.sunMarker.style.top = `${sunY}px`;
+          elements.sunMarker.style.display = 'block';
+          
+          // Update sun line
+          elements.sunLine.style.width = `${Math.sqrt(Math.pow(sunX - centerX, 2) + Math.pow(sunY - centerY, 2))}px`;
+          elements.sunLine.style.transform = `rotate(${adjustedSunAzimuth}deg)`;
+          elements.sunLine.style.display = 'block';
+        } else {
+          elements.sunMarker.style.display = 'none';
+          elements.sunLine.style.display = 'none';
+        }
+        
+        if (moonAltitude > 0) {
+          elements.moonMarker.style.left = `${moonX}px`;
+          elements.moonMarker.style.top = `${moonY}px`;
+          elements.moonMarker.style.display = 'block';
+          
+          // Update moon line
+          elements.moonLine.style.width = `${Math.sqrt(Math.pow(moonX - centerX, 2) + Math.pow(moonY - centerY, 2))}px`;
+          elements.moonLine.style.transform = `rotate(${adjustedMoonAzimuth}deg)`;
+          elements.moonLine.style.display = 'block';
+        } else {
+          elements.moonMarker.style.display = 'none';
+          elements.moonLine.style.display = 'none';
+        }
+        
+        // Update azimuth and altitude text
+        elements.sunAzimuth.textContent = `${Math.round(sunAzimuth)}°`;
+        elements.sunAltitude.textContent = `${Math.round(sunAltitude)}°`;
+        elements.moonAzimuth.textContent = `${Math.round(moonAzimuth)}°`;
+        elements.moonAltitude.textContent = `${Math.round(moonAltitude)}°`;
+      }
+      
+      // Helper function to format time
+      function formatTime(date) {
+        if (!date) return '---';
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      
+      // Debounce function for limiting input events
+      function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      }
+      
+      // Start the app
+      getCurrentLocation();
+    });
+  </script>
+</body>
+</html>
