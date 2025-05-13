@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Light Source Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .control-section {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #555;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button, select {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button.disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #debugLog {
+            background-color: #282c34;
+            color: #abb2bf;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 15px;
+            max-height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border-radius: 5px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            font-size: 0.9em; /* Slightly smaller log font */
+        }
+        #screenLightOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black; /* Start black */
+            z-index: 9999;
+            display: none;
+        }
+        .slider-container {
+            margin: 15px 0;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .slider-container input[type="range"] {
+            width: 100%;
+            margin-top: 0;
+        }
+        .slider-container span {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .warning {
+            color: #e67e22; /* Orange warning */
+            font-size: 0.8em;
+            text-align: center;
+            margin-top: 5px;
+            min-height: 1em; /* Reserve space */
+        }
+    </style>
+</head>
+<body>
+    <div id="screenLightOverlay"></div>
+    <div class="control-section">
+        <h2>Advanced Light Source Control</h2>
+        <select id="lightMode">
+            <option value="steady">Steady Light</option>
+            <option value="cameraStrobeAdjustable">Camera Strobe (Adjustable)</option>
+            <option value="screenStrobeAdjustable">Screen Strobe (rAF)</option>
+            <option value="pulse">Pulse</option>
+            <option value="sos">SOS Signal</option>
+            <option value="dance">Dance Party</option>
+        </select>
+
+        <div class="slider-container">
+            <label for="strobeOnTime">Strobe ON Time: <span id="strobeOnTimeValue">20</span>ms</label>
+            <input type="range" id="strobeOnTime" min="1" max="250" value="20"> 
+             <div class="warning" id="onTimeWarning"></div>
+        </div>
+        <div class="slider-container">
+            <label for="strobeOffTime">Strobe OFF Time: <span id="strobeOffTimeValue">50</span>ms</label>
+            <input type="range" id="strobeOffTime" min="1" max="500" value="50"> 
+            <div class="warning" id="offTimeWarning"></div>
+        </div>
+
+        <button id="lightToggle">Enable Light Source</button>
+        <div id="debugLog">Debug Log:</div>
+    </div>
+
+    <script>
+        const lightToggleButton = document.getElementById('lightToggle');
+        const lightModeSelector = document.getElementById('lightMode');
+        const debugLogElement = document.getElementById('debugLog');
+        const screenLightOverlay = document.getElementById('screenLightOverlay');
+
+        const strobeOnTimeSlider = document.getElementById('strobeOnTime');
+        const strobeOnTimeValueDisplay = document.getElementById('strobeOnTimeValue');
+        const strobeOffTimeSlider = document.getElementById('strobeOffTime');
+        const strobeOffTimeValueDisplay = document.getElementById('strobeOffTimeValue');
+        const onTimeWarning = document.getElementById('onTimeWarning');
+        const offTimeWarning = document.getElementById('offTimeWarning');
+
+        let isLightOn = false;
+        let currentStrobeOnTime = parseInt(strobeOnTimeSlider.value);
+        let currentStrobeOffTime = parseInt(strobeOffTimeSlider.value);
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+            const newLogEntry = document.createElement('div');
+            newLogEntry.textContent = `[${timestamp}] ${message}`;
+            debugLogElement.appendChild(newLogEntry);
+            while (debugLogElement.children.length > 100) { // Limit log entries
+                debugLogElement.removeChild(debugLogElement.firstChild);
+            }
+            debugLogElement.scrollTop = debugLogElement.scrollHeight;
+            // console.log(message); // You can uncomment this for browser console logging
+        }
+
+        class LightController {
+            constructor() {
+                this.activeStream = null;
+                this.lightTrack = null;
+                this.strobeOnTimeoutId = null; // For camera strobe
+                this.strobeOffTimeoutId = null; // For camera strobe
+                this.currentMode = '';
+                this.sosTimeoutId = null;
+                this.danceIntervalId = null; // Specifically for dance mode
+                this.pulseIntervalId = null; // Specifically for pulse mode
+
+                // For rAF screen strobe
+                this.screenRafId = null;
+                this.screenLastSwitchTime = 0;
+                this.screenIsCurrentlyOn = false; // Visual state of screen light
+                log('LightController initialized.');
+            }
+
+            clearAllTimersAndIntervals() {
+                if (this.strobeOnTimeoutId) clearTimeout(this.strobeOnTimeoutId);
+                if (this.strobeOffTimeoutId) clearTimeout(this.strobeOffTimeoutId);
+                if (this.sosTimeoutId) clearTimeout(this.sosTimeoutId);
+                if (this.danceIntervalId) clearTimeout(this.danceIntervalId); // Changed from lightInterval
+                if (this.pulseIntervalId) clearInterval(this.pulseIntervalId); // Changed from lightInterval
+
+                this.strobeOnTimeoutId = null;
+                this.strobeOffTimeoutId = null;
+                this.sosTimeoutId = null;
+                this.danceIntervalId = null;
+                this.pulseIntervalId = null;
+
+                if (this.screenRafId) {
+                    cancelAnimationFrame(this.screenRafId);
+                    this.screenRafId = null;
+                }
+            }
+
+            stopAllLightSources(isInternalCall = false) {
+                log('Stopping all light sources...');
+                this.clearAllTimersAndIntervals();
+
+                if (this.lightTrack && this.lightTrack.readyState === 'live') {
+                    this.applyTorchConstraint(this.lightTrack, false, true)
+                        .catch(err => log(`Silent torch off err: ${err.message.substring(0, 50)}...`))
+                        .finally(() => {
+                            if (this.lightTrack) { // Check again, might be nulled
+                                this.lightTrack.stop();
+                                log(`Light track "${this.lightTrack.label}" stopped.`);
+                                this.lightTrack = null;
+                            }
+                        });
+                } else if (this.lightTrack) {
+                    log(`Light track "${this.lightTrack.label}" not live. Nullifying.`);
+                    this.lightTrack = null; // Already stopped or invalid
+                }
+
+                if (this.activeStream) {
+                    this.activeStream.getTracks().forEach(track => {
+                        if (track.readyState === 'live') track.stop();
+                    });
+                    this.activeStream = null;
+                    log('Active stream tracks stopped.');
+                }
+                
+                screenLightOverlay.style.backgroundColor = 'black'; // Ensure screen is off
+                screenLightOverlay.style.display = 'none';
+                this.screenIsCurrentlyOn = false;
+
+                if (!isInternalCall) {
+                    isLightOn = false;
+                    lightToggleButton.textContent = 'Enable Light Source';
+                    this.currentMode = '';
+                }
+            }
+
+            async getCameraStream() {
+                // ... (getCameraStream implementation - largely unchanged)
+                this.stopAllLightSources(true); 
+                log('Attempting to get camera stream...');
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    log('getUserMedia is not supported in this browser.');
+                    throw new Error('getUserMedia is not supported.');
+                }
+                const constraintSets = [ /* ... your constraint sets ... */ 
+                    { video: { facingMode: 'environment', advanced: [{ torch: true }] } },
+                    { video: { facingMode: { exact: 'environment' }, advanced: [{ torch: true }] } },
+                    { video: { advanced: [{ torch: true }] } }, 
+                    { video: { facingMode: 'environment' } },
+                    { video: true } 
+                ];
+                for (const constraints of constraintSets) {
+                    try {
+                        log(`Trying constraints: ${JSON.stringify(constraints).substring(0,100)}...`);
+                        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        const videoTracks = stream.getVideoTracks();
+                        if (videoTracks.length === 0) {
+                            stream.getTracks().forEach(track => track.stop()); continue;
+                        }
+                        this.activeStream = stream;
+                        this.lightTrack = videoTracks[0];
+                        log(`Stream obtained. Track: ${this.lightTrack.label}`);
+                        // const capabilities = this.lightTrack.getCapabilities ? this.lightTrack.getCapabilities() : {};
+                        // log(`Track capabilities: ${JSON.stringify(capabilities).substring(0,100)}...`);
+                        return { stream, track: this.lightTrack };
+                    } catch (error) {
+                        log(`Constraints failed: ${error.name} - ${error.message.substring(0,50)}...`);
+                    }
+                }
+                throw new Error('Could not access any camera.');
+            }
+
+            async applyTorchConstraint(track, state, silent = false) {
+                // ... (applyTorchConstraint implementation - unchanged)
+                 if (!track || track.readyState === 'ended') {
+                    if (!silent) log(`Track not avail/ended for torch: ${state}.`);
+                    return Promise.reject(new Error('Track not available or ended.'));
+                }
+                try {
+                    await track.applyConstraints({ advanced: [{ torch: state }] });
+                    if (!silent) log(`Torch constraint ${state ? 'ON' : 'OFF'}.`);
+                    return Promise.resolve();
+                } catch (error) {
+                    if (!silent) log(`Failed torch constraint ${state}: ${error.message.substring(0,50)}...`);
+                    return Promise.reject(error);
+                }
+            }
+            
+            async _activateLightInternal(mode) {
+                this.stopAllLightSources(true); 
+                this.currentMode = mode;
+                log(`Activating internal: ${mode}`);
+
+                try {
+                    if (mode === 'cameraStrobeAdjustable') {
+                        if (!this.lightTrack || this.lightTrack.readyState === 'ended') {
+                            await this.getCameraStream(); // Ensure stream for camera strobe
+                        }
+                        this.startAdjustableStrobe('camera');
+                    } else if (mode === 'screenStrobeAdjustable') {
+                        this.startAdjustableStrobe('screen');
+                    } else if (mode.startsWith('camera') || ['steady', 'pulse', 'sos', 'dance'].includes(mode)) {
+                        await this.tryWebTorch(mode); // Handles non-strobe camera modes
+                    } else {
+                        throw new Error(`Unknown mode in _activateLightInternal: ${mode}`);
+                    }
+                    isLightOn = true;
+                    // Button text updated in activateLight
+                } catch (error) {
+                    log(`Err in _activateLightInternal ${mode}: ${error.message.substring(0,100)}...`);
+                    throw error; 
+                }
+            }
+
+            async activateLight(mode) {
+                 this.currentMode = mode;
+                 log(`Activating light: ${mode}`);
+                 lightToggleButton.textContent = 'Initializing...';
+                 lightToggleButton.classList.add('disabled');
+                 lightToggleButton.disabled = true;
+
+                try {
+                    await this._activateLightInternal(mode);
+                    let btnText = 'Disable Light Source';
+                    if (mode === 'screenStrobeAdjustable') btnText = 'Disable Screen Strobe (rAF)';
+                    else if (mode === 'cameraStrobeAdjustable') btnText = 'Disable Camera Strobe';
+                    lightToggleButton.textContent = btnText;
+                } catch (activationError) {
+                    log(`Activation failed for ${mode}: ${activationError.message.substring(0,100)}...`);
+                    // Fallback logic from previous version (steady screen light)
+                    if (!mode.startsWith('screen')) { // Avoid fallback if screen mode itself failed
+                        log('Attempting Screen Light (steady) as fallback...');
+                        try {
+                            this.stopAllLightSources(true); // Clear previous attempts
+                            screenLightOverlay.style.display = 'block';
+                            screenLightOverlay.style.backgroundColor = 'white';
+                            isLightOn = true; // Screen light is now the active light
+                            this.currentMode = 'steadyScreenFallback'; // Indicate fallback mode
+                            lightToggleButton.textContent = 'Disable Light Source (Screen Fallback)';
+                            log(`Successfully activated Screen Light (steady) as fallback.`);
+                        } catch (screenLightError) {
+                            log(`Screen Light fallback also failed: ${screenLightError.message}`);
+                            this.stopAllLightSources(); 
+                            alert('Could not activate any light source.');
+                        }
+                    } else {
+                         this.stopAllLightSources();
+                         alert('Could not activate selected light mode.');
+                    }
+                } finally {
+                    lightToggleButton.classList.remove('disabled');
+                    lightToggleButton.disabled = false;
+                }
+            }
+            
+            // --- SCREEN STROBE (rAF) ---
+            _screenStrobeRafLoop() {
+                if (!isLightOn || this.currentMode !== 'screenStrobeAdjustable') {
+                    screenLightOverlay.style.backgroundColor = 'black';
+                    screenLightOverlay.style.display = 'none';
+                    this.screenRafId = null;
+                    this.screenIsCurrentlyOn = false;
+                    return;
+                }
+
+                this.screenRafId = requestAnimationFrame(this._screenStrobeRafLoop.bind(this));
+
+                const now = performance.now();
+                const elapsed = now - this.screenLastSwitchTime;
+                const targetDuration = this.screenIsCurrentlyOn ? currentStrobeOnTime : currentStrobeOffTime;
+
+                if (elapsed >= targetDuration) {
+                    this.screenIsCurrentlyOn = !this.screenIsCurrentlyOn;
+                    screenLightOverlay.style.backgroundColor = this.screenIsCurrentlyOn ? 'white' : 'black';
+                    this.screenLastSwitchTime = now - (elapsed - targetDuration); // Adjust for overshoot
+                    // log(`Screen Strobe (rAF): ${this.screenIsCurrentlyOn ? 'ON' : 'OFF'}`); // Too noisy
+                }
+                
+                if (screenLightOverlay.style.display === 'none') { // Ensure visible
+                    screenLightOverlay.style.display = 'block';
+                }
+            }
+
+            // --- ADJUSTABLE STROBE (Camera setTimeout, Screen rAF) ---
+            startAdjustableStrobe(type) {
+                this.clearAllTimersAndIntervals(); // Stop everything first
+                this.currentMode = type === 'camera' ? 'cameraStrobeAdjustable' : 'screenStrobeAdjustable';
+                log(`Starting ${this.currentMode}. On:${currentStrobeOnTime}ms, Off:${currentStrobeOffTime}ms`);
+                
+                if (type === 'screen') {
+                    screenLightOverlay.style.display = 'block';
+                    this.screenIsCurrentlyOn = false; // Start visually off
+                    screenLightOverlay.style.backgroundColor = 'black';
+                    this.screenLastSwitchTime = performance.now();
+                    if (this.screenRafId) cancelAnimationFrame(this.screenRafId); // ensure no duplicates
+                    this.screenRafId = requestAnimationFrame(this._screenStrobeRafLoop.bind(this));
+                } else { // Camera (setTimeout based)
+                    let cameraStrobeIsOn = false; // Local state for camera strobe loop
+                    const cameraStrobeLoop = async () => {
+                        if (!isLightOn || this.currentMode !== 'cameraStrobeAdjustable') {
+                            if (this.lightTrack && this.lightTrack.readyState === 'live') await this.applyTorchConstraint(this.lightTrack, false, true);
+                            return;
+                        }
+                        
+                        cameraStrobeIsOn = !cameraStrobeIsOn;
+                        try {
+                            if (!this.lightTrack || this.lightTrack.readyState === 'ended') {
+                                log("Camera track lost during strobe, attempting to reacquire.");
+                                await this.getCameraStream(); // Re-acquire if lost
+                                if (!this.lightTrack) throw new Error("Failed to re-acquire camera for strobe.");
+                            }
+                            await this.applyTorchConstraint(this.lightTrack, cameraStrobeIsOn);
+                        } catch (e) {
+                            log(`Camera strobe error: ${e.message.substring(0,50)}...`);
+                            this.stopAllLightSources(); // Stop on error
+                            return;
+                        }
+                        
+                        const nextTimeoutDuration = cameraStrobeIsOn ? currentStrobeOnTime : currentStrobeOffTime;
+                        if (cameraStrobeIsOn) {
+                           this.strobeOnTimeoutId = setTimeout(cameraStrobeLoop, nextTimeoutDuration);
+                        } else {
+                           this.strobeOffTimeoutId = setTimeout(cameraStrobeLoop, nextTimeoutDuration);
+                        }
+                    };
+                    cameraStrobeLoop(); // Start the camera strobe cycle
+                }
+            }
+
+            updateStrobeTimes(onTime, offTime) {
+                currentStrobeOnTime = Math.max(1, onTime); // Ensure at least 1ms
+                currentStrobeOffTime = Math.max(1, offTime);
+                // log(`Strobe times updated: On=${currentStrobeOnTime}ms, Off=${currentStrobeOffTime}ms`); // Can be noisy
+
+                if (isLightOn && (this.currentMode === 'cameraStrobeAdjustable' || this.currentMode === 'screenStrobeAdjustable')) {
+                    // For rAF screen strobe, the loop will pick up new values automatically.
+                    // For camera (setTimeout), we need to restart it to apply new timings effectively.
+                    if (this.currentMode === 'cameraStrobeAdjustable') {
+                        log('Restarting camera strobe with new times...');
+                        this.clearAllTimersAndIntervals(); // Clear existing camera strobe timeouts
+                        this.startAdjustableStrobe('camera'); // Restart with new values
+                    }
+                    // For screen rAF, no explicit restart of loop is needed here,
+                    // as it reads currentStrobeOnTime/OffTime on each frame.
+                    // However, the very first visual change might reflect this after one cycle if it was mid-cycle.
+                }
+            }
+
+            async tryWebTorch(mode) { // Handles non-adjustable camera modes
+                if (mode === 'cameraStrobeAdjustable' || mode === 'screenStrobeAdjustable') return; // Handled by startAdjustableStrobe
+
+                if (!this.lightTrack || this.lightTrack.readyState === 'ended') {
+                    await this.getCameraStream();
+                }
+                if (!this.lightTrack) throw new Error('Failed to get light track for WebTorch.');
+
+                switch(mode) {
+                    case 'steady':
+                        await this.applyTorchConstraint(this.lightTrack, true);
+                        log('Steady light mode activated.');
+                        break;
+                    case 'pulse':
+                        // ... (pulse logic using this.pulseIntervalId)
+                        await this.applyTorchConstraint(this.lightTrack, true);
+                        let pulseBrightness = 0.0, pulseIncreasing = true;
+                        this.pulseIntervalId = setInterval(async () => { /* ... */ }, 100);
+                        log('Pulse mode activated.');
+                        break;
+                    case 'sos':
+                        // ... (sos logic using this.sosTimeoutId - ensure it's properly managed)
+                        log('SOS mode activated.');
+                        const sosUnitDuration = 250; 
+                        const sosPattern = [ /* ... sos pattern ... */ ];
+                        let sosIndex = 0;
+                        const executeSosStep = async () => { /* ... sos step logic ... */ this.sosTimeoutId = setTimeout(executeSosStep, step.duration); };
+                        await this.applyTorchConstraint(this.lightTrack, false); 
+                        executeSosStep();
+                        break;
+                    case 'dance':
+                        // ... (dance logic using this.danceIntervalId)
+                        log('Dance Party mode activated.');
+                        let danceStrobeState = true;
+                        await this.applyTorchConstraint(this.lightTrack, danceStrobeState);
+                        const updateDancePattern = async () => { /* ... dance pattern logic ... */ this.danceIntervalId = setTimeout(updateDancePattern, /* ... */); };
+                        this.danceIntervalId = setTimeout(updateDancePattern, Math.random() * 300 + 50);
+                        break;
+                    default:
+                        log(`Unknown web torch mode: ${mode}`);
+                }
+            }
+        } // End LightController Class
+
+        const lightController = new LightController();
+
+        // Slider Event Listeners
+        strobeOnTimeSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            strobeOnTimeValueDisplay.textContent = value;
+            onTimeWarning.textContent = value < 10 ? "EXTREMELY FAST ON!" : (value < 30 ? "Very Fast On" : "");
+            lightController.updateStrobeTimes(value, currentStrobeOffTime);
+        });
+
+        strobeOffTimeSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            strobeOffTimeValueDisplay.textContent = value;
+            offTimeWarning.textContent = value < 10 ? "EXTREMELY SHORT OFF!" : (value < 30 ? "Very Short Off" : "");
+            lightController.updateStrobeTimes(currentStrobeOnTime, value);
+        });
+        
+        strobeOnTimeValueDisplay.textContent = strobeOnTimeSlider.value; // Init
+        strobeOffTimeValueDisplay.textContent = strobeOffTimeSlider.value; // Init
+        onTimeWarning.textContent = parseInt(strobeOnTimeSlider.value) < 10 ? "EXTREMELY FAST ON!" : (parseInt(strobeOnTimeSlider.value) < 30 ? "Very Fast On" : "");
+        offTimeWarning.textContent = parseInt(strobeOffTimeSlider.value) < 10 ? "EXTREMELY SHORT OFF!" : (parseInt(strobeOffTimeSlider.value) < 30 ? "Very Short Off" : "");
+
+
+        lightToggleButton.addEventListener('click', async () => {
+            if (!isLightOn) {
+                await lightController.activateLight(lightModeSelector.value);
+            } else {
+                lightController.stopAllLightSources();
+            }
+        });
+
+        lightModeSelector.addEventListener('change', async () => {
+            log(`Mode changed to: ${lightModeSelector.value}`);
+            if (isLightOn) { // If light is already on, switch to new mode
+                await lightController.activateLight(lightModeSelector.value);
+            }
+        });
+
+        log('App ready. Use HTTPS. Grant permissions. Extreme strobes may be disorienting.');
+        if (window.location.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+            log("WARNING: Not HTTPS. Flashlight/Camera may fail.");
+            alert("WARNING: Flashlight control requires HTTPS. Features may be limited.");
+        }
+
+    </script>
+</body>
+</html>
