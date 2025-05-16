@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Optimized Math Renderer with Zoom</title>
+
+  <!-- 1) Configure MathJax (fast preview + lean options) BEFORE loading it -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      },
+      options: {
+        enableMenu: false,
+        renderActions: {
+          addHover: [],      // no hover-zoom
+          assistiveMml: []   // no assistive MML
+        },
+        fastPreview: {
+          disabled: false,
+          scale: 0.8
+        }
+      }
+    };
+  </script>
+
+  <!-- 2) Load MathJax -->
+  <script
+    id="MathJax-script"
+    async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <!-- 3) Load html2canvas for PNG export -->
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      font-family: monospace;
+      font-size: 1rem;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .controls label {
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .controls input,
+    .controls select {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #buttons {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 0.9rem;
+    }
+    #render-container {
+      overflow: auto;
+      border: 1px solid #ccc;
+      background: white;
+      transform-origin: top left;
+    }
+    #rendered {
+      padding: 12px;
+      min-height: 80px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Optimized Math Renderer &amp; Zoom</h1>
+
+  <textarea id="latex-input">\[
+\text{Example: }\frac{1}{8} + \frac{2}{3} + \frac{1}{6} + \frac{1}{6} = 1\tfrac{1}{8}
+\]</textarea>
+
+  <div class="controls">
+    <div>
+      <label for="font-size">Font size (px)</label>
+      <input type="range" id="font-size" min="12" max="72" value="24"/>
+    </div>
+    <div>
+      <label for="line-height">Line height</label>
+      <input type="range" id="line-height" min="1" max="2" step="0.1" value="1.2"/>
+    </div>
+    <div>
+      <label for="letter-spacing">Letter spacing (px)</label>
+      <input type="range" id="letter-spacing" min="0" max="5" value="0"/>
+    </div>
+    <div>
+      <label for="text-color">Text color</label>
+      <input type="color" id="text-color" value="#333333"/>
+    </div>
+    <div>
+      <label for="bg-color">Background color</label>
+      <input type="color" id="bg-color" value="#ffffff"/>
+    </div>
+    <div>
+      <label for="alignment">Alignment</label>
+      <select id="alignment">
+        <option value="left">Left</option>
+        <option value="center" selected>Center</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+    <div>
+      <label for="zoom">Zoom (scale)</label>
+      <input type="range" id="zoom" min="0.5" max="2" step="0.01" value="1"/>
+    </div>
+  </div>
+
+  <div id="buttons">
+    <button id="clear-btn">Clear</button>
+    <button id="save-btn">Save as PNG</button>
+  </div>
+
+  <div id="render-container">
+    <div id="rendered"></div>
+  </div>
+
+  <script>
+    // Utility: debounce
+    function debounce(fn, wait) {
+      let t;
+      return function(...args) {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), wait);
+      };
+    }
+
+    // DOM refs
+    const inputEl         = document.getElementById('latex-input');
+    const containerEl     = document.getElementById('render-container');
+    const renderedEl      = document.getElementById('rendered');
+    const fontSizeEl      = document.getElementById('font-size');
+    const lineHeightEl    = document.getElementById('line-height');
+    const letterSpacingEl = document.getElementById('letter-spacing');
+    const textColorEl     = document.getElementById('text-color');
+    const bgColorEl       = document.getElementById('bg-color');
+    const alignmentEl     = document.getElementById('alignment');
+    const zoomEl          = document.getElementById('zoom');
+    const clearBtn        = document.getElementById('clear-btn');
+    const saveBtn         = document.getElementById('save-btn');
+
+    // Core render
+    function renderMath() {
+      // Throttle style updates in rAF
+      requestAnimationFrame(() => {
+        renderedEl.style.fontSize        = fontSizeEl.value + 'px';
+        renderedEl.style.lineHeight      = lineHeightEl.value;
+        renderedEl.style.letterSpacing   = letterSpacingEl.value + 'px';
+        renderedEl.style.color           = textColorEl.value;
+        renderedEl.style.backgroundColor = bgColorEl.value;
+        renderedEl.style.textAlign       = alignmentEl.value;
+        containerEl.style.transform      = `scale(${zoomEl.value})`;
+      });
+
+      // Inject & typeset
+      renderedEl.innerHTML = inputEl.value;
+      MathJax.typesetPromise([renderedEl]).catch(console.error);
+    }
+
+    // Debounced for 250ms
+    const debouncedRender = debounce(renderMath, 250);
+
+    // Wire inputs
+    [
+      inputEl,
+      fontSizeEl,
+      lineHeightEl,
+      letterSpacingEl,
+      textColorEl,
+      bgColorEl,
+      alignmentEl,
+      zoomEl
+    ].forEach(el => el.addEventListener('input', debouncedRender));
+
+    // Clear
+    clearBtn.addEventListener('click', () => {
+      inputEl.value = '';
+      renderMath();
+    });
+
+    // Save as PNG (temporarily reset scale)
+    saveBtn.addEventListener('click', () => {
+      const prev = containerEl.style.transform;
+      containerEl.style.transform = 'scale(1)';
+      html2canvas(containerEl).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'math-render.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        containerEl.style.transform = prev;
+      });
+    });
+
+    // Initial on MathJax ready
+    window.addEventListener('load', () => {
+      MathJax.startup.promise.then(renderMath);
+    });
+  </script>
+</body>
+</html>
