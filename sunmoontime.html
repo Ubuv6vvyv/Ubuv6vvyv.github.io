@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang=en>
+<head>
+    <meta charset=UTF-8>
+    <meta content="width=device-width,initial-scale=1" name=viewport>
+    <title>Sun & Moon Tracker (Refactored v4)</title>
+    <link href=https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css rel=stylesheet>
+    <style>
+        :root{--primary:#f59e0b;--primary-dark:#d97706;--primary-light:#fef3c7;--secondary:#3b82f6;--secondary-dark:#1e40af;--secondary-light:#dbeafe;--dark:#1f2937;--light:#f9fafb;--gray:#6b7280;--success:#10b981;--danger:#ef4444;--warning:#f59e0b; --text-light: #f9fafb; --text-dark: #1f2937;}
+        *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size: 14px;}
+        body{background-color:var(--light);color:var(--dark);line-height:1.4; transition: background-color 0.5s ease, background-image 0.5s ease;}
+        body.near-sunrise{background-image:linear-gradient(to top, #fcd34d, #fbbf24, #f59e0b); color:var(--text-dark) !important;}
+        body.near-sunset{background-image:linear-gradient(to bottom, #f59e0b, #d97706, #9a3412); color:var(--text-light) !important;}
+        body.near-sunrise .card, body.near-sunset .card {background-color:rgba(255,255,255,0.85); box-shadow: 0 1px 2px rgba(0,0,0,0.1);}
+        body.near-sunrise .card *, body.near-sunrise .tab, body.near-sunrise .search-box, body.near-sunrise .search-box::placeholder, body.near-sunrise .current-location, body.near-sunrise .gps-button, body.near-sunrise .compass-note, body.near-sunrise .sunrise-sunset-info, body.near-sunrise .now-card h2, body.near-sunrise .golden-hour-status, body.near-sunrise .golden-hour-countdown, body.near-sunrise .direction-marker, body.near-sunrise .compass p, body.near-sunrise .compass span, body.near-sunrise .compass-explanation, body.near-sunrise .compass-explanation strong {color:var(--text-dark) !important;}
+        body.near-sunset .card *, body.near-sunset .tab, body.near-sunset .search-box, body.near-sunset .search-box::placeholder, body.near-sunset .current-location, body.near-sunset .gps-button, body.near-sunset .compass-note, body.near-sunset .sunrise-sunset-info, body.near-sunset .now-card h2, body.near-sunset .golden-hour-status, body.near-sunset .golden-hour-countdown, body.near-sunset .direction-marker, body.near-sunset .compass p, body.near-sunset .compass span, body.near-sunset .compass-explanation, body.near-sunset .compass-explanation strong {color:var(--text-light) !important;}
+        body.near-sunset .compass{background-color:rgba(254,243,199,0.6); border-color:var(--primary-light);}
+        body.near-sunset .direction-marker{color:var(--primary-light) !important;}
+        body.near-sunset .device-heading-line{background-color:var(--secondary-light) !important;}
+        body.near-sunset .center-dot {background-color: var(--text-light) !important;}
+        body.near-sunrise .compass-explanation strong {color: var(--primary-darker, #b45309) !important;} /* Darker orange for sunrise */
+        body.near-sunset .compass-explanation strong {color: var(--primary-lighter, #fef3c7) !important;} /* Lighter orange for sunset */
+
+        .container{max-width:480px;margin:0 auto;padding:0 .75rem}
+        header{background-color:var(--primary);color:#fff;padding:.75rem 0;box-shadow:0 2px 4px rgba(0,0,0,.1);position:sticky;top:0;z-index:1000}
+        header h1{font-size:1.25rem; text-align:center;}
+        .search-container{margin:.75rem 0;position:relative}
+        .search-box{width:100%;padding:.6rem .75rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.9rem;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+        .gps-button{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:0 0;border:none;color:var(--gray);cursor:pointer;font-size:1rem}
+        .tabs{display:flex;margin:.75rem 0;border-bottom:1px solid #e5e7eb}
+        .tab{padding:.6rem .5rem;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;color:var(--gray);transition:all .2s;flex:1;text-align:center;font-size:.8rem;display:flex;align-items:center;justify-content:center;gap:.3rem}
+        .tab i {font-size: 0.8rem;}
+        .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+        .tab-content{display:none;padding:.5rem 0}.tab-content.active{display:block}
+        .card{background-color:#fff;border-radius:.3rem;box-shadow:0 1px 2px rgba(0,0,0,.1);padding:.75rem;margin-bottom:.75rem}
+        .card-header{display:flex;align-items:center;gap:.3rem;margin-bottom:.5rem;color:var(--dark);font-weight:600;font-size:1rem}
+        .card-header i {font-size: 0.9rem;}
+        .now-card{text-align:center;padding:1rem; position: relative;}
+        .now-card h2{font-size:1.1rem;margin-bottom:.25rem}
+        .sunrise-sunset-info { position: absolute; top: 4px; right: 8px; font-size: 0.7rem; color: var(--dark); background-color: rgba(255,255,255,0.6); padding: 2px 4px; border-radius: 3px; z-index: 5;}
+        .time-row{display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid #f3f4f6; font-size: .8rem;}
+        .time-row:last-child{border-bottom:none}
+        .time-label{display:flex;align-items:center;gap:.3rem}.time-label i {font-size:0.8rem;} .time-value{font-weight:500}
+        .compass-container{position:relative;width:240px;height:240px;margin:.5rem auto; overflow: hidden;}
+        .compass{width:100%;height:100%;border-radius:50%;background-color:var(--primary-light);border:2px solid var(--primary-dark);position:relative; transition: transform 0.1s linear;}
+        .direction-marker{position:absolute;font-weight:600;color:var(--primary-dark); font-size: .75rem;}
+        .direction-n{top:8px;left:50%;transform:translateX(-50%)}.direction-e{right:8px;top:50%;transform:translateY(-50%)}.direction-s{bottom:8px;left:50%;transform:translateX(-50%)}.direction-w{left:8px;top:50%;transform:translateY(-50%)}
+        .sun-marker,.moon-marker{position:absolute;width:20px;height:20px;border-radius:50%;transform:translate(-50%,-50%);z-index:3}
+        .sun-marker{background:radial-gradient(circle,#f59e0b 60%,rgba(245,158,11,.3) 100%);box-shadow:0 0 8px rgba(245,158,11,.8)}
+        .moon-marker{background:radial-gradient(circle,#d1d5db 60%,rgba(209,213,219,.3) 100%);box-shadow:0 0 8px rgba(209,213,219,.8)}
+        .center-dot{position:absolute;width:8px;height:8px;border-radius:50%;background-color:var(--dark);top:50%;left:50%;transform:translate(-50%,-50%)}
+        .sun-line,.moon-line{position:absolute;top:50%;left:50%;height:2px;transform-origin:left center;z-index:2}
+        .sun-line{background-color:var(--primary-dark)}.moon-line{background-color:var(--gray)}
+        .device-heading-line{position:absolute; top:10px;left:50%; width:2px; height:110px; background-color:var(--secondary); transform:translateX(-50%); z-index:4; pointer-events:none;}
+        .compass-note{text-align:center;margin-top:.5rem;font-size:.75rem;color:var(--gray); padding: 0 .5rem;}
+        .compass-explanation{font-size: .7rem; text-align:left; margin-top: .5rem; padding: .5rem; background-color:var(--primary-light); border-radius: .3rem;}
+        .compass-explanation p {margin-bottom: .25rem;} .compass-explanation strong {color: var(--primary-dark);}
+        .moon-phase-container{display:flex;flex-direction:column;align-items:center;margin-top:.5rem}
+        .moon-phase{width:80px;height:80px;border-radius:50%;position:relative;background-color:#d1d5db;overflow:hidden}
+        .moon-phase-shadow{position:absolute;width:100%;height:100%;border-radius:50%;background-color:var(--dark);top:0;left:0;transform-origin:center center}
+        .moon-info{margin-top:.5rem;text-align:center}.phase-name{font-weight:600;font-size:.9rem;margin-bottom:.1rem}.phase-percent{color:var(--gray);font-size:.8rem}
+        .loading{text-align:center;padding:1rem;color:var(--gray); font-size: .9rem;}
+        .error-message{color:var(--danger);text-align:center;padding:.5rem; font-size: .9rem;}
+        .location-suggestions{position:absolute;width:100%;background:#fff;border-radius:.3rem;box-shadow:0 4px 6px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;z-index:1001;display:none}
+        .location-suggestion{padding:.6rem .75rem;border-bottom:1px solid #f3f4f6;cursor:pointer; font-size: .85rem;}
+        .current-location{font-size:.8rem;color:var(--gray);text-align:center;margin-bottom:.5rem}
+        .golden-hour-status{font-size:1rem;font-weight:600;margin-bottom:.25rem}.golden-hour-countdown{font-size:1.1rem;font-weight:700;margin-bottom:.25rem}
+        .golden-hour-happening{color:var(--success);animation:pulse 2s infinite}@keyframes pulse{0%{opacity:.7}50%{opacity:1}100%{opacity:.7}}
+        .notification-banner{background-color:var(--primary);color:#fff;padding:.6rem .75rem;border-radius:.3rem;margin-bottom:.75rem;display:none;align-items:center;justify-content:space-between; font-size: .85rem;}
+        .notification-close{background:0 0;border:none;color:#fff;cursor:pointer;font-size:1rem}
+        .map-container{height:180px;border-radius:.3rem;overflow:hidden;margin-top:.75rem}
+        .sun-moon-info-grid {display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .75rem; font-size: .8rem;}
+        .sun-moon-info-grid div {padding: .2rem 0; border-bottom: 1px solid #f0f0f0;}
+        .sun-moon-info-grid div:nth-last-child(-n+2) {border-bottom: none;}
+        .sun-moon-info-grid strong {color: var(--primary-dark); display: block; margin-bottom: .1rem; font-size: .7rem; font-weight: 600;}
+        @media (max-width:480px){.card{border-radius:0;margin-left:-.75rem;margin-right:-.75rem;width:calc(100% + 1.5rem)}}
+    </style>
+</head>
+<body>
+<header><div class=container><h1><i class="fas fa-sun"></i> Sun & Moon Tracker</h1></div></header>
+<div class=container>
+    <div class=search-container><input class=search-box id=location-search placeholder="Search location..."><button class=gps-button id=gps-button><i class="fas fa-crosshairs"></i></button><div class=location-suggestions id=location-suggestions></div></div>
+    <div class=current-location id=current-location>Getting your location...</div>
+    <div class=notification-banner id=golden-hour-notification><div><i class="fas fa-bell"></i> Golden hour is happening now!</div><button class=notification-close id=notification-close><i class="fas fa-times"></i></button></div>
+    <div class="card now-card" id=now-card><div class=loading>Loading data...</div><div id="sunrise-sunset-info" class="sunrise-sunset-info">Next: --:--</div></div>
+    <div class=tabs>
+        <div class="tab active" data-tab=sun-moon><i class="fas fa-sun"></i> Sun & Moon Data</div>
+        <div class=tab data-tab=compass><i class="fas fa-compass"></i> Compass</div>
+        <div class=tab data-tab=map><i class="fas fa-map-marker-alt"></i> Map</div>
+    </div>
+
+    <div class="tab-content active" id=sun-moon-tab>
+        <div class=card>
+            <div class=card-header><i class="fas fa-sun"></i> Sun Data Today</div>
+            <div class="sun-moon-info-grid" id=sun-data-details><div class=loading>Loading...</div></div>
+        </div>
+         <div class=card>
+            <div class=card-header><i class="fas fa-hourglass-half"></i> Golden Hours</div>
+            <div id=golden-hour-times><div class=loading>Loading times...</div></div>
+        </div>
+        <div class=card>
+            <div class=card-header><i class="fas fa-moon"></i> Moon Data Today</div>
+            <div class="sun-moon-info-grid" id=moon-data-details><div class=loading>Loading...</div></div>
+            <div class=moon-phase-container>
+                <div class=moon-phase id=moon-phase><div class=moon-phase-shadow id=moon-phase-shadow></div></div>
+                <div class=moon-info><div class=phase-name id=phase-name>Loading...</div><div class=phase-percent id=phase-percent></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-content" id=compass-tab>
+        <div class=card>
+            <div class=card-header><i class="fas fa-compass"></i> Sun Compass</div>
+            <div class=compass-container>
+                <div class=compass id=sun-compass><div class="direction-marker direction-n">N</div><div class="direction-marker direction-e">E</div><div class="direction-marker direction-s">S</div><div class="direction-marker direction-w">W</div><div class=center-dot></div><div class=sun-line id=sun-line style="display:none"></div><div class=sun-marker id=sun-marker style="display:none"></div></div>
+                <div class="device-heading-line" id="device-heading-line-sun"></div>
+            </div>
+            <div class=compass-note id=compass-note>Requesting sensor access...</div>
+            <div class="compass-explanation">
+                <p><strong>How to use:</strong></p>
+                <p>1. The <strong>Compass Dial</strong> (with N, E, S, W) rotates to show <strong>True North</strong> at its 'N' marker.</p>
+                <p>2. The <strong style="color:var(--primary-dark);">Orange Sun Line & Icon</strong> show the Sun's actual direction on this North-oriented dial.</p>
+                <p>3. The <strong style="color:var(--secondary);">Blue Line</strong> always points to the <strong>top of your phone screen</strong>.</p>
+                <p>4. <strong>To Find the Sun:</strong> Rotate your phone until the orange Sun Line is perfectly aligned under the fixed blue Device Line.</p>
+            </div>
+        </div>
+        <div class=card>
+            <div class=card-header><i class="fas fa-moon"></i> Moon Compass</div>
+            <div class=compass-container>
+                <div class=compass id=moon-compass><div class="direction-marker direction-n">N</div><div class="direction-marker direction-e">E</div><div class="direction-marker direction-s">S</div><div class="direction-marker direction-w">W</div><div class=center-dot></div><div class=moon-line id=moon-line style="display:none"></div><div class=moon-marker id=moon-marker style="display:none"></div></div>
+                <div class="device-heading-line" id="device-heading-line-moon"></div>
+            </div>
+             <div class="compass-explanation">
+                <p>Align the gray Moon Line (on the rotating dial) with the fixed blue Device Line to point your phone at the Moon.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-content" id=map-tab>
+        <div class=card>
+            <div class=card-header><i class="fas fa-map-marked-alt"></i> Location Map</div>
+            <div class=map-container id=map></div>
+        </div>
+    </div>
+</div>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places,geometry"></script>
+<script>
+!function(){"use strict";var n=Math.PI,t=Math.sin,e=Math.cos,r=Math.tan,a=Math.asin,u=Math.atan2,o=Math.acos,i=n/180,c=864e5,d=2440588,s=2451545;function f(n){return new Date((n+.5-d)*c)}function l(n){return function(n){return n.valueOf()/c-.5+d}(n)-s}var h=23.4397*i;function M(n,a){return u(t(n)*e(h)-r(a)*t(h),e(n))}function v(n,r){return a(t(r)*e(h)+e(r)*t(h)*t(n))}function g(n,a,o){return u(t(n),e(n)*t(a)-r(o)*e(a))}function w(n,r,u){return a(t(r)*t(u)+e(r)*e(u)*e(n))}function m(n,t){return i*(280.16+360.9856235*n)-t}function p(n){return i*(357.5291+.98560028*n)}function D(e){return e+i*(1.9148*t(e)+.02*t(2*e)+3e-4*t(3*e))+102.9372*i+n}function P(n){var t=D(p(n));return{dec:v(t,0),ra:M(t,0)}}var y={getPosition:function(n,t,e){var r=i*-e,a=i*t,u=l(n),o=P(u),c=m(u,r)-o.ra;return{azimuth:g(c,a,o.dec),altitude:w(c,a,o.dec)}}},b=y.times=[[-.833,"sunrise","sunset"],[-.3,"sunriseEnd","sunsetStart"],[-6,"dawn","dusk"],[-12,"nauticalDawn","nauticalDusk"],[-18,"nightEnd","night"],[6,"goldenHourEnd","goldenHour"]];y.addTime=function(n,t,e){b.push([n,t,e])};var H=9e-4;function T(t,e,r){return H+(t+e)/(2*n)+r}function E(n,e,r){return s+n+.0053*t(e)-.0069*t(2*r)}function I(n,r,a,u,i,c,d){var s=function(n,r,a){return o((t(n)-t(r)*t(a))/(e(r)*e(a)))}(n,a,u);return E(T(s,r,i),c,d)}function k(n){var r=i*(134.963+13.064993*n),a=i*(93.272+13.22935*n),u=i*(218.316+13.176396*n)+6.289*i*t(r),o=5.128*i*t(a),c=385001-20905*e(r);return{ra:M(u,o),dec:v(u,o),dist:c}}function q(n,t){return new Date(n.valueOf()+t*c/24)}y.getTimes=function(t,e,r,a){var u,o,c,d,s,h=i*-r,M=i*e,g=function(n){return-2.076*Math.sqrt(n)/60}(a=a||0),w=function(t,e){return Math.round(t-H-e/(2*n))}(l(t),h),m=T(0,h,w),P=p(m),y=D(P),k=v(y,0),q=E(m,P,y),x={solarNoon:f(q),nadir:f(q-.5)};for(u=0,o=b.length;u<o;u+=1)s=q-((d=I(((c=b[u])[0]+g)*i,h,M,k,w,P,y))-q),x[c[1]]=f(s),x[c[2]]=f(d);return x},y.getMoonPosition=function(n,a,o){var c=i*-o,d=i*a,s=l(n),f=k(s),h=m(s,c)-f.ra,M=w(h,d,f.dec),v=u(t(h),r(d)*e(f.dec)-t(f.dec)*e(h));return M+=function(n){return n<0&&(n=0),2967e-7/Math.tan(n+.00312536/(n+.08901179))}(M),{azimuth:g(h,d,f.dec),altitude:M,distance:f.dist,parallacticAngle:v}},y.getMoonIllumination=function(n){var r=l(n||new Date),a=P(r),i=k(r),c=149598e3,d=o(t(a.dec)*t(i.dec)+e(a.dec)*e(i.dec)*e(a.ra-i.ra)),s=u(c*t(d),i.dist-c*e(d)),f=u(e(a.dec)*t(a.ra-i.ra),t(a.dec)*e(i.dec)-e(a.dec)*t(i.dec)*e(a.ra-i.ra));return{fraction:(1+e(s))/2,phase:.5+.5*s*(f<0?-1:1)/Math.PI,angle:f}},y.getMoonTimes=function(n,t,e,r){var a=new Date(n);r?a.setUTCHours(0,0,0,0):a.setHours(0,0,0,0);for(var u,o,c,d,s,f,l,h,M,v,g,w,m,p=.133*i,D=y.getMoonPosition(a,t,e).altitude-p,P=1;P<=24&&(u=y.getMoonPosition(q(a,P),t,e).altitude-p,h=((s=(D+(o=y.getMoonPosition(q(a,P+1),t,e).altitude-p))/2-u)*(l=-(f=(o-D)/2)/(2*s))+f)*l+u,v=0,(M=f*f-4*s*u)>=0&&(g=l-(m=Math.sqrt(M)/(2*Math.abs(s))),w=l+m,Math.abs(g)<=1&&v++,Math.abs(w)<=1&&v++,g<-1&&(g=w)),1===v?D<0?c=P+g:d=P+g:2===v&&(c=P+(h<0?w:g),d=P+(h<0?g:w)),!c||!d);P+=2)D=o;var b={};return c&&(b.rise=q(a,c)),d&&(b.set=q(a,d)),c||d||(b[h>0?"alwaysUp":"alwaysDown"]=!0),b},"object"==typeof exports&&"undefined"!=typeof module?module.exports=y:"function"==typeof define&&define.amd?define(y):window.SunCalc=y}()
+
+document.addEventListener("DOMContentLoaded",(function(){
+'use strict';
+const _DEG2RAD=Math.PI/180,_RAD2DEG=180/Math.PI,_COMPASS_RADIUS=120,_WEATHER_API_KEY_UNUSED="2c7be934d4b79d1ff8dc09e4de01f4df";
+const _state={lat:null,lng:null,locationName:"",sunTimes:null,moonTimes:null,moonIllumination:null,sunPosition:{azimuth:0,altitude:0},moonPosition:null,map:null,mapMarker:null,compassAvailable:null,deviceHeadingAlpha:null,lastLoggedOrientation:void 0,googleAutocompleteService:null,googlePlacesService:null,googleGeocoder:null};
+const _elements={tabs:document.querySelectorAll(".tab"),tabContents:document.querySelectorAll(".tab-content"),locationSearch:document.getElementById("location-search"),gpsButton:document.getElementById("gps-button"),currentLocation:document.getElementById("current-location"),nowCard:document.getElementById("now-card"),sunriseSunsetInfo:document.getElementById("sunrise-sunset-info"),goldenHourTimes:document.getElementById("golden-hour-times"),sunDataDetails:document.getElementById("sun-data-details"),moonDataDetails:document.getElementById("moon-data-details"),moonPhase:document.getElementById("moon-phase"),moonPhaseShadow:document.getElementById("moon-phase-shadow"),phaseName:document.getElementById("phase-name"),phasePercent:document.getElementById("phase-percent"),sunCompass:document.getElementById("sun-compass"),moonCompass:document.getElementById("moon-compass"),sunMarker:document.getElementById("sun-marker"),moonMarker:document.getElementById("moon-marker"),sunLine:document.getElementById("sun-line"),moonLine:document.getElementById("moon-line"),deviceHeadingLineSun:document.getElementById("device-heading-line-sun"),deviceHeadingLineMoon:document.getElementById("device-heading-line-moon"),compassNote:document.getElementById("compass-note"),sunAzimuth:document.getElementById("sun-azimuth"),sunAltitude:document.getElementById("sun-altitude"),moonAzimuth:document.getElementById("moon-azimuth"),moonAltitude:document.getElementById("moon-altitude"),locationSuggestions:document.getElementById("location-suggestions"),goldenHourNotification:document.getElementById("golden-hour-notification"),notificationClose:document.getElementById("notification-close"),mapContainer:document.getElementById("map")};
+function _formatTime(n){return n?n.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"---"}
+function _debounce(n,e){let t;return function(...o){clearTimeout(t),t=setTimeout((()=>{clearTimeout(t),n.apply(this,o)}),e)}}
+function _getDayOfYear(n){const e=new Date(n.getFullYear(),0,0);const t=n.getTime()-e.getTime()+((e.getTimezoneOffset()-n.getTimezoneOffset())*60*1000);return Math.floor(t/86400000)}
+function _calculateSimplifiedSunPosition(dateObj,latitude,longitude){
+try{
+const latRad=latitude*_DEG2RAD;const lonDeg=longitude;
+const year=dateObj.getFullYear();
+const utcHours=dateObj.getUTCHours();const utcMinutes=dateObj.getUTCMinutes();const utcSeconds=dateObj.getUTCSeconds();
+const timeUTC=utcHours+utcMinutes/60+utcSeconds/3600;
+const dayOfYear=_getDayOfYear(dateObj);
+const isLeap=(year%4==0&&year%100!=0||year%400==0);const daysInYear=isLeap?366:365;
+const gamma=(2*Math.PI/daysInYear)*(dayOfYear-1+(timeUTC/24));
+const eqTime=229.18*(0.000075+0.001868*Math.cos(gamma)-0.032077*Math.sin(gamma)-0.014615*Math.cos(2*gamma)-0.040849*Math.sin(2*gamma));
+const declRad=0.006918-0.399912*Math.cos(gamma)+0.070257*Math.sin(gamma)-0.006758*Math.cos(2*gamma)+0.000907*Math.sin(2*gamma)-0.002697*Math.cos(3*gamma)+0.00148*Math.sin(3*gamma);
+const localHours=dateObj.getHours();const localMinutes=dateObj.getMinutes();const localSeconds=dateObj.getSeconds();
+const localTime=localHours+localMinutes/60+localSeconds/3600;
+const timezoneOffsetHours=-(dateObj.getTimezoneOffset()/60);
+const lstm=timezoneOffsetHours*15;
+const timeCorrection=4*(lonDeg-lstm)+eqTime;
+const lst=localTime+timeCorrection/60;
+const hraDeg=15*(lst-12);
+const hraRad=hraDeg*_DEG2RAD;
+const sinAltitude=Math.sin(latRad)*Math.sin(declRad)+Math.cos(latRad)*Math.cos(declRad)*Math.cos(hraRad);
+const sinAltitudeClamped=Math.max(-1,Math.min(1,sinAltitude));
+const altitudeRad=Math.asin(sinAltitudeClamped);
+let azimuthRad=Math.atan2(Math.sin(hraRad),Math.cos(hraRad)*Math.sin(latRad)-Math.tan(declRad)*Math.cos(latRad));
+azimuthRad=(azimuthRad+2*Math.PI)%(2*Math.PI);
+console.log(`SIMPLIFIED CALC: Alt=${(altitudeRad*_RAD2DEG).toFixed(2)} Az=${(azimuthRad*_RAD2DEG).toFixed(2)} (UTC H: ${timeUTC.toFixed(2)}, Day: ${dayOfYear}, HRA: ${hraDeg.toFixed(2)})`);
+return{azimuth:azimuthRad,altitude:altitudeRad};
+}catch(n){console.error("Error in _calculateSimplifiedSunPosition:",n);return{azimuth:0,altitude:-Math.PI/2}}}
+function _handleOrientation(n){if(void 0!==n.webkitCompassHeading){_state.deviceHeadingAlpha=n.webkitCompassHeading;if(!_state.compassAvailable){_state.compassAvailable=!0;console.log("Orientation: webkitCompassHeading active.")}}else if(null!==n.alpha){_state.deviceHeadingAlpha=n.alpha;if(!_state.compassAvailable){_state.compassAvailable=!0;console.log("Orientation: alpha active.")}}else if(_state.compassAvailable!==!1){console.log("Orientation event: no valid data.")}}
+function _requestOrientationPermission(){if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){DeviceOrientationEvent.requestPermission().then(n=>{console.log("Orientation permission:",n);_state.compassAvailable=(n==="granted");if(n==="granted")window.addEventListener("deviceorientation",_handleOrientation);_updateCompassUI()}).catch(n=>{console.error("Orientation permission error:",n);_state.compassAvailable=!1;_updateCompassUI()})}else{_state.compassAvailable=("DeviceOrientationEvent"in window)?null:!1;if(_state.compassAvailable===null)window.addEventListener("deviceorientation",_handleOrientation);if(_state.compassAvailable===!1)console.log("DeviceOrientationEvent not supported.");_updateCompassUI()}}
+function _updateCompassUI(){
+if(!_state.sunPosition||!_state.moonPosition||_state.lat===null||_state.lng===null){if(_elements.compassNote&&_state.lat===null)_elements.compassNote.textContent="Waiting for location...";return}
+const s=_state.sunPosition.azimuth*_RAD2DEG;
+const r=_state.sunPosition.altitude*_RAD2DEG;
+const c=_state.moonPosition.azimuth*_RAD2DEG;
+const l=_state.moonPosition.altitude*_RAD2DEG;
+const u=_COMPASS_RADIUS; 
+const d=_COMPASS_RADIUS; 
+let h=s;
+let m=c;
+let g="";
+if(_state.deviceHeadingAlpha!==null&&_state.compassAvailable===!0){
+const n=_state.deviceHeadingAlpha;
+if(_elements.sunCompass)_elements.sunCompass.style.transform=`rotate(${-n}deg)`;
+if(_elements.moonCompass)_elements.moonCompass.style.transform=`rotate(${-n}deg)`;
+g="Device orientation active.";
+if(typeof _state.lastLoggedOrientation==="undefined"||Math.abs(_state.lastLoggedOrientation-n)>1||_state.lastLoggedOrientation===null){
+console.log(`COMPASS DEBUG: Loc: ${_state.lat.toFixed(4)}, ${_state.lng.toFixed(4)} | Device Heading (True North): ${n.toFixed(1)}° | Sun Az (True): ${s.toFixed(1)}°`);
+_state.lastLoggedOrientation=n;
+}
+}else{
+if(_elements.sunCompass)_elements.sunCompass.style.transform="rotate(0deg)";
+if(_elements.moonCompass)_elements.moonCompass.style.transform="rotate(0deg)";
+if(_state.compassAvailable===!1){
+g="Orientation sensor unavailable/denied.";
+if(_state.lastLoggedOrientation!==!1){console.log(`COMPASS DEBUG (No Orientation): Loc: ${_state.lat.toFixed(4)}, Sun Az (True): ${s.toFixed(1)}°`);_state.lastLoggedOrientation=!1}
+}else{
+g="Requesting/Waiting for orientation sensor...";
+if(_state.lastLoggedOrientation!==null){console.log(`COMPASS DEBUG (Waiting): Loc: ${_state.lat.toFixed(4)}, Sun Az (True): ${s.toFixed(1)}°`);_state.lastLoggedOrientation=null}
+}
+}
+if(_elements.compassNote)_elements.compassNote.textContent=g;
+const f=h*_DEG2RAD;
+const p=Math.max(0,Math.min(1,(90-Math.abs(r))/90))*u;
+const y=u+p*Math.sin(f);
+const T=d-p*Math.cos(f);
+if(_elements.sunMarker&&_elements.sunLine){
+if(r > -5.0){ 
+_elements.sunMarker.style.left=`${y}px`;_elements.sunMarker.style.top=`${T}px`;_elements.sunMarker.style.display="block";
+_elements.sunLine.style.width=`${p}px`;_elements.sunLine.style.transform=`rotate(${h}deg)`;_elements.sunLine.style.display="block";
+}else{
+_elements.sunMarker.style.display="none";_elements.sunLine.style.display="none"}
+}
+const M=m*_DEG2RAD;
+const P=Math.max(0,Math.min(1,(90-Math.abs(l))/90))*u;
+const S=u+P*Math.sin(M);
+const w=d-P*Math.cos(M);
+if(_elements.moonMarker&&_elements.moonLine){
+if(l>0){
+_elements.moonMarker.style.left=`${S}px`;_elements.moonMarker.style.top=`${w}px`;_elements.moonMarker.style.display="block";
+_elements.moonLine.style.width=`${P}px`;_elements.moonLine.style.transform=`rotate(${m}deg)`;_elements.moonLine.style.display="block";
+}else{
+_elements.moonMarker.style.display="none";_elements.moonLine.style.display="none"}
+}
+if(_elements.sunAzimuth&&_elements.sunAltitude&&_elements.moonAzimuth&&_elements.moonAltitude){
+_elements.sunAzimuth.textContent=`${Math.round(s)}°`;_elements.sunAltitude.textContent=`${Math.round(r)}°`;
+_elements.moonAzimuth.textContent=`${Math.round(c)}°`;_elements.moonAltitude.textContent=`${Math.round(l)}°`
+}
+}
+function _calculateCelestialData(){
+if(_state.lat===null||_state.lng===null)return;
+const n=new Date();
+console.log(`DEBUG: Calculating data for Date: ${n.toString()}, Lat: ${_state.lat}, Lng: ${_state.lng}`);
+try{
+_state.sunTimes=SunCalc.getTimes(n,_state.lat,_state.lng);
+_state.moonTimes=SunCalc.getMoonTimes(n,_state.lat,_state.lng,true);
+_state.moonIllumination=SunCalc.getMoonIllumination(n);
+_state.moonPosition=SunCalc.getMoonPosition(n,_state.lat,_state.lng);
+_state.sunPosition=_calculateSimplifiedSunPosition(n,_state.lat,_state.lng);
+if(!_state.sunPosition||typeof _state.sunPosition.azimuth==="undefined"||typeof _state.sunPosition.altitude==="undefined"){
+console.warn("Simplified sun position returned invalid. Using default.");
+_state.sunPosition={azimuth:0,altitude:0.1*_DEG2RAD}; 
+}
+console.log(`DEBUG: Sun Position Used - Az: ${(_state.sunPosition.azimuth*_RAD2DEG).toFixed(2)}°, Alt: ${(_state.sunPosition.altitude*_RAD2DEG).toFixed(2)}°`);
+}catch(n){
+console.error("Error during celestial calculations:",n);
+_state.sunTimes=null;_state.moonTimes=null;_state.moonIllumination=null;
+_state.sunPosition={azimuth:0,altitude:0.1*_DEG2RAD};_state.moonPosition=null;
+}
+}
+function _updateAllUI(){if(_state.lat!==null&&_state.lng!==null){_updateNowCardUI();_updateSunDataDetailsUI();_updateGoldenHourTimesUI();_updateMoonDataDetailsUI();_updateMoonPhaseUI();_updateCompassUI();_updateSunriseSunsetInfo()}}
+function _updateSunriseSunsetInfo(){
+const n=new Date();
+if(!_state.sunTimes||_state.lat===null){if(_elements.sunriseSunsetInfo)_elements.sunriseSunsetInfo.textContent="";return}
+let e,t,r="Next: --:--";
+const c=1800000; 
+document.body.classList.remove("near-sunrise","near-sunset");
+if(n<_state.sunTimes.sunrise){e=_state.sunTimes.sunrise;t="Sunrise"}
+else if(n<_state.sunTimes.sunset){e=_state.sunTimes.sunset;t="Sunset"}
+else{
+const i=new Date(n);
+i.setDate(n.getDate()+1);
+i.setHours(0,0,0,0); 
+const a=SunCalc.getTimes(i,_state.lat,_state.lng);
+e=a.sunrise;t="Sunrise"
+}
+if(e){
+const o=e-n;
+if(o>0){
+const n=Math.floor(o/3600000);
+const i=Math.floor((o%3600000)/60000);
+r=`${t} in ${n}h ${i}m`;
+if(o<=c){if(t==="Sunrise")document.body.classList.add("near-sunrise");else document.body.classList.add("near-sunset")}
+}else{r=`${t} now`}}
+if(_elements.sunriseSunsetInfo)_elements.sunriseSunsetInfo.textContent=r
+}
+function _getUserLocation(){if(navigator.geolocation){_elements.currentLocation.textContent="Getting your location...";navigator.geolocation.getCurrentPosition(n=>{_state.lat=n.coords.latitude;_state.lng=n.coords.longitude;_state.googleGeocoder.geocode({location:{lat:_state.lat,lng:_state.lng}},(n,e)=>{_state.locationName=(e==="OK"&&n[0])?n[0].formatted_address:`${_state.lat.toFixed(4)}, ${_state.lng.toFixed(4)}`;if(e!=="OK")console.warn("Geocoder failed:",e);_elements.locationSearch.value="";_elements.currentLocation.textContent=_state.locationName;_processLocationUpdate()})},n=>{console.error("Geolocation error:",n);_elements.currentLocation.textContent="Using default location (Melbourne).";_state.lat=-37.8136;_state.lng=144.9631;_state.locationName="Melbourne, VIC, Australia (Default)";_processLocationUpdate()},{timeout:10000,enableHighAccuracy:!1})}else{_elements.currentLocation.textContent="Geolocation not supported. Using default (Melbourne).";_state.lat=-37.8136;_state.lng=144.9631;_state.locationName="Melbourne, VIC, Australia (Default)";_processLocationUpdate()}}
+const _handleLocationSearchDebounced=_debounce(()=>{const n=_elements.locationSearch.value.trim();if(n.length>2){_state.googleAutocompleteService.getPlacePredictions({input:n},(n,e)=>{_renderLocationSuggestions((e===google.maps.places.PlacesServiceStatus.OK&&n)?n:[])})}else{_renderLocationSuggestions([])}},300);
+function _renderLocationSuggestions(n){_elements.locationSuggestions.innerHTML="";n.forEach(n=>{const e=document.createElement("div");e.className="location-suggestion";e.textContent=n.description;e.addEventListener("click",()=>_selectLocationSuggestion(n));_elements.locationSuggestions.appendChild(e)});_elements.locationSuggestions.style.display=n.length>0?"block":"none"}
+function _selectLocationSuggestion(n){_elements.locationSearch.value=n.description;_elements.locationSuggestions.style.display="none";_state.googlePlacesService.getDetails({placeId:n.place_id,fields:["geometry","formatted_address"]},(n,e)=>{if(e===google.maps.places.PlacesServiceStatus.OK&&n?.geometry?.location){_state.lat=n.geometry.location.lat();_state.lng=n.geometry.location.lng();_state.locationName=n.formatted_address;_elements.currentLocation.textContent=_state.locationName;_processLocationUpdate()}else{console.error("Place details error:",e)}})}
+function _processLocationUpdate(){console.log(`Location Updated: ${_state.locationName} (${_state.lat}, ${_state.lng})`);_initOrUpdateMap();_calculateCelestialData();_updateAllUI()}
+function _initOrUpdateMap(){if(_state.lat===null||_state.lng===null||!_elements.mapContainer)return;const n={lat:_state.lat,lng:_state.lng};const e={path:google.maps.SymbolPath.CIRCLE,fillColor:"#f59e0b",fillOpacity:1,strokeColor:"#ffffff",strokeWeight:2,scale:8};if(_state.map){_state.map.setCenter(n);if(_state.mapMarker)_state.mapMarker.setPosition(n);else _state.mapMarker=new google.maps.Marker({position:n,map:_state.map,icon:e})}else{_state.map=new google.maps.Map(_elements.mapContainer,{center:n,zoom:13,mapTypeId:"terrain",streetViewControl:!1,fullscreenControl:!1,mapTypeControl:!1,zoomControl:!0});_state.mapMarker=new google.maps.Marker({position:n,map:_state.map,icon:e})}}
+function _fetchWeatherDummy(){ console.log("Weather fetching is removed."); if(_elements.weatherContainer) _elements.weatherContainer.innerHTML = ''; if(_elements.qualityContainer) _elements.qualityContainer.innerHTML = '';}
+function _updateNowCardUI(){if(!_elements.nowCard||!_state.sunTimes||!_state.sunPosition||!_state.sunPosition.hasOwnProperty('altitude')){if(_elements.nowCard)_elements.nowCard.innerHTML=`<div class=loading>Loading data...</div><div id="sunrise-sunset-info" class="sunrise-sunset-info">Next: --:--</div>`;return}const n=new Date,e=_state.sunPosition.altitude>0;let t="",o="",r=null,c=!1;const l=n>=_state.sunTimes.sunrise&&n<=_state.sunTimes.goldenHourEnd,u=n>=_state.sunTimes.goldenHour&&n<=_state.sunTimes.sunset;if(l||u){c=!0,t="Golden hour now!";const s=(l?_state.sunTimes.goldenHourEnd:_state.sunTimes.sunset)-n;s>0&&(o=`${Math.round(s/6e4)} min remaining`),_elements.goldenHourNotification?.classList.add("show")}else{_elements.goldenHourNotification?.classList.remove("show");if(n<_state.sunTimes.sunrise)r=_state.sunTimes.sunrise,t="Morning GH starts";else if(n<_state.sunTimes.goldenHour)r=_state.sunTimes.goldenHour,t="Evening GH starts";else{const e=new Date(n);e.setDate(n.getDate()+1),e.setHours(0,0,0,0);const s=SunCalc.getTimes(e,_state.lat,_state.lng);r=s.sunrise,t="Tomorrow's GH"}if(r){const n=r-o;o=`in ${Math.floor(n/36e5)}h ${Math.floor(n%36e5/6e4)}m`}}let d="";d="Weather data removed.";_elements.nowCard.innerHTML=`<h2>${e?"Daytime":"Nighttime"}</h2><div class="golden-hour-status ${c?"golden-hour-happening":""}">${t} ${c?o:""}</div>${!c&&o?`<div class="golden-hour-countdown">Next: ${o}</div>`:""}<div id="sunrise-sunset-info" class="sunrise-sunset-info"></div>`}
+function _updateSunDataDetailsUI(){if(!_elements.sunDataDetails||!_state.sunTimes||!_state.sunPosition||!_state.sunPosition.hasOwnProperty('altitude')){if(_elements.sunDataDetails)_elements.sunDataDetails.innerHTML="<div class=loading>Loading...</div>";return}let n=`<div><strong>Sunrise:</strong> ${_formatTime(_state.sunTimes.sunrise)}</div>`;n+=`<div><strong>Sunset:</strong> ${_formatTime(_state.sunTimes.sunset)}</div>`;n+=`<div><strong>Solar Noon:</strong> ${_formatTime(_state.sunTimes.solarNoon)}</div>`;n+=`<div><strong>Dawn (Civil):</strong> ${_formatTime(_state.sunTimes.dawn)}</div>`;n+=`<div><strong>Dusk (Civil):</strong> ${_formatTime(_state.sunTimes.dusk)}</div>`;n+=`<div><strong>Day Length:</strong> ${(()=>{const n=_state.sunTimes.sunset-_state.sunTimes.sunrise,t=Math.floor(n/36e5),e=Math.floor(n%36e5/6e4);return`${t}h ${e}m`})()}</div>`;n+=`<div><strong>Current Azimuth:</strong> ${Math.round(_state.sunPosition.azimuth*_RAD2DEG)}°</div>`;n+=`<div><strong>Current Altitude:</strong> ${Math.round(_state.sunPosition.altitude*_RAD2DEG)}°</div>`;_elements.sunDataDetails.innerHTML=n}
+function _updateGoldenHourTimesUI(){if(!_elements.goldenHourTimes||!_state.sunTimes){if(_elements.goldenHourTimes)_elements.goldenHourTimes.innerHTML="<div class=loading>Loading...</div>";return}const n=_formatTime(_state.sunTimes.sunrise),e=_formatTime(_state.sunTimes.goldenHourEnd),t=_formatTime(_state.sunTimes.goldenHour),o=_formatTime(_state.sunTimes.sunset),r=_state.sunTimes.goldenHourEnd&&_state.sunTimes.sunrise?Math.round((_state.sunTimes.goldenHourEnd-_state.sunTimes.sunrise)/6e4):"N/A",c=_state.sunTimes.sunset&&_state.sunTimes.goldenHour?Math.round((_state.sunTimes.sunset-_state.sunTimes.goldenHour)/6e4):"N/A";_elements.goldenHourTimes.innerHTML=`<div class="time-row"><div class="time-label"><i class="fas fa-sun"></i> Morning Start</div><div class="time-value">${n}</div></div><div class="time-row"><div class="time-label"><i class="fas fa-sun"></i> Morning End</div><div class="time-value">${e}</div></div><div class="time-row"><div class="time-label"><i class="fas fa-hourglass-half"></i> Morning Duration</div><div class="time-value">${r} min</div></div><div class="time-row"><div class="time-label"><i class="fas fa-sun"></i> Evening Start</div><div class="time-value">${t}</div></div><div class="time-row"><div class="time-label"><i class="fas fa-sun"></i> Evening End</div><div class="time-value">${o}</div></div><div class="time-row"><div class="time-label"><i class="fas fa-hourglass-half"></i> Evening Duration</div><div class="time-value">${c} min</div></div>`}
+function _updateMoonDataDetailsUI(){if(!_elements.moonDataDetails||!_state.moonTimes||!_state.moonPosition||!_state.moonPosition.hasOwnProperty('altitude')||!_state.moonIllumination){if(_elements.moonDataDetails)_elements.moonDataDetails.innerHTML="<div class=loading>Loading...</div>";return}let n="---",t="---",r="";_state.moonTimes.rise&&(n=_formatTime(_state.moonTimes.rise));_state.moonTimes.set&&(t=_formatTime(_state.moonTimes.set));_state.moonTimes.alwaysUp?r="Always Up":_state.moonTimes.alwaysDown&&(r="Always Down");let c=`<div><strong>Moonrise:</strong> ${n}</div>`;c+=`<div><strong>Moonset:</strong> ${t}</div>`;r&&(c+=`<div><strong>Status:</strong> ${r}</div>`);c+=`<div><strong>Current Azimuth:</strong> ${Math.round(_state.moonPosition.azimuth*_RAD2DEG)}°</div>`;c+=`<div><strong>Current Altitude:</strong> ${Math.round(_state.moonPosition.altitude*_RAD2DEG)}°</div>`;c+=`<div><strong>Distance:</strong> ${Math.round(_state.moonPosition.distance/1e3)} x1000 km</div>`;_elements.moonDataDetails.innerHTML=c}
+function _updateMoonPhaseUI(){if(!_elements.moonPhase||!_state.moonIllumination){if(_elements.phaseName)_elements.phaseName.textContent="Loading...";if(_elements.phasePercent)_elements.phasePercent.textContent="";return}const n=_state.moonIllumination.phase,e=_state.moonIllumination.fraction;let t="Unknown";if(n<0.03||n>0.97)t="New Moon";else if(n<0.23)t="Waxing Crescent";else if(n<0.27)t="First Quarter";else if(n<0.48)t="Waxing Gibbous";else if(n<0.52)t="Full Moon";else if(n<0.73)t="Waning Gibbous";else if(n<0.77)t="Last Quarter";else t="Waning Crescent";let o=0,s="0%";if(n<=0.5){o=(1-(n*2))*100;s=`${(n*2)*50}%`}else{o=((n-0.5)*2)*100;s="0%"}o=Math.max(0,Math.min(100,o));_elements.moonPhaseShadow.style.width=`${o}%`;_elements.moonPhaseShadow.style.left=s;_elements.phaseName.textContent=t;_elements.phasePercent.textContent=`${Math.round(e*100)}% illuminated`}
+function _initApp(){console.log("Initializing App v4...");_state.googleAutocompleteService=new google.maps.places.AutocompleteService();_state.googlePlacesService=new google.maps.places.PlacesService(document.createElement("div"));_state.googleGeocoder=new google.maps.Geocoder();_elements.tabs.forEach(n=>{n.addEventListener("click",(function(){const n=this.getAttribute("data-tab");_elements.tabs.forEach(n=>n.classList.remove("active"));_elements.tabContents.forEach(n=>n.classList.remove("active"));this.classList.add("active");document.getElementById(`${n}-tab`)?.classList.add("active")}))});_elements.gpsButton?.addEventListener("click",_getUserLocation);_elements.locationSearch?.addEventListener("input",_handleLocationSearchDebounced);document.addEventListener("click",n=>{if(_elements.locationSuggestions&&!_elements.locationSuggestions.contains(n.target)&&n.target!==_elements.locationSearch){_elements.locationSuggestions.style.display="none"}});_elements.notificationClose?.addEventListener("click",()=>{_elements.goldenHourNotification?.classList.remove("show")});_requestOrientationPermission();_getUserLocation();setInterval(_calculateCelestialData,60000);setInterval(_updateAllUI,10000);setInterval(_updateSunriseSunsetInfo,1000);setInterval(_updateCompassUI,100);_updateCompassUI()}
+_initApp()
+}));
+</script>
+</body>
+</html>
