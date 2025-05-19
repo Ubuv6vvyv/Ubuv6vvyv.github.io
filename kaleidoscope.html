@@ -834,3 +834,188 @@
                     // Tile the pattern to main canvas
                     tilePattern();
                 }
+                
+                // Schedule next frame (recursive call)
+                animationRequest = requestAnimationFrame(animationLoop);
+            }
+            
+            // Start the animation loop
+            animationLoop();
+        }
+        
+        // Function to pause/play animation
+        function pausePlayAnimation() {
+            const playPauseBtn = document.getElementById('togglePlayPause');
+            
+            if (playAnimationToggle) {
+                playAnimationToggle = false;
+                cancelAnimationFrame(animationRequest);
+                playPauseBtn.textContent = 'Play';
+                playPauseBtn.classList.remove('btn-secondary');
+                playPauseBtn.classList.add('btn-primary');
+            } else {
+                playAnimationToggle = true;
+                animationLoop();
+                playPauseBtn.textContent = 'Pause';
+                playPauseBtn.classList.remove('btn-primary');
+                playPauseBtn.classList.add('btn-secondary');
+            }
+        }
+        
+        // Function to save current canvas as image
+        function saveImage() {
+            if (!animation) return;
+            
+            try {
+                const link = document.createElement('a');
+                link.download = 'kaleidoscope-' + new Date().getTime() + '.png';
+                link.href = animation.toDataURL('image/png');
+                link.click();
+            } catch (err) {
+                console.error('Error saving image:', err);
+                alert('Failed to save image. Your browser may not support this feature.');
+            }
+        }
+        
+        // Video recording functions
+        function startRecording() {
+            if (recording) {
+                stopRecording();
+                return;
+            }
+            
+            // Check browser support
+            if (!navigator.mediaDevices || !MediaRecorder) {
+                alert('Your browser does not support recording. Try using Chrome or Firefox.');
+                return;
+            }
+            
+            try {
+                // Reset chunks
+                recordedChunks = [];
+                
+                // Get canvas stream
+                const stream = animation.captureStream(fps);
+                
+                // Configure MediaRecorder
+                const options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 5000000 };
+                mediaRecorder = new MediaRecorder(stream, options);
+                
+                // Set up event handlers
+                mediaRecorder.ondataavailable = handleDataAvailable;
+                mediaRecorder.onstop = handleStop;
+                
+                // Calculate recording duration in ms
+                const recordingDuration = videoDuration * 1000;
+                
+                // Start recording
+                mediaRecorder.start(100); // Collect data every 100ms
+                recording = true;
+                
+                // Update UI
+                recordBtn.textContent = 'Stop Recording';
+                recordingIndicator.classList.remove('hidden');
+                
+                // Set timeout to stop recording after specified duration
+                setTimeout(() => {
+                    if (recording) {
+                        stopRecording();
+                    }
+                }, recordingDuration);
+                
+                console.log('Recording started...');
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                alert('Failed to start recording: ' + error.message);
+            }
+        }
+        
+        function stopRecording() {
+            if (!recording || !mediaRecorder) return;
+            
+            try {
+                mediaRecorder.stop();
+                recording = false;
+                recordBtn.textContent = 'Record';
+                recordingIndicator.classList.add('hidden');
+                console.log('Recording stopped...');
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+                alert('Failed to stop recording: ' + error.message);
+            }
+        }
+        
+        function handleDataAvailable(event) {
+            if (event.data && event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        }
+        
+        function handleStop() {
+            // Create blob from chunks
+            finishedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+            
+            // Create URL for the blob
+            const videoURL = URL.createObjectURL(finishedBlob);
+            
+            // Download video file
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = videoURL;
+            a.download = 'kaleidoscope-' + new Date().getTime() + '.webm';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(videoURL);
+            }, 100);
+        }
+        
+        // Initialization function
+        function init() {
+            // Create a default pattern if no image is loaded
+            if (!isImageLoaded) {
+                console.log('No image loaded, creating default pattern');
+                resizeImage();
+            }
+            
+            // Remove loading screen after initialization
+            setTimeout(() => {
+                loadingScreen.classList.add("hidden");
+            }, 1000);
+        }
+        
+        // Start application
+        window.addEventListener('load', init);
+        
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // Only resize if animation is active and browser window changes significantly
+                if (playAnimationToggle && window.innerWidth > 0) {
+                    console.log('Window resized, adjusting kaleidoscope');
+                    changeTiling();
+                }
+            }, 500);
+        });
+        
+        // Handle errors
+        window.addEventListener('error', (e) => {
+            console.error('Error occurred:', e.error);
+            loadingScreen.classList.add("hidden");
+            alert('An error occurred. Please refresh the page and try again.');
+        });
+        
+        // Handle visibility change (pause when tab is not visible)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && playAnimationToggle) {
+                pausePlayAnimation();
+            }
+        });
+    </script>
+</body>
+</html>
