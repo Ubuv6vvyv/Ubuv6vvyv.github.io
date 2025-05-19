@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sun & Moon Compass with Maps</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cascadia+Code&display=swap">
+    <style>
+        body {
+            font-family: overlock-sc;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .location-section {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .location-section h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #4CAF50;
+        }
+        #location-search-input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: #e0e0e0;
+            font-size: 0.9em;
+        }
+        .location-buttons {
+             display: flex;
+             gap: 10px;
+             margin-bottom: 15px;
+        }
+        .location-buttons button {
+            flex-grow: 1;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background-color 0.2s;
+        }
+        .location-buttons button:hover {
+            background-color: #45a049;
+        }
+        .location-buttons button.secondary {
+            background-color: #555;
+        }
+        .location-buttons button.secondary:hover {
+            background-color: #666;
+        }
+        #map {
+            width: 100%;
+            height: 200px;
+            border-radius: 6px;
+            background-color: #333;
+            margin-bottom: 10px;
+            border: 1px solid #444;
+        }
+        #lat-lon-display {
+            font-size: 0.75em;
+            color: #aaa;
+            text-align: center;
+font-family: overlock-sc;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .tab-button {
+            flex: 1;
+            padding: 14px 10px;
+            background-color: #1e1e1e;
+            color: #a0a0a0;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: background-color 0.3s, color 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-button.active {
+            background-color: #282828;
+            color: #4CAF50;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .tab-content {
+            padding: 15px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            flex-grow: 1;
+            display: none; 
+            flex-direction: column;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+        .compass-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+        .instructions {
+            font-size: 0.75em;
+            color: #b0b0b0;
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 0 10px;
+            line-height: 1.4;
+        }
+        .compass-container {
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background-color: #2a2a2a;
+            margin: 0 auto 15px auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 0 15px rgba(0,0,0,0.3);
+            border: 4px solid #383838;
+        }
+.cascadia-code { font-family: 'Cascadia Code'; }
+        .compass-rose {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3Cstyle%3E.cls-1%7Bfill:%23404040;%7D.cls-2%7Bfont-size:14px;fill:%23909090;font-family:Arial,sans-serif;text-anchor:middle;font-weight:bold;%7D%3C/style%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='98' fill='%232a2a2a' stroke='%23383838' stroke-width='2'/%3E%3Cpath class='cls-1' d='M100,10 l0,15 M100,190 l0,-15 M10,100 l15,0 M190,100 l-15,0 M170.71,29.29 l-10.6,10.6 M29.29,170.71 l10.6,-10.6 M29.29,29.29 l10.6,10.6 M170.71,170.71 l-10.6,-10.6' stroke='%23404040' stroke-width='2'/%3E%3Ctext x='100' y='25' class='cls-2'%3EN%3C/text%3E%3Ctext x='100' y='185' class='cls-2'%3ES%3C/text%3E%3Ctext x='18' y='104' class='cls-2'%3EW%3C/text%3E%3Ctext x='182' y='104' class='cls-2'%3EE%3C/text%3E%3C/svg%3E");
+            background-size: contain;
+        }
+        .fixed-line {
+            width: 1px;
+            height: 40%;
+            background-color: #e05c3c;
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            transform: translateX(-50%) rotate(0deg);
+            border-radius: 2px;
+            box-shadow: 0 0 6px #e74c3c;
+            z-index: 10;
+        }
+        .celestial-line {
+            width: 2px;
+            height: 50%;
+            position: absolute;
+            top: 0%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            transform: translateX(-50%) rotate(0deg);
+            border-radius: 2px 2px 0 0;
+            z-index: 5;
+        }
+        .celestial-line::after { 
+            content: '';
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+        }
+        #sun-celestial-line {
+            background-color: #f1c40f;
+            box-shadow: 0 0 8px #f1c40f;
+        }
+        #sun-celestial-line::after {
+            content: '☀️';
+        }
+        #moon-celestial-line {
+            background-color: #bdc3c7;
+            box-shadow: 0 0 8px #bdc3c7;
+        }
+        #moon-celestial-line::after {
+            content: '🌙';
+        }
+        .info-panel {
+            text-align: left;
+            margin-top: 10px;
+            font-size: 0.8em;
+            line-height: 1.6;
+            overflow-y: auto;
+            max-height: calc(100vh - 550px);
+            padding: 10px;
+            background-color: #282828;
+            border-radius: 6px;
+        }
+        .info-panel h4 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: #4CAF50;
+            font-size: 1.1em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+        }
+        .info-panel p {
+            margin: 4px 0;
+        }
+        .info-panel strong {
+            color: #b0b0b0;
+        }
+        .info-panel span {
+            color: #e0e0e0;
+        }
+        .status-messages {
+            font-size: 0.8em;
+            color: #999;
+            text-align: center;
+            margin-top: auto;
+            padding: 10px 0;
+        }
+        .error-message {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 8px;
+            background-color: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+        .pac-container {
+            background-color: #333;
+            border: 1px solid #555 !important;
+            border-radius: 4px;
+            z-index: 10000 !important;
+        }
+        .pac-item {
+            padding: 8px;
+            font-size: 0.9em;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+        .pac-item:hover {
+            background-color: #4CAF50;
+        }
+        .pac-item-query {
+            font-size: 0.9em;
+            color: #e0e0e0;
+        }
+        .pac-matched {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        @media (max-width: 400px) {
+            .compass-container {
+                width: 200px;
+                height: 200px;
+            }
+            .info-panel {
+                font-size: 0.75em;
+                max-height: calc(100vh - 500px);
+            }
+            .celestial-line::after {
+                font-size: 16px;
+            }
+            .location-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="cascadia-code">
+    <div class="container">
+        <div class="location-section">
+            <h3>Select Location</h3>
+            <input type="text" id="location-search-input" placeholder="Search for a city or address...">
+            <div class="location-buttons">
+                <button onclick="getUserLocation()" class="secondary">Use My Current Location</button>
+            </div>
+            <div id="map"></div>
+            <p id="lat-lon-display">Latitude: N/A, Longitude: N/A</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab('sun')">Sun Compass ☀️</button>
+            <button class="tab-button" onclick="openTab('moon')">Moon Compass 🌙</button>
+        </div>
+        
+        <div id="sun-tab" class="tab-content active">
+            <div class="compass-area">
+                <p class="instructions">Align <strong>yellow line (☀️)</strong> with <strong>red line</strong> (device top).
+                When aligned, device top points to Sun.</p>
+                <div class="compass-container">
+                    <div class="compass-rose"></div>
+                    <div class="fixed-line"></div>
+                    <div class="celestial-line" id="sun-celestial-line"></div>
+                </div>
+            </div>
+            <div class="info-panel" id="sun-info"><h4>Sun Data</h4><p>Initializing...</p></div>
+            <div id="sun-error" class="error-message" style="display: none;"></div>
+        </div>
+
+        <div id="moon-tab" class="tab-content">
+             <div class="compass-area">
+                <p class="instructions">Align <strong>grey line (🌙)</strong> with 
+                <strong>red line</strong> (device top). When aligned, device top points to Moon.</p>
+                <div class="compass-container">
+                    <div class="compass-rose"></div>
+                    <div class="fixed-line"></div>
+                    <div class="celestial-line" id="moon-celestial-line"></div>
+                </div>
+            </div>
+            <div class="info-panel" id="moon-info"><h4>Moon Data</h4><p>Initializing...</p></div>
+            <div id="moon-error" class="error-message" style="display: none;"></div>
+        </div>
+        
+        <div class="status-messages">
+            <p id="device-orientation-info">Device orientation: N/A</p>
+            <p id="general-error" class="error-message" style="display: none;"></p>
+        </div>
+    </div>
+</div>
+
+    <script>
+        const Maps_API_KEY = 'AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA'; // Replace with your actual key
+
+        let currentLat, currentLon;
+        let deviceHeading = 0;
+        let orientationEventsAvailable = false;
+        let map, mapMarker;
+        let autocomplete;
+
+        const sunCelestialLine = document.getElementById('sun-celestial-line');
+        const moonCelestialLine = document.getElementById('moon-celestial-line');
+        const sunInfoPanel = document.getElementById('sun-info');
+        const moonInfoPanel = document.getElementById('moon-info');
+        const sunErrorPanel = document.getElementById('sun-error');
+        const moonErrorPanel = document.getElementById('moon-error');
+        const generalErrorPanel = document.getElementById('general-error');
+        const deviceOrientationInfo = document.getElementById('device-orientation-info');
+        const locationSearchInput = document.getElementById('location-search-input');
+        const latLonDisplay = document.getElementById('lat-lon-display');
+        
+        let compassRoseSun, compassRoseMoon;
+
+        function callSunCalc(methodName, ...args) {
+            if (typeof SunCalc === 'undefined') {
+                const errorMsg = `SunCalc object is undefined. Cannot call ${methodName}. Ensure suncalc.js is loaded.`;
+                console.error(errorMsg);
+                throw new ReferenceError(errorMsg);
+            }
+            if (typeof SunCalc[methodName] !== 'function') {
+                const errorMsg = `SunCalc.${methodName} is not a function.`;
+                console.error(errorMsg + " Ensure suncalc.js is loaded correctly and the version is compatible.");
+                throw new TypeError(errorMsg);
+            }
+            return SunCalc[methodName](...args);
+        }
+
+        function initApp() {
+            compassRoseSun = document.querySelector('#sun-tab .compass-rose');
+            compassRoseMoon = document.querySelector('#moon-tab .compass-rose');
+            initMap();
+            initAutocomplete();
+            getUserLocation(); 
+            startDeviceOrientation();
+            requestAnimationFrame(animationLoop);
+            setInterval(updateCelestialInfoIfLocationSet, 60 * 1000);
+        }
+
+        function initMap(lat = 0, lon = 0) {
+            const initialLocation = { lat: lat, lng: lon };
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: initialLocation,
+                zoom: (lat === 0 && lon === 0) ? 2 : 10,
+                mapTypeId: 'roadmap',
+                disableDefaultUI: true,
+                zoomControl: true,
+                streetViewControl: false,
+                mapTypeControl: false,
+                 styles: [ 
+                    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+                    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+                    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+                    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+                    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+                    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+                    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+                    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+                    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+                    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+                    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+                    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+                    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
+                ],
+            });
+            mapMarker = new google.maps.Marker({
+                position: initialLocation,
+                map: map,
+                draggable: true,
+            });
+            mapMarker.addListener('dragend', () => {
+                const newPos = mapMarker.getPosition();
+                updateLocation(newPos.lat(), newPos.lng(), "Marker Dragged");
+            });
+        }
+
+        function initAutocomplete() {
+            autocomplete = new google.maps.places.Autocomplete(locationSearchInput, {
+                types: ['geocode'] 
+            });
+            autocomplete.setFields(['address_components', 'geometry', 'icon', 'name']);
+            autocomplete.addListener('place_changed', onPlaceChanged);
+        }
+
+        function onPlaceChanged() {
+            const place = autocomplete.getPlace();
+            if (place.geometry && place.geometry.location) {
+                updateLocation(place.geometry.location.lat(), place.geometry.location.lng(), place.name);
+                locationSearchInput.value = place.name; 
+            } else {
+                showGeneralError("No details available for input: '" + (place.name || locationSearchInput.value) + "'. Please select from suggestions.");
+            }
+        }
+        
+        function updateLocation(lat, lon, name = "Selected Location") {
+            currentLat = lat;
+            currentLon = lon;
+            latLonDisplay.textContent = `Lat: ${currentLat.toFixed(4)}, Lon: ${currentLon.toFixed(4)} (${name})`;
+            if (map && mapMarker) {
+                const newPosition = { lat: currentLat, lng: currentLon };
+                map.setCenter(newPosition);
+                map.setZoom(10);
+                mapMarker.setPosition(newPosition);
+            } else {
+                initMap(currentLat, currentLon);
+            }
+            clearGeneralError();
+            updateCelestialInfo();
+        }
+
+        function openTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+            document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+            document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
+            updateCelestialInfoIfLocationSet();
+        }
+
+        function showErrorInPanel(panelElement, title, message) {
+            panelElement.innerHTML = `<h4>${title}</h4><p class="error-message" style="display:block; text-align:left; padding: 5px; margin: 5px 0;">${message}</p>`;
+        }
+        
+        function showGeneralError(message) {
+            generalErrorPanel.textContent = message;
+            generalErrorPanel.style.display = 'block';
+        }
+
+        function clearGeneralError() {
+            generalErrorPanel.textContent = '';
+            generalErrorPanel.style.display = 'none';
+        }
+
+        function formatTime(date) {
+            if (!date || isNaN(date.getTime())) return 'N/A';
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+        function updateSunInfo() {
+            if (typeof currentLat === 'undefined' || typeof currentLon === 'undefined') {
+                sunInfoPanel.innerHTML = "<h4>Sun Data</h4><p>Please select a location.</p>";
+                return null;
+            }
+            const now = new Date();
+            try {
+                const sunPosition = callSunCalc('getPosition', now, currentLat, currentLon);
+                const sunTimes = callSunCalc('getTimes', now, currentLat, currentLon);
+                const sunAzimuthDegrees = (sunPosition.azimuth * 180 / Math.PI + 180) % 360;
+                const sunAltitudeDegrees = sunPosition.altitude * 180 / Math.PI;
+
+                sunInfoPanel.innerHTML = `
+                    <h4>Sun Data</h4>
+                    <p><strong>Azimuth:</strong> <span>${sunAzimuthDegrees.toFixed(1)}° (from N)</span></p>
+                    <p><strong>Altitude:</strong> <span>${sunAltitudeDegrees.toFixed(1)}°</span></p>
+                    <p><strong>Status:</strong> <span>${sunAltitudeDegrees > -0.833 ? 'Above Horizon' : 'Below Horizon'}</span></p><hr>
+                    <p><strong>Dawn (Civil):</strong> <span>${formatTime(sunTimes.dawn)}</span></p>
+                    <p><strong>Sunrise:</strong> <span>${formatTime(sunTimes.sunrise)}</span></p>
+                    <p><strong>Sunrise End:</strong> <span>${formatTime(sunTimes.sunriseEnd)}</span></p>
+                    <p><strong>Golden Hour End (Morning):</strong> <span>${formatTime(sunTimes.goldenHourEnd)}</span></p>
+                    <p><strong>Solar Noon:</strong> <span>${formatTime(sunTimes.solarNoon)}</span></p>
+                    <p><strong>Golden Hour Start (Evening):</strong> <span>${formatTime(sunTimes.goldenHour)}</span></p>
+                    <p><strong>Sunset Start:</strong> <span>${formatTime(sunTimes.sunsetStart)}</span></p>
+                    <p><strong>Sunset:</strong> <span>${formatTime(sunTimes.sunset)}</span></p>
+                    <p><strong>Dusk (Civil):</strong> <span>${formatTime(sunTimes.dusk)}</span></p><hr>
+                    <p><strong>Nautical Dawn:</strong> <span>${formatTime(sunTimes.nauticalDawn)}</span></p>
+                    <p><strong>Nautical Dusk:</strong> <span>${formatTime(sunTimes.nauticalDusk)}</span></p>
+                    <p><strong>Night Starts (Astronomical Dusk):</strong> <span>${formatTime(sunTimes.night)}</span></p>
+                    <p><strong>Night Ends (Astronomical Dawn):</strong> <span>${formatTime(sunTimes.nightEnd)}</span></p>
+                `;
+                return sunAzimuthDegrees;
+            } catch (e) {
+                console.error("Error in updateSunInfo:", e);
+                showErrorInPanel(sunInfoPanel, "Sun Data Error", `Could not calculate Sun data: ${e.message}`);
+                return null;
+            }
+        }
+
+        function updateMoonInfo() {
+            if (typeof currentLat === 'undefined' || typeof currentLon === 'undefined') {
+                 moonInfoPanel.innerHTML = "<h4>Moon Data</h4><p>Please select a location.</p>";
+                 return null;
+            }
+            const now = new Date();
+            try {
+                const moonPosition = callSunCalc('getMoonPosition', now, currentLat, currentLon);
+                const moonTimes = callSunCalc('getMoonTimes', now, currentLat, currentLon);
+                const moonIllumination = callSunCalc('getMoonIllumination', now);
+                const moonAzimuthDegrees = (moonPosition.azimuth * 180 / Math.PI + 180) % 360;
+                const moonAltitudeDegrees = moonPosition.altitude * 180 / Math.PI;
+                let phaseName = "Unknown";
+                const phase = moonIllumination.phase;
+                if (phase < 0.015 || phase >= 0.985) phaseName = "New Moon 🌑";
+                else if (phase < 0.235) phaseName = "Waxing Crescent 🌒";
+                else if (phase < 0.265) phaseName = "First Quarter 🌓";
+                else if (phase < 0.485) phaseName = "Waxing Gibbous 🌔";
+                else if (phase < 0.515) phaseName = "Full Moon 🌕";
+                else if (phase < 0.735) phaseName = "Waning Gibbous 🌖";
+                else if (phase < 0.765) phaseName = "Last Quarter 🌗";
+                else phaseName = "Waning Crescent 🌘";
+                
+                const riseTime = moonTimes.rise ? formatTime(moonTimes.rise) : (moonTimes.alwaysUp ? 'Always Up' : (moonTimes.alwaysDown ? 'Always Down' : 'Does not rise today'));
+                const setTime = moonTimes.set ? formatTime(moonTimes.set) : (moonTimes.alwaysUp ? 'Always Up' : (moonTimes.alwaysDown ? 'Always Down' : 'Does not set today'));
+                moonInfoPanel.innerHTML = `
+                    <h4>Moon Data</h4>
+                    <p><strong>Azimuth:</strong> <span>${moonAzimuthDegrees.toFixed(1)}° (from N)</span></p>
+                    <p><strong>Altitude:</strong> <span>${moonAltitudeDegrees.toFixed(1)}°</span></p>
+                    <p><strong>Distance:</strong> <span>${moonPosition.distance.toFixed(0)} km</span></p>
+                    <p><strong>Status:</strong> <span>${moonAltitudeDegrees > 0 ? 'Above Horizon' : 'Below Horizon'}</span></p><hr>
+                    <p><strong>Phase:</strong> <span>${phaseName}</span></p>
+                    <p><strong>Illumination:</strong> <span>${(moonIllumination.fraction * 100).toFixed(1)}%</span></p><hr>
+                    <p><strong>Moonrise:</strong> <span>${riseTime}</span></p>
+                    <p><strong>Moonset:</strong> <span>${setTime}</span></p>
+                `;
+                return moonAzimuthDegrees;
+            } catch (e) {
+                console.error("Error in updateMoonInfo:", e);
+                showErrorInPanel(moonInfoPanel, "Moon Data Error", `Could not calculate Moon data: ${e.message}`);
+                return null;
+            }
+        }
+        
+        function updateCelestialInfo() {
+            updateSunInfo();
+            updateMoonInfo();
+            
+            if (!orientationEventsAvailable && (typeof currentLat !== 'undefined' && typeof currentLon !== 'undefined')) {
+                 const defaultRotation = 0;
+                 let sunAzimuthForNoOrient = defaultRotation;
+                 let moonAzimuthForNoOrient = defaultRotation;
+                 try {
+                     const sunPos = callSunCalc('getPosition', new Date(), currentLat, currentLon);
+                     sunAzimuthForNoOrient = (sunPos.azimuth * 180 / Math.PI + 180) % 360;
+                 } catch (e) { /* ignore */ }
+                 try {
+                     const moonPos = callSunCalc('getMoonPosition', new Date(), currentLat, currentLon);
+                     moonAzimuthForNoOrient = (moonPos.azimuth * 180 / Math.PI + 180) % 360;
+                 } catch (e) { /* ignore */ }
+
+                 sunCelestialLine.style.transform = `translateX(-50%) rotate(${sunAzimuthForNoOrient}deg)`;
+                 moonCelestialLine.style.transform = `translateX(-50%) rotate(${moonAzimuthForNoOrient}deg)`;
+                 
+                 if (compassRoseSun) compassRoseSun.style.transform = 'rotate(0deg)';
+                 if (compassRoseMoon) compassRoseMoon.style.transform = 'rotate(0deg)';
+
+                 const currentTab = document.querySelector('.tab-content.active');
+                 const infoPanel = currentTab.id === 'sun-tab' ? sunInfoPanel : moonInfoPanel;
+                 if (infoPanel && !infoPanel.querySelector('.error-message') && !infoPanel.querySelector('.orientation-note')) {
+                    const note = document.createElement('p');
+                    note.className = 'instructions orientation-note';
+                    note.style.fontSize = '0.9em';
+                    note.style.color = '#ffcc00';
+                    note.textContent = 'Compass shows direction relative to North (Device orientation not available).';
+                    infoPanel.appendChild(note);
+                 }
+            } else if (orientationEventsAvailable) {
+                const currentTab = document.querySelector('.tab-content.active');
+                const infoPanel = currentTab.id === 'sun-tab' ? sunInfoPanel : moonInfoPanel;
+                const existingNote = infoPanel ? infoPanel.querySelector('.orientation-note') : null;
+                if (existingNote) existingNote.remove();
+            }
+        }
+
+        function updateCelestialInfoIfLocationSet() {
+            if (typeof currentLat !== 'undefined' && typeof currentLon !== 'undefined') {
+                updateCelestialInfo();
+            }
+        }
+
+        function handleOrientation(event) {
+            if (!orientationEventsAvailable) {
+                orientationEventsAvailable = true;
+                updateCelestialInfo(); // Remove note if it was added
+            }
+            let alpha = event.alpha;
+            if (typeof event.webkitCompassHeading !== "undefined" && event.webkitCompassHeading !== null) {
+                alpha = event.webkitCompassHeading;
+                deviceOrientationInfo.textContent = `Device Heading (iOS): ${alpha.toFixed(1)}°`;
+            } else if (alpha !== null) {
+                deviceOrientationInfo.textContent = `Device Heading: ${alpha.toFixed(1)}°`;
+            } else {
+                deviceOrientationInfo.textContent = "Device heading (alpha) is null.";
+                alpha = deviceHeading; 
+            }
+            deviceHeading = alpha;
+        }
+
+        function startDeviceOrientation() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            addOrientationListeners();
+                        } else {
+                            deviceOrientationInfo.textContent = "Orientation permission denied.";
+                            orientationEventsAvailable = false;
+                            updateCelestialInfo(); // Update to show note
+                        }
+                    }).catch(err => {
+                        console.error("Orientation permission error:", err);
+                        deviceOrientationInfo.textContent = "Orientation permission error. Trying fallback.";
+                        addOrientationListeners(); // Try adding listener anyway (for non-iOS13+ browsers)
+                    });
+            } else {
+                addOrientationListeners();
+            }
+        }
+
+        function addOrientationListeners() {
+            let listenerType = "";
+            if ('DeviceOrientationAbsoluteEvent' in window) {
+                 window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                 listenerType = "DeviceOrientationAbsoluteEvent";
+            } else if ('DeviceOrientationEvent' in window) { 
+                 window.addEventListener('deviceorientation', handleOrientation, true);
+                 listenerType = "DeviceOrientationEvent";
+            }
+            
+            if (listenerType) {
+                if (deviceOrientationInfo.textContent.includes("N/A") || deviceOrientationInfo.textContent.includes("not supported")) {
+                    deviceOrientationInfo.textContent = "Device orientation active.";
+                }
+            } else {
+                 deviceOrientationInfo.textContent = "Device orientation not supported.";
+                 orientationEventsAvailable = false;
+                 updateCelestialInfo(); // Update to show note
+            }
+        }
+        
+        function getUserLocation() {
+            locationSearchInput.value = '';
+            clearGeneralError();
+            sunInfoPanel.innerHTML = "<h4>Sun Data</h4><p>Fetching current location...</p>";
+            moonInfoPanel.innerHTML = "<h4>Moon Data</h4><p>Fetching current location...</p>";
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        updateLocation(position.coords.latitude, position.coords.longitude, "Current Location");
+                    },
+                    (error) => {
+                        console.error("Error getting current location:", error);
+                        showGeneralError("Could not get current location: " + error.message + ". Try searching.");
+                        sunInfoPanel.innerHTML = "<h4>Sun Data</h4><p>Could not get current location. Please search or allow location access.</p>";
+                        moonInfoPanel.innerHTML = "<h4>Moon Data</h4><p>Could not get current location. Please search or allow location access.</p>";
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                );
+            } else {
+                showGeneralError("Geolocation is not supported by this browser. Please search for a location.");
+                sunInfoPanel.innerHTML = "<h4>Sun Data</h4><p>Geolocation not supported. Please search for a location.</p>";
+                moonInfoPanel.innerHTML = "<h4>Moon Data</h4><p>Geolocation not supported. Please search for a location.</p>";
+            }
+        }
+
+        function animationLoop() {
+            if (orientationEventsAvailable && typeof currentLat !== 'undefined' && typeof currentLon !== 'undefined') {
+                const activeTabElement = document.querySelector('.tab-content.active');
+                if (!activeTabElement) {
+                    requestAnimationFrame(animationLoop);
+                    return;
+                }
+                const activeTabId = activeTabElement.id;
+
+                let celestialAzimuth = null;
+                let currentCompassRoseToRotate = null;
+                let currentCelestialLineToRotate = null;
+
+                try {
+                    if (activeTabId === 'sun-tab') {
+                        currentCompassRoseToRotate = compassRoseSun;
+                        currentCelestialLineToRotate = sunCelestialLine;
+                        const sunPosition = callSunCalc('getPosition', new Date(), currentLat, currentLon);
+                        celestialAzimuth = (sunPosition.azimuth * 180 / Math.PI + 180) % 360;
+                    } else if (activeTabId === 'moon-tab') {
+                        currentCompassRoseToRotate = compassRoseMoon;
+                        currentCelestialLineToRotate = moonCelestialLine;
+                        const moonPosition = callSunCalc('getMoonPosition', new Date(), currentLat, currentLon);
+                        celestialAzimuth = (moonPosition.azimuth * 180 / Math.PI + 180) % 360;
+                    }
+
+                    if (currentCompassRoseToRotate) {
+                        currentCompassRoseToRotate.style.transform = `rotate(${-deviceHeading}deg)`;
+                    }
+
+                    if (currentCelestialLineToRotate && !isNaN(celestialAzimuth)) {
+                        const lineRotation = celestialAzimuth - deviceHeading;
+                        currentCelestialLineToRotate.style.transform = `translateX(-50%) rotate(${lineRotation}deg)`;
+                    }
+                } catch (e) {
+                    // Errors handled by callSunCalc and info panel updates
+                }
+            }
+            requestAnimationFrame(animationLoop);
+        }
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${Maps_API_KEY}&libraries=places,maps&callback=initApp`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => {
+            showGeneralError("Failed to load Google Maps API. Please check your internet connection and ensure the API key is correct and enabled.");
+            locationSearchInput.disabled = true;
+            locationSearchInput.placeholder = "Maps API Load Error";
+        };
+        document.head.appendChild(script);
+
+        window.gm_authFailure = () => {
+            showGeneralError("Google Maps API Authentication Failed. Check API key, billing, and enabled APIs (Maps JavaScript, Places, Geocoding).");
+            locationSearchInput.disabled = true;
+            locationSearchInput.placeholder = "Maps API Auth Error";
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof SunCalc === 'undefined') {
+                console.error("SunCalc is NOT loaded at DOMContentLoaded. This is a critical failure.");
+                showGeneralError("Critical error: SunCalc library failed to load. Celestial calculations will not work.");
+            }
+        });
+    </script>
+</body>
+</html>

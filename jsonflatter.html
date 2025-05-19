@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced JSON Flattener</title>
+    <style>
+        :root {
+            --primary: #4a6cf7;
+            --secondary: #e74c3c;
+            --bg: #f9f9f9;
+            --card: #ffffff;
+            --text: #333;
+            --border: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 1rem;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+            background-color: var(--card);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+        
+        .input-container, .output-container {
+            margin-bottom: 1.5rem;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 1rem 0;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        button.secondary {
+            background-color: var(--secondary);
+        }
+        
+        button.outline {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        select, input {
+            padding: 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        
+        .options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .output-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 1rem;
+            justify-content: space-between;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            max-height: 500px; /* Limit table height */
+            overflow-y: auto; /* Enable vertical scrolling */
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed; /* Prevent table from growing infinitely */
+        }
+        
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            word-break: break-word; /* Handle long content */
+            max-width: 500px; /* Limit cell width */
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+            position: sticky; /* Keep headers visible while scrolling */
+            top: 0;
+            z-index: 10;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background-color: var(--border);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-bar .progress {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .pagination button {
+            padding: 5px 10px;
+            min-width: 40px;
+        }
+        
+        .pagination-info {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+        
+        /* Loading Spinner */
+        .loader {
+            display: none;
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 24px;
+            height: 24px;
+            margin: 0 auto;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .controls, .output-options {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn-group, .options {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            button, select, input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enhanced JSON Flattener</h1>
+        
+        <div class="input-container">
+            <textarea id="input-json" placeholder="Paste your JSON here or use the browse button to upload a file..."></textarea>
+            
+            <div class="controls">
+                <div class="btn-group">
+                    <button id="btn-browse">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 11.08V8l-6-6H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2v-3.08"></path>
+                            <path d="M18 14v4h4"></path>
+                            <path d="M18 18l-5-5-5 5"></path>
+                        </svg>
+                        Browse
+                    </button>
+                    <input type="file" id="file-input" class="file-input" accept=".json,.txt">
+                    
+                    <button id="btn-flatten">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                        Flatten
+                    </button>
+                    
+                    <button id="btn-clear" class="secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        </svg>
+                        Clear
+                    </button>
+                </div>
+                
+                <div class="options">
+                    <label for="separator">Separator:</label>
+                    <input type="text" id="separator" value="." size="2">
+                    
+                    <label for="output-format">Output Format:</label>
+                    <select id="output-format">
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="table">HTML Table</option>
+                        <option value="text">Plain Text</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+            <div class="loader"></div>
+        </div>
+        
+        <div class="output-container">
+            <h3>Output</h3>
+            <div id="output-display"></div>
+            <div id="pagination-container" class="pagination" style="display:none;"></div>
+            <div id="pagination-info" class="pagination-info"></div>
+            
+            <div class="output-options">
+                <div class="btn-group">
+                    <button id="btn-copy" class="outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy
+                    </button>
+                    
+                    <button id="btn-download" class="outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    </button>
+                    
+                    <button id="btn-new-window" class="outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                        New Window
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+    
+    <script>
+    // Optimized flatten function
+    function flattenJSON(obj, separator = '.', prefix = '') {
+        return Object.keys(obj).reduce((acc, key) => {
+            const newKey = prefix ? `${prefix}${separator}${key}` : key;
+            if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+                Object.assign(acc, flattenJSON(obj[key], separator, newKey));
+            } else {
+                acc[newKey] = obj[key];
+            }
+            return acc;
+        }, {});
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputTextarea = document.getElementById('input-json');
+        const outputDisplay = document.getElementById('output-display');
+        const separatorInput = document.getElementById('separator');
+        const outputFormatSelect = document.getElementById('output-format');
+        const fileInput = document.getElementById('file-input');
+        const paginationContainer = document.getElementById('pagination-container');
+        const paginationInfo = document.getElementById('pagination-info');
+        const progressBar = document.querySelector('.progress-bar');
+        const progressElement = document.querySelector('.progress');
+        const loader = document.querySelector('.loader');
+        
+        // Buttons
+        const browseBtn = document.getElementById('btn-browse');
+        const flattenBtn = document.getElementById('btn-flatten');
+        const clearBtn = document.getElementById('btn-clear');
+        const copyBtn = document.getElementById('btn-copy');
+        const downloadBtn = document.getElementById('btn-download');
+        const newWindowBtn = document.getElementById('btn-new-window');
+        
+        // Toast
+        const toast = document.getElementById('toast');
+        
+        // Store flattened data and pagination settings
+        let flattenedData = null;
+        let flattenedEntries = [];
+        let currentPage = 1;
+        const itemsPerPage = 100; // Number of items per page for the table view
+        
+        // Show toast notification
+        function showToast(message, duration = 2000) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+        
+        // Show progress
+        function updateProgress(percent) {
+            progressBar.style.display = 'block';
+            progressElement.style.width = `${percent}%`;
+            
+            if (percent >= 100) {
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressElement.style.width = '0%';
+                }, 500);
+            }
+        }
+        
+        // Toggle loading indicator
+        function toggleLoader(show) {
+            loader.style.display = show ? 'block' : 'none';
+        }
+        
+        // Generate pagination controls
+        function setupPagination() {
+            if (!flattenedEntries.length) return;
+            
+            const totalPages = Math.ceil(flattenedEntries.length / itemsPerPage);
+            
+            if (totalPages <= 1) {
+                paginationContainer.style.display = 'none';
+                paginationInfo.textContent = '';
+                return;
+            }
+            
+            paginationContainer.style.display = 'flex';
+            paginationContainer.innerHTML = '';
+            
+            // First page
+            const firstPageBtn = document.createElement('button');
+            firstPageBtn.textContent = '«';
+            firstPageBtn.onclick = () => goToPage(1);
+            paginationContainer.appendChild(firstPageBtn);
+            
+            // Previous page
+            const prevPageBtn = document.createElement('button');
+            prevPageBtn.textContent = '‹';
+            prevPageBtn.onclick = () => goToPage(Math.max(1, currentPage - 1));
+            paginationContainer.appendChild(prevPageBtn);
+            
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.className = i === currentPage ? 'active' : '';
+                pageBtn.onclick = () => goToPage(i);
+                paginationContainer.appendChild(pageBtn);
+            }
+            
+            // Next page
+            const nextPageBtn = document.createElement('button');
+            nextPageBtn.textContent = '›';
+            nextPageBtn.onclick = () => goToPage(Math.min(totalPages, currentPage + 1));
+            paginationContainer.appendChild(nextPageBtn);
+            
+            // Last page
+            const lastPageBtn = document.createElement('button');
+            lastPageBtn.textContent = '»';
+            lastPageBtn.onclick = () => goToPage(totalPages);
+            paginationContainer.appendChild(lastPageBtn);
+            
+            // Update pagination info
+            paginationInfo.textContent = `Showing ${Math.min(flattenedEntries.length, (currentPage - 1) * itemsPerPage + 1)} - ${Math.min(flattenedEntries.length, currentPage * itemsPerPage)} of ${flattenedEntries.length} entries`;
+        }
+        
+        // Go to specific page
+        function goToPage(page) {
+            currentPage = page;
+            updateOutput();
+        }
+        
+        // Flatten JSON with Web Worker for better performance
+        function processFlattenJSON() {
+            try {
+                const inputText = inputTextarea.value.trim();
+                if (!inputText) {
+                    showToast('Please enter some JSON to flatten');
+                    return;
+                }
+                
+                toggleLoader(true);
+                updateProgress(10);
+                
+                // Use setTimeout to prevent UI freeze
+                setTimeout(() => {
+                    try {
+                        const jsonData = JSON.parse(inputText);
+                        const separator = separatorInput.value || '.';
+                        
+                        updateProgress(50);
+                        
+                        // Process in chunks for large objects
+                        setTimeout(() => {
+                            try {
+                                flattenedData = flattenJSON(jsonData, separator);
+                                flattenedEntries = Object.entries(flattenedData);
+                                
+                                updateProgress(90);
+                                
+                                // Update UI
+                                setTimeout(() => {
+                                    updateOutput();
+                                    updateProgress(100);
+                                    toggleLoader(false);
+                                    showToast(`JSON flattened successfully! Found ${flattenedEntries.length} entries.`);
+                                }, 10);
+                            } catch (error) {
+                                toggleLoader(false);
+                                showToast(`Error during flattening: ${error.message}`);
+                                console.error(error);
+                            }
+                        }, 10);
+                    } catch (error) {
+                        toggleLoader(false);
+                        showToast(`Error parsing JSON: ${error.message}`);
+                        console.error(error);
+                    }
+                }, 10);
+            } catch (error) {
+                toggleLoader(false);
+                showToast(`Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+        
+        // Update output based on selected format
+        function updateOutput() {
+            if (!flattenedData) return;
+            
+            const format = outputFormatSelect.value;
+            
+            switch (format) {
+                case 'json':
+                    outputDisplay.innerHTML = `<textarea readonly>${JSON.stringify(flattenedData, null, 2)}</textarea>`;
+                    paginationContainer.style.display = 'none';
+                    paginationInfo.textContent = '';
+                    break;
+                    
+                case 'csv':
+                    // Optimized CSV generation
+                    const csvContent = generateOptimizedCSV(flattenedEntries);
+                    outputDisplay.innerHTML = `<textarea readonly>${csvContent}</textarea>`;
+                    paginationContainer.style.display = 'none';
+                    paginationInfo.textContent = '';
+                    break;
+                    
+                case 'table':
+                    // Paginated table
+                    const start = (currentPage - 1) * itemsPerPage;
+                    const end = Math.min(flattenedEntries.length, start + itemsPerPage);
+                    const paginatedEntries = flattenedEntries.slice(start, end);
+                    
+                    const tableHTML = generateTable(paginatedEntries);
+                    outputDisplay.innerHTML = `<div class="table-container">${tableHTML}</div>`;
+                    setupPagination();
+                    break;
+                    
+                case 'text':
+                    // Optimized text generation
+                    const textContent = generateOptimizedText(flattenedEntries);
+                    outputDisplay.innerHTML = `<textarea readonly>${textContent}</textarea>`;
+                    paginationContainer.style.display = 'none';
+                    paginationInfo.textContent = '';
+                    break;
+            }
+        }
+        
+        // Optimized CSV generation
+        function generateOptimizedCSV(entries) {
+            if (!entries.length) return 'key,value';
+            
+            const escapeCSV = (val) => {
+                if (val === null || val === undefined) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+            
+            let csvContent = 'key,value\n';
+            
+            // Process in chunks of 1000 entries at a time for better performance
+            const chunkSize = 1000;
+            for (let i = 0; i < entries.length; i += chunkSize) {
+                const chunk = entries.slice(i, i + chunkSize);
+                csvContent += chunk.map(([key, val]) => `${escapeCSV(key)},${escapeCSV(val)}`).join('\n');
+                if (i + chunkSize < entries.length) csvContent += '\n';
+            }
+            
+            return csvContent;
+        }
+        
+        // Generate HTML table
+        function generateTable(entries) {
+            if (!entries.length) return '<p>No data available</p>';
+            
+            let tableHTML = '<table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>';
+            
+            entries.forEach(([key, value]) => {
+                // Safely handle different value types
+                let displayValue = '';
+                if (value === null) {
+                    displayValue = '<em>null</em>';
+                } else if (value === undefined) {
+                    displayValue = '<em>undefined</em>';
+                } else if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value);
+                } else {
+                    displayValue = String(value);
+                }
+                
+                tableHTML += `<tr><td>${escapeHTML(key)}</td><td>${escapeHTML(displayValue)}</td></tr>`;
+            });
+            
+            tableHTML += '</tbody></table>';
+            return tableHTML;
+        }
+        
+        // Escape HTML for safe display
+        function escapeHTML(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
+        // Optimized text generation
+        function generateOptimizedText(entries) {
+            if (!entries.length) return '';
+            
+            // Process in chunks for better performance
+            const chunkSize = 1000;
+            let textContent = '';
+            
+            for (let i = 0; i < entries.length; i += chunkSize) {
+                const chunk = entries.slice(i, i + chunkSize);
+                textContent += chunk.map(([key, val]) => `${key}: ${val === null || val === undefined ? '' : val}`).join('\n');
+                if (i + chunkSize < entries.length) textContent += '\n';
+            }
+            
+            return textContent;
+        }
+        
+        // Handle file input
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                showToast('File is too large. Maximum size is 10MB.');
+                return;
+            }
+            
+            toggleLoader(true);
+            const reader = new FileReader();
+            
+            reader.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percentLoaded = Math.round((e.loaded / e.total) * 100);
+                    updateProgress(percentLoaded);
+                }
+            };
+            
+            reader.onload = function(e) {
+                inputTextarea.value = e.target.result;
+                toggleLoader(false);
+                updateProgress(100);
+            };
+            
+            reader.onerror = function() {
+                toggleLoader(false);
+                showToast('Error reading file');
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // Copy output to clipboard
+        function copyOutput() {
+            if (!flattenedData) {
+                showToast('No data to copy');
+                return;
+            }
+            
+            const format = outputFormatSelect.value;
+            let content = '';
+            
+            switch (format) {
+                case 'json':
+                    content = JSON.stringify(flattenedData, null, 2);
+                    break;
+                case 'csv':
+                    content = generateOptimizedCSV(flattenedEntries);
+                    break;
+                case 'table':
+                    // For table, we'll copy all entries as CSV (not just the current page)
+                    content = generateOptimizedCSV(flattenedEntries);
+                    break;
+                case 'text':
+                    content = generateOptimizedText(flattenedEntries);
+                    break;
+            }
+            
+            // Use modern clipboard API with fallback
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(content)
+                    .then(() => showToast('Copied to clipboard!'))
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        fallbackCopyToClipboard(content);
+                    });
+            } else {
+                fallbackCopyToClipboard(content);
+            }
+        }
+        
+        // Fallback copy method
+        function fallbackCopyToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                showToast(successful ? 'Copied to clipboard!' : 'Failed to copy');
+            } catch (err) {
+                console.error('Fallback: Could not copy text: ', err);
+                showToast('Failed to copy to clipboard');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        // Download output - optimized for large datasets
+        function downloadOutput() {
+            if (!flattenedData) {
+                showToast('No data to download');
+                return;
+            }
+            
+            const format = outputFormatSelect.value;
+            let content = '';
+            let mimeType = '';
+            let extension = '';
+            let filename = 'flattened-json';
+            
+            // Prepare content based on format
+            switch (format) {
+                case 'json':
+                    content = JSON.stringify(flattenedData, null, 2);
+                    mimeType = 'application/json';
+                    extension = 'json';
+                    break;
+                case 'csv':
+                    content = generateOptimizedCSV(flattenedEntries);
+                    mimeType = 'text/csv';
+                    extension = 'csv';
+                    break;
+                case 'table':
+                    // Generate full HTML document for table download
+                    content = `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Flattened JSON</title>
+                        <style>
+                            body { font-family: sans-serif; padding: 20px; }
+                            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+                            th { background-color: #f2f2f2; position: sticky; top: 0; }
+                            .container { max-height: 100vh; overflow: auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Flattened JSON</h1>
+                        <p>Total entries: ${flattenedEntries.length}</p>
+                        <div class="container">
+                            ${generateTable(flattenedEntries)}
+                        </div>
+                    </body>
+                    </html>`;
+                    mimeType = 'text/html';
+                    extension = 'html';
+                    break;
+                case 'text':
+                    content = generateOptimizedText(flattenedEntries);
+                    mimeType = 'text/plain';
+                    extension = 'txt';
+                    break;
+            }
+            
+            filename = `${filename}.${extension}`;
+            
+            // Create and download file
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            showToast(`Downloaded as ${filename}`);
+        }
+        
+        // Open output in new window
+        function openInNewWindow() {
+            if (!flattenedData) {
+                showToast('No data to display');
+                return;
+            }
+            
+            const format = outputFormatSelect.value;
+            let content = '';
+            let mimeType = '';
+            
+            // Prepare content based on format
+            switch (format) {
+                case 'json':
+                    content = `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Flattened JSON</title>
+                        <style>
+                            body { font-family: monospace; padding: 20px; background-color: #f8f8f8; }
+                            pre { background-color: white; padding: 15px; border: 1px solid #ddd; border-radius: 4px; overflow: auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Flattened JSON</h1>
+                        <pre>${escapeHTML(JSON.stringify(flattenedData, null, 2))}</pre>
+                    </body>
+                    </html>`;
+                    mimeType = 'text/html';
+                    break;
+                case 'csv':
+                    content = `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Flattened JSON (CSV)</title>
+                        <style>
+                            body { font-family: monospace; padding: 20px; background-color: #f8f8f8; }
+                            pre { background-color: white; padding: 15px; border: 1px solid #ddd; border-radius: 4px; overflow: auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Flattened JSON (CSV)</h1>
+                        <pre>${escapeHTML(generateOptimizedCSV(flattenedEntries))}</pre>
+                    </body>
+                    </html>`;
+                    mimeType = 'text/html';
+                    break;
+                case 'table':
+                    content = `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Flattened JSON (Table)</title>
+                        <style>
+                            body { font-family: sans-serif; padding: 20px; background-color: #f8f8f8; }
+                            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; word-break: break-word; }
+                            th { background-color: #f2f2f2; position: sticky; top: 0; }
+                            .container { max-height: 90vh; overflow: auto; background-color: white; border: 1px solid #ddd; border-radius: 4px; }
+                            h1 { margin-top: 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Flattened JSON (Table)</h1>
+                        <p>Total entries: ${flattenedEntries.length}</p>
+                        <div class="container">
+                            ${generateTable(flattenedEntries)}
+                        </div>
+                    </body>
+                    </html>`;
+                    mimeType = 'text/html';
+                    break;
+                case 'text':
+                    content = `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Flattened JSON (Text)</title>
+                        <style>
+                            body { font-family: monospace; padding: 20px; background-color: #f8f8f8; }
+                            pre { background-color: white; padding: 15px; border: 1px solid #ddd; border-radius: 4px; overflow: auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Flattened JSON (Text)</h1>
+                        <pre>${escapeHTML(generateOptimizedText(flattenedEntries))}</pre>
+                    </body>
+                    </html>`;
+                    mimeType = 'text/html';
+                    break;
+            }
+            
+            // Open in new window
+            const newWindow = window.open('', '_blank');
+            if (!newWindow) {
+                showToast('Pop-up blocked! Please allow pop-ups and try again.');
+                return;
+            }
+            
+            newWindow.document.write(content);
+            newWindow.document.close();
+        }
+        
+        // Event listeners
+        browseBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        flattenBtn.addEventListener('click', processFlattenJSON);
+        clearBtn.addEventListener('click', () => {
+            inputTextarea.value = '';
+            outputDisplay.innerHTML = '';
+            flattenedData = null;
+            flattenedEntries = [];
+            paginationContainer.style.display = 'none';
+            paginationInfo.textContent = '';
+        });
+        
+        copyBtn.addEventListener('click', copyOutput);
+        downloadBtn.addEventListener('click', downloadOutput);
+        newWindowBtn.addEventListener('click', openInNewWindow);
+        
+        // Listen for format changes to update output view
+        outputFormatSelect.addEventListener('change', updateOutput);
+        
+        // Handle paste event for direct JSON pasting
+        inputTextarea.addEventListener('paste', () => {
+            // Give time for paste to complete before processing
+            setTimeout(() => {
+                try {
+                    // Attempt to auto-parse if it looks like valid JSON
+                    const text = inputTextarea.value.trim();
+                    if (text.startsWith('{') && text.endsWith('}')) {
+                        JSON.parse(text); // Just to validate
+                        // Only auto-process if it's relatively small (prevent freezing for huge JSON)
+                        if (text.length < 500000) {
+                            processFlattenJSON();
+                        }
+                    }
+                } catch (e) {
+                    // Not valid JSON or too complex, ignore
+                }
+            }, 100);
+        });
+        
+        // Enable keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Enter to flatten
+            if (e.ctrlKey && e.key === 'Enter') {
+                processFlattenJSON();
+                e.preventDefault();
+            }
+            
+            // Escape to clear
+            if (e.key === 'Escape') {
+                clearBtn.click();
+                e.preventDefault();
+            }
+            
+            // Ctrl+S to download
+            if (e.ctrlKey && e.key === 's' && flattenedData) {
+                downloadOutput();
+                e.preventDefault();
+            }
+        });
+        
+        // Check for dark mode preference
+        function setColorTheme() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.style.setProperty('--bg', '#1a1a1a');
+                document.documentElement.style.setProperty('--card', '#2d2d2d');
+                document.documentElement.style.setProperty('--text', '#e0e0e0');
+                document.documentElement.style.setProperty('--border', '#444');
+            }
+        }
+        
+        // Initialize theme
+        setColorTheme();
+        
+        // Watch for theme changes
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setColorTheme);
+        }
+        
+        // Show sample JSON if textarea is empty
+        if (!inputTextarea.value) {
+            const sampleJson = {
+                "user": {
+                    "name": "John Doe",
+                    "email": "john@example.com",
+                    "address": {
+                        "street": "123 Main St",
+                        "city": "Anytown",
+                        "zipcode": 12345
+                    }
+                },
+                "orders": [
+                    {
+                        "id": 1001,
+                        "items": ["item1", "item2"]
+                    }
+                ],
+                "settings": {
+                    "notifications": {
+                        "email": true,
+                        "sms": false
+                    }
+                }
+            };
+            
+            inputTextarea.placeholder = `Paste your JSON here or use the browse button to upload a file...\n\nExample JSON:\n${JSON.stringify(sampleJson, null, 2)}`;
+        }
+    });
+    </script>
+</body>
+</html>

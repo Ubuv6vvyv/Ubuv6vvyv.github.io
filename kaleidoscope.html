@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Kaleidoscope Animation</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2ecc71;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --accent: #e74c3c;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--dark);
+            color: var(--light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        
+        .container {
+            width: 100%;
+            padding: 0 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            padding: 1rem 0;
+            background-color: rgba(0,0,0,0.7);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        
+        header h1 {
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        #animation {
+            width: 100%;
+            height: auto;
+            display: block;
+            background-color: black;
+            margin: 0 auto;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .controls-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 0.5rem 0;
+            transition: transform 0.3s ease;
+        }
+        
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .controls {
+            padding: 1rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .controls.collapsed {
+            max-height: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-danger {
+            background-color: var(--accent);
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+        }
+        
+        .slider-container {
+            margin-bottom: 1rem;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+        
+        .slider-label span {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .cover-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -0.5rem;
+        }
+        
+        .col {
+            flex: 1;
+            padding: 0 0.5rem;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        
+        .button-group.center {
+            justify-content: center;
+        }
+        
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            gap: 1rem;
+        }
+        
+        .image-preview img {
+            max-width: 100px;
+            height: auto;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .col {
+                flex: 0 0 100%;
+                margin-bottom: 1rem;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+        }
+
+        .recording-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background-color: var(--accent);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            z-index: 10;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Kaleidoscope Animation</h1>
+        </div>
+    </header>
+    
+    <main class="container">
+        <div class="canvas-container">
+            <canvas id="animation"></canvas>
+            <div id="recordingIndicator" class="recording-indicator hidden">Recording...</div>
+        </div>
+        
+        <div class="image-preview">
+            <div id="imageContainer"></div>
+            <div id="newImageContainer"></div>
+        </div>
+    </main>
+
+    <div class="controls-wrapper">
+        <div class="controls-header">
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+            <div class="button-group">
+                <button class="btn" onclick="document.getElementById('imageInput').click()">Upload Image</button>
+                <button class="btn btn-secondary" id="togglePlayPause" onclick="pausePlayAnimation()">Pause</button>
+                <button class="btn" onclick="saveImage()">Save Image</button>
+                <button class="btn btn-danger" id="recordVideoButton">Record</button>
+            </div>
+            <button class="btn btn-icon" id="toggleControls">⚙️</button>
+        </div>
+        
+        <div class="controls" id="controlsPanel">
+            <div class="row">
+                <div class="col">
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="canvasWidthInput">Canvas Width</label>
+                            <span id="widthValue">1000px</span>
+                        </div>
+                        <input type="range" id="canvasWidthInput" min="300" max="3000" value="1000" step="10">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="canvasHeightInput">Canvas Height</label>
+                            <span id="heightValue">800px</span>
+                        </div>
+                        <input type="range" id="canvasHeightInput" min="300" max="3000" value="800" step="10">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="numTilesInput">Number of Tiles</label>
+                            <span id="tilesValue">2</span>
+                        </div>
+                        <input type="range" id="numTilesInput" min="1" max="10" value="2" step="1">
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="speedInput">Animation Speed</label>
+                            <span id="speedValue">5</span>
+                        </div>
+                        <input type="range" id="speedInput" min="1" max="20" value="5" step="1">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="animationStepInput">Animation Step Size</label>
+                            <span id="stepValue">1.5</span>
+                        </div>
+                        <input type="range" id="animationStepInput" min="0.5" max="5" value="1.5" step="0.1">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="animationLengthInput">Animation Length</label>
+                            <span id="lengthValue">600</span>
+                        </div>
+                        <input type="range" id="animationLengthInput" min="200" max="2000" value="600" step="50">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <label for="videoDurationInput">Video Duration (seconds)</label>
+                            <span id="durationValue">10</span>
+                        </div>
+                        <input type="range" id="videoDurationInput" min="1" max="60" value="10" step="1">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="coverScreen" class="cover-screen">
+        <div class="spinner"></div>
+        <p>Loading kaleidoscope...</p>
+    </div>
+
+    <script>
+        // DOM elements
+        const animation = document.getElementById("animation");
+        const imageInput = document.getElementById('imageInput');
+        const imageContainer = document.getElementById('imageContainer');
+        const newImageContainer = document.getElementById('newImageContainer');
+        const loadingScreen = document.getElementById("coverScreen");
+        const recordBtn = document.getElementById("recordVideoButton");
+        const toggleButton = document.getElementById('toggleControls');
+        const controlsPanel = document.getElementById('controlsPanel');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+        
+        // Input elements
+        const canvasWidthInput = document.getElementById("canvasWidthInput");
+        const canvasHeightInput = document.getElementById("canvasHeightInput");
+        const numTilesInput = document.getElementById('numTilesInput');
+        const animationSpeedInput = document.getElementById('speedInput');
+        const animationStepInput = document.getElementById('animationStepInput');
+        const animationLengthInput = document.getElementById('animationLengthInput');
+        const videoDurationInput = document.getElementById('videoDurationInput');
+
+        // Label elements for showing slider values
+        const widthValue = document.getElementById('widthValue');
+        const heightValue = document.getElementById('heightValue');
+        const tilesValue = document.getElementById('tilesValue');
+        const speedValue = document.getElementById('speedValue');
+        const stepValue = document.getElementById('stepValue');
+        const lengthValue = document.getElementById('lengthValue');
+        const durationValue = document.getElementById('durationValue');
+
+        // Global variables
+        let isImageLoaded = false;
+        let userImage;
+        let actualWidth = 400;
+        let actualHeight = 533;
+        let scaledWidth = 400;
+        let scaledHeight = 533;
+        let widthScalingRatio = 1;
+        let playAnimationToggle = false;
+        let animationRequest;
+        let recording = false;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let finishedBlob;
+        
+        // Constants
+        const SqrtOf3_4 = Math.sqrt(3)/2;
+        const fps = 30; // video record frames per second
+        
+        // Animation configuration
+        let canvasWidth = parseInt(canvasWidthInput.value);
+        let canvasHeight = parseInt(canvasHeightInput.value);
+        let numTiles = parseInt(numTilesInput.value);
+        let maxImageWidth;
+        let animationLength = parseInt(animationLengthInput.value);
+        let animationSpeed = 2000;
+        let counter = animationSpeed * 0.5;
+        let patDim = 400;
+        let animationWidth = canvasWidth;
+        let animationHeight = canvasHeight;
+        let animationStep = parseFloat(animationStepInput.value);
+        let videoDuration = parseInt(videoDurationInput.value);
+        
+        // Browser detection
+        const ua = navigator.userAgent;
+        const isSafari = ua.includes("Safari") && !ua.includes("Chrome");
+        const isFirefox = ua.includes("Firefox");
+        const isIOS = /iPad|iPhone|iPod/.test(ua);
+        const isAndroid = ua.includes("Android");
+        console.log(`Browser detection: Safari: ${isSafari}, Firefox: ${isFirefox}, iOS: ${isIOS}, Android: ${isAndroid}`);
+        
+        // Event listeners for inputs
+        imageInput.addEventListener('change', readSourceImage);
+        canvasWidthInput.addEventListener('input', updateWidthValue);
+        canvasHeightInput.addEventListener('input', updateHeightValue);
+        numTilesInput.addEventListener('input', updateTilesValue);
+        animationSpeedInput.addEventListener('input', updateSpeedValue);
+        animationStepInput.addEventListener('input', updateStepValue);
+        animationLengthInput.addEventListener('input', updateLengthValue);
+        videoDurationInput.addEventListener('input', updateDurationValue);
+        
+        canvasWidthInput.addEventListener('change', changeTiling);
+        canvasHeightInput.addEventListener('change', changeTiling);
+        numTilesInput.addEventListener('change', changeTiling);
+        animationSpeedInput.addEventListener('change', getUserInputs);
+        animationStepInput.addEventListener('change', getUserInputs);
+        animationLengthInput.addEventListener('change', getUserInputs);
+        videoDurationInput.addEventListener('change', getUserInputs);
+        
+        // Toggle controls
+        toggleButton.addEventListener('click', () => {
+            controlsPanel.classList.toggle('collapsed');
+        });
+        
+        // Recording
+        recordBtn.addEventListener('click', startRecording);
+        
+        // Initialize slider values
+        updateWidthValue();
+        updateHeightValue();
+        updateTilesValue();
+        updateSpeedValue();
+        updateStepValue();
+        updateLengthValue();
+        updateDurationValue();
+        
+        // Function to update slider value displays
+        function updateWidthValue() {
+            widthValue.textContent = `${canvasWidthInput.value}px`;
+        }
+        
+        function updateHeightValue() {
+            heightValue.textContent = `${canvasHeightInput.value}px`;
+        }
+        
+        function updateTilesValue() {
+            tilesValue.textContent = numTilesInput.value;
+        }
+        
+        function updateSpeedValue() {
+            speedValue.textContent = animationSpeedInput.value;
+        }
+        
+        function updateStepValue() {
+            stepValue.textContent = animationStepInput.value;
+        }
+        
+        function updateLengthValue() {
+            lengthValue.textContent = animationLengthInput.value;
+        }
+        
+        function updateDurationValue() {
+            durationValue.textContent = videoDurationInput.value;
+        }
+        
+        // Main functions
+        function refresh() {
+            getUserInputs();
+            createAnimation();
+        }
+        
+        function getUserInputs() {
+            canvasWidth = parseInt(canvasWidthInput.value);
+            canvasHeight = parseInt(canvasHeightInput.value);
+            numTiles = parseInt(numTilesInput.value);
+            maxImageWidth = Math.ceil(canvasWidth / numTiles);
+            
+            const speedInputValue = parseInt(animationSpeedInput.value);
+            animationSpeed = 8000 / speedInputValue * (numTiles / 2.5);
+            animationStep = parseFloat(animationStepInput.value);
+            animationLength = parseInt(animationLengthInput.value);
+            videoDuration = Math.max(1, Math.min(60, parseInt(videoDurationInput.value)));
+            
+            console.log(`Settings updated: Speed: ${animationSpeed}, Step: ${animationStep}, Length: ${animationLength}, Video Duration: ${videoDuration}s`);
+        }
+        
+        function changeTiling() {
+            getUserInputs();
+            resizeImage();
+            animation.scrollIntoView({ behavior: "smooth", block: "start" });
+            createAnimation();
+        }
+        
+        function readSourceImage() {
+            // Clear existing images
+            imageContainer.innerHTML = '';
+            newImageContainer.innerHTML = '';
+            
+            if (playAnimationToggle) {
+                cancelAnimationFrame(animationRequest);
+                playAnimationToggle = false;
+            }
+            
+            loadingScreen.classList.remove("hidden");
+            counter = animationSpeed * 0.5; // Reset animation start point
+            
+            // Read image file
+            const file = imageInput.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imageData = event.target.result;
+                userImage = new Image();
+                userImage.src = imageData;
+                userImage.onload = () => {
+                    actualWidth = userImage.width;
+                    actualHeight = userImage.height;
+                    resizeImage();
+                };
+            };
+            
+            reader.readAsDataURL(file);
+            isImageLoaded = true;
+        }
+        
+        function resizeImage() {
+            if (isImageLoaded) {
+                imageContainer.innerHTML = '';
+                newImageContainer.innerHTML = '';
+            }
+            
+            // Calculate image scaling dimensions
+            if (actualWidth > maxImageWidth) {
+                scaledWidth = maxImageWidth;
+                widthScalingRatio = scaledWidth / actualWidth;
+                scaledHeight = actualHeight * widthScalingRatio;
+            } else {
+                scaledWidth = actualWidth;
+                widthScalingRatio = 1;
+                scaledHeight = actualHeight;
+            }
+            
+            patDim = scaledWidth;
+            
+            // Create resized version of the image
+            const newCanvas = document.createElement('canvas');
+            newCanvas.width = scaledWidth;
+            newCanvas.height = scaledHeight;
+            const ctx = newCanvas.getContext('2d');
+            
+            if (userImage) {
+                ctx.drawImage(userImage, 0, 0, scaledWidth, scaledHeight);
+                
+                const resizedImgSrc = newCanvas.toDataURL();
+                
+                // Display the resized image
+                const originalImg = document.createElement('img');
+                originalImg.setAttribute("id", "originalImg");
+                originalImg.src = resizedImgSrc;
+                originalImg.width = scaledWidth;
+                originalImg.height = scaledHeight;
+                imageContainer.appendChild(originalImg);
+                
+                // Generate flipped version after a short delay
+                setTimeout(generateFlippedImage, 300);
+            } else {
+                // Create a default pattern if no image is loaded
+                ctx.fillStyle = 'rgba(41, 128, 185, 0.5)';
+                ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+                
+                // Add some visual elements to the default pattern
+                ctx.fillStyle = 'rgba(39, 174, 96, 0.7)';
+                ctx.beginPath();
+                ctx.arc(scaledWidth/2, scaledHeight/2, scaledWidth/4, 0, Math.PI*2);
+                ctx.fill();
+                
+                const resizedImgSrc = newCanvas.toDataURL();
+                
+                // Display the default pattern
+                const originalImg = document.createElement('img');
+                originalImg.setAttribute("id", "originalImg");
+                originalImg.src = resizedImgSrc;
+                originalImg.width = scaledWidth;
+                originalImg.height = scaledHeight;
+                imageContainer.appendChild(originalImg);
+                
+                // Generate flipped version after a short delay
+                setTimeout(generateFlippedImage, 300);
+            }
+        }
+        
+        function generateFlippedImage() {
+            const originalImg = document.getElementById('originalImg');
+            if (!originalImg) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = originalImg.width;
+            canvas.height = originalImg.height;
+            
+            // Draw the original image
+            ctx.drawImage(originalImg, 0, 0);
+            
+            // Flip horizontally
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(canvas, -canvas.width, 0);
+            ctx.restore();
+            
+            // Create and display the flipped image
+            const flippedImg = new Image();
+            flippedImg.setAttribute("id", "flippedImg");
+            flippedImg.src = canvas.toDataURL();
+            newImageContainer.appendChild(flippedImg);
+            
+            // Start animation after a short delay
+            setTimeout(createAnimation, 300);
+        }
+        
+        // Kaleidoscope animation function (optimized)
+        function createAnimation() {
+            loadingScreen.classList.add("hidden");
+            
+            getUserInputs();
+            
+            if (playAnimationToggle) {
+                cancelAnimationFrame(animationRequest);
+                playAnimationToggle = false;
+            }
+            
+            playAnimationToggle = true;
+            
+            // Set up canvas
+            animationWidth = canvasWidth;
+            animationHeight = canvasHeight;
+            animation.width = animationWidth;
+            animation.height = animationHeight;
+            
+            // Get images and create patterns
+            const baseImg = document.getElementById("originalImg");
+            const baseRImg = document.getElementById("flippedImg");
+            
+            if (!baseImg || !baseRImg) {
+                // If images aren't available yet, create a default pattern
+                resizeImage();
+                return;
+            }
+            
+            const ctx = animation.getContext("2d", { willReadFrequently: true, alpha: false });
+            const pat = ctx.createPattern(baseImg, "repeat");
+            const patR = ctx.createPattern(baseRImg, "repeat");
+            
+            // Calculate triangle dimensions
+            const height = SqrtOf3_4 * patDim;
+            let offset = 0;
+            
+            ctx.translate(-0.5 * patDim, 0);
+            
+            // Create offscreen buffer for better performance
+            const bufferCanvas = document.createElement('canvas');
+            bufferCanvas.width = patDim * 3;
+            bufferCanvas.height = Math.floor(SqrtOf3_4 * patDim * 2);
+            const bufferCtx = bufferCanvas.getContext('2d', { alpha: false });
+            
+            // Draw kaleidoscope pattern
+            const drawPattern = function(alternateMode) {
+                offset = Math.sin(counter / animationSpeed * Math.PI) * animationLength;
+                counter++;
+                let i = 0;
+                
+                // Draw first row
+                bufferCtx.save();
+                bufferCtx.fillStyle = pat;
+                bufferCtx.translate(0, offset);
+                
+                while (i <= 3) {
+                    bufferCtx.beginPath();
+                    bufferCtx.moveTo(0, -offset);
+                    bufferCtx.lineTo(patDim, -offset);
+                    bufferCtx.lineTo(0.5 * patDim, height - offset);
+                    bufferCtx.closePath();
+                    bufferCtx.fill();
+                    
+                    if (i % 3 == 0) {
+                        bufferCtx.translate(patDim, -offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(-patDim, offset);
+                    } else if (i % 3 == 1) {
+                        if (alternateMode) {
+                            bufferCtx.rotate(120 * Math.PI / 180);
+                            bufferCtx.translate(-3 * patDim, 0);
+                            bufferCtx.rotate(-120 * Math.PI / 180);
+                        }
+                        bufferCtx.translate(0.5 * patDim, height - offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(-0.5 * patDim, -height + offset);
+                    } else if (i % 3 == 2) {
+                        bufferCtx.translate(0, -offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(0, offset);
+                    }
+                    i++;
+                }
+                
+                bufferCtx.restore();
+                bufferCtx.save();
+                bufferCtx.scale(-1, -1);
+                bufferCtx.fillStyle = patR;
+                bufferCtx.translate((-i + (i % 3 == 0 ? 0.5 : i % 3 == 1 ? 1.5 : -0.5)) * patDim, -height + offset);
+                bufferCtx.translate(0, -offset);
+                bufferCtx.rotate(120 * Math.PI / 180);
+                bufferCtx.translate(0, offset);
+                
+                let j = 0;
+                while (j < i + 1) {
+                    bufferCtx.beginPath();
+                    if (j > 0 || !alternateMode) {
+                        bufferCtx.moveTo(0, -offset);
+                        bufferCtx.lineTo(patDim, -offset);
+                        bufferCtx.lineTo(0.5 * patDim, height - offset);
+                        bufferCtx.closePath();
+                        bufferCtx.fill();
+                    }
+                    
+                    if (j % 3 == 1) {
+                        bufferCtx.translate(patDim, -offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(-patDim, offset);
+                    } else if (j % 3 == 2) {
+                        bufferCtx.translate(0.5 * patDim, height - offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(-0.5 * patDim, -height + offset);
+                    } else if (j % 3 == 0) {
+                        bufferCtx.translate(0, -offset);
+                        bufferCtx.rotate(-120 * Math.PI / 180);
+                        bufferCtx.translate(0, offset);
+                    }
+                    j++;
+                }
+                
+                bufferCtx.restore();
+            };
+            
+            const patternHeight = Math.floor(SqrtOf3_4 * patDim * 2);
+            
+            // Tile the pattern to fill the canvas
+            const tilePattern = function() {
+                const rowData = bufferCtx.getImageData(0, 0, patDim * 3, patternHeight);
+                
+                // Use fewer iterations when in recording mode (for performance)
+                const fillFactor = recording ? 1 : 1.2;
+                
+                for (let i = 0; patternHeight * i < animationHeight + SqrtOf3_4 * patDim * fillFactor; i++) {
+                    for (let j = 0; j * patDim < animationWidth + patDim * fillFactor; j += 3) {
+                        ctx.putImageData(rowData, j * patDim, i * patternHeight);
+                    }
+                }
+            };
+            
+            // Animation loop with requestAnimationFrame
+            function animationLoop() {
+                if (playAnimationToggle) {
+                    // Clear the buffer
+                    bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+                    
+                    // Draw patterns to buffer
+                    drawPattern(false);
+                    bufferCtx.translate(animationStep * patDim, height);
+                    drawPattern(true);
+                    bufferCtx.translate(animationStep * -1 * patDim, -height);
+                    
+                    // Clear the main canvas
+                    ctx.clearRect(0, 0, animationWidth, animationHeight);
+                    
+                    // Tile the pattern to main canvas
+                    tilePattern();
+                }
