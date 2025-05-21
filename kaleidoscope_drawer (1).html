@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Kaleidoscope Drawer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 100vw;
+            width: 100%;
+            max-width: 450px;
+        }
+        
+        .title {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: clamp(1.2rem, 5vw, 1.8rem);
+            font-weight: 700;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .canvas-container {
+            position: relative;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            background: #fff;
+        }
+        
+        #canvas {
+            display: block;
+            cursor: crosshair;
+            touch-action: none;
+            border-radius: 50%;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .control-group {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: #555;
+            font-size: 11px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+            margin-bottom: 3px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        input[type="color"] {
+            width: 100%;
+            height: 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: none;
+        }
+        
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 8px;
+        }
+        
+        input[type="checkbox"] {
+            transform: scale(1.2);
+            margin-right: 8px;
+            accent-color: #667eea;
+        }
+        
+        .value-display {
+            font-size: 10px;
+            color: #777;
+            text-align: center;
+            margin-top: 2px;
+        }
+        
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 12px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-toggle {
+            background: #f5f5f5;
+            color: #666;
+            border: 1px solid #ddd;
+        }
+        
+        .btn-toggle.active {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            box-shadow: 0 3px 10px rgba(255, 107, 107, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        @media (max-width: 480px) {
+            .container { padding: 8px; margin: 2px; }
+            .controls { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        @media (orientation: portrait) and (max-height: 800px) {
+            body { padding: 2px; justify-content: flex-start; }
+            .container { margin-top: 5px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">✨ Kaleidoscope Drawer</h1>
+        
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="mirrors">Mirrors</label>
+                <input type="range" id="mirrors" min="1" max="36" value="6" step="1">
+                <div class="value-display" id="mirrorsValue">6</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="brushSize">Line</label>
+                <input type="range" id="brushSize" min="0.2" max="8" value="0.8" step="0.2">
+                <div class="value-display" id="brushValue">0.8px</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="rotation">Rotate</label>
+                <input type="range" id="rotation" min="0" max="360" value="0" step="5">
+                <div class="value-display" id="rotationValue">0°</div>
+            </div>
+            
+            <div class="control-group">
+                <label for="color">Color</label>
+                <input type="color" id="color" value="#000000">
+            </div>
+            
+            <div class="control-group">
+                <label for="spirographSpeed">Speed</label>
+                <input type="range" id="spirographSpeed" min="0.5" max="5" value="2" step="0.5">
+                <div class="value-display" id="speedValue">2x</div>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showGuides"> Guides
+                </label>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn-toggle" id="spirographMode">🌀 Spirograph</button>
+            <button class="btn-primary" id="clear">Clear</button>
+            <button class="btn-secondary" id="download">Save</button>
+            <button class="btn-secondary" id="randomize">Random</button>
+        </div>
+    </div>
+
+    <script>
+        class KaleidoscopeDrawer {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.isDrawing = false;
+                this.spirographMode = false;
+                this.spirographAnimation = null;
+                this.lastX = 0;
+                this.lastY = 0;
+                this.spirographAngle = 0;
+                this.userX = 0;
+                this.userY = 0;
+                
+                this.segments = 6;
+                this.brushSize = 0.8;
+                this.color = '#000000';
+                this.bgcolor = '#ffffff';
+                this.rotation = 0;
+                this.showGuides = false;
+                this.spirographSpeed = 2;
+                
+                this.setupCanvas();
+                this.setupEvents();
+                this.setupControls();
+                this.redraw();
+            }
+            
+            setupCanvas() {
+                const vh = window.innerHeight;
+                const vw = window.innerWidth;
+                const maxSize = Math.min(vw - 20, vh * 0.65, 420);
+                const size = Math.max(maxSize, 280);
+                
+                this.canvas.width = size * 2;
+                this.canvas.height = size * 2;
+                this.canvas.style.width = size + 'px';
+                this.canvas.style.height = size + 'px';
+                
+                this.centerX = this.canvas.width / 2;
+                this.centerY = this.canvas.height / 2;
+                this.radius = this.canvas.width / 2 - 4;
+                
+                this.ctx.scale(2, 2);
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+            }
+            
+            setupEvents() {
+                this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.canvas.addEventListener('mouseout', () => this.stopDrawing());
+                
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.canvas.dispatchEvent(new MouseEvent('mouseup', {}));
+                });
+                
+                window.addEventListener('resize', () => this.setupCanvas());
+            }
+            
+            setupControls() {
+                document.getElementById('mirrors').addEventListener('input', (e) => {
+                    this.segments = parseInt(e.target.value);
+                    document.getElementById('mirrorsValue').textContent = this.segments;
+                    this.redraw();
+                });
+                
+                document.getElementById('brushSize').addEventListener('input', (e) => {
+                    this.brushSize = parseFloat(e.target.value);
+                    document.getElementById('brushValue').textContent = this.brushSize + 'px';
+                });
+                
+                document.getElementById('rotation').addEventListener('input', (e) => {
+                    this.rotation = parseInt(e.target.value) * Math.PI / 180;
+                    document.getElementById('rotationValue').textContent = e.target.value + '°';
+                    this.redraw();
+                });
+                
+                document.getElementById('color').addEventListener('input', (e) => {
+                    this.color = e.target.value;
+                });
+                
+                document.getElementById('spirographSpeed').addEventListener('input', (e) => {
+                    this.spirographSpeed = parseFloat(e.target.value);
+                    document.getElementById('speedValue').textContent = this.spirographSpeed + 'x';
+                });
+                
+                document.getElementById('showGuides').addEventListener('change', (e) => {
+                    this.showGuides = e.target.checked;
+                    this.redraw();
+                });
+                
+                document.getElementById('spirographMode').addEventListener('click', (e) => {
+                    this.toggleSpirographMode();
+                });
+                
+                document.getElementById('clear').addEventListener('click', () => this.clear());
+                document.getElementById('download').addEventListener('click', () => this.download());
+                document.getElementById('randomize').addEventListener('click', () => this.randomize());
+            }
+            
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = this.canvas.width / 2 / rect.width;
+                const scaleY = this.canvas.height / 2 / rect.height;
+                
+                return {
+                    x: (e.clientX - rect.left) * scaleX - this.centerX / 2,
+                    y: (e.clientY - rect.top) * scaleY - this.centerY / 2
+                };
+            }
+            
+            startDrawing(e) {
+                this.isDrawing = true;
+                const pos = this.getMousePos(e);
+                this.lastX = pos.x;
+                this.lastY = pos.y;
+                this.userX = pos.x;
+                this.userY = pos.y;
+                
+                if (this.spirographMode) {
+                    this.spirographAngle = 0;
+                    this.startSpirograph();
+                }
+            }
+            
+            draw(e) {
+                if (!this.isDrawing) return;
+                
+                const pos = this.getMousePos(e);
+                this.userX = pos.x;
+                this.userY = pos.y;
+                
+                if (!this.spirographMode) {
+                    const x = pos.x;
+                    const y = pos.y;
+                    
+                    if (Math.sqrt(x * x + y * y) > this.radius / 2 - this.brushSize) return;
+                    
+                    this.drawLine(this.lastX, this.lastY, x, y);
+                    this.lastX = x;
+                    this.lastY = y;
+                }
+            }
+            
+            stopDrawing() {
+                this.isDrawing = false;
+                if (this.spirographAnimation) {
+                    cancelAnimationFrame(this.spirographAnimation);
+                    this.spirographAnimation = null;
+                }
+            }
+            
+            startSpirograph() {
+                const animate = () => {
+                    if (!this.isDrawing) return;
+                    
+                    const centerDist = Math.sqrt(this.userX * this.userX + this.userY * this.userY);
+                    const maxDist = this.radius / 2 - this.brushSize;
+                    
+                    if (centerDist > maxDist) {
+                        const scale = maxDist / centerDist;
+                        this.userX *= scale;
+                        this.userY *= scale;
+                    }
+                    
+                    const spiralRadius = centerDist * 0.3;
+                    const spiralX = this.userX + Math.cos(this.spirographAngle * 7) * spiralRadius * 0.5;
+                    const spiralY = this.userY + Math.sin(this.spirographAngle * 5) * spiralRadius * 0.7;
+                    
+                    this.drawLine(this.lastX, this.lastY, spiralX, spiralY);
+                    
+                    this.lastX = spiralX;
+                    this.lastY = spiralY;
+                    this.spirographAngle += 0.08 * this.spirographSpeed;
+                    
+                    this.spirographAnimation = requestAnimationFrame(animate);
+                };
+                animate();
+            }
+            
+            toggleSpirographMode() {
+                this.spirographMode = !this.spirographMode;
+                const btn = document.getElementById('spirographMode');
+                btn.classList.toggle('active', this.spirographMode);
+                btn.textContent = this.spirographMode ? '🎨 Normal' : '🌀 Spirograph';
+                
+                if (!this.spirographMode && this.spirographAnimation) {
+                    cancelAnimationFrame(this.spirographAnimation);
+                    this.spirographAnimation = null;
+                }
+            }
+            
+            drawLine(x1, y1, x2, y2) {
+                const angleStep = (Math.PI * 2) / this.segments;
+                
+                this.ctx.strokeStyle = this.color;
+                this.ctx.lineWidth = this.brushSize;
+                
+                for (let i = 0; i < this.segments; i++) {
+                    const angle = i * angleStep + this.rotation;
+                    
+                    this.ctx.save();
+                    this.ctx.translate(this.centerX / 2, this.centerY / 2);
+                    this.ctx.rotate(angle);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x1, y1);
+                    this.ctx.lineTo(x2, y2);
+                    this.ctx.stroke();
+                    
+                    this.ctx.restore();
+                    
+                    if (i % 2 === 1) {
+                        this.ctx.save();
+                        this.ctx.translate(this.centerX / 2, this.centerY / 2);
+                        this.ctx.rotate(angle);
+                        this.ctx.scale(-1, 1);
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x1, y1);
+                        this.ctx.lineTo(x2, y2);
+                        this.ctx.stroke();
+                        
+                        this.ctx.restore();
+                    }
+                }
+            }
+            
+            redraw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.fillStyle = this.bgcolor;
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX / 2, this.centerY / 2, this.radius / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                if (this.showGuides && this.segments > 1) {
+                    this.ctx.strokeStyle = '#e0e0e0';
+                    this.ctx.lineWidth = 0.5;
+                    this.ctx.globalAlpha = 0.6;
+                    
+                    const angleStep = (Math.PI * 2) / this.segments;
+                    for (let i = 0; i < this.segments; i++) {
+                        const angle = i * angleStep + this.rotation;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(this.centerX / 2, this.centerY / 2);
+                        this.ctx.lineTo(
+                            this.centerX / 2 + Math.cos(angle) * this.radius / 2,
+                            this.centerY / 2 + Math.sin(angle) * this.radius / 2
+                        );
+                        this.ctx.stroke();
+                    }
+                    this.ctx.globalAlpha = 1;
+                }
+                
+                this.ctx.strokeStyle = '#ccc';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX / 2, this.centerY / 2, this.radius / 2, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
+            
+            clear() {
+                this.redraw();
+            }
+            
+            download() {
+                const link = document.createElement('a');
+                link.download = 'kaleidoscope-art.png';
+                link.href = this.canvas.toDataURL();
+                link.click();
+            }
+            
+            randomize() {
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe', '#fd79a8', '#e84393'];
+                
+                document.getElementById('mirrors').value = Math.floor(Math.random() * 20) + 6;
+                document.getElementById('brushSize').value = (Math.random() * 3 + 0.4).toFixed(1);
+                document.getElementById('rotation').value = Math.floor(Math.random() * 360);
+                document.getElementById('color').value = colors[Math.floor(Math.random() * colors.length)];
+                document.getElementById('spirographSpeed').value = (Math.random() * 3 + 1).toFixed(1);
+                
+                ['mirrors', 'brushSize', 'rotation', 'color', 'spirographSpeed'].forEach(id => {
+                    document.getElementById(id).dispatchEvent(new Event('input'));
+                });
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => new KaleidoscopeDrawer());
+    </script>
+</body>
+</html>
