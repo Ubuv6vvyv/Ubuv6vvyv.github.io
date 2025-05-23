@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optimized Kaleidoscope Animation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kaleidoscope Pro - Patterns</title>
     <style>
         :root {
             --primary: #3498db;
@@ -12,1010 +12,534 @@
             --light: #ecf0f1;
             --accent: #e74c3c;
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: var(--dark);
+            background: var(--dark);
             color: var(--light);
-            overflow-x: hidden;
-            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
-        
         .container {
             width: 100%;
-            padding: 0 1rem;
             max-width: 1200px;
             margin: 0 auto;
+            padding: 0 0.5rem; /* Reduced horizontal padding */
         }
-        
         header {
-            padding: 1rem 0;
-            background-color: rgba(0,0,0,0.7);
+            background: rgba(44, 62, 80, 0.9);
+            backdrop-filter: blur(8px);
             position: sticky;
             top: 0;
             z-index: 100;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            padding: 0.5rem 0; /* Reduced header padding */
+            flex-shrink: 0;
         }
-        
         header h1 {
-            font-size: 1.5rem;
             text-align: center;
-            margin-bottom: 0.5rem;
+            font-size: 1.2rem; /* Further reduced title for small screens */
+            color: var(--light);
         }
-        
+        main.container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding-top: 0.5rem; /* Reduced top padding */
+            padding-bottom: 80px; /* Space for controls_header height + some */
+        }
         .canvas-container {
             position: relative;
-            width: 100%;
-            margin: 0 auto;
+            width: 95vw; /* Slightly more width */
+            max-width: 450px; /* Slightly smaller max for portrait */
+            aspect-ratio: 1 / 1;
+            margin: 0 auto; /* Removed top/bottom margin, handled by main padding */
+            box-shadow: 0 0 10px rgba(0,0,0,0.4);
         }
-        
-        #animation {
+        #animationCanvas {
             width: 100%;
-            height: auto;
+            height: 100%;
+            background: #000;
             display: block;
-            background-color: black;
-            margin: 0 auto;
+            border-radius: 6px;
+            border: 1px solid var(--primary);
         }
-        
-        .hidden {
-            display: none !important;
-        }
-        
         .controls-wrapper {
             position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
-            z-index: 10;
-            background-color: rgba(0,0,0,0.8);
+            background: rgba(30, 40, 50, 0.95);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 0.5rem 0;
-            transition: transform 0.3s ease;
+            transition: transform .3s ease-in-out;
+            z-index: 1000;
+            border-top: 1px solid rgba(255,255,255,0.05);
         }
-        
         .controls-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: .4rem .8rem; /* Compact header */
         }
-        
-        .controls {
-            padding: 1rem;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        
-        .controls.collapsed {
-            max-height: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        
+        .button-group { display: flex; gap: .4rem; } /* Smaller gap */
         .btn {
-            background-color: var(--primary);
-            color: white;
+            background: var(--primary);
+            color: #fff;
             border: none;
-            padding: 0.5rem 1rem;
+            padding: .4rem .8rem; /* Compact buttons */
             border-radius: 4px;
             cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            font-weight: normal; /* Normal weight for compactness */
+            font-size: 0.75rem; /* Smaller font */
+            transition: background-color 0.2s, opacity 0.2s;
         }
-        
-        .btn:hover {
-            background-color: #2980b9;
-        }
-        
-        .btn-secondary {
-            background-color: var(--secondary);
-        }
-        
-        .btn-secondary:hover {
-            background-color: #27ae60;
-        }
-        
-        .btn-danger {
-            background-color: var(--accent);
-        }
-        
-        .btn-danger:hover {
-            background-color: #c0392b;
-        }
-        
-        .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.8rem;
-        }
-        
+        .btn-secondary { background: var(--secondary); }
+        .btn-danger { background: var(--accent); }
         .btn-icon {
-            width: 36px;
-            height: 36px;
+            width: 32px; /* Smaller icon button */
+            height: 32px;
             padding: 0;
             border-radius: 50%;
+            font-size: 1rem; /* Smaller icon */
         }
-        
-        .slider-container {
-            margin-bottom: 1rem;
+        .btn:hover { opacity: .85; }
+        .btn:active { transform: scale(0.95); }
+
+        .controls {
+            padding: 0.5rem; /* Compact padding */
+            max-height: 0;
+            overflow-y: auto;
+            transition: max-height .3s ease-in-out; /* Slightly faster */
         }
-        
+        .controls.expanded {
+            max-height: 35vh; /* Reduced max height for controls panel */
+        }
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsive columns */
+            gap: 0.5rem; /* Gap between columns */
+            align-items: start;
+        }
+        .col {
+            /* flex: 1; min-width: 200px; No longer needed due to grid */
+            padding: 0; /* No col padding, gap handles spacing */
+        }
+        .slider-container, .select-container { margin-bottom: .5rem; } /* Reduced margin */
         .slider-label {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.25rem;
-        }
-        
-        .slider-label span {
-            font-size: 0.8rem;
-            opacity: 0.8;
-        }
-        
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 6px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 3px;
-            outline: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            background: var(--primary);
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            background: var(--primary);
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .cover-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.8);
-            color: white;
-            display: flex;
             align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            margin-bottom: .2rem; /* Reduced margin */
+            font-size: .7rem; /* Smaller label font */
         }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(255,255,255,0.3);
+        .slider-label span { /* Value display */
+            font-size: .65rem;
+            opacity: .9;
+            background: rgba(255,255,255,0.08);
+            padding: .1rem .25rem;
+            border-radius: 2px;
+        }
+        input[type=range] {
+            width: 100%;
+            height: 6px; /* Thinner slider track */
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+            padding: 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px; /* Smaller thumb */
+            height: 16px;
+            background: var(--primary);
             border-radius: 50%;
-            border-top-color: var(--primary);
-            animation: spin 1s linear infinite;
-            margin-right: 1rem;
+            border: 2px solid var(--light);
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        input[type=range]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 50%;
+            border: 2px solid var(--light);
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        
-        .row {
-            display: flex;
-            flex-wrap: wrap;
-            margin: 0 -0.5rem;
-        }
-        
-        .col {
-            flex: 1;
-            padding: 0 0.5rem;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-        
-        .button-group.center {
-            justify-content: center;
-        }
-        
-        .image-preview {
-            display: flex;
-            flex-wrap: wrap;
-            margin-top: 1rem;
-            gap: 1rem;
-        }
-        
-        .image-preview img {
-            max-width: 100px;
-            height: auto;
-            border: 2px solid rgba(255,255,255,0.2);
-        }
-        
-        @media (max-width: 768px) {
-            .col {
-                flex: 0 0 100%;
-                margin-bottom: 1rem;
-            }
-            
-            .button-group {
-                justify-content: center;
-            }
-        }
+        input[type=range]::-webkit-slider-thumb:hover { background: var(--secondary); }
+        input[type=range]::-moz-range-thumb:hover { background: var(--secondary); }
 
-        .recording-indicator {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background-color: var(--accent);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            z-index: 10;
-            animation: pulse 1.5s infinite;
+        select {
+            width: 100%;
+            padding: .3rem .5rem; /* Compact select */
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 3px;
+            font-size: 0.75rem; /* Smaller select font */
         }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+        select option { background: var(--dark); color: var(--light); }
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Kaleidoscope Animation</h1>
-        </div>
-    </header>
-    
+    <header><div class="container"><h1>Kaleidoscope Pro</h1></div></header>
     <main class="container">
         <div class="canvas-container">
-            <canvas id="animation"></canvas>
-            <div id="recordingIndicator" class="recording-indicator hidden">Recording...</div>
-        </div>
-        
-        <div class="image-preview">
-            <div id="imageContainer"></div>
-            <div id="newImageContainer"></div>
+            <canvas id="animationCanvas"></canvas>
         </div>
     </main>
 
     <div class="controls-wrapper">
         <div class="controls-header">
-            <input type="file" id="imageInput" accept="image/*" style="display:none">
             <div class="button-group">
-                <button class="btn" onclick="document.getElementById('imageInput').click()">Upload Image</button>
-                <button class="btn btn-secondary" id="togglePlayPause" onclick="pausePlayAnimation()">Pause</button>
-                <button class="btn" onclick="saveImage()">Save Image</button>
-                <button class="btn btn-danger" id="recordVideoButton">Record</button>
+                <button class="btn" id="uploadBtn">Upload</button>
+                <button class="btn btn-secondary" id="playPauseBtn">Pause</button>
+                <button class="btn" id="saveBtn">Save</button>
             </div>
-            <button class="btn btn-icon" id="toggleControls">⚙️</button>
+            <button class="btn btn-icon" id="toggleControls" aria-expanded="false" title="Toggle Controls">⚙️</button>
         </div>
-        
         <div class="controls" id="controlsPanel">
             <div class="row">
                 <div class="col">
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="canvasWidthInput">Canvas Width</label>
-                            <span id="widthValue">1000px</span>
-                        </div>
-                        <input type="range" id="canvasWidthInput" min="300" max="3000" value="1000" step="10">
+                        <div class="slider-label"><label for="scaleInput">Pattern Scale</label><span id="scaleVal">1</span></div>
+                        <input type="range" id="scaleInput" min="0.25" max="4" step="0.05" value="1">
                     </div>
-                    
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="canvasHeightInput">Canvas Height</label>
-                            <span id="heightValue">800px</span>
-                        </div>
-                        <input type="range" id="canvasHeightInput" min="300" max="3000" value="800" step="10">
+                        <div class="slider-label"><label for="sectorsInput">Sectors</label><span id="sectorsVal">8</span></div>
+                        <input type="range" id="sectorsInput" min="2" max="32" step="2" value="8">
                     </div>
-                    
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="numTilesInput">Number of Tiles</label>
-                            <span id="tilesValue">2</span>
-                        </div>
-                        <input type="range" id="numTilesInput" min="1" max="10" value="2" step="1">
-                    </div>
+                        <div class="slider-label"><label for="speedInput">Anim Speed</label><span id="speedVal">1</span></div>
+                        <input type="range" id="speedInput" min="0" max="3" step="0.05" value="1"> </div>
                 </div>
-                
                 <div class="col">
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="speedInput">Animation Speed</label>
-                            <span id="speedValue">5</span>
-                        </div>
-                        <input type="range" id="speedInput" min="1" max="20" value="5" step="1">
+                        <div class="slider-label"><label for="zoomInput">Image Zoom</label><span id="zoomVal">1</span></div>
+                        <input type="range" id="zoomInput" min="0.1" max="5" step="0.05" value="1">
                     </div>
-                    
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="animationStepInput">Animation Step Size</label>
-                            <span id="stepValue">1.5</span>
-                        </div>
-                        <input type="range" id="animationStepInput" min="0.5" max="5" value="1.5" step="0.1">
+                        <div class="slider-label"><label for="panXInput">Image Pan X</label><span id="panXVal">0</span></div>
+                        <input type="range" id="panXInput" min="-300" max="300" step="1" value="0">
                     </div>
-                    
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="animationLengthInput">Animation Length</label>
-                            <span id="lengthValue">600</span>
-                        </div>
-                        <input type="range" id="animationLengthInput" min="200" max="2000" value="600" step="50">
+                        <div class="slider-label"><label for="panYInput">Image Pan Y</label><span id="panYVal">0</span></div>
+                        <input type="range" id="panYInput" min="-300" max="300" step="1" value="0">
                     </div>
-                    
+                </div>
+                <div class="col">
                     <div class="slider-container">
-                        <div class="slider-label">
-                            <label for="videoDurationInput">Video Duration (seconds)</label>
-                            <span id="durationValue">10</span>
-                        </div>
-                        <input type="range" id="videoDurationInput" min="1" max="60" value="10" step="1">
+                        <div class="slider-label"><label for="rotateInput">Kaleido Rotate</label><span id="rotateVal">0</span></div>
+                        <input type="range" id="rotateInput" min="-0.2" max="0.2" step="0.002" value="0"> </div>
+                    <div class="select-container">
+                        <label for="modeSelect" style="font-size: 0.7rem; margin-bottom: 0.2rem; display:block;">Effect Mode <span id="modeVal" style="opacity:0.7;">Normal</span></label>
+                        <select id="modeSelect">
+                            <option value="0">Normal</option>
+                            <option value="1">Hue Shift</option>
+                            <option value="2">Alternate Sector Reflect</option>
+                            <option value="3">Offset Image Sectors</option>
+                            <option value="4">Static Image, Rotating Wedges</option>
+                            <option value="5">Central Pulse Zoom</option>
+                            <option value="6">Image Edge Bias</option>
+                        </select>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <div id="coverScreen" class="cover-screen">
-        <div class="spinner"></div>
-        <p>Loading kaleidoscope...</p>
-    </div>
+    <input type="file" id="fileInput" accept="image/*">
 
     <script>
-        // DOM elements
-        const animation = document.getElementById("animation");
-        const imageInput = document.getElementById('imageInput');
-        const imageContainer = document.getElementById('imageContainer');
-        const newImageContainer = document.getElementById('newImageContainer');
-        const loadingScreen = document.getElementById("coverScreen");
-        const recordBtn = document.getElementById("recordVideoButton");
-        const toggleButton = document.getElementById('toggleControls');
+        const canvas = document.getElementById('animationCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const toggleBtn = document.getElementById('toggleControls');
         const controlsPanel = document.getElementById('controlsPanel');
-        const recordingIndicator = document.getElementById('recordingIndicator');
-        
-        // Input elements
-        const canvasWidthInput = document.getElementById("canvasWidthInput");
-        const canvasHeightInput = document.getElementById("canvasHeightInput");
-        const numTilesInput = document.getElementById('numTilesInput');
-        const animationSpeedInput = document.getElementById('speedInput');
-        const animationStepInput = document.getElementById('animationStepInput');
-        const animationLengthInput = document.getElementById('animationLengthInput');
-        const videoDurationInput = document.getElementById('videoDurationInput');
 
-        // Label elements for showing slider values
-        const widthValue = document.getElementById('widthValue');
-        const heightValue = document.getElementById('heightValue');
-        const tilesValue = document.getElementById('tilesValue');
-        const speedValue = document.getElementById('speedValue');
-        const stepValue = document.getElementById('stepValue');
-        const lengthValue = document.getElementById('lengthValue');
-        const durationValue = document.getElementById('durationValue');
+        const inputs = {
+            scaleInput: document.getElementById('scaleInput'),
+            sectorsInput: document.getElementById('sectorsInput'),
+            speedInput: document.getElementById('speedInput'),
+            zoomInput: document.getElementById('zoomInput'),
+            panXInput: document.getElementById('panXInput'),
+            panYInput: document.getElementById('panYInput'),
+            rotateInput: document.getElementById('rotateInput'),
+            modeSelect: document.getElementById('modeSelect')
+        };
 
-        // Global variables
-        let isImageLoaded = false;
-        let userImage;
-        let actualWidth = 400;
-        let actualHeight = 533;
-        let scaledWidth = 400;
-        let scaledHeight = 533;
-        let widthScalingRatio = 1;
-        let playAnimationToggle = false;
-        let animationRequest;
-        let recording = false;
-        let mediaRecorder;
-        let recordedChunks = [];
-        let finishedBlob;
-        
-        // Constants
-        const SqrtOf3_4 = Math.sqrt(3)/2;
-        const fps = 30; // video record frames per second
-        
-        // Animation configuration
-        let canvasWidth = parseInt(canvasWidthInput.value);
-        let canvasHeight = parseInt(canvasHeightInput.value);
-        let numTiles = parseInt(numTilesInput.value);
-        let maxImageWidth;
-        let animationLength = parseInt(animationLengthInput.value);
-        let animationSpeed = 2000;
-        let counter = animationSpeed * 0.5;
-        let patDim = 400;
-        let animationWidth = canvasWidth;
-        let animationHeight = canvasHeight;
-        let animationStep = parseFloat(animationStepInput.value);
-        let videoDuration = parseInt(videoDurationInput.value);
-        
-        // Browser detection
-        const ua = navigator.userAgent;
-        const isSafari = ua.includes("Safari") && !ua.includes("Chrome");
-        const isFirefox = ua.includes("Firefox");
-        const isIOS = /iPad|iPhone|iPod/.test(ua);
-        const isAndroid = ua.includes("Android");
-        console.log(`Browser detection: Safari: ${isSafari}, Firefox: ${isFirefox}, iOS: ${isIOS}, Android: ${isAndroid}`);
-        
-        // Event listeners for inputs
-        imageInput.addEventListener('change', readSourceImage);
-        canvasWidthInput.addEventListener('input', updateWidthValue);
-        canvasHeightInput.addEventListener('input', updateHeightValue);
-        numTilesInput.addEventListener('input', updateTilesValue);
-        animationSpeedInput.addEventListener('input', updateSpeedValue);
-        animationStepInput.addEventListener('input', updateStepValue);
-        animationLengthInput.addEventListener('input', updateLengthValue);
-        videoDurationInput.addEventListener('input', updateDurationValue);
-        
-        canvasWidthInput.addEventListener('change', changeTiling);
-        canvasHeightInput.addEventListener('change', changeTiling);
-        numTilesInput.addEventListener('change', changeTiling);
-        animationSpeedInput.addEventListener('change', getUserInputs);
-        animationStepInput.addEventListener('change', getUserInputs);
-        animationLengthInput.addEventListener('change', getUserInputs);
-        videoDurationInput.addEventListener('change', getUserInputs);
-        
-        // Toggle controls
-        toggleButton.addEventListener('click', () => {
-            controlsPanel.classList.toggle('collapsed');
-        });
-        
-        // Recording
-        recordBtn.addEventListener('click', startRecording);
-        
-        // Initialize slider values
-        updateWidthValue();
-        updateHeightValue();
-        updateTilesValue();
-        updateSpeedValue();
-        updateStepValue();
-        updateLengthValue();
-        updateDurationValue();
-        
-        // Function to update slider value displays
-        function updateWidthValue() {
-            widthValue.textContent = `${canvasWidthInput.value}px`;
+        const vals = {
+            scale: document.getElementById('scaleVal'),
+            sectors: document.getElementById('sectorsVal'),
+            speed: document.getElementById('speedVal'),
+            zoom: document.getElementById('zoomVal'),
+            panX: document.getElementById('panXVal'),
+            panY: document.getElementById('panYVal'),
+            rotate: document.getElementById('rotateVal'),
+            mode: document.getElementById('modeVal')
+        };
+
+        let P = {
+            baseResolutionWidth: 600,
+            baseResolutionHeight: 600,
+            currentScale: 1,
+            numSectors: 8,
+            animationSpeed: 0.5, // Default animation speed reduced
+            sourceZoom: 1,
+            sourceOffsetX: 0,
+            sourceOffsetY: 0,
+            kaleidoRotSpeed: 0,
+            patternMode: 0,
+            playing: true
+        };
+
+        let img = new Image();
+        let loaded = false;
+        let counter = 0;
+        let lastTimestamp = 0;
+        let deltaTime = 0;
+
+        function applySettings() {
+            canvas.width = P.baseResolutionWidth;
+            canvas.height = P.baseResolutionHeight;
         }
-        
-        function updateHeightValue() {
-            heightValue.textContent = `${canvasHeightInput.value}px`;
-        }
-        
-        function updateTilesValue() {
-            tilesValue.textContent = numTilesInput.value;
-        }
-        
-        function updateSpeedValue() {
-            speedValue.textContent = animationSpeedInput.value;
-        }
-        
-        function updateStepValue() {
-            stepValue.textContent = animationStepInput.value;
-        }
-        
-        function updateLengthValue() {
-            lengthValue.textContent = animationLengthInput.value;
-        }
-        
-        function updateDurationValue() {
-            durationValue.textContent = videoDurationInput.value;
-        }
-        
-        // Main functions
-        function refresh() {
-            getUserInputs();
-            createAnimation();
-        }
-        
-        function getUserInputs() {
-            canvasWidth = parseInt(canvasWidthInput.value);
-            canvasHeight = parseInt(canvasHeightInput.value);
-            numTiles = parseInt(numTilesInput.value);
-            maxImageWidth = Math.ceil(canvasWidth / numTiles);
-            
-            const speedInputValue = parseInt(animationSpeedInput.value);
-            animationSpeed = 8000 / speedInputValue * (numTiles / 2.5);
-            animationStep = parseFloat(animationStepInput.value);
-            animationLength = parseInt(animationLengthInput.value);
-            videoDuration = Math.max(1, Math.min(60, parseInt(videoDurationInput.value)));
-            
-            console.log(`Settings updated: Speed: ${animationSpeed}, Step: ${animationStep}, Length: ${animationLength}, Video Duration: ${videoDuration}s`);
-        }
-        
-        function changeTiling() {
-            getUserInputs();
-            resizeImage();
-            animation.scrollIntoView({ behavior: "smooth", block: "start" });
-            createAnimation();
-        }
-        
-        function readSourceImage() {
-            // Clear existing images
-            imageContainer.innerHTML = '';
-            newImageContainer.innerHTML = '';
-            
-            if (playAnimationToggle) {
-                cancelAnimationFrame(animationRequest);
-                playAnimationToggle = false;
-            }
-            
-            loadingScreen.classList.remove("hidden");
-            counter = animationSpeed * 0.5; // Reset animation start point
-            
-            // Read image file
-            const file = imageInput.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const imageData = event.target.result;
-                userImage = new Image();
-                userImage.src = imageData;
-                userImage.onload = () => {
-                    actualWidth = userImage.width;
-                    actualHeight = userImage.height;
-                    resizeImage();
-                };
-            };
-            
-            reader.readAsDataURL(file);
-            isImageLoaded = true;
-        }
-        
-        function resizeImage() {
-            if (isImageLoaded) {
-                imageContainer.innerHTML = '';
-                newImageContainer.innerHTML = '';
-            }
-            
-            // Calculate image scaling dimensions
-            if (actualWidth > maxImageWidth) {
-                scaledWidth = maxImageWidth;
-                widthScalingRatio = scaledWidth / actualWidth;
-                scaledHeight = actualHeight * widthScalingRatio;
-            } else {
-                scaledWidth = actualWidth;
-                widthScalingRatio = 1;
-                scaledHeight = actualHeight;
-            }
-            
-            patDim = scaledWidth;
-            
-            // Create resized version of the image
-            const newCanvas = document.createElement('canvas');
-            newCanvas.width = scaledWidth;
-            newCanvas.height = scaledHeight;
-            const ctx = newCanvas.getContext('2d');
-            
-            if (userImage) {
-                ctx.drawImage(userImage, 0, 0, scaledWidth, scaledHeight);
-                
-                const resizedImgSrc = newCanvas.toDataURL();
-                
-                // Display the resized image
-                const originalImg = document.createElement('img');
-                originalImg.setAttribute("id", "originalImg");
-                originalImg.src = resizedImgSrc;
-                originalImg.width = scaledWidth;
-                originalImg.height = scaledHeight;
-                imageContainer.appendChild(originalImg);
-                
-                // Generate flipped version after a short delay
-                setTimeout(generateFlippedImage, 300);
-            } else {
-                // Create a default pattern if no image is loaded
-                ctx.fillStyle = 'rgba(41, 128, 185, 0.5)';
-                ctx.fillRect(0, 0, scaledWidth, scaledHeight);
-                
-                // Add some visual elements to the default pattern
-                ctx.fillStyle = 'rgba(39, 174, 96, 0.7)';
-                ctx.beginPath();
-                ctx.arc(scaledWidth/2, scaledHeight/2, scaledWidth/4, 0, Math.PI*2);
-                ctx.fill();
-                
-                const resizedImgSrc = newCanvas.toDataURL();
-                
-                // Display the default pattern
-                const originalImg = document.createElement('img');
-                originalImg.setAttribute("id", "originalImg");
-                originalImg.src = resizedImgSrc;
-                originalImg.width = scaledWidth;
-                originalImg.height = scaledHeight;
-                imageContainer.appendChild(originalImg);
-                
-                // Generate flipped version after a short delay
-                setTimeout(generateFlippedImage, 300);
-            }
-        }
-        
-        function generateFlippedImage() {
-            const originalImg = document.getElementById('originalImg');
-            if (!originalImg) return;
-            
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = originalImg.width;
-            canvas.height = originalImg.height;
-            
-            // Draw the original image
-            ctx.drawImage(originalImg, 0, 0);
-            
-            // Flip horizontally
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(canvas, -canvas.width, 0);
-            ctx.restore();
-            
-            // Create and display the flipped image
-            const flippedImg = new Image();
-            flippedImg.setAttribute("id", "flippedImg");
-            flippedImg.src = canvas.toDataURL();
-            newImageContainer.appendChild(flippedImg);
-            
-            // Start animation after a short delay
-            setTimeout(createAnimation, 300);
-        }
-        
-        // Kaleidoscope animation function (optimized)
-        function createAnimation() {
-            loadingScreen.classList.add("hidden");
-            
-            getUserInputs();
-            
-            if (playAnimationToggle) {
-                cancelAnimationFrame(animationRequest);
-                playAnimationToggle = false;
-            }
-            
-            playAnimationToggle = true;
-            
-            // Set up canvas
-            animationWidth = canvasWidth;
-            animationHeight = canvasHeight;
-            animation.width = animationWidth;
-            animation.height = animationHeight;
-            
-            // Get images and create patterns
-            const baseImg = document.getElementById("originalImg");
-            const baseRImg = document.getElementById("flippedImg");
-            
-            if (!baseImg || !baseRImg) {
-                // If images aren't available yet, create a default pattern
-                resizeImage();
-                return;
-            }
-            
-            const ctx = animation.getContext("2d", { willReadFrequently: true, alpha: false });
-            const pat = ctx.createPattern(baseImg, "repeat");
-            const patR = ctx.createPattern(baseRImg, "repeat");
-            
-            // Calculate triangle dimensions
-            const height = SqrtOf3_4 * patDim;
-            let offset = 0;
-            
-            ctx.translate(-0.5 * patDim, 0);
-            
-            // Create offscreen buffer for better performance
-            const bufferCanvas = document.createElement('canvas');
-            bufferCanvas.width = patDim * 3;
-            bufferCanvas.height = Math.floor(SqrtOf3_4 * patDim * 2);
-            const bufferCtx = bufferCanvas.getContext('2d', { alpha: false });
-            
-            // Draw kaleidoscope pattern
-            const drawPattern = function(alternateMode) {
-                offset = Math.sin(counter / animationSpeed * Math.PI) * animationLength;
-                counter++;
-                let i = 0;
-                
-                // Draw first row
-                bufferCtx.save();
-                bufferCtx.fillStyle = pat;
-                bufferCtx.translate(0, offset);
-                
-                while (i <= 3) {
-                    bufferCtx.beginPath();
-                    bufferCtx.moveTo(0, -offset);
-                    bufferCtx.lineTo(patDim, -offset);
-                    bufferCtx.lineTo(0.5 * patDim, height - offset);
-                    bufferCtx.closePath();
-                    bufferCtx.fill();
-                    
-                    if (i % 3 == 0) {
-                        bufferCtx.translate(patDim, -offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(-patDim, offset);
-                    } else if (i % 3 == 1) {
-                        if (alternateMode) {
-                            bufferCtx.rotate(120 * Math.PI / 180);
-                            bufferCtx.translate(-3 * patDim, 0);
-                            bufferCtx.rotate(-120 * Math.PI / 180);
-                        }
-                        bufferCtx.translate(0.5 * patDim, height - offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(-0.5 * patDim, -height + offset);
-                    } else if (i % 3 == 2) {
-                        bufferCtx.translate(0, -offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(0, offset);
-                    }
-                    i++;
+
+        function updateVal(id) {
+            const key = id.replace(/Input|Select/, '');
+            if (vals[key] && inputs[id]) {
+                if (id === 'modeSelect') {
+                    vals[key].textContent = inputs[id].options[inputs[id].selectedIndex].text.split(' ')[0]; // Show first word
+                } else {
+                    vals[key].textContent = inputs[id].value;
                 }
-                
-                bufferCtx.restore();
-                bufferCtx.save();
-                bufferCtx.scale(-1, -1);
-                bufferCtx.fillStyle = patR;
-                bufferCtx.translate((-i + (i % 3 == 0 ? 0.5 : i % 3 == 1 ? 1.5 : -0.5)) * patDim, -height + offset);
-                bufferCtx.translate(0, -offset);
-                bufferCtx.rotate(120 * Math.PI / 180);
-                bufferCtx.translate(0, offset);
-                
-                let j = 0;
-                while (j < i + 1) {
-                    bufferCtx.beginPath();
-                    if (j > 0 || !alternateMode) {
-                        bufferCtx.moveTo(0, -offset);
-                        bufferCtx.lineTo(patDim, -offset);
-                        bufferCtx.lineTo(0.5 * patDim, height - offset);
-                        bufferCtx.closePath();
-                        bufferCtx.fill();
-                    }
-                    
-                    if (j % 3 == 1) {
-                        bufferCtx.translate(patDim, -offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(-patDim, offset);
-                    } else if (j % 3 == 2) {
-                        bufferCtx.translate(0.5 * patDim, height - offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(-0.5 * patDim, -height + offset);
-                    } else if (j % 3 == 0) {
-                        bufferCtx.translate(0, -offset);
-                        bufferCtx.rotate(-120 * Math.PI / 180);
-                        bufferCtx.translate(0, offset);
-                    }
-                    j++;
-                }
-                
-                bufferCtx.restore();
-            };
-            
-            const patternHeight = Math.floor(SqrtOf3_4 * patDim * 2);
-            
-            // Tile the pattern to fill the canvas
-            const tilePattern = function() {
-                const rowData = bufferCtx.getImageData(0, 0, patDim * 3, patternHeight);
-                
-                // Use fewer iterations when in recording mode (for performance)
-                const fillFactor = recording ? 1 : 1.2;
-                
-                for (let i = 0; patternHeight * i < animationHeight + SqrtOf3_4 * patDim * fillFactor; i++) {
-                    for (let j = 0; j * patDim < animationWidth + patDim * fillFactor; j += 3) {
-                        ctx.putImageData(rowData, j * patDim, i * patternHeight);
-                    }
-                }
-            };
-            
-            // Animation loop with requestAnimationFrame
-            function animationLoop() {
-                if (playAnimationToggle) {
-                    // Clear the buffer
-                    bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
-                    
-                    // Draw patterns to buffer
-                    drawPattern(false);
-                    bufferCtx.translate(animationStep * patDim, height);
-                    drawPattern(true);
-                    bufferCtx.translate(animationStep * -1 * patDim, -height);
-                    
-                    // Clear the main canvas
-                    ctx.clearRect(0, 0, animationWidth, animationHeight);
-                    
-                    // Tile the pattern to main canvas
-                    tilePattern();
-                }
-                
-                // Schedule next frame (recursive call)
-                animationRequest = requestAnimationFrame(animationLoop);
-            }
-            
-            // Start the animation loop
-            animationLoop();
-        }
-        
-        // Function to pause/play animation
-        function pausePlayAnimation() {
-            const playPauseBtn = document.getElementById('togglePlayPause');
-            
-            if (playAnimationToggle) {
-                playAnimationToggle = false;
-                cancelAnimationFrame(animationRequest);
-                playPauseBtn.textContent = 'Play';
-                playPauseBtn.classList.remove('btn-secondary');
-                playPauseBtn.classList.add('btn-primary');
-            } else {
-                playAnimationToggle = true;
-                animationLoop();
-                playPauseBtn.textContent = 'Pause';
-                playPauseBtn.classList.remove('btn-primary');
-                playPauseBtn.classList.add('btn-secondary');
             }
         }
-        
-        // Function to save current canvas as image
+
+        function readInputs() {
+            P.currentScale = +inputs.scaleInput.value;
+            P.numSectors = +inputs.sectorsInput.value;
+            P.animationSpeed = +inputs.speedInput.value;
+            P.sourceZoom = +inputs.zoomInput.value;
+            P.sourceOffsetX = +inputs.panXInput.value;
+            P.sourceOffsetY = +inputs.panYInput.value;
+            P.kaleidoRotSpeed = +inputs.rotateInput.value;
+            P.patternMode = +inputs.modeSelect.value;
+        }
+
+        function toggleControls() {
+            const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+            toggleBtn.setAttribute('aria-expanded', String(!expanded));
+            controlsPanel.classList.toggle('expanded');
+            toggleBtn.innerHTML = expanded ? '⚙️' : '✕';
+        }
+
+        function togglePlay() {
+            P.playing = !P.playing;
+            playPauseBtn.textContent = P.playing ? 'Pause' : 'Play';
+            if (P.playing) {
+                lastTimestamp = performance.now();
+                requestAnimationFrame(animate);
+            }
+        }
+
         function saveImage() {
-            if (!animation) return;
-            
-            try {
+            const wasPlaying = P.playing;
+            if (wasPlaying) P.playing = false;
+            drawKaleidoscope(ctx, canvas.width, canvas.height, true, counter); // Pass current counter for static draw
+
+            canvas.toBlob(blob => {
                 const link = document.createElement('a');
-                link.download = 'kaleidoscope-' + new Date().getTime() + '.png';
-                link.href = animation.toDataURL('image/png');
+                link.download = `kaleidoscope-pattern-${Date.now()}.png`;
+                link.href = URL.createObjectURL(blob);
                 link.click();
-            } catch (err) {
-                console.error('Error saving image:', err);
-                alert('Failed to save image. Your browser may not support this feature.');
-            }
-        }
-        
-        // Video recording functions
-        function startRecording() {
-            if (recording) {
-                stopRecording();
-                return;
-            }
-            
-            // Check browser support
-            if (!navigator.mediaDevices || !MediaRecorder) {
-                alert('Your browser does not support recording. Try using Chrome or Firefox.');
-                return;
-            }
-            
-            try {
-                // Reset chunks
-                recordedChunks = [];
-                
-                // Get canvas stream
-                const stream = animation.captureStream(fps);
-                
-                // Configure MediaRecorder
-                const options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 5000000 };
-                mediaRecorder = new MediaRecorder(stream, options);
-                
-                // Set up event handlers
-                mediaRecorder.ondataavailable = handleDataAvailable;
-                mediaRecorder.onstop = handleStop;
-                
-                // Calculate recording duration in ms
-                const recordingDuration = videoDuration * 1000;
-                
-                // Start recording
-                mediaRecorder.start(100); // Collect data every 100ms
-                recording = true;
-                
-                // Update UI
-                recordBtn.textContent = 'Stop Recording';
-                recordingIndicator.classList.remove('hidden');
-                
-                // Set timeout to stop recording after specified duration
-                setTimeout(() => {
-                    if (recording) {
-                        stopRecording();
-                    }
-                }, recordingDuration);
-                
-                console.log('Recording started...');
-            } catch (error) {
-                console.error('Error starting recording:', error);
-                alert('Failed to start recording: ' + error.message);
-            }
-        }
-        
-        function stopRecording() {
-            if (!recording || !mediaRecorder) return;
-            
-            try {
-                mediaRecorder.stop();
-                recording = false;
-                recordBtn.textContent = 'Record';
-                recordingIndicator.classList.add('hidden');
-                console.log('Recording stopped...');
-            } catch (error) {
-                console.error('Error stopping recording:', error);
-                alert('Failed to stop recording: ' + error.message);
-            }
-        }
-        
-        function handleDataAvailable(event) {
-            if (event.data && event.data.size > 0) {
-                recordedChunks.push(event.data);
-            }
-        }
-        
-        function handleStop() {
-            // Create blob from chunks
-            finishedBlob = new Blob(recordedChunks, { type: 'video/webm' });
-            
-            // Create URL for the blob
-            const videoURL = URL.createObjectURL(finishedBlob);
-            
-            // Download video file
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = videoURL;
-            a.download = 'kaleidoscope-' + new Date().getTime() + '.webm';
-            document.body.appendChild(a);
-            a.click();
-            
-            // Clean up
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(videoURL);
-            }, 100);
-        }
-        
-        // Initialization function
-        function init() {
-            // Create a default pattern if no image is loaded
-            if (!isImageLoaded) {
-                console.log('No image loaded, creating default pattern');
-                resizeImage();
-            }
-            
-            // Remove loading screen after initialization
-            setTimeout(() => {
-                loadingScreen.classList.add("hidden");
-            }, 1000);
-        }
-        
-        // Start application
-        window.addEventListener('load', init);
-        
-        // Handle window resize
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                // Only resize if animation is active and browser window changes significantly
-                if (playAnimationToggle && window.innerWidth > 0) {
-                    console.log('Window resized, adjusting kaleidoscope');
-                    changeTiling();
+                URL.revokeObjectURL(link.href);
+                if (wasPlaying) {
+                     P.playing = true;
+                     lastTimestamp = performance.now();
+                     requestAnimationFrame(animate);
                 }
-            }, 500);
-        });
-        
-        // Handle errors
-        window.addEventListener('error', (e) => {
-            console.error('Error occurred:', e.error);
-            loadingScreen.classList.add("hidden");
-            alert('An error occurred. Please refresh the page and try again.');
-        });
-        
-        // Handle visibility change (pause when tab is not visible)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && playAnimationToggle) {
-                pausePlayAnimation();
+            }, 'image/png', 0.92);
+        }
+
+        function drawKaleidoscope(targetCtx, width, height, isStaticDraw = false, staticCounter) {
+            targetCtx.fillStyle = '#000000';
+            targetCtx.fillRect(0, 0, width, height);
+
+            const currentCounter = isStaticDraw ? staticCounter : counter;
+            const angleInc = (2 * Math.PI) / (P.numSectors || 2);
+
+            targetCtx.save(); // Global save
+            targetCtx.translate(width / 2, height / 2);
+            targetCtx.scale(P.currentScale, P.currentScale);
+            targetCtx.rotate(currentCounter * P.kaleidoRotSpeed);
+
+            const effectiveRadius = Math.hypot(width / P.currentScale, height / P.currentScale) / 2 * 1.42; // Adjusted for full coverage
+
+            for (let i = 0; i < P.numSectors; i++) {
+                targetCtx.save(); // Sector save
+                targetCtx.rotate(i * angleInc);
+
+                // Default reflection for kaleidoscope effect
+                if (i % 2 !== 0 && P.patternMode !== 2) { // Mode 2 handles its own reflection
+                     targetCtx.scale(1, -1);
+                }
+
+
+                targetCtx.beginPath();
+                targetCtx.moveTo(0, 0);
+                targetCtx.arc(0, 0, effectiveRadius, -angleInc / 2, angleInc / 2);
+                targetCtx.closePath();
+                targetCtx.clip();
+
+                targetCtx.save(); // Image specific transforms and effects save
+
+                // Apply pattern modes transformations BEFORE image drawing
+                let dynamicSourceZoom = P.sourceZoom;
+                let currentSourceOffsetX = P.sourceOffsetX;
+                let currentSourceOffsetY = P.sourceOffsetY;
+
+                targetCtx.filter = 'none'; // Reset filter for each sector initially
+
+                switch (P.patternMode) {
+                    case 1: // Hue Shift
+                        targetCtx.filter = `hue-rotate(${currentCounter * 25}deg)`;
+                        break;
+                    case 2: // Alternate Sector Reflect (different axis)
+                        if (i % 2 === 0) {
+                            targetCtx.scale(-1, 1); // Reflect horizontally
+                        } else {
+                            targetCtx.scale(1,-1); // Reflect vertically (default like)
+                        }
+                        break;
+                    case 3: // Offset Image Sectors
+                        if (i % 2 === 0) {
+                            currentSourceOffsetX += Math.sin(currentCounter * 0.5) * 30;
+                            currentSourceOffsetY += Math.cos(currentCounter * 0.5) * 30;
+                        } else {
+                            currentSourceOffsetX -= Math.sin(currentCounter * 0.5) * 30;
+                            currentSourceOffsetY -= Math.cos(currentCounter * 0.5) * 30;
+                        }
+                        break;
+                    case 4: // Static Image, Rotating Wedges
+                        // Counteract the kaleidoscope rotation and individual sector rotation for the image
+                        targetCtx.rotate(- (currentCounter * P.kaleidoRotSpeed) - (i * angleInc) );
+                        if (i % 2 !== 0) targetCtx.scale(1,-1); // re-apply original reflection if needed
+                        break;
+                    case 5: // Central Pulse Zoom
+                        dynamicSourceZoom *= (1 + Math.sin(currentCounter * 1.5) * 0.3);
+                        break;
+                    case 6: // Image Edge Bias
+                        if (loaded) {
+                            const bias = Math.sin(currentCounter * 0.8) * (img.width / 4 / dynamicSourceZoom);
+                            if (i % 2 === 0) {
+                                currentSourceOffsetX += bias;
+                            } else {
+                                currentSourceOffsetX -= bias;
+                            }
+                        }
+                        break;
+                }
+
+                // Common image transformations (pan, zoom, internal rotation)
+                const dynamicPanFactor = isStaticDraw ? 0 : Math.sin(currentCounter * 0.3) * 20; // Subtle pan animation
+                targetCtx.translate(currentSourceOffsetX + dynamicPanFactor, currentSourceOffsetY + dynamicPanFactor);
+                targetCtx.scale(dynamicSourceZoom, dynamicSourceZoom);
+                targetCtx.rotate(currentCounter * 0.05); // Slow internal image rotation
+
+                if (loaded) {
+                    targetCtx.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
+                } else { // Fallback procedural pattern
+                    targetCtx.fillStyle = `hsl(${(i * 360 / P.numSectors + currentCounter * 20) % 360}, 60%, 45%)`;
+                    targetCtx.fillRect(-effectiveRadius, -effectiveRadius, effectiveRadius * 2, effectiveRadius * 2);
+                }
+
+                targetCtx.restore(); // Image specific transforms and effects restore
+                targetCtx.restore(); // Sector restore (clipping, sector rotation)
             }
-        });
+            targetCtx.restore(); // Global restore
+        }
+
+        function animate(timestamp) {
+            if (!P.playing) return;
+
+            deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+            if (deltaTime > 100) deltaTime = 16.666; // Cap deltaTime
+
+            counter += (deltaTime / 16.666) * P.animationSpeed * 0.1; // Adjusted animation speed scaling
+
+            drawKaleidoscope(ctx, canvas.width, canvas.height, false, counter);
+            requestAnimationFrame(animate);
+        }
+
+        function init() {
+            Object.keys(inputs).forEach(id => {
+                const keyWithoutSuffix = id.replace(/Input|Select/, '');
+                let pKey = keyWithoutSuffix;
+                if (keyWithoutSuffix === 'scale') pKey = 'currentScale'; // Handle special case for scale
+
+                if (P.hasOwnProperty(pKey)) {
+                    inputs[id].value = P[pKey];
+                }
+                updateVal(id);
+
+                inputs[id].addEventListener(inputs[id].tagName === 'SELECT' ? 'change' : 'input', () => {
+                    readInputs();
+                    updateVal(id);
+                    if (!P.playing) { // If paused, redraw statically on input change
+                         drawKaleidoscope(ctx, canvas.width, canvas.height, true, counter);
+                    }
+                });
+            });
+            
+            playPauseBtn.textContent = P.playing ? 'Pause' : 'Play';
+
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                const f = e.target.files[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    img.onload = () => {
+                        loaded = true;
+                        if (!P.playing) {
+                            drawKaleidoscope(ctx, canvas.width, canvas.height, true, counter);
+                        }
+                    };
+                    img.onerror = () => { loaded = false; alert("Error loading image."); };
+                    img.src = ev.target.result;
+                };
+                reader.onerror = () => { alert("Failed to read file."); };
+                reader.readAsDataURL(f);
+                fileInput.value = '';
+            });
+
+            playPauseBtn.addEventListener('click', togglePlay);
+            saveBtn.addEventListener('click', saveImage);
+            toggleBtn.addEventListener('click', toggleControls);
+
+            applySettings();
+            readInputs(); // Ensure P is synced with initial slider values set by P object
+
+            if (P.playing) {
+                lastTimestamp = performance.now();
+                requestAnimationFrame(animate);
+            } else {
+                drawKaleidoscope(ctx, canvas.width, canvas.height, true, counter);
+            }
+        }
+        window.addEventListener('load', init);
     </script>
 </body>
 </html>
