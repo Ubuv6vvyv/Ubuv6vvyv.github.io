@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Fun Image Effects</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #f0f0f0; display: flex; flex-direction: column; align-items: center; touch-action: manipulation; }
+        .container { width: 100%; max-width: 480px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        header { background-color: #333; color: white; padding: 10px; text-align: center; }
+        header h1 { margin: 0; font-size: 1.5em; }
+        .controls { padding: 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #eee; }
+        .controls > div, .effects-group > div { margin-bottom: 5px; }
+        label { display: block; margin-bottom: 3px; font-size: 0.9em; color: #555; }
+        input[type="file"], select, input[type="range"] { width: calc(100% - 10px); padding: 8px 5px; border-radius: 4px; border: 1px solid #ddd; box-sizing: border-box; }
+        input[type="file"] { padding: 5px; }
+        .canvas-container { width: 100%; aspect-ratio: 1; overflow: hidden; position: relative; background-color: #e0e0e0; }
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        .buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; padding: 10px; }
+        button { padding: 10px; border: none; border-radius: 4px; background-color: #5cb85c; color: white; font-size: 0.9em; cursor: pointer; }
+        button:active { opacity: 0.8; }
+        button.warn { background-color: #f0ad4e; }
+        button.danger { background-color: #d9534f; }
+        .effect-params label { display: inline-block; width: 50px; }
+        .effect-params input[type="range"] { width: calc(100% - 60px); vertical-align: middle; }
+        .effects-group { display: flex; flex-direction: column; }
+        .slider-val { font-size: 0.8em; color: #777; margin-left: 5px; }
+        .overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header><h1>Image Fun</h1></header>
+
+        <div class="controls">
+            <div>
+                <label for="upl">Upload Image:</label>
+                <input type="file" id="upl" accept="image/*">
+            </div>
+            <div class="effects-group">
+                <label for="eff">Effect:</label>
+                <select id="eff">
+                    <option value="bulge">Bulge</option>
+                    <option value="dent">Dent</option>
+                    <option value="swirl">Swirl</option>
+                    <option value="pinch">Pinch</option>
+                    <option value="pixelate">Pixelate</option>
+                    <option value="ripple">Ripple</option>
+                    <option value="shearH">Shear H</option>
+                </select>
+            </div>
+            <div class="effect-params">
+                <label for="str">Strength:</label>
+                <input type="range" id="str" min="-100" max="100" value="30"><span id="strVal" class="slider-val">30</span>
+            </div>
+            <div class="effect-params">
+                <label for="rad">Size:</label>
+                <input type="range" id="rad" min="10" max="300" value="100"><span id="radVal" class="slider-val">100</span>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="cvs"></canvas>
+            <canvas id="ovl" class="overlay-canvas"></canvas>
+        </div>
+
+        <div class="buttons">
+            <button id="undoBtn" class="warn">Undo</button>
+            <button id="restoreBtn" class="danger">Reset</button>
+            <button id="saveBtn">Save</button>
+        </div>
+    </div>
+
+    <script>
+        const upl = document.getElementById('upl');
+        const cvs = document.getElementById('cvs');
+        const ctx = cvs.getContext('2d', { willReadFrequently: true });
+        const ovl = document.getElementById('ovl');
+        const octx = ovl.getContext('2d');
+        const effSelect = document.getElementById('eff');
+        const strSlider = document.getElementById('str');
+        const radSlider = document.getElementById('rad');
+        const strVal = document.getElementById('strVal');
+        const radVal = document.getElementById('radVal');
+        const undoBtn = document.getElementById('undoBtn');
+        const restoreBtn = document.getElementById('restoreBtn');
+        const saveBtn = document.getElementById('saveBtn');
+
+        let origImg = null;
+        let currentImgData = null;
+        let history = [];
+        const MAX_IMG_SIZE = 800;
+        let isInteracting = false;
+        let lastEffectTime = 0;
+        const EFFECT_THROTTLE = 30; 
+        let currentInteractionPos = null;
+        let animationFrameId = null;
+
+        strSlider.oninput = () => strVal.textContent = strSlider.value;
+        radSlider.oninput = () => {
+            radVal.textContent = radSlider.value;
+            drawOverlay(currentInteractionPos);
+        };
+        effSelect.onchange = () => drawOverlay(currentInteractionPos);
+
+        function resizeCanvas(width, height) {
+            cvs.width = width; cvs.height = height;
+            ovl.width = width; ovl.height = height;
+        }
+
+        upl.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let { width, height } = img;
+                        if (width > MAX_IMG_SIZE || height > MAX_IMG_SIZE) {
+                            const ratio = Math.min(MAX_IMG_SIZE / width, MAX_IMG_SIZE / height);
+                            width = Math.round(width * ratio);
+                            height = Math.round(height * ratio);
+                        }
+                        resizeCanvas(width, height);
+                        ctx.drawImage(img, 0, 0, width, height);
+                        origImg = ctx.getImageData(0, 0, cvs.width, cvs.height);
+                        currentImgData = new ImageData(new Uint8ClampedArray(origImg.data), origImg.width, origImg.height);
+                        history = [];
+                        updateUndoBtn();
+                        drawOverlay(null);
+                    }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function saveState(dataToSave) {
+            if (dataToSave) {
+                history.push(new ImageData(new Uint8ClampedArray(dataToSave.data), dataToSave.width, dataToSave.height));
+                if (history.length > 10) history.shift();
+                updateUndoBtn();
+            }
+        }
+
+        function getInteractionPos(canvasEl, evt) {
+            const rect = canvasEl.getBoundingClientRect();
+            const clientX = evt.clientX ?? evt.touches?.[0]?.clientX;
+            const clientY = evt.clientY ?? evt.touches?.[0]?.clientY;
+            if (clientX === undefined || clientY === undefined) return null;
+
+            const scaleX = canvasEl.width / rect.width;
+            const scaleY = canvasEl.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function drawOverlay(pos) {
+            octx.clearRect(0, 0, ovl.width, ovl.height);
+            if (pos && origImg) {
+                octx.beginPath();
+                octx.arc(pos.x, pos.y, parseInt(radSlider.value), 0, 2 * Math.PI);
+                octx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                octx.lineWidth = 2;
+                octx.setLineDash([5, 5]);
+                octx.stroke();
+                octx.setLineDash([]);
+            }
+        }
+
+        function applyEffectLoop() {
+            if (!isInteracting || !currentInteractionPos || !currentImgData) {
+                animationFrameId = null;
+                return;
+            }
+            const now = Date.now();
+            if (now - lastEffectTime >= EFFECT_THROTTLE) {
+                applyEffectAt(currentInteractionPos.x, currentInteractionPos.y, false);
+                lastEffectTime = now;
+            }
+            animationFrameId = requestAnimationFrame(applyEffectLoop);
+        }
+
+        function startInteraction(evt) {
+            if (!origImg) return;
+            evt.preventDefault?.();
+            currentInteractionPos = getInteractionPos(cvs, evt);
+            if (!currentInteractionPos) return;
+
+            isInteracting = true;
+            saveState(currentImgData); 
+            applyEffectAt(currentInteractionPos.x, currentInteractionPos.y, true); 
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            lastEffectTime = Date.now(); 
+            animationFrameId = requestAnimationFrame(applyEffectLoop);
+            drawOverlay(currentInteractionPos);
+        }
+
+        function continueInteraction(evt) {
+            if (!isInteracting || !origImg) return;
+            evt.preventDefault?.();
+            const newPos = getInteractionPos(cvs, evt);
+            if (!newPos) { stopInteraction(); return; }
+            currentInteractionPos = newPos;
+            drawOverlay(currentInteractionPos);
+        }
+
+        function stopInteraction() {
+            isInteracting = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            // Save the final state of the continuous effect if an interaction occurred
+            // The initial state before the drag was already saved in startInteraction
+            // To make the entire drag one undo step, we don't push new states here
+            // but rely on the currentImgData being the result of the drag.
+            drawOverlay(null);
+        }
+
+        cvs.addEventListener('mousedown', startInteraction);
+        cvs.addEventListener('mousemove', (e) => {
+            if (!isInteracting) {
+                 currentInteractionPos = getInteractionPos(cvs, e);
+                 drawOverlay(currentInteractionPos);
+            } else { 
+                continueInteraction(e);
+            }
+        });
+        cvs.addEventListener('mouseup', stopInteraction);
+        cvs.addEventListener('mouseleave', () => { // Changed from mouseout
+            if (!isInteracting) drawOverlay(null);
+            else stopInteraction(); // If interaction was happening and mouse leaves, stop it
+        });
+
+        cvs.addEventListener('touchstart', startInteraction, { passive: false });
+        cvs.addEventListener('touchmove', continueInteraction, { passive: false });
+        cvs.addEventListener('touchend', stopInteraction);
+        cvs.addEventListener('touchcancel', stopInteraction);
+
+        function applyEffectAt(x, y, isSingleApplication) { // isSingleApplication not actively used for saving state here now
+            if (!currentImgData) return;
+
+            const strengthVal = parseInt(strSlider.value); // -100 to 100
+            const radius = parseInt(radSlider.value);
+            const effectType = effSelect.value;
+
+            const inputData = currentImgData; 
+            const outputData = new ImageData(inputData.width, inputData.height); 
+            
+            const pixels = outputData.data;
+            const sourcePixels = inputData.data;
+
+            const w = inputData.width;
+            const h = inputData.height;
+
+            for (let i = 0; i < h; i++) { // Y-coordinate
+                for (let j = 0; j < w; j++) { // X-coordinate
+                    const dx = j - x;
+                    const dy = i - y;
+                    const distSq = dx * dx + dy * dy;
+                    const radSq = radius * radius;
+                    const currentIdx = (i * w + j) * 4;
+
+                    if (distSq < radSq) {
+                        const dist = Math.sqrt(distSq);
+                        const normalizedDist = dist / radius; 
+                        const falloff = (1 - normalizedDist); 
+
+                        let srcX = j;
+                        let srcY = i;
+                        let useBilinear = true;
+
+
+                        switch (effectType) {
+                            case 'bulge': {
+                                const factor = 1 - (strengthVal / 100) * falloff;
+                                srcX = x + dx * factor;
+                                srcY = y + dy * factor;
+                                break;
+                            }
+                            case 'dent': {
+                                const factor = 1 + (strengthVal / 100) * falloff;
+                                srcX = x + dx * factor;
+                                srcY = y + dy * factor;
+                                break;
+                            }
+                            case 'swirl': {
+                                const angle = (strengthVal / 100) * falloff * Math.PI * 1.5; 
+                                const cosA = Math.cos(angle);
+                                const sinA = Math.sin(angle);
+                                srcX = x + dx * cosA - dy * sinA;
+                                srcY = y + dx * sinA + dy * cosA;
+                                break;
+                            }
+                            case 'pinch': {
+                                const factor = 1 + (strengthVal / 100) * falloff;
+                                srcX = x + dx * factor;
+                                srcY = y + dy * factor;
+                                break;
+                            }
+                            case 'pixelate': {
+                                useBilinear = false;
+                                const pixelSize = Math.max(2, Math.round(Math.abs(strengthVal) / 10 + 2)); // 2 to 12
+                                const blockX = Math.floor(j / pixelSize) * pixelSize;
+                                const blockY = Math.floor(i / pixelSize) * pixelSize;
+                                // Sample from center of source block for stability if blocks are relative to image,
+                                // or top-left if blocks are aligned with effect. Let's use top-left of current block.
+                                srcX = blockX;
+                                srcY = blockY;
+                                break;
+                            }
+                            case 'ripple': {
+                                const amplitude = (strengthVal / 100) * radius * 0.2 * falloff; // Amplitude scales with strength & radius
+                                const frequency = 10 / Math.max(10, radius) * 5; // More waves for smaller radius
+                                const offset = Math.sin(dist * frequency) * amplitude;
+                                if (dist !== 0) {
+                                    srcX = j + (dx / dist) * offset;
+                                    srcY = i + (dy / dist) * offset;
+                                } else {
+                                    srcX = j; srcY = i;
+                                }
+                                break;
+                            }
+                            case 'shearH': { // Horizontal Shear
+                                const shearFactor = (strengthVal / 100) * 0.5 * falloff; // Max 0.5 shear
+                                srcX = j + (i - y) * shearFactor; // Shear based on vertical distance from effect center
+                                srcY = i;
+                                break;
+                            }
+                        }
+
+                        if (useBilinear) {
+                            const sx_floor = Math.floor(srcX);
+                            const sy_floor = Math.floor(srcY);
+                            const fracX = srcX - sx_floor;
+                            const fracY = srcY - sy_floor;
+
+                            if (sx_floor >= 0 && sx_floor < w - 1 && sy_floor >= 0 && sy_floor < h - 1) {
+                                for (let k = 0; k < 4; k++) { // R, G, B, A
+                                    const p00 = sourcePixels[(sy_floor * w + sx_floor) * 4 + k];
+                                    const p10 = sourcePixels[(sy_floor * w + sx_floor + 1) * 4 + k];
+                                    const p01 = sourcePixels[((sy_floor + 1) * w + sx_floor) * 4 + k];
+                                    const p11 = sourcePixels[((sy_floor + 1) * w + sx_floor + 1) * 4 + k];
+
+                                    const interpTop = p00 * (1 - fracX) + p10 * fracX;
+                                    const interpBottom = p01 * (1 - fracX) + p11 * fracX;
+                                    pixels[currentIdx + k] = interpTop * (1 - fracY) + interpBottom * fracY;
+                                }
+                            } else { // Edge case: use nearest neighbor if interpolation goes out of bounds
+                                const clampedX = Math.max(0, Math.min(w - 1, Math.round(srcX)));
+                                const clampedY = Math.max(0, Math.min(h - 1, Math.round(srcY)));
+                                const srcIdxNN = (clampedY * w + clampedX) * 4;
+                                pixels[currentIdx] = sourcePixels[srcIdxNN];
+                                pixels[currentIdx + 1] = sourcePixels[srcIdxNN + 1];
+                                pixels[currentIdx + 2] = sourcePixels[srcIdxNN + 2];
+                                pixels[currentIdx + 3] = sourcePixels[srcIdxNN + 3];
+                            }
+                        } else { // No bilinear interpolation (e.g., for Pixelate)
+                            const clampedX = Math.max(0, Math.min(w - 1, Math.round(srcX)));
+                            const clampedY = Math.max(0, Math.min(h - 1, Math.round(srcY)));
+                            const srcIdxNN = (clampedY * w + clampedX) * 4;
+                             if (srcIdxNN >=0 && srcIdxNN < sourcePixels.length -3) {
+                                pixels[currentIdx] = sourcePixels[srcIdxNN];
+                                pixels[currentIdx + 1] = sourcePixels[srcIdxNN + 1];
+                                pixels[currentIdx + 2] = sourcePixels[srcIdxNN + 2];
+                                pixels[currentIdx + 3] = sourcePixels[srcIdxNN + 3];
+                            } else {
+                                pixels[currentIdx] = 0; pixels[currentIdx + 1] = 0; pixels[currentIdx + 2] = 0; pixels[currentIdx + 3] = 0;
+                            }
+                        }
+
+                    } else { // If outside effect radius, copy original pixel
+                        pixels[currentIdx] = sourcePixels[currentIdx];
+                        pixels[currentIdx + 1] = sourcePixels[currentIdx + 1];
+                        pixels[currentIdx + 2] = sourcePixels[currentIdx + 2];
+                        pixels[currentIdx + 3] = sourcePixels[currentIdx + 3];
+                    }
+                }
+            }
+            currentImgData = outputData;
+            ctx.putImageData(outputData, 0, 0);
+        }
+
+        undoBtn.addEventListener('click', () => {
+            if (history.length > 0) {
+                currentImgData = history.pop();
+                ctx.putImageData(currentImgData, 0, 0);
+                updateUndoBtn();
+            } else if (origImg) { 
+                currentImgData = new ImageData(new Uint8ClampedArray(origImg.data), origImg.width, origImg.height);
+                ctx.putImageData(currentImgData, 0, 0);
+            }
+        });
+
+        restoreBtn.addEventListener('click', () => {
+            if (origImg) {
+                currentImgData = new ImageData(new Uint8ClampedArray(origImg.data), origImg.width, origImg.height);
+                ctx.putImageData(currentImgData, 0, 0);
+                history = [];
+                updateUndoBtn();
+            }
+        });
+
+        saveBtn.addEventListener('click', () => {
+            if (!currentImgData) return alert('No image to save!');
+            const link = document.createElement('a');
+            link.download = 'image-fun.png';
+            link.href = cvs.toDataURL('image/png');
+            link.click();
+        });
+
+        function updateUndoBtn() {
+            undoBtn.disabled = history.length === 0;
+            undoBtn.style.opacity = undoBtn.disabled ? 0.5 : 1;
+        }
+        updateUndoBtn();
+        drawOverlay(null);
+    </script>
+</body>
+</html>
