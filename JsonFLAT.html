@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relational JSON Flattening Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace; /* Default body font */
+            font-size: 14px;
+            color: #e0e0e0; /* Light gray text for dark background */
+            background: linear-gradient(-45deg, #0d1a26, #132233, #1a2d40, #20394d);
+            background-size: 400% 400%;
+            animation: gradientPulse 20s ease infinite;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientPulse {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        h1, h2, h3, .font-heading {
+            font-family: 'Chakra Petch', sans-serif; /* Heading font */
+        }
+
+        /* Custom scrollbar for pre elements */
+        pre::-webkit-scrollbar, textarea::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        pre::-webkit-scrollbar-track, textarea::-webkit-scrollbar-track {
+            background: #2d3748; /* Darker track */
+            border-radius: 8px;
+        }
+        pre::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb {
+            background: #4a5568; /* Lighter thumb */
+            border-radius: 8px;
+        }
+        pre::-webkit-scrollbar-thumb:hover, textarea::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* Lighter thumb on hover */
+        }
+
+        details summary {
+            list-style: none;
+        }
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+        details summary::before {
+            content: '▶';
+            margin-right: 0.4rem;
+            font-size: 0.7em;
+            display: inline-block;
+            transition: transform 0.15s ease-in-out;
+            color: #90cdf4; /* Light blue for accents */
+        }
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        textarea, input[type="text"] { /* General input styling */
+            font-size: 14px;
+            background-color: #1a202c; /* Dark background for inputs */
+            color: #e0e0e0; /* Light text */
+            border: 1px solid #4a5568; /* Subtle border */
+        }
+        textarea::placeholder {
+            color: #718096;
+        }
+
+        button {
+            font-size: 14px;
+            font-family: 'Chakra Petch', sans-serif; /* Consistent button font */
+        }
+        
+        .btn-primary {
+            background-color: #3182ce; /* Blue primary */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2b6cb0;
+        }
+        .btn-secondary {
+            background-color: #4a5568; /* Gray secondary */
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #2d3748;
+        }
+        .btn-success {
+            background-color: #38a169; /* Green success */
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #2f855a;
+        }
+
+        .card {
+            background-color: rgba(26, 32, 44, 0.8); /* Semi-transparent dark card */
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(74, 85, 104, 0.5);
+        }
+        
+        .message-info { background-color: rgba(49, 130, 206, 0.2); color: #90cdf4; border-left: 3px solid #3182ce;}
+        .message-error { background-color: rgba(229, 62, 62, 0.2); color: #feb2b2; border-left: 3px solid #e53e3e;}
+        .message-warning { background-color: rgba(221, 107, 32, 0.2); color: #fbd38d; border-left: 3px solid #dd6b20;}
+
+
+        @media (min-width: 640px) { /* sm breakpoint */
+            body { font-size: 15px; }
+            textarea, input[type="text"], button { font-size: 15px; }
+            h1 { font-size: 2.25rem; /* 36px */ }
+        }
+    </style>
+</head>
+<body class="text-slate-200">
+
+    <div class="container mx-auto p-3 sm:p-4 md:p-6 max-w-3xl">
+        <header class="mb-6 text-center">
+            <h1 class="font-bold text-sky-300">Relational JSON Flattener</h1>
+            <p class="text-slate-400 text-sm mt-1">Upload or paste JSON to convert into structured, relational CSVs.</p>
+        </header>
+
+        <div class="card shadow-xl rounded-lg p-4 sm:p-6 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
+                <label for="jsonInput" class="block text-base font-semibold text-sky-400 mb-2 sm:mb-0 font-heading">JSON Input:</label>
+                <input type="file" id="fileInput" accept=".txt" class="hidden"/>
+                <button id="uploadButton" class="btn-secondary font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out text-xs sm:text-sm shadow-md w-full sm:w-auto">
+                    Upload .txt File
+                </button>
+            </div>
+            <textarea id="jsonInput" rows="10" class="w-full p-2.5 border-slate-700 rounded-md focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition duration-150 shadow-sm text-sm" placeholder="Paste JSON here or upload a .txt file..."></textarea>
+            <button id="flattenButton" class="btn-primary mt-4 w-full font-bold py-2.5 px-4 rounded-md transition duration-150 ease-in-out transform hover:scale-101 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 shadow-lg">
+                Flatten JSON
+            </button>
+        </div>
+
+        <div id="messagesContainer" class="mb-4 space-y-1.5">
+            </div>
+
+        <div id="outputContainer" class="space-y-4">
+            </div>
+    </div>
+
+    <script>
+        let tablesGlobal;
+        let idCounterGlobal;
+
+        function generateIdInternal(prefix) {
+            return `${prefix}_${idCounterGlobal++}`;
+        }
+
+        function addRowToTableInternal(tableName, row) {
+            if (!tablesGlobal[tableName]) {
+                tablesGlobal[tableName] = { headers: new Set(), rows: [] };
+            }
+            Object.keys(row).forEach(header => tablesGlobal[tableName].headers.add(header));
+            tablesGlobal[tableName].rows.push(row);
+        }
+        
+        function processValueInternal(currentValue, currentEntityId, currentEntityTableName, parentEntityId, parentEntityTableName) {
+            if (Array.isArray(currentValue)) {
+                currentValue.forEach((item, index) => {
+                    if (typeof item === 'object' && item !== null) {
+                        const itemEntityId = generateIdInternal(currentEntityTableName + '_item');
+                        processValueInternal(item, itemEntityId, currentEntityTableName, parentEntityId, parentEntityTableName);
+                    } else {
+                        const primitiveArrayTableName = `${currentEntityTableName}_values`;
+                        const row = {};
+                        if (parentEntityId && parentEntityTableName) {
+                             row[`fk_${parentEntityTableName}_id`] = parentEntityId;
+                        }
+                        row['index'] = index;
+                        row['value'] = item;
+                        addRowToTableInternal(primitiveArrayTableName, row);
+                    }
+                });
+            } else if (typeof currentValue === 'object' && currentValue !== null) {
+                const rowData = {};
+                rowData[`pk_${currentEntityTableName}_id`] = currentEntityId;
+
+                if (parentEntityId && parentEntityTableName) {
+                    rowData[`fk_${parentEntityTableName}_id`] = parentEntityId;
+                }
+
+                for (const key in currentValue) {
+                    if (Object.prototype.hasOwnProperty.call(currentValue, key)) {
+                        const value = currentValue[key];
+                        if (typeof value === 'object' && value !== null) {
+                            const childEntityIdForObject = generateIdInternal(key);
+                            processValueInternal(value, childEntityIdForObject, key, currentEntityId, currentEntityTableName);
+                        } else {
+                            rowData[key] = value;
+                        }
+                    }
+                }
+                addRowToTableInternal(currentEntityTableName, rowData);
+            }
+        }
+
+        function tryFixJsonInternal(jsonString) {
+            let messages = [];
+            try {
+                return { data: JSON.parse(jsonString), messages: ["JSON parsed successfully."] };
+            } catch (e) { 
+                messages.push(`Parse failed: ${e.message.substring(0, 100)}`);
+            }
+
+            let currentJson = jsonString.replace(/,\s*([}\]])/g, '$1');
+            if (currentJson !== jsonString) {
+                messages.push("Attempted: remove trailing commas.");
+                try {
+                    return { data: JSON.parse(currentJson), messages };
+                } catch (e) { 
+                    messages.push(`Fix trailing commas failed: ${e.message.substring(0,100)}`);
+                }
+            }
+            
+            let openBraces = 0;
+            let openBrackets = 0;
+            for (let i = 0; i < jsonString.length; i++) {
+                if (jsonString[i] === '{') openBraces++;
+                else if (jsonString[i] === '}') openBraces--;
+                else if (jsonString[i] === '[') openBrackets++;
+                else if (jsonString[i] === ']') openBrackets--;
+            }
+
+            let repairedJson = jsonString;
+            let repairAttempted = false;
+            if (openBraces > 0) {
+                repairedJson += '}'.repeat(openBraces);
+                messages.push(`Attempted: close ${openBraces} '}'.`);
+                repairAttempted = true;
+            }
+            if (openBrackets > 0) {
+                repairedJson += ']'.repeat(openBrackets);
+                messages.push(`Attempted: close ${openBrackets} ']'.`);
+                repairAttempted = true;
+            }
+
+            if (repairAttempted) {
+                try {
+                    return { data: JSON.parse(repairedJson), messages };
+                } catch (e) {
+                    messages.push(`Closing brackets/braces failed: ${e.message.substring(0,100)}`);
+                }
+            }
+            
+            messages.push("All auto-fixes failed. Check JSON syntax.");
+            return { data: null, messages, error: true };
+        }
+
+        function flattenRelationalEntryInternal(jsonInputString, rootName = 'root_data') {
+            tablesGlobal = {}; 
+            idCounterGlobal = 0; 
+
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = ''; 
+            
+            let parseResult = tryFixJsonInternal(jsonInputString);
+            
+            parseResult.messages.forEach(msg => {
+                const p = document.createElement('p');
+                p.className = `text-xs p-1.5 rounded ${parseResult.error && msg.toLowerCase().includes("failed") ? 'message-error' : 'message-info'}`;
+                p.textContent = msg;
+                messagesContainer.appendChild(p);
+            });
+
+            if (!parseResult.data) {
+                return { error: "Invalid JSON.", details: parseResult.messages.join(' ') };
+            }
+
+            const jsonData = parseResult.data;
+
+            if (Array.isArray(jsonData)) {
+                jsonData.forEach((item) => {
+                    if (typeof item === 'object' && item !== null) {
+                        const rootItemId = generateIdInternal(`${rootName}_item`);
+                        processValueInternal(item, rootItemId, rootName, null, null);
+                    } else {
+                        const primitiveArrayTableName = `${rootName}_values`;
+                        const row = { value: item };
+                        addRowToTableInternal(primitiveArrayTableName, row);
+                    }
+                });
+            } else if (typeof jsonData === 'object' && jsonData !== null) {
+                const rootId = generateIdInternal(rootName);
+                processValueInternal(jsonData, rootId, rootName, null, null);
+            } else {
+                 const errorMsg = "Input is not a JSON object or array.";
+                 const p = document.createElement('p');
+                 p.className = 'text-xs message-error p-1.5 rounded';
+                 p.textContent = errorMsg;
+                 messagesContainer.appendChild(p);
+                return { error: errorMsg };
+            }
+
+            const csvOutputs = {};
+            for (const tableName in tablesGlobal) {
+                const { headers: headerSet, rows } = tablesGlobal[tableName];
+                if (rows.length === 0) continue; 
+
+                const headers = Array.from(headerSet);
+                const sortOrder = (h) => {
+                    if (h.startsWith('pk_')) return 0;
+                    if (h.startsWith('fk_')) return 1;
+                    return 2;
+                };
+                headers.sort((a, b) => {
+                    const orderA = sortOrder(a);
+                    const orderB = sortOrder(b);
+                    if (orderA !== orderB) return orderA - orderB;
+                    return a.localeCompare(b); 
+                });
+
+                let csvString = headers.map(header => `"${String(header).replace(/"/g, '""')}"`).join(',') + '\n';
+                rows.forEach(row => {
+                    csvString += headers.map(header => {
+                        const val = row[header];
+                        if (val === undefined || val === null) return '';
+                        let cell = String(val);
+                        if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
+                            cell = `"${cell.replace(/"/g, '""')}"`;
+                        }
+                        return cell;
+                    }).join(',') + '\n';
+                });
+                csvOutputs[tableName] = csvString;
+            }
+            return csvOutputs;
+        }
+
+        function downloadCSVInternal(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else { // Fallback for browsers that don't support download attribute
+                const modal = document.createElement('div');
+                Object.assign(modal.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '1000', padding: '10px' });
+                const modalContent = document.createElement('div');
+                Object.assign(modalContent.style, { backgroundColor: '#1a202c', color: '#e0e0e0', padding: '15px', borderRadius: '6px', maxWidth: '90%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '1px solid #4a5568'});
+                modalContent.innerHTML = `
+                    <h3 class="text-base font-semibold mb-1.5 text-sky-400 font-heading">Download Unavailable</h3>
+                    <p class="text-xs text-slate-400 mb-2">Browser doesn't support direct downloads. Copy content for '${filename}':</p>
+                    <textarea rows="8" class="w-full p-1.5 border rounded text-xs bg-slate-800 text-slate-200 border-slate-600" readonly>${csvContent}</textarea>
+                    <button id="closeModalBtnInternal" class="mt-2 bg-slate-600 hover:bg-slate-700 text-white text-xs py-1.5 px-3 rounded">Close</button>
+                `;
+                modal.appendChild(modalContent);
+                document.body.appendChild(modal);
+                document.getElementById('closeModalBtnInternal').onclick = () => document.body.removeChild(modal);
+            }
+        }
+
+        document.getElementById('uploadButton').addEventListener('click', () => {
+            document.getElementById('fileInput').click(); // Trigger hidden file input
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('jsonInput').value = e.target.result;
+                    const messagesContainer = document.getElementById('messagesContainer');
+                    const p = document.createElement('p');
+                    p.className = 'text-xs message-info p-1.5 rounded';
+                    p.textContent = `File "${file.name}" loaded successfully.`;
+                    messagesContainer.insertBefore(p, messagesContainer.firstChild); // Add to top
+                };
+                reader.onerror = () => {
+                    const messagesContainer = document.getElementById('messagesContainer');
+                    const p = document.createElement('p');
+                    p.className = 'text-xs message-error p-1.5 rounded';
+                    p.textContent = `Error reading file "${file.name}".`;
+                    messagesContainer.insertBefore(p, messagesContainer.firstChild);
+                };
+                reader.readAsText(file);
+            }
+            event.target.value = null; // Reset file input to allow re-upload of the same file
+        });
+
+        document.getElementById('flattenButton').addEventListener('click', () => {
+            const jsonInputString = document.getElementById('jsonInput').value;
+            const outputContainer = document.getElementById('outputContainer');
+            const messagesContainer = document.getElementById('messagesContainer'); // Cleared in flattenRelationalEntryInternal
+
+            outputContainer.innerHTML = ''; 
+
+            if (!jsonInputString.trim()) {
+                const p = document.createElement('p');
+                p.className = 'text-xs message-warning p-1.5 rounded';
+                p.textContent = 'JSON input is empty.';
+                // Prepend to messages so it's visible if other messages are also cleared
+                messagesContainer.insertBefore(p, messagesContainer.firstChild);
+                return;
+            }
+            
+            const result = flattenRelationalEntryInternal(jsonInputString);
+
+            if (result.error) {
+                // Error messages are already handled by flattenRelationalEntryInternal via messagesContainer
+                // but we can add a general error display in output if needed
+                // For now, relying on messagesContainer is cleaner.
+            } else {
+                const csvOutputs = result;
+                let tableCount = 0;
+                for (const tableName in csvOutputs) {
+                    tableCount++;
+                    const csvString = csvOutputs[tableName];
+                    
+                    const details = document.createElement('details');
+                    details.className = 'card p-3 rounded-lg shadow-lg transition-all duration-200 ease-in-out';
+                    details.open = true;
+
+                    const summary = document.createElement('summary');
+                    summary.className = 'text-base font-semibold text-sky-400 cursor-pointer hover:text-sky-300 flex justify-between items-center font-heading';
+                    summary.innerHTML = `<span>Table: ${tableName}</span>`;
+                    
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.className = 'mt-2.5';
+
+                    const pre = document.createElement('pre');
+                    pre.className = 'bg-slate-800 p-2 border border-slate-700 rounded text-xs overflow-x-auto max-h-60 shadow-inner';
+                    pre.textContent = csvString;
+
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'btn-success mt-2.5 font-semibold py-1.5 px-3 rounded text-xs shadow transform hover:scale-105';
+                    downloadBtn.textContent = `Download ${tableName}.csv`;
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation(); 
+                        downloadCSVInternal(csvString, `${tableName}.csv`);
+                    };
+                    
+                    contentWrapper.appendChild(pre);
+                    contentWrapper.appendChild(downloadBtn);
+                    details.appendChild(summary);
+                    details.appendChild(contentWrapper);
+                    outputContainer.appendChild(details);
+                }
+                if (tableCount === 0 && !document.querySelector('#messagesContainer .message-error')) {
+                     const p = document.createElement('p');
+                     p.className = 'text-xs message-warning p-1.5 rounded';
+                     p.textContent = 'Processing complete, no tables generated. Input might be empty or only null values.';
+                     messagesContainer.appendChild(p);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
