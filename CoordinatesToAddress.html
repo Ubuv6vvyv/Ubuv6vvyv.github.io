@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Coordinate to Address</title>
+    <style>
+        #coordinates, #results {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        #submit, #download-tsv, #download-csv {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        #error {
+            color: red;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Coordinate to Address</h1>
+    <textarea id="coordinates" placeholder="Enter coordinates (e.g., -37.78559620252012, 144.96932282550418)"></textarea>
+    <button id="submit">Get Addresses</button>
+    <div id="error"></div>
+    <textarea id="results" placeholder="Addresses will appear here" readonly></textarea>
+    <button id="download-tsv">Download as TSV</button>
+    <button id="download-csv">Download as CSV</button>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places&callback=initMap" async defer></script>
+    <script>
+        let geocoder;
+        let sortedData = [];
+
+        function initMap() {
+            geocoder = new google.maps.Geocoder();
+            const submitButton = document.getElementById("submit");
+            const errorDiv = document.getElementById("error");
+            const resultsArea = document.getElementById("results");
+
+            submitButton.addEventListener("click", function() {
+                errorDiv.textContent = "";
+                resultsArea.value = "";
+                sortedData = [];
+                const coordinates = document.getElementById("coordinates").value.trim();
+                
+                if (!coordinates) {
+                    errorDiv.textContent = "Please enter at least one coordinate pair.";
+                    return;
+                }
+
+                const coordinateArray = coordinates.split("\n");
+                const promises = [];
+
+                coordinateArray.forEach((coordinate, index) => {
+                    const latLng = coordinate.trim().split(",");
+                    if (latLng.length === 2) {
+                        const lat = parseFloat(latLng[0].trim());
+                        const lng = parseFloat(latLng[1].trim());
+
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            promises.push(new Promise((resolve) => {
+                                geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                                    if (status === "OK" && results[0]) {
+                                        const address = results[0].formatted_address;
+                                        let postcode = '9999';
+                                        for (const component of results[0].address_components) {
+                                            if (component.types.includes('postal_code')) {
+                                                postcode = component.short_name;
+                                                break;
+                                            }
+                                        }
+                                        resolve({lat, lng, address, postcode});
+                                    } else {
+                                        resolve({lat, lng, address: 'Not found', postcode: '9999'});
+                                    }
+                                });
+                            }));
+                        } else {
+                            promises.push(Promise.resolve({lat: latLng[0].trim(), lng: latLng[1].trim(), address: 'Invalid coordinates', postcode: '9999'}));
+                        }
+                    }
+                });
+
+                Promise.all(promises).then((results) => {
+                    // Display in original order: Latitude, Longitude, Full Address
+                    resultsArea.value = results.map(item => `${item.lat}, ${item.lng}, ${item.address}`).join('\n');
+                    // Sort for downloads by postcode
+                    sortedData = [...results].sort((a, b) => a.postcode.localeCompare(b.postcode, undefined, {numeric: true}));
+                }).catch((error) => {
+                    errorDiv.textContent = "Error fetching addresses: " + error.message;
+                });
+            });
+
+            document.getElementById("download-tsv").addEventListener("click", function() {
+                if (sortedData.length === 0) {
+                    alert("No data to download. Please get addresses first.");
+                    return;
+                }
+                const header = "Latitude\tLongitude\tAddress";
+                const content = sortedData.map(item => `${item.lat}\t${item.lng}\t${item.address}`).join('\n');
+                const blob = new Blob([header + '\n' + content], {type: 'text/tab-separated-values'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'addresses.tsv';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            document.getElementById("download-csv").addEventListener("click", function() {
+                if (sortedData.length === 0) {
+                    alert("No data to download. Please get addresses first.");
+                    return;
+                }
+                const header = "Latitude,Longitude,Address";
+                const content = sortedData.map(item => `"${item.lat}","${item.lng}","${item.address.replace(/"/g, '""')}"`).join('\n');
+                const blob = new Blob([header + '\n' + content], {type: 'text/csv'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'addresses.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+    </script>
+</body>
+</html>
