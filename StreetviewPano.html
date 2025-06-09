@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <!-- Ensure proper scaling on mobile devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Street View Panorama Stitcher</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:400,700,300" rel="stylesheet">
@@ -13,153 +12,151 @@
         padding: 0;
         box-sizing: border-box;
       }
+      html, body {
+        height: 100%;
+        overflow: hidden; /* Prevent body scroll on mobile */
+      }
       body {
-        font: 14px/1.6 'Roboto', tahoma, sans-serif;
+        font: 13px/1.5 'Roboto', tahoma, sans-serif; /* Reduced base font size */
         background-color: #f7f7f7;
-        padding: 20px;
         color: #333;
+        display: flex;
+        flex-direction: column;
       }
       section {
+        width: 100%;
         max-width: 800px;
         margin: 0 auto;
         background-color: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 10px; /* Reduced padding */
+        box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        height: 100%; /* Make section take full height */
       }
       h1, h2 {
-        margin-bottom: 1em;
+        margin-bottom: 0.5em; /* Reduced margin */
+        font-size: 1.2em;
         text-align: center;
         color: #444;
       }
+      h1 { font-size: 1.4em; }
       form {
-        margin-bottom: 1em;
+        margin-bottom: 0.5em; /* Reduced margin */
         text-align: center;
+        display: flex;
+        justify-content: center;
       }
       input[type="text"] {
-        width: 80%;
-        padding: 8px;
+        width: 75%;
+        padding: 6px; /* Reduced padding */
         border: 1px solid #ccc;
         border-radius: 4px;
       }
       input[type="submit"] {
-        padding: 8px;
-        width: 18%;
+        padding: 6px 8px; /* Reduced padding */
+        width: auto;
         border: none;
         background-color: #4285F4;
         color: #fff;
         border-radius: 4px;
         cursor: pointer;
+        margin-left: 5px;
       }
       input[type="submit"]:hover {
         background-color: #357ae8;
       }
       #progressDiv, #messageDiv, #errorDiv, #addressOutput {
-        margin: 10px 0;
+        margin: 5px 0; /* Reduced margin */
         text-align: center;
         font-weight: bold;
+        font-size: 0.9em;
       }
-      #errorDiv {
-        color: #d32f2f;
-      }
+      #errorDiv { color: #d32f2f; }
       #canvasContainer {
-        margin-top: 20px;
+        flex-grow: 1; /* Allows container to fill available space */
         position: relative;
         border: 1px solid #ddd;
         border-radius: 8px;
         overflow: hidden;
         background-color: #eee;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+        min-height: 150px; /* Ensure a minimum height */
       }
-      /* Control buttons container */
-      #controlButtons, #navButtons {
+      #canvasContainer canvas {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain; /* Ensures panorama fits without being squashed */
+      }
+      /* Consolidated & Condensed Button Controls */
+      #controlButtons {
         margin-top: 10px;
         text-align: center;
+        display: flex;
+        flex-wrap: wrap; /* Allow buttons to wrap on small screens */
+        gap: 5px; /* Space between buttons */
+        justify-content: center;
       }
-      #controlButtons button, #navButtons button {
-        margin: 5px;
-        padding: 10px 16px;
-        font-size: 14px;
+      #controlButtons button {
+        padding: 8px 10px; /* Reduced padding */
+        font-size: 12px; /* Reduced font size */
         background-color: #4285F4;
         color: #fff;
         border: none;
         border-radius: 4px;
         cursor: pointer;
         transition: background-color 0.2s;
+        flex-grow: 1; /* Allow buttons to grow and fill space */
+        flex-basis: 100px; /* Minimum width before wrapping */
       }
-      #controlButtons button:hover, #navButtons button:hover {
+      #controlButtons button:hover {
         background-color: #357ae8;
       }
-      /* Responsive styling for mobile portrait devices */
-      @media (max-width: 600px) {
-        section {
-          width: 100%;
-          padding: 10px;
-        }
-        input[type="text"] {
-          width: 70%;
-        }
-        input[type="submit"] {
-          width: 25%;
-        }
-        #canvasContainer canvas {
-          width: 100%;
-          height: auto;
-        }
-        #controlButtons button, #navButtons button {
-          font-size: 12px;
-          padding: 8px 12px;
-        }
-      }
+      /* Hide unnecessary navButtons container */
+      #navButtons { display: none; }
     </style>
   </head>
   <body>
     <section>
-      <h1>Google Street View Panorama Stitcher</h1>
-      
-      <div id="formSection">
-        <!-- Form to load via a Street View URL or panoId -->
+      <h1>Street View Stitcher</h1> <div id="formSection">
         <div class="inputGroup">
-          <h2>Load via Street View URL / panoId</h2>
+          <h2>Load by URL/PanoID or Search Address</h2>
           <form id="URLForm">
-            <input type="text" id="URLInput" placeholder="Enter full Street View URL or panoId">
-            <input type="submit" value="Load URL">
+            <input type="text" id="URLInput" placeholder="Enter Street View URL or panoId">
+            <input type="submit" value="Load">
           </form>
         </div>
-        <!-- Form to search for an address (with autocomplete) -->
         <div class="inputGroup">
-          <h2>Or Search by Address</h2>
           <form id="addressForm">
             <input type="text" id="addressInput" placeholder="Enter an address">
-            <input type="submit" value="Search Address">
+            <input type="submit" value="Search">
           </form>
         </div>
       </div>
       
-      <!-- Status and address output -->
       <div id="progressDiv">Status messages will appear here.</div>
       <div id="messageDiv"></div>
       <div id="errorDiv"></div>
       <div id="addressOutput"></div>
       
-      <!-- Container for rendered panorama -->
+      <div id="controlButtons"></div>
+      
       <div id="canvasContainer"></div>
       
-      <!-- Control and navigation buttons (always visible) -->
-      <div id="controlButtons"></div>
-      <div id="navButtons"></div>
     </section>
 
-    <!-- Load Google Maps API with Places library using your API key -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places"></script>
     <script>
+    // --- Start of IIFE to encapsulate code ---
+    (function() {
       /****************************************************************
        * Global Variables and Initialization
        ****************************************************************/
       let currentPanoData = null;
-      // Persist current movement direction (in degrees)
-      let currentMovementDirection = null;
+      let currentMovementDirection = null; // Persist movement direction (in degrees)
       const streetViewService = new google.maps.StreetViewService();
       const geocoder = new google.maps.Geocoder();
 
@@ -167,13 +164,13 @@
        * Helper: Extract a panoId from a full Street View URL.
        ****************************************************************/
       function getIdFromURL(url) {
-        const match = url.match(/!3m3!1s([^!]+)/);
-        return match && match[1] ? match[1] : url;
+        // Updated regex to be more robust and find panoId in common URL formats
+        const match = url.match(/!1s([^!]+)|pano=([^&]+)/);
+        return match ? (match[1] || match[2]) : url;
       }
 
       /****************************************************************
        * Class: GoogleStreetViewLoader
-       * Fetches and stitches Street View tiles into a full panorama.
        ****************************************************************/
       class GoogleStreetViewLoader {
         constructor() {
@@ -185,17 +182,14 @@
         onProgress(callback) {
           this.progressCallback = callback;
         }
-        loadTile(panoId, zoom, x, y, tileSize) {
+        loadTile(panoId, zoom, x, y) {
           return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = "Anonymous";
             img.onload = () => resolve({ img, x, y });
-            img.onerror = () => reject(new Error("Failed to load tile at x:" + x + " y:" + y));
-            const subdomain = "cbk" + Math.floor(Math.random() * 4);
-            img.src = "https://" + subdomain + ".google.com/cbk?output=tile&panoid=" + panoId +
-                      "&zoom=" + zoom +
-                      "&x=" + x +
-                      "&y=" + y;
+            img.onerror = () => reject(new Error(`Failed to load tile at x:${x} y:${y}`));
+            // Use a consistent subdomain to improve browser caching
+            img.src = `https://cbk0.google.com/cbk?output=tile&panoid=${panoId}&zoom=${zoom}&x=${x}&y=${y}`;
           });
         }
         async load(panoId, zoom) {
@@ -204,12 +198,14 @@
           const tilesY = Math.pow(2, zoom - 1);
           const totalTiles = tilesX * tilesY;
           let loadedTiles = 0;
+
           this.canvas.width = tilesX * TILE_SIZE;
           this.canvas.height = tilesY * TILE_SIZE;
+          
           const tilePromises = [];
           for (let y = 0; y < tilesY; y++) {
             for (let x = 0; x < tilesX; x++) {
-              let promise = this.loadTile(panoId, zoom, x, y, TILE_SIZE)
+              let promise = this.loadTile(panoId, zoom, x, y)
                 .then(tile => {
                   this.ctx.drawImage(tile.img, tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                   loadedTiles++;
@@ -229,23 +225,14 @@
       /****************************************************************
        * UI Helper Functions
        ****************************************************************/
-      function showProgress(message) {
-        document.getElementById("progressDiv").innerText = message;
-      }
-      function showMessage(message) {
-        document.getElementById("messageDiv").innerText = message;
-      }
-      function showError(message) {
-        document.getElementById("errorDiv").innerText = message;
-      }
-      function clearCanvas() {
-        document.getElementById("canvasContainer").innerHTML = "";
-      }
-      function updateAddressOutput(address) {
-        document.getElementById("addressOutput").innerText = "Current location: " + address;
-      }
+      function showProgress(message) { document.getElementById("progressDiv").innerText = message; }
+      function showMessage(message) { document.getElementById("messageDiv").innerText = message; }
+      function showError(message) { document.getElementById("errorDiv").innerText = message; }
+      function clearCanvas() { document.getElementById("canvasContainer").innerHTML = ""; }
+      function updateAddressOutput(address) { document.getElementById("addressOutput").innerText = `Location: ${address}`; }
+      
       function displayAddress(latlng) {
-        geocoder.geocode({ location: latlng }, function(results, status) {
+        geocoder.geocode({ location: latlng }, (results, status) => {
           if (status === "OK" && results[0]) {
             updateAddressOutput(results[0].formatted_address);
           } else {
@@ -255,40 +242,43 @@
       }
 
       /****************************************************************
-       * Movement Functions: Step Forward, Step Backward, and Next Street
-       * A persistent global (currentMovementDirection) is maintained.
+       * Movement Functions
        ****************************************************************/
       function initMovementDirection() {
-        if (currentPanoData) {
-          if (currentPanoData.pov && typeof currentPanoData.pov.heading === "number") {
+        if (!currentPanoData) return;
+        // Prioritize the Point of View (POV) heading if available
+        if (currentPanoData.pov && typeof currentPanoData.pov.heading === 'number') {
             currentMovementDirection = currentPanoData.pov.heading;
-          } else if (currentPanoData.links && currentPanoData.links.length > 0) {
+        } else if (currentPanoData.links && currentPanoData.links.length > 0) {
             currentMovementDirection = currentPanoData.links[0].heading;
-          } else {
-            currentMovementDirection = 0;
-          }
+        } else {
+            currentMovementDirection = 0; // Default if no other info
         }
       }
 
-      function moveForward() {
-        if (!currentPanoData) return;
-        if (currentMovementDirection === null) {
-          initMovementDirection();
-        }
-        const target = currentMovementDirection;
+      function findBestLink(targetHeading) {
+        if (!currentPanoData || !currentPanoData.links) return null;
         let bestLink = null;
-        let bestDiff = Infinity;
+        let bestDiff = 180; // Max possible difference is 180
         currentPanoData.links.forEach(link => {
-          let diff = Math.abs(target - link.heading);
+          let diff = Math.abs(targetHeading - link.heading) % 360;
           diff = diff > 180 ? 360 - diff : diff;
           if (diff < bestDiff) {
             bestDiff = diff;
             bestLink = link;
           }
         });
+        return bestLink;
+      }
+
+      function moveForward() {
+        if (!currentPanoData) return;
+        if (currentMovementDirection === null) initMovementDirection();
+        
+        const bestLink = findBestLink(currentMovementDirection);
         if (bestLink) {
-          currentMovementDirection = bestLink.heading;
-          updatePanoramaById(bestLink.pano, 3, () => loadNearby());
+          currentMovementDirection = bestLink.heading; // Maintain new direction
+          updatePanoramaById(bestLink.pano, 3, loadNearby);
         } else {
           showError("No forward movement available.");
         }
@@ -296,158 +286,97 @@
 
       function moveBackward() {
         if (!currentPanoData) return;
-        if (currentMovementDirection === null) {
-          initMovementDirection();
-        }
-        // Reverse the current movement direction (add 180°)
-        const target = (currentMovementDirection + 180) % 360;
-        let bestLink = null;
-        let bestDiff = Infinity;
-        currentPanoData.links.forEach(link => {
-          let diff = Math.abs(target - link.heading);
-          diff = diff > 180 ? 360 - diff : diff;
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestLink = link;
-          }
-        });
+        if (currentMovementDirection === null) initMovementDirection();
+
+        const target = (currentMovementDirection + 180) % 360; // Opposite direction
+        const bestLink = findBestLink(target);
         if (bestLink) {
-          currentMovementDirection = bestLink.heading;
-          updatePanoramaById(bestLink.pano, 3, () => loadNearby());
+          // When moving backward, we adopt the heading of the link we are moving to,
+          // but our conceptual "forward" is the reverse of that link's direction.
+          currentMovementDirection = bestLink.heading; 
+          updatePanoramaById(bestLink.pano, 3, loadNearby);
         } else {
           showError("No backward movement available.");
         }
       }
-
+      
       function nextStreet() {
         if (!currentPanoData) return;
-        if (currentMovementDirection === null) {
-          initMovementDirection();
-        }
-        // Choose a link that deviates significantly (e.g., >45°) from currentMovementDirection
-        let candidate = null;
-        currentPanoData.links.forEach(link => {
-          let diff = Math.abs(currentMovementDirection - link.heading);
-          diff = diff > 180 ? 360 - diff : diff;
-          if (diff > 45) {
-            candidate = link;
-          }
+        if (currentMovementDirection === null) initMovementDirection();
+
+        // Find a link that deviates significantly (e.g., > 45°)
+        const candidate = currentPanoData.links.find(link => {
+            let diff = Math.abs(currentMovementDirection - link.heading) % 360;
+            diff = diff > 180 ? 360 - diff : diff;
+            return diff > 45 && diff < 135; // Aim for perpendicular streets
         });
+
         if (candidate) {
           currentMovementDirection = candidate.heading;
-          updatePanoramaById(candidate.pano, 3, () => loadNearby());
+          updatePanoramaById(candidate.pano, 3, loadNearby);
         } else {
           showError("No next street available.");
         }
       }
 
       /****************************************************************
-       * Create Control Buttons: Download, Step Forward, Step Backward,
-       * Next Street, Random Melbourne, and Random Global.
+       * Create Control Buttons (Consolidated)
        ****************************************************************/
       function createControlButtons() {
-        let controlDiv = document.getElementById("controlButtons");
-        if (!controlDiv) {
-          controlDiv = document.createElement("div");
-          controlDiv.id = "controlButtons";
-          document.getElementById("canvasContainer").appendChild(controlDiv);
-        }
-        controlDiv.innerHTML = "";
-        // Download Button
-        let downloadButton = document.createElement("button");
-        downloadButton.innerText = "Download Image";
-        downloadButton.addEventListener("click", function() {
-          let canvas = document.querySelector("#canvasContainer canvas");
-          if (canvas) {
-            let dataURL = canvas.toDataURL("image/jpeg", 0.8);
-            let a = document.createElement("a");
-            a.href = dataURL;
-            a.download = "panorama.jpg";
-            a.click();
-          }
+        const controlDiv = document.getElementById("controlButtons");
+        controlDiv.innerHTML = ""; // Clear existing buttons
+
+        const addButton = (text, onClick) => {
+            const button = document.createElement("button");
+            button.innerText = text;
+            button.addEventListener("click", onClick);
+            controlDiv.appendChild(button);
+        };
+        
+        // Add all buttons
+        addButton("Download", () => {
+            const canvas = document.querySelector("#canvasContainer canvas");
+            if (canvas) {
+                const a = document.createElement("a");
+                a.href = canvas.toDataURL("image/jpeg", 0.9); // Slightly higher quality
+                a.download = `panorama_${currentPanoData?.location?.pano || 'image'}.jpg`;
+                a.click();
+            }
         });
-        controlDiv.appendChild(downloadButton);
-        // Movement Buttons
-        let forwardButton = document.createElement("button");
-        forwardButton.innerText = "Step Forward";
-        forwardButton.addEventListener("click", moveForward);
-        controlDiv.appendChild(forwardButton);
-        let backwardButton = document.createElement("button");
-        backwardButton.innerText = "Step Backward";
-        backwardButton.addEventListener("click", moveBackward);
-        controlDiv.appendChild(backwardButton);
-        let nextStreetButton = document.createElement("button");
-        nextStreetButton.innerText = "Next Street";
-        nextStreetButton.addEventListener("click", nextStreet);
-        controlDiv.appendChild(nextStreetButton);
-        // Random Location Buttons
-        let randomMelbourneButton = document.createElement("button");
-        randomMelbourneButton.innerText = "Random Melbourne Location";
-        randomMelbourneButton.addEventListener("click", loadRandomMelbourne);
-        controlDiv.appendChild(randomMelbourneButton);
-        let randomGlobalButton = document.createElement("button");
-        randomGlobalButton.innerText = "Random Global Location";
-        randomGlobalButton.addEventListener("click", loadRandomGlobal);
-        controlDiv.appendChild(randomGlobalButton);
+        addButton("Step Forward", moveForward);
+        addButton("Step Backward", moveBackward);
+        addButton("Next Street", nextStreet);
+        addButton("Random Melbourne", loadRandomMelbourne);
+        addButton("Random Global", loadRandomGlobal);
       }
-
+      
       /****************************************************************
-       * Create Navigation Buttons (Alternate UI: persistent forward/backward)
-       ****************************************************************/
-      function createNavigationButtons() {
-        let navContainer = document.getElementById("navButtons");
-        if (!navContainer) {
-          navContainer = document.createElement("div");
-          navContainer.id = "navButtons";
-          document.getElementById("canvasContainer").appendChild(navContainer);
-        }
-        navContainer.innerHTML = "";
-        let forwardBtn = document.createElement("button");
-        forwardBtn.innerText = "Step Forward";
-        forwardBtn.addEventListener("click", moveForward);
-        navContainer.appendChild(forwardBtn);
-        let backwardBtn = document.createElement("button");
-        backwardBtn.innerText = "Step Backward";
-        backwardBtn.addEventListener("click", moveBackward);
-        navContainer.appendChild(backwardBtn);
-      }
-
-      /****************************************************************
-       * Helper: Get a nearby LatLng (small random offset) from an existing one.
+       * Panorama Loading Logic
        ****************************************************************/
       function getNearbyLatLng(latlng) {
-        const offsetLat = (Math.random() - 0.5) * 0.002;
-        const offsetLng = (Math.random() - 0.5) * 0.002;
+        const offset = 0.005; // Slightly larger offset for better results
+        const offsetLat = (Math.random() - 0.5) * offset;
+        const offsetLng = (Math.random() - 0.5) * offset;
         return { lat: latlng.lat + offsetLat, lng: latlng.lng + offsetLng };
       }
+
       function loadNearby() {
         if (currentPanoData && currentPanoData.location && currentPanoData.location.latLng) {
-          const nearby = getNearbyLatLng(currentPanoData.location.latLng);
+          const nearby = getNearbyLatLng(currentPanoData.location.latLng.toJSON());
           loadPanoramaAtLatLng(nearby, 3, loadNearby);
         }
       }
-
-      /****************************************************************
-       * Load Panorama by panoId with an optional retry callback.
-       ****************************************************************/
+      
       async function loadPanoramaById(panoId, zoom = 3, retryCallback) {
-        showProgress("Loading panorama for panoId: " + panoId);
+        showProgress(`Loading panorama: ${panoId}`);
         const loader = new GoogleStreetViewLoader();
-        loader.onProgress((p) => {
-          showProgress("Loaded " + p.toFixed(0) + "%");
-        });
+        loader.onProgress(p => showProgress(`Loading... ${p.toFixed(0)}%`));
         try {
           await loader.load(panoId, zoom);
-          showProgress("Finished loading panorama.");
+          showProgress("Finished loading.");
           clearCanvas();
           document.getElementById("canvasContainer").appendChild(loader.canvas);
-          showMessage("Panorama loaded. " + loader.metadata.copyright);
-          // Initialize movement direction if not set
-          if (currentMovementDirection === null) {
-            initMovementDirection();
-          }
-          createControlButtons();
-          createNavigationButtons();
+          showMessage(`Panorama loaded. ${loader.metadata.copyright}`);
         } catch (e) {
           showError(e.message);
           if (typeof retryCallback === "function") {
@@ -457,45 +386,33 @@
         }
       }
 
-      /****************************************************************
-       * Update Panorama by fetching panorama data and then loading it.
-       * Accepts an optional retry callback.
-       ****************************************************************/
       function updatePanoramaById(panoId, zoom = 3, retryCallback) {
-        showProgress("Fetching panorama data for panoId: " + panoId);
-        streetViewService.getPanorama({ pano: panoId }, function(data, status) {
+        showProgress(`Fetching data for panoId: ${panoId}`);
+        streetViewService.getPanorama({ pano: panoId }, (data, status) => {
           if (status === "OK" && data && data.location && data.location.pano) {
             currentPanoData = data;
-            // Set persistent movement direction if not already set
             if (currentMovementDirection === null) {
               initMovementDirection();
             }
             loadPanoramaById(data.location.pano, zoom, retryCallback);
-            createNavigationButtons();
             displayAddress(data.location.latLng);
           } else {
-            showError("Could not fetch panorama data for panoId: " + panoId);
-            if (typeof retryCallback === "function") {
-              retryCallback();
-            }
+            showError(`Could not fetch data for panoId: ${panoId}`);
+            if (typeof retryCallback === "function") retryCallback();
           }
         });
       }
 
-      /****************************************************************
-       * Load panorama at a given LatLng with an optional retry callback.
-       ****************************************************************/
       function loadPanoramaAtLatLng(latlng, zoom = 3, retryCallback) {
-        showProgress("Loading panorama at location...");
-        streetViewService.getPanorama({ location: latlng, radius: 50 }, function(data, status) {
+        showProgress("Searching for Street View...");
+        streetViewService.getPanorama({ location: latlng, radius: 50, source: 'outdoor' }, (data, status) => {
           if (status === "OK" && data && data.location && data.location.pano) {
             currentPanoData = data;
             updatePanoramaById(data.location.pano, zoom, retryCallback);
-            createNavigationButtons();
             displayAddress(data.location.latLng);
           } else {
             if (typeof retryCallback === "function") {
-              showMessage("No Street View found. Trying another location...");
+              showMessage("No Street View found. Trying another nearby location...");
               retryCallback();
             } else {
               showError("No Street View panorama found at this location.");
@@ -505,107 +422,85 @@
       }
 
       /****************************************************************
-       * Random Location Functions:
-       * - getRandomMelbourneLatLng() for Melbourne CBD.
-       * - getRandomGlobalLatLng() for one of the top 10 global cities.
+       * Random Location Functions
        ****************************************************************/
       function getRandomMelbourneLatLng() {
-        const minLat = -37.835, maxLat = -37.795;
-        const minLng = 144.942, maxLng = 144.988;
-        const lat = minLat + Math.random() * (maxLat - minLat);
-        const lng = minLng + Math.random() * (maxLng - minLng);
+        const bounds = { minLat: -37.835, maxLat: -37.795, minLng: 144.942, maxLng: 144.988 };
+        const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
+        const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
         return { lat, lng };
       }
       function getRandomGlobalLatLng() {
         const globalCities = [
-          { name: "New York City, USA", minLat: 40.70, maxLat: 40.87, minLng: -74.02, maxLng: -73.93 },
-          { name: "London, UK", minLat: 51.50, maxLat: 51.52, minLng: -0.15, maxLng: -0.10 },
-          { name: "Tokyo, Japan", minLat: 35.68, maxLat: 35.70, minLng: 139.75, maxLng: 139.77 },
-          { name: "Paris, France", minLat: 48.85, maxLat: 48.87, minLng: 2.33, maxLng: 2.35 },
-          { name: "Hong Kong, China", minLat: 22.28, maxLat: 22.31, minLng: 114.15, maxLng: 114.18 },
-          { name: "Singapore", minLat: 1.28, maxLat: 1.30, minLng: 103.84, maxLng: 103.86 },
-          { name: "Sydney, Australia", minLat: -33.87, maxLat: -33.85, minLng: 151.20, maxLng: 151.22 },
-          { name: "Dubai, UAE", minLat: 25.20, maxLat: 25.22, minLng: 55.27, maxLng: 55.29 },
-          { name: "Berlin, Germany", minLat: 52.51, maxLat: 52.53, minLng: 13.37, maxLng: 13.40 },
-          { name: "Shanghai, China", minLat: 31.22, maxLat: 31.24, minLng: 121.45, maxLng: 121.47 }
+            { name: "New York", lat: 40.7128, lng: -74.0060 }, { name: "London", lat: 51.5074, lng: -0.1278 },
+            { name: "Tokyo", lat: 35.6895, lng: 139.6917 }, { name: "Paris", lat: 48.8566, lng: 2.3522 },
+            { name: "Sydney", lat: -33.8688, lng: 151.2093 }, { name: "Rome", lat: 41.9028, lng: 12.4964 },
+            { name: "Rio de Janeiro", lat: -22.9068, lng: -43.1729 }, { name: "Hong Kong", lat: 22.3193, lng: 114.1694 }
         ];
-        const city = globalCities[Math.floor(Math.random() * globalCities.length)];
-        const lat = city.minLat + Math.random() * (city.maxLat - city.minLat);
-        const lng = city.minLng + Math.random() * (city.maxLng - city.minLng);
-        return { lat, lng };
+        // Pick a random city center and find a pano nearby
+        return globalCities[Math.floor(Math.random() * globalCities.length)];
       }
       function loadRandomMelbourne() {
-        const randomLatLng = getRandomMelbourneLatLng();
-        loadPanoramaAtLatLng(randomLatLng, 3, loadRandomMelbourne);
+        loadPanoramaAtLatLng(getRandomMelbourneLatLng(), 3, loadRandomMelbourne);
       }
       function loadRandomGlobal() {
-        const randomLatLng = getRandomGlobalLatLng();
-        loadPanoramaAtLatLng(randomLatLng, 3, loadRandomGlobal);
+        loadPanoramaAtLatLng(getRandomGlobalLatLng(), 3, loadRandomGlobal);
       }
 
       /****************************************************************
-       * Search for Panorama by Address.
+       * Event Listeners and Initializer
        ****************************************************************/
-      function searchPanoramaByLocation(address) {
-        showProgress("Searching for panorama at location: " + address);
-        geocoder.geocode({ address: address }, function (results, status) {
-          if (status === "OK" && results[0]) {
-            const latlng = results[0].geometry.location;
-            loadPanoramaAtLatLng(latlng, 3);
+      function initialize() {
+        document.getElementById("URLForm").addEventListener("submit", e => {
+          e.preventDefault();
+          const url = document.getElementById("URLInput").value.trim();
+          if (url) updatePanoramaById(getIdFromURL(url), 3, loadNearby);
+          else showError("Please enter a Street View URL or panoId.");
+        });
+
+        document.getElementById("addressForm").addEventListener("submit", e => {
+          e.preventDefault();
+          const address = document.getElementById("addressInput").value.trim();
+          if (address) {
+              geocoder.geocode({ address }, (results, status) => {
+                  if (status === "OK" && results[0]) {
+                      loadPanoramaAtLatLng(results[0].geometry.location, 3);
+                  } else {
+                      showError(`Geocoding failed: ${status}`);
+                  }
+              });
           } else {
-            showError("Geocoding failed: " + status);
+              showError("Please enter an address.");
           }
         });
-      }
 
-      /****************************************************************
-       * Event Listeners for Forms.
-       ****************************************************************/
-      document.getElementById("URLForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        const url = document.getElementById("URLInput").value.trim();
-        if (url) {
-          const panoId = getIdFromURL(url);
-          updatePanoramaById(panoId, 3, loadNearby);
-        } else {
-          showError("Please enter a Street View URL or panoId.");
-        }
-      });
-      document.getElementById("addressForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        const address = document.getElementById("addressInput").value.trim();
-        if (address) {
-          searchPanoramaByLocation(address);
-        } else {
-          showError("Please enter an address.");
-        }
-      });
-      const addressInput = document.getElementById("addressInput");
-      const autocomplete = new google.maps.places.Autocomplete(addressInput);
+        const autocomplete = new google.maps.places.Autocomplete(document.getElementById("addressInput"));
 
-      /****************************************************************
-       * On Page Load: Immediately show progress and attempt to get geolocation.
-       * Always ensure control buttons are visible.
-       ****************************************************************/
-      window.addEventListener("load", function() {
-        showProgress("Getting your current location...");
+        // Initial Load
         createControlButtons(); // Always display control buttons
+        showProgress("Getting your location...");
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
-            function(position) {
+            position => {
               const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
-              loadPanoramaAtLatLng(latlng, 3, loadNearby);
+              loadPanoramaAtLatLng(latlng, 3, loadRandomMelbourne); // Fallback to Melbourne if local fails
             },
-            function(error) {
-              showError("Could not determine your location. Please enter your start address. Defaulting to a random location in Melbourne CBD.");
+            () => {
+              showError("Could not get your location. Defaulting to Melbourne.");
               loadRandomMelbourne();
             }
           );
         } else {
-          showError("Geolocation is not supported by your browser. Please enter your start address. Defaulting to a random location in Melbourne CBD.");
+          showError("Geolocation not supported. Defaulting to Melbourne.");
           loadRandomMelbourne();
         }
-      });
+      }
+      
+      // Run the initializer when the window loads
+      window.addEventListener("load", initialize);
+
+    // --- End of IIFE ---
+    })();
     </script>
   </body>
 </html>
