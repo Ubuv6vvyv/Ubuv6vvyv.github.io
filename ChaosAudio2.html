@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Vocal Synthesizer v2.0</title>
+    <style>
+        :root {
+            --bg-color: #1e2d3b;
+            --surface-color: #2c3e50;
+            --primary-color: #4ecdc4;
+            --on-surface-color: #ecf0f1;
+            --on-surface-variant-color: #bdc3c7;
+            --border-color: #34495e;
+            --off-color: #263849;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--on-surface-color);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin: 0;
+            padding: 10px 5px;
+            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+            min-height: 100vh;
+        }
+        #app-container {
+            width: 100%;
+            max-width: 380px;
+            padding: 8px;
+            background-color: var(--surface-color);
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+        }
+        .control-group {
+            padding: 10px;
+        }
+        .control-group:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+        .label {
+            font-size: 0.65em;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--on-surface-variant-color);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .section-header { margin-bottom: 8px; display:flex; justify-content: space-between; align-items: center;}
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        input[type="range"] {
+            width: 100%; -webkit-appearance: none; appearance: none;
+            background: transparent; cursor: pointer; height: 14px; margin: 0;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: var(--bg-color);
+            height: 3px;
+            border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            margin-top: -5.5px;
+            background-color: var(--primary-color);
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            box-shadow: 0 0 6px var(--primary-color);
+        }
+        .button-container { display: flex; gap: 10px; }
+        button {
+            flex-grow: 1; padding: 10px; font-size: 0.8em; font-weight: 700;
+            border: none; border-radius: 8px; background-color: var(--primary-color);
+            color: #000; cursor: pointer; transition: transform 0.1s, background-color 0.2s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .toggle-btn {
+            background-color: var(--off-color); color: var(--on-surface-variant-color);
+            padding: 4px 8px; font-size: 0.7em; height:24px; flex-grow: 0;
+            min-width: 60px;
+        }
+        .toggle-btn.active {
+            background-color: var(--primary-color);
+            color: #000;
+            font-weight: 700;
+        }
+        .preset-buttons { display: flex; gap: 4px; margin-top: 8px; }
+        .preset-buttons button {
+            background-color: #333; color: var(--on-surface-variant-color);
+            font-size: 0.7em; padding: 6px; flex-grow:1;
+        }
+        .preset-buttons button.active {
+            background-color: var(--primary-color);
+            color: #000;
+            font-weight: 700;
+        }
+        .value-display { font-weight: 500; color: var(--on-surface-color); }
+        .hidden-section { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div class="control-group">
+        <div class="button-container">
+            <button id="startButton">START</button>
+            <button id="stopButton">STOP</button>
+        </div>
+        <label class="label"><span>Volume</span> <span class="value-display" id="masterGainValue">50%</span></label>
+        <input type="range" id="masterGain" min="0" max="1" step="0.01" value="0.5">
+    </div>
+
+    <div class="control-group grid-container">
+        <div>
+            <div class="label"><span>VOICE 1</span></div>
+            <label class="label"><span>Pitch</span> <span class="value-display" id="pitch1Value">110 Hz</span></label>
+            <input type="range" id="pitch-1" min="0" max="1000" step="1" value="250">
+            <label class="label"><span>Vowel</span> <span class="value-display" id="vowel1Value">Ah</span></label>
+            <input type="range" id="vowel-1" min="0" max="100" step="1" value="50">
+            <label class="label"><span>Breath</span> <span class="value-display" id="breath1Value">0%</span></label>
+            <input type="range" id="breath-1" min="0" max="0.2" step="0.001" value="0">
+            <div class="preset-buttons" id="wave-type-1">
+                <button class="active" data-wave="sawtooth">Full</button>
+                <button data-wave="square">Robotic</button>
+            </div>
+        </div>
+        <div>
+             <div class="section-header" style="margin-bottom:8px;">
+                <div class="label" style="margin-bottom:0;">VOICE 2</div>
+                <button class="toggle-btn" id="toggle-voice2">OFF</button>
+            </div>
+            <div id="voice-2-controls" class="hidden-section">
+                 <label class="label"><span>Pitch</span> <span class="value-display" id="pitch2Value">110 Hz</span></label>
+                <input type="range" id="pitch-2" min="0" max="1000" step="1" value="250">
+                <label class="label"><span>Vowel</span> <span class="value-display" id="vowel2Value">Ah</span></label>
+                <input type="range" id="vowel-2" min="0" max="100" step="1" value="50">
+                <label class="label"><span>Breath</span> <span class="value-display" id="breath2Value">0%</span></label>
+                <input type="range" id="breath-2" min="0" max="0.2" step="0.001" value="0">
+                <div class="preset-buttons" id="wave-type-2">
+                    <button class="active" data-wave="sawtooth">Full</button>
+                    <button data-wave="square">Robotic</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="control-group">
+        <div class="label">VOICE MIXER & SHAPING</div>
+        <label class="label"><span>Mix (1 ᐊ-► 2)</span> <span class="value-display" id="mixValue">50%</span></label>
+        <input type="range" id="mix" min="0" max="1" step="0.01" value="0.5">
+        <label class="label" style="margin-top:10px;"><span>Timbre / Gender</span> <span class="value-display" id="timbreValue">0%</span></label>
+        <input type="range" id="timbre" min="-50" max="50" step="1" value="0">
+        <label class="label"><span>Resonance</span> <span class="value-display" id="qValue">10.0</span></label>
+        <input type="range" id="q" min="1" max="30" step="0.1" value="10">
+        <label class="label" style="margin-top:10px;"><span>Breath Color</span> <span class="value-display" id="noiseFilterValue">High</span></label>
+        <input type="range" id="noise-filter" min="500" max="10000" step="50" value="5000">
+    </div>
+
+    <div class="control-group">
+        <div class="label">ARTICULATION</div>
+        <div class="grid-container">
+             <div>
+                <label class="label"><span>Wobble Speed</span> <span class="value-display" id="wobbleSpeedValue">5.0 Hz</span></label>
+                <input type="range" id="wobble-speed" min="0.1" max="20" step="0.1" value="5">
+            </div>
+            <div>
+                <label class="label"><span>Wobble Depth</span> <span class="value-display" id="wobbleDepthValue">10%</span></label>
+                <input type="range" id="wobble-depth" min="0" max="100" step="1" value="10">
+            </div>
+        </div>
+        <div class="section-header" style="margin:12px 0 8px 0;">
+             <div class="label" style="margin-bottom:0;">VOCAL WAH</div>
+            <button class="toggle-btn" id="toggle-wah">OFF</button>
+        </div>
+        <div id="wah-controls" class="hidden-section grid-container">
+            <div>
+                <label class="label"><span>Wah Speed</span> <span class="value-display" id="wahSpeedValue">1.0 Hz</span></label>
+                <input type="range" id="wah-speed" min="0.1" max="5" step="0.05" value="1.0">
+            </div>
+             <div>
+                <label class="label"><span>Wah Depth</span> <span class="value-display" id="wahDepthValue">20%</span></label>
+                <input type="range" id="wah-depth" min="0" max="100" step="1" value="20">
+            </div>
+        </div>
+        <label class="label" style="margin-top:12px;"><span>Fade In</span> <span class="value-display" id="attackValue">0.20 s</span></label>
+        <input type="range" id="attack" min="0.01" max="3" step="0.01" value="0.2">
+        <label class="label"><span>Fade Out</span> <span class="value-display" id="releaseValue">0.50 s</span></label>
+        <input type="range" id="release" min="0.01" max="3" step="0.01" value="0.5">
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- AUDIO CONTEXT AND NODE DECLARATIONS ---
+    let audioContext, masterGain, envelope;
+    let osc1, noiseSource1, noiseGain1, noiseFilter1, sourceMix1, formant1a, formant2a, formant3a, voice1Gain;
+    let osc2, noiseSource2, noiseGain2, noiseFilter2, sourceMix2, formant1b, formant2b, formant3b, voice2Gain;
+    let wobbleLFO, wobbleGain, wahLFO, wahGain;
+    let isPlaying = false, isAudioSetup = false;
+    const smoothTime = 0.01;
+
+    const minF = 50, maxF = 1000;
+    const logRange = Math.log(maxF / minF);
+    const convertToLog = (val, maxVal) => minF * Math.exp(logRange * val / maxVal);
+    
+    // --- FORMANT DATA (Expanded) ---
+    const vowels = {
+        'Oo': [300, 870, 2240], 'Oh': [500, 870, 2410], 'Er': [500, 1400, 2500],
+        'Ah': [730, 1090, 2440], 'Ae': [690, 1750, 2500], 'Ay': [520, 1840, 2480],
+        'Ee': [270, 2290, 3010]
+    };
+    const vowelKeys = Object.keys(vowels);
+
+    // --- INITIALIZATION ---
+    function initAudioEngine() {
+        if (isAudioSetup) return;
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        masterGain = audioContext.createGain();
+        envelope = audioContext.createGain();
+        envelope.connect(masterGain);
+        masterGain.connect(audioContext.destination);
+
+        // Voice 1 Nodes
+        osc1 = audioContext.createOscillator();
+        noiseSource1 = audioContext.createBufferSource();
+        noiseGain1 = audioContext.createGain();
+        noiseFilter1 = audioContext.createBiquadFilter();
+        sourceMix1 = audioContext.createGain();
+        formant1a = audioContext.createBiquadFilter();
+        formant2a = audioContext.createBiquadFilter();
+        formant3a = audioContext.createBiquadFilter();
+        voice1Gain = audioContext.createGain();
+        
+        // Voice 2 Nodes
+        osc2 = audioContext.createOscillator();
+        noiseSource2 = audioContext.createBufferSource();
+        noiseGain2 = audioContext.createGain();
+        noiseFilter2 = audioContext.createBiquadFilter();
+        sourceMix2 = audioContext.createGain();
+        formant1b = audioContext.createBiquadFilter();
+        formant2b = audioContext.createBiquadFilter();
+        formant3b = audioContext.createBiquadFilter();
+        voice2Gain = audioContext.createGain();
+        
+        // LFOs
+        wobbleLFO = audioContext.createOscillator();
+        wobbleGain = audioContext.createGain();
+        wahLFO = audioContext.createOscillator();
+        wahGain = audioContext.createGain();
+
+        // --- ROUTING ---
+        // Voice 1 Path:
+        osc1.connect(sourceMix1);
+        noiseSource1.connect(noiseFilter1);
+        noiseFilter1.connect(noiseGain1);
+        noiseGain1.connect(sourceMix1);
+        sourceMix1.connect(formant1a); sourceMix1.connect(formant2a); sourceMix1.connect(formant3a);
+        formant1a.connect(voice1Gain); formant2a.connect(voice1Gain); formant3a.connect(voice1Gain);
+        voice1Gain.connect(envelope);
+
+        // Voice 2 Path:
+        osc2.connect(sourceMix2);
+        noiseSource2.connect(noiseFilter2);
+        noiseFilter2.connect(noiseGain2);
+        noiseGain2.connect(sourceMix2);
+        sourceMix2.connect(formant1b); sourceMix2.connect(formant2b); sourceMix2.connect(formant3b);
+        formant1b.connect(voice2Gain); formant2b.connect(voice2Gain); formant3b.connect(voice2Gain);
+        voice2Gain.connect(envelope);
+
+        // LFO Paths
+        wobbleLFO.connect(wobbleGain);
+        wobbleGain.connect(osc1.detune);
+        wobbleGain.connect(osc2.detune);
+        wahLFO.connect(wahGain);
+        // Wah LFO will be connected to vowel calculation, not directly to filters
+        
+        // Noise Buffer Setup
+        const bufferSize = audioContext.sampleRate * 2;
+        const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) { output[i] = Math.random() * 2 - 1; }
+        noiseSource1.buffer = noiseBuffer;
+        noiseSource2.buffer = noiseBuffer;
+        noiseSource1.loop = true;
+        noiseSource2.loop = true;
+        
+        // Start all persistent sources
+        osc1.start(); osc2.start();
+        wobbleLFO.start(); wahLFO.start();
+        noiseSource1.start(); noiseSource2.start();
+        isAudioSetup = true;
+    }
+
+    // --- AUDIO START/STOP ---
+    function startAudio() {
+        if (isPlaying) return;
+        initAudioEngine();
+        if (audioContext.state === 'suspended') audioContext.resume();
+        isPlaying = true;
+        document.getElementById('startButton').classList.add('active');
+        
+        document.querySelectorAll('input[type="range"]').forEach(s => s.dispatchEvent(new Event('input')));
+        document.querySelectorAll('.preset-buttons button.active, .toggle-btn').forEach(b => {
+             if(b.classList.contains('active') || !b.classList.contains('toggle-btn')) {
+                b.dispatchEvent(new Event('click', {bubbles: true}));
+             }
+        });
+        
+        triggerAttack();
+    }
+
+    function stopAudio() {
+        if (!isPlaying || !isAudioSetup) return;
+        triggerRelease();
+        isPlaying = false;
+        document.getElementById('startButton').classList.remove('active');
+    }
+    
+    // --- ENVELOPE ---
+    function triggerAttack() {
+        if (!isAudioSetup) return;
+        const now = audioContext.currentTime;
+        const attackTime = parseFloat(document.getElementById('attack').value);
+        envelope.gain.cancelScheduledValues(now);
+        envelope.gain.setValueAtTime(0, now);
+        envelope.gain.setTargetAtTime(1.0, now, attackTime / 4 + 0.001);
+    }
+
+    function triggerRelease() {
+        if (!isAudioSetup) return;
+        const now = audioContext.currentTime;
+        const releaseTime = parseFloat(document.getElementById('release').value);
+        envelope.gain.cancelScheduledValues(now);
+        envelope.gain.setTargetAtTime(0, now, releaseTime / 4 + 0.001);
+    }
+
+    // --- PARAMETER UPDATE FUNCTIONS ---
+    let wahLFOValue = 0;
+    function getVowelFormants(position, keyCount) {
+        const wahDepth = document.getElementById('toggle-wah').classList.contains('active') ? parseFloat(document.getElementById('wah-depth').value) : 0;
+        const finalPosition = Math.max(0, Math.min(100, position + (wahLFOValue * wahDepth)));
+
+        const segment = (keyCount - 1) * (finalPosition / 100);
+        const startIndex = Math.floor(segment);
+        const endIndex = Math.min(startIndex + 1, keyCount - 1);
+        const remainder = segment - startIndex;
+        const startVowel = vowels[vowelKeys[startIndex]];
+        const endVowel = vowels[vowelKeys[endIndex]];
+        
+        const f1 = startVowel[0] + (endVowel[0] - startVowel[0]) * remainder;
+        const f2 = startVowel[1] + (endVowel[1] - startVowel[1]) * remainder;
+        const f3 = startVowel[2] + (endVowel[2] - startVowel[2]) * remainder;
+        const label = vowelKeys[startIndex] + (remainder > 0.5 && startIndex < keyCount - 1 ? `-${vowelKeys[endIndex]}`: '');
+        return { f1, f2, f3, label };
+    }
+    
+    function updateAllParams() {
+        if (!isAudioSetup) return;
+        const now = audioContext.currentTime;
+        
+        // Read all UI values first
+        const masterGainValue = parseFloat(document.getElementById('masterGain').value);
+        const q = parseFloat(document.getElementById('q').value);
+        const timbre = 1 + (parseFloat(document.getElementById('timbre').value) / 100);
+        const mix = parseFloat(document.getElementById('mix').value);
+        const isVoice2On = document.getElementById('toggle-voice2').classList.contains('active');
+        
+        // Voice 1
+        const freq1 = convertToLog(document.getElementById('pitch-1').value, 1000);
+        const wave1 = document.querySelector('#wave-type-1 .active')?.dataset.wave ?? 'sawtooth';
+        const breath1 = parseFloat(document.getElementById('breath-1').value);
+        const vowel1Pos = parseFloat(document.getElementById('vowel-1').value);
+        
+        osc1.frequency.setTargetAtTime(freq1, now, smoothTime);
+        osc1.type = wave1;
+        noiseGain1.gain.setTargetAtTime(breath1, now, smoothTime);
+        const formants1 = getVowelFormants(vowel1Pos, vowelKeys.length);
+        formant1a.frequency.setTargetAtTime(formants1.f1 * timbre, now, smoothTime);
+        formant2a.frequency.setTargetAtTime(formants1.f2 * timbre, now, smoothTime);
+        formant3a.frequency.setTargetAtTime(formants1.f3 * timbre, now, smoothTime);
+        formant1a.Q.setTargetAtTime(q, now, smoothTime);
+        formant2a.Q.setTargetAtTime(q, now, smoothTime);
+        formant3a.Q.setTargetAtTime(q, now, smoothTime);
+        
+        // Voice 2
+        const freq2 = convertToLog(document.getElementById('pitch-2').value, 1000);
+        const wave2 = document.querySelector('#wave-type-2 .active')?.dataset.wave ?? 'sawtooth';
+        const breath2 = parseFloat(document.getElementById('breath-2').value);
+        const vowel2Pos = parseFloat(document.getElementById('vowel-2').value);
+        
+        osc2.frequency.setTargetAtTime(freq2, now, smoothTime);
+        osc2.type = wave2;
+        noiseGain2.gain.setTargetAtTime(breath2, now, smoothTime);
+        const formants2 = getVowelFormants(vowel2Pos, vowelKeys.length);
+        formant1b.frequency.setTargetAtTime(formants2.f1 * timbre, now, smoothTime);
+        formant2b.frequency.setTargetAtTime(formants2.f2 * timbre, now, smoothTime);
+        formant3b.frequency.setTargetAtTime(formants2.f3 * timbre, now, smoothTime);
+        formant1b.Q.setTargetAtTime(q, now, smoothTime);
+        formant2b.Q.setTargetAtTime(q, now, smoothTime);
+        formant3b.Q.setTargetAtTime(q, now, smoothTime);
+
+        // Mixer & Master
+        voice1Gain.gain.setTargetAtTime(1 - mix, now, smoothTime);
+        voice2Gain.gain.setTargetAtTime(isVoice2On ? mix : 0, now, smoothTime);
+        masterGain.gain.setTargetAtTime(masterGainValue, now, smoothTime);
+
+        // Articulation
+        const wobbleSpeed = parseFloat(document.getElementById('wobble-speed').value);
+        const wobbleDepth = parseFloat(document.getElementById('wobble-depth').value);
+        const wahSpeed = parseFloat(document.getElementById('wah-speed').value);
+        
+        wobbleLFO.frequency.setTargetAtTime(wobbleSpeed, now, smoothTime);
+        wobbleGain.gain.setTargetAtTime(wobbleDepth, now, smoothTime);
+        wahLFO.frequency.setTargetAtTime(wahSpeed, now, smoothTime);
+        
+        const noiseFilterFreq = parseFloat(document.getElementById('noise-filter').value);
+        noiseFilter1.frequency.setTargetAtTime(noiseFilterFreq, now, smoothTime);
+        noiseFilter1.type = "highpass";
+        noiseFilter2.frequency.setTargetAtTime(noiseFilterFreq, now, smoothTime);
+        noiseFilter2.type = "highpass";
+
+        // --- Update UI Displays ---
+        document.getElementById('masterGainValue').textContent = `${Math.round(masterGainValue * 100)}%`;
+        document.getElementById('pitch1Value').textContent = `${Math.round(freq1)} Hz`;
+        document.getElementById('vowel1Value').textContent = formants1.label;
+        document.getElementById('breath1Value').textContent = `${Math.round(breath1/0.2 * 100)}%`;
+        document.getElementById('pitch2Value').textContent = `${Math.round(freq2)} Hz`;
+        document.getElementById('vowel2Value').textContent = formants2.label;
+        document.getElementById('breath2Value').textContent = `${Math.round(breath2/0.2 * 100)}%`;
+        document.getElementById('mixValue').textContent = `${Math.round((1-mix)*100)}% / ${Math.round(mix*100)}%`;
+        document.getElementById('timbreValue').textContent = `${document.getElementById('timbre').value}%`;
+        document.getElementById('qValue').textContent = q.toFixed(1);
+        document.getElementById('wobbleSpeedValue').textContent = `${wobbleSpeed.toFixed(1)} Hz`;
+        document.getElementById('wobbleDepthValue').textContent = `${Math.round(wobbleDepth)}%`;
+        document.getElementById('wahSpeedValue').textContent = `${wahSpeed.toFixed(1)} Hz`;
+        document.getElementById('wahDepthValue').textContent = `${document.getElementById('wah-depth').value}%`;
+        document.getElementById('noiseFilterValue').textContent = `${Math.round(noiseFilterFreq / 1000)}kHz`;
+        document.getElementById('attackValue').textContent = `${parseFloat(document.getElementById('attack').value).toFixed(2)} s`;
+        document.getElementById('releaseValue').textContent = `${parseFloat(document.getElementById('release').value).toFixed(2)} s`;
+    }
+
+    // --- LFO Update Loop for Wah ---
+    function updateLFOs() {
+        if(isAudioSetup) {
+             // The wahLFO will be used to manually calculate the vowel offset
+             // This avoids connecting an LFO to another LFO's parameter which is complex
+             // We create a simple value from -1 to 1
+             wahLFOValue = Math.sin(audioContext.currentTime * 2 * Math.PI * wahLFO.frequency.value);
+             if(isPlaying && document.getElementById('toggle-wah').classList.contains('active')) {
+                 updateAllParams();
+             }
+        }
+        requestAnimationFrame(updateLFOs);
+    }
+    updateLFOs();
+
+    // --- EVENT LISTENERS ---
+    document.getElementById('startButton').addEventListener('click', startAudio);
+    document.getElementById('stopButton').addEventListener('click', stopAudio);
+    
+    document.getElementById('app-container').addEventListener('input', updateAllParams);
+    document.querySelectorAll('.preset-buttons button, .toggle-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            if (e.target.classList.contains('toggle-btn')) {
+                e.target.classList.toggle('active');
+                e.target.textContent = e.target.classList.contains('active') ? 'ON' : 'OFF';
+                const controlsId = e.target.id.replace('toggle-', '') + '-controls';
+                const controlsEl = document.getElementById(controlsId);
+                if(controlsEl) controlsEl.classList.toggle('hidden-section');
+            } else { // Preset button
+                const parent = e.target.parentElement;
+                if(parent.querySelector('.active')) parent.querySelector('.active').classList.remove('active');
+                e.target.classList.add('active');
+            }
+            updateAllParams();
+        });
+    });
+});
+</script>
+
+</body>
+</html>
