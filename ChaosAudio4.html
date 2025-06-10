@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Creative Vowel Synthesizer</title>
+<style>
+:root {
+  --bg-color: #1a1a2d;
+  --surface-color: #2c2c44;
+  --border-color: #4a4a68;
+  --primary-gradient: linear-gradient(90deg, #8a2be2 0%, #4169e1 50%, #00ced1 100%);
+  --on-surface-color: #f0f0f8;
+  --on-surface-variant-color: #a0a0c0;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--on-surface-color);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin: 0;
+  padding: 20px 10px;
+  user-select: none;
+  min-height: 100vh;
+}
+#app-container {
+  width: 100%;
+  max-width: 340px;
+  padding: 12px;
+  background: var(--surface-color);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  border: 1px solid var(--border-color);
+}
+.control-group {
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: rgba(0,0,0,.2);
+  border: 1px solid rgba(255,255,255,.05);
+}
+.label {
+  font-size: .7em;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--on-surface-variant-color);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+.button-container {
+  display: flex;
+  gap: 10px;
+}
+button {
+  flex-grow: 1;
+  padding: 12px;
+  font-size: .9em;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary-gradient);
+  color: #fff;
+  cursor: pointer;
+  transition: all .2s ease;
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+}
+button:active {
+  transform: scale(.95);
+  box-shadow: 0 2px 10px rgba(138, 43, 226, 0.2);
+}
+.toggle-btn {
+    background: #33334d;
+    color: var(--on-surface-variant-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: .9em;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+.toggle-btn.active {
+    background: var(--primary-gradient);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 0 10px rgba(0, 206, 209, 0.5);
+}
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none; appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 16px; margin: 0;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  background: #1a1a2d;
+  height: 4px;
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  margin-top: -6px;
+  height: 16px; width: 16px;
+  border-radius: 50%;
+  background-image: var(--primary-gradient);
+  border: 2px solid rgba(255,255,255,.4);
+  box-shadow: 0 0 5px rgba(0, 206, 209, 0.7);
+}
+.value-display {
+  font-weight: 600;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.divider {
+    text-align: center;
+    margin-top: 15px;
+    margin-bottom: 12px;
+    font-size: .8em;
+    font-weight: 700;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.effect-section { display: none; }
+.effect-section.active { display: block; }
+</style>
+
+<div id="app-container">
+  <div class="control-group"><div class="button-container">
+    <button id="startButton">🎵 START</button>
+    <button id="stopButton">⏹️ STOP</button>
+  </div></div>
+
+  <div class="control-group">
+    <div class="divider">🎤 VOWEL</div>    
+    <label class="label"><span>Pitch</span><span class="value-display" id="pitchValue">--</span></label>
+    <input type="range" id="pitch" min="100" max="800" step="1" value="250">
+    <label class="label"><span>Vowel</span><span class="value-display" id="vowelValue">--</span></label>
+    <input type="range" id="vowel" min="0" max="100" step="1" value="50">
+
+    <div class="divider">⏳ ENVELOPE</div>
+    <label class="label"><span>Attack</span><span class="value-display" id="attackValue">--</span></label>
+    <input type="range" id="attack" min="0.01" max="2" step="0.01" value="0.1">
+    <label class="label"><span>Release</span><span class="value-display" id="releaseValue">--</span></label>
+    <input type="range" id="release" min="0.01" max="2" step="0.01" value="0.2">
+    
+    <div class="divider">🌊 MODULATION</div>
+    <label class="label"><span>Vocal Wah</span><button class="toggle-btn" id="toggle-wah" data-target="wah-controls">OFF</button></label>
+    <div id="wah-controls" class="effect-section">
+      <label class="label"><span>Speed</span><span class="value-display" id="wahSpeedValue">--</span></label>
+      <input type="range" id="wah-speed" min="0.1" max="8" step="0.05" value="1.0">
+      <label class="label"><span>Depth</span><span class="value-display" id="wahDepthValue">--</span></label>
+      <input type="range" id="wah-depth" min="0" max="100" step="1" value="50">
+    </div>
+    <label class="label"><span>Wobble</span><button class="toggle-btn" id="toggle-wobble" data-target="wobble-controls">OFF</button></label>
+    <div id="wobble-controls" class="effect-section">
+        <label class="label"><span>Rate</span><span class="value-display" id="wobbleRateValue">--</span></label>
+        <input type="range" id="wobble-rate" min="0.1" max="20" step="0.1" value="5">
+        <label class="label"><span>Depth</span><span class="value-display" id="wobbleDepthValue">--</span></label>
+        <input type="range" id="wobble-depth" min="0" max="100" step="1" value="10">
+    </div>
+
+    <div class="divider">👾 EFFECTS</div>
+    <label class="label"><span>Alien</span><button class="toggle-btn" id="toggle-alien" data-target="alien-controls">OFF</button></label>
+    <div id="alien-controls" class="effect-section">
+        <label class="label"><span>Frequency</span><span class="value-display" id="alienFreqValue">--</span></label>
+        <input type="range" id="alien-freq" min="20" max="1000" step="1" value="150">
+    </div>
+    <label class="label"><span>Robot</span><button class="toggle-btn" id="toggle-robot" data-target="robot-controls">OFF</button></label>
+    <div id="robot-controls" class="effect-section">
+        <label class="label"><span>Bit Depth</span><span class="value-display" id="robotBitsValue">--</span></label>
+        <input type="range" id="robot-bits" min="1" max="16" step="1" value="16">
+        <label class="label"><span>Downsample</span><span class="value-display" id="robotDownsampleValue">--</span></label>
+        <input type="range" id="robot-downsample" min="1" max="50" step="1" value="1">
+    </div>
+
+    <div class="divider">🎧 MIX</div>
+    <label class="label"><span>Breath</span><span class="value-display" id="breathValue">--</span></label>
+    <input type="range" id="breath" min="0" max="0.3" step="0.001" value="0">
+    <label class="label"><span>Volume</span><span class="value-display" id="volumeValue">--</span></label>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let audioContext, isPlaying = false, isInitialized = false;
+    let osc, noise, noiseGain, envelope, formantFilter1, formantFilter2, formantFilter3, vibrato, vibratoGain, ringMod, ringModOsc, ringModWet, ringModDry, bitcrusher, robotWet, robotDry;
+    let wahModulation = 0;
+
+    const SMOOTH_TIME = 0.02;
+    const FORMANT_Q = 15;
+
+    const ui = {};
+    document.querySelectorAll('[id]').forEach(el => ui[el.id] = el);
+
+    const VOWEL_FORMANTS = { 'Ii': [240, 2400, 3200], 'Ih': [400, 2000, 2800], 'Eh': [550, 1770, 2490], 'Ae': [690, 1750, 2500], 'Aa': [730, 1090, 2440], 'Ah': [600, 1040, 2250], 'Ao': [570, 840, 2410], 'Oo': [300, 870, 2240], 'Uu': [250, 600, 2200], 'Er': [500, 1400, 2500], 'Aw': [600, 1100, 2300], 'Oy': [400, 1200, 2600] };
+    const VOWEL_NAMES = Object.keys(VOWEL_FORMANTS);
+    
+    const pitchToFreq = (val) => 40 * Math.pow(2, val / 200);
+
+    function getVowelFormants(vowelPos) {
+        const wahActive = ui['toggle-wah'].classList.contains('active');
+        const wahDepth = wahActive ? parseFloat(ui['wah-depth'].value) : 0;
+        const adjustedPos = Math.max(0, Math.min(100, parseFloat(vowelPos) + wahModulation * wahDepth)) / 100 * (VOWEL_NAMES.length - 1);
+        const index = Math.floor(adjustedPos), nextIndex = Math.min(index + 1, VOWEL_NAMES.length - 1), fraction = adjustedPos - index;
+        const current = VOWEL_FORMANTS[VOWEL_NAMES[index]], next = VOWEL_FORMANTS[VOWEL_NAMES[nextIndex]];
+        return {
+            f1: current[0] + (next[0] - current[0]) * fraction, f2: current[1] + (next[1] - current[1]) * fraction,
+            f3: current[2] + (next[2] - current[2]) * fraction, label: VOWEL_NAMES[index]
+        };
+    }
+
+    function updateFormantFilters() {
+        const formants = getVowelFormants(ui.vowel.value);
+        ui.vowelValue.textContent = formants.label;
+        if (isInitialized) {
+            const now = audioContext.currentTime;
+            formantFilter1.frequency.setTargetAtTime(formants.f1, now, SMOOTH_TIME);
+            formantFilter2.frequency.setTargetAtTime(formants.f2, now, SMOOTH_TIME);
+            formantFilter3.frequency.setTargetAtTime(formants.f3, now, SMOOTH_TIME);
+        }
+    }
+
+    function initializeAudio() {
+        if (isInitialized) return;
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        osc = audioContext.createOscillator(); noise = audioContext.createBufferSource(); noiseGain = audioContext.createGain();
+        envelope = audioContext.createGain();
+        [formantFilter1, formantFilter2, formantFilter3] = [1,2,3].map(() => audioContext.createBiquadFilter());
+        vibrato = audioContext.createOscillator(); vibratoGain = audioContext.createGain();
+        ringMod = audioContext.createGain(); ringModOsc = audioContext.createOscillator(); ringModWet = audioContext.createGain(); ringModDry = audioContext.createGain();
+        robotWet = audioContext.createGain(); robotDry = audioContext.createGain();
+        bitcrusher = audioContext.createScriptProcessor(1024, 1, 1);
+
+        osc.type = 'sawtooth'; vibrato.type = 'sine'; ringModOsc.type = 'sine';
+        [formantFilter1, formantFilter2, formantFilter3].forEach(f => { f.type = 'bandpass'; f.Q.value = FORMANT_Q; });
+        
+        const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate, audioContext.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+        noise.buffer = noiseBuffer; noise.loop = true;
+
+        // *** FIXED: Rebuilt audio graph with robust bypass logic for each effect ***
+        const sourceMix = audioContext.createGain();
+        osc.connect(sourceMix); noise.connect(noiseGain); noiseGain.connect(sourceMix);
+        
+        const formantMix = audioContext.createGain();
+        sourceMix.connect(formantFilter1); sourceMix.connect(formantFilter2); sourceMix.connect(formantFilter3);
+        [formantFilter1, formantFilter2, formantFilter3].forEach(f => f.connect(formantMix));
+
+        // Create a chain of nodes, starting from the clean formant sound
+        let lastNode = formantMix;
+
+        // --- ALIEN (Ring Mod) Stage ---
+        const alienOut = audioContext.createGain();
+        // Wet path
+        lastNode.connect(ringModWet).connect(ringMod).connect(alienOut);
+        ringModOsc.connect(ringMod.gain);
+        // Dry path
+        lastNode.connect(ringModDry).connect(alienOut);
+        lastNode = alienOut; // The output of this stage becomes the input for the next
+
+        // --- ROBOT (Bitcrusher) Stage ---
+        const robotOut = audioContext.createGain();
+        // Wet path
+        lastNode.connect(robotWet).connect(bitcrusher).connect(robotOut);
+        // Dry path
+        lastNode.connect(robotDry).connect(robotOut);
+        lastNode = robotOut;
+
+        // Final connection to master envelope
+        lastNode.connect(envelope);
+        envelope.connect(audioContext.destination);
+        
+        // Connect vibrato to oscillator detune (doesn't interrupt main signal)
+        vibrato.connect(vibratoGain); vibratoGain.connect(osc.detune);
+
+        // Bitcrusher processing logic
+        let phaser = 0; let lastSample = 0;
+        bitcrusher.onaudioprocess = function(e) {
+            const input = e.inputBuffer.getChannelData(0), output = e.outputBuffer.getChannelData(0);
+            const bits = parseInt(ui['robot-bits'].value), downsample = parseInt(ui['robot-downsample'].value);
+            const step = Math.pow(0.5, bits);
+            for (let i = 0; i < output.length; i++) {
+                phaser++;
+                if (phaser >= downsample) { phaser = 0; lastSample = step * Math.floor(input[i] / step + 0.5); }
+                output[i] = lastSample;
+            }
+        };
+
+        envelope.gain.value = 0;
+        osc.start(); noise.start(); vibrato.start(); ringModOsc.start();
+        isInitialized = true;
+        
+        document.querySelectorAll('input').forEach(el => el.dispatchEvent(new Event('input')));
+        updateEffects(); // Set initial bypass states
+    }
+
+    function startSynth() {
+        if (!isInitialized) initializeAudio();
+        if (isPlaying || !audioContext) return;
+        const now = audioContext.currentTime;
+        const attackTime = parseFloat(ui.attack.value);
+        envelope.gain.cancelScheduledValues(now); envelope.gain.setTargetAtTime(parseFloat(ui.volume.value), now, attackTime);
+        isPlaying = true;
+    }
+
+    function stopSynth() {
+        if (!isPlaying || !audioContext) return;
+        const now = audioContext.currentTime;
+        const releaseTime = parseFloat(ui.release.value);
+        envelope.gain.cancelScheduledValues(now); envelope.gain.setTargetAtTime(0, now, releaseTime);
+        isPlaying = false;
+    }
+
+    function updateEffects() {
+        if (!isInitialized) return;
+        const now = audioContext.currentTime;
+        vibratoGain.gain.setTargetAtTime(ui['toggle-wobble'].classList.contains('active') ? parseFloat(ui['wobble-depth'].value) : 0, now, SMOOTH_TIME);
+        
+        const alienActive = ui['toggle-alien'].classList.contains('active');
+        ringModWet.gain.setTargetAtTime(alienActive ? 1 : 0, now, SMOOTH_TIME);
+        ringModDry.gain.setTargetAtTime(alienActive ? 0 : 1, now, SMOOTH_TIME);
+        
+        const robotActive = ui['toggle-robot'].classList.contains('active');
+        robotWet.gain.setTargetAtTime(robotActive ? 1 : 0, now, SMOOTH_TIME);
+        robotDry.gain.setTargetAtTime(robotActive ? 0 : 1, now, SMOOTH_TIME);
+    }
+
+    function animationLoop() {
+        if (isInitialized && isPlaying && ui['toggle-wah'].classList.contains('active')) {
+            wahModulation = Math.sin(audioContext.currentTime * parseFloat(ui['wah-speed'].value) * 2 * Math.PI);
+            updateFormantFilters();
+        }
+        requestAnimationFrame(animationLoop);
+    }
+    
+    function setupEventListeners() {
+        ui.startButton.addEventListener('click', startSynth);
+        ui.stopButton.addEventListener('click', stopSynth);
+        
+        const handlers = {
+            pitch: v => { const f = pitchToFreq(v); ui.pitchValue.textContent = `${Math.round(f)} Hz`; if (isInitialized) osc.frequency.setTargetAtTime(f, audioContext.currentTime, SMOOTH_TIME); },
+            vowel: () => updateFormantFilters(),
+            breath: v => { ui.breathValue.textContent = `${(v * 333).toFixed(0)}%`; if (isInitialized) noiseGain.gain.setTargetAtTime(v, audioContext.currentTime, SMOOTH_TIME); },
+            volume: v => { ui.volumeValue.textContent = `${(v * 100).toFixed(0)}%`; if (isPlaying) envelope.gain.setTargetAtTime(v, audioContext.currentTime, SMOOTH_TIME); },
+            attack: v => ui.attackValue.textContent = `${v.toFixed(2)} s`,
+            release: v => ui.releaseValue.textContent = `${v.toFixed(2)} s`,
+            'wah-speed': v => ui.wahSpeedValue.textContent = `${v.toFixed(1)} Hz`,
+            'wah-depth': v => ui.wahDepthValue.textContent = `${v.toFixed(0)}%`,
+            'wobble-rate': v => { ui.wobbleRateValue.textContent = `${v.toFixed(1)} Hz`; if (isInitialized) vibrato.frequency.setTargetAtTime(v, audioContext.currentTime, SMOOTH_TIME); },
+            'wobble-depth': updateEffects,
+            'alien-freq': v => { ui.alienFreqValue.textContent = `${v.toFixed(0)} Hz`; if (isInitialized) ringModOsc.frequency.setTargetAtTime(v, audioContext.currentTime, SMOOTH_TIME); },
+            'robot-bits': v => ui.robotBitsValue.textContent = `${v}`,
+            'robot-downsample': v => ui.robotDownsampleValue.textContent = `${v}x`,
+        };
+        for (const id in handlers) if(ui[id]) ui[id].addEventListener('input', () => handlers[id](parseFloat(ui[id].value)));
+        
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('active');
+                this.textContent = this.classList.contains('active') ? 'ON' : 'OFF';
+                document.getElementById(this.dataset.target).classList.toggle('active');
+                updateEffects();
+            });
+        });
+
+        document.querySelectorAll('input').forEach(el => el.dispatchEvent(new Event('input')));
+    }
+
+    setupEventListeners();
+    animationLoop();
+    document.addEventListener('touchstart', () => { if (audioContext && audioContext.state === 'suspended') audioContext.resume(); }, { once: true });
+});
+</script>
+</body>
+</html>
