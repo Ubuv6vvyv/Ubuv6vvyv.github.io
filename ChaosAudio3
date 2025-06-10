@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Enhanced Vocal Synthesizer v2.1 (Corrected)</title>
+<style>
+:root {
+  --bg-color: #1e2d3b;
+  --surface-color: #2c3e50;
+  --primary-color: #4ecdc4;
+  --secondary-color: #f39c12;
+  --on-surface-color: #ecf0f1;
+  --on-surface-variant-color: #bdc3c7;
+  --border-color: #34495e;
+  --off-color: #263849;
+  --accent-color: #e74c3c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(135deg, var(--bg-color) 0%, #0f1a24 100%);
+  color: var(--on-surface-color);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 5px;
+  user-select: none;
+  min-height: 100vh;
+}
+
+#app-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 12px;
+  background: var(--surface-color);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.1);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+}
+
+.control-group {
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: rgba(0,0,0,.1);
+  border: 1px solid rgba(255,255,255,.05);
+}
+
+.label {
+  font-size: .65em;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--on-surface-variant-color);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.section-header {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 16px;
+  margin: 0;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, var(--bg-color) 0%, var(--primary-color) 50%, var(--secondary-color) 100%);
+  height: 4px;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.3);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3498db 100%);
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--primary-color), 0 2px 4px rgba(0,0,0,.3);
+  border: 2px solid rgba(255,255,255,.2);
+}
+
+.button-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+button {
+  flex-grow: 1;
+  padding: 12px;
+  font-size: .8em;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3498db 100%);
+  color: #000;
+  cursor: pointer;
+  transition: all .2s ease;
+  box-shadow: 0 4px 12px rgba(78, 205, 196, .3);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(78, 205, 196, .4);
+}
+
+button:active {
+  transform: scale(.95);
+}
+
+.toggle-btn {
+  background: var(--off-color);
+  color: var(--on-surface-variant-color);
+  padding: 6px 12px;
+  font-size: .7em;
+  height: 28px;
+  flex-grow: 0;
+  min-width: 70px;
+  box-shadow: none;
+}
+
+.toggle-btn.active {
+  background: linear-gradient(135deg, var(--accent-color) 0%, #c0392b 100%);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(231, 76, 60, .4);
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.preset-buttons button {
+  background: var(--off-color);
+  color: var(--on-surface-variant-color);
+  font-size: .65em;
+  padding: 8px;
+  flex-grow: 1;
+  box-shadow: none;
+}
+
+.preset-buttons button.active {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #d35400 100%);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(243, 156, 18, .4);
+}
+
+.value-display {
+  font-weight: 600;
+  color: var(--primary-color);
+  text-shadow: 0 0 4px rgba(78, 205, 196, .3);
+}
+
+.hidden-section {
+  display: none;
+}
+
+.fx-section {
+  background: rgba(231, 76, 60, .1);
+  border: 1px solid rgba(231, 76, 60, .2);
+}
+
+.advanced-section {
+  background: rgba(243, 156, 18, .1);
+  border: 1px solid rgba(243, 156, 18, .2);
+}
+
+.visualizer {
+  height: 60px;
+  background: rgba(0,0,0,.3);
+  border-radius: 8px;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.wave-display {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(180deg, transparent 0%, var(--primary-color) 50%, transparent 100%);
+  opacity: .6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: .3; }
+  50% { opacity: .8; }
+}
+
+.status-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: .3; }
+}
+</style>
+
+<div id="app-container">
+  <div class="control-group">
+    <div class="button-container">
+      <button id="startButton">🎵 START</button>
+      <button id="stopButton">⏹️ STOP</button>
+    </div>
+    <div class="visualizer">
+      <div class="wave-display" id="waveDisplay"></div>
+      <div class="status-indicator" id="statusIndicator" style="display:none;"></div>
+    </div>
+    <label class="label">
+      <span>Master Volume</span>
+      <span class="value-display" id="masterGainValue">50%</span>
+    </label>
+    <input type="range" id="masterGain" min="0" max="1" step="0.01" value="0.5">
+  </div>
+
+  <div class="control-group grid-container">
+    <div>
+      <div class="label"><span>🎤 VOICE 1</span></div>
+      <label class="label">
+        <span>Pitch</span>
+        <span class="value-display" id="pitch1Value">250 Hz</span>
+      </label>
+      <input type="range" id="pitch-1" min="1" max="800" step="1" value="250">
+      
+      <label class="label">
+        <span>Vowel</span>
+        <span class="value-display" id="vowel1Value">Ah</span>
+      </label>
+      <input type="range" id="vowel-1" min="0" max="100" step="1" value="50">
+      
+      <label class="label">
+        <span>Breath</span>
+        <span class="value-display" id="breath1Value">0%</span>
+      </label>
+      <input type="range" id="breath-1" min="0" max="0.3" step="0.001" value="0">
+      
+      <label class="label">
+        <span>Gain</span>
+        <span class="value-display" id="gain1Value">80%</span>
+      </label>
+      <input type="range" id="gain-1" min="0" max="1" step="0.01" value="0.8">
+      
+      <div class="preset-buttons" id="wave-type-1">
+        <button class="active" data-wave="sawtooth">Rich</button>
+        <button data-wave="square">Robot</button>
+        <button data-wave="triangle">Soft</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-header">
+        <div class="label" style="margin-bottom:0">🎤 VOICE 2</div>
+        <button class="toggle-btn" id="toggle-voice2">OFF</button>
+      </div>
+      <div class="hidden-section" id="voice2-controls">
+        <label class="label">
+          <span>Pitch</span>
+          <span class="value-display" id="pitch2Value">250 Hz</span>
+        </label>
+        <input type="range" id="pitch-2" min="80" max="800" step="1" value="250">
+        
+        <label class="label">
+           <span>Vowel</span>
+          <span class="value-display" id="vowel2Value">Ah</span>
+        </label>
+        <input type="range" id="vowel-2" min="0" max="100" step="1" value="50">
+        
+        <label class="label">
+          <span>Breath</span>
+          <span class="value-display" id="breath2Value">0%</span>
+        </label>
+        <input type="range" id="breath-2" min="0" max="0.3" step="0.001" value="0">
+        
+        <label class="label">
+          <span>Gain</span>
+          <span class="value-display" id="gain2Value">80%</span>
+        </label>
+        <input type="range" id="gain-2" min="0" max="1" step="0.01" value="0.8">
+        
+        <div class="preset-buttons" id="wave-type-2">
+          <button class="active" data-wave="sawtooth">Rich</button>
+          <button data-wave="square">Robot</button>
+          <button data-wave="triangle">Soft</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <div class="label">🎛️ VOICE SHAPING</div>
+    <label class="label">
+      <span>Voice Mix (1 ↔ 2)</span>
+      <span class="value-display" id="mixValue">50% / 50%</span>
+    </label>
+    <input type="range" id="mix" min="0" max="1" step="0.01" value="0.5">
+    
+    <div class="grid-container">
+      <div>
+        <label class="label">
+          <span>Formant Shift</span>
+          <span class="value-display" id="timbreValue">0%</span>
+        </label>
+        <input type="range" id="timbre" min="-50" max="50" step="1" value="0">
+      </div>
+      <div>
+        <label class="label">
+          <span>Resonance</span>
+          <span class="value-display" id="qValue">10.0</span>
+        </label>
+        <input type="range" id="q" min="1" max="30" step="0.1" value="10">
+      </div>
+    </div>
+    
+    <label class="label">
+      <span>Breath Tone</span>
+      <span class="value-display" id="noiseFilterValue">5.0kHz</span>
+    </label>
+    <input type="range" id="noise-filter" min="500" max="12000" step="50" value="5000">
+  </div>
+
+  <div class="control-group fx-section">
+    <div class="label">🌊 MODULATION & FX</div>
+    
+    <div class="grid-container">
+      <div>
+        <label class="label">
+          <span>Vibrato Rate</span>
+          <span class="value-display" id="wobbleSpeedValue">5.0 Hz</span>
+        </label>
+        <input type="range" id="wobble-speed" min="0.1" max="30" step="0.1" value="5">
+      </div>
+      <div>
+        <label class="label">
+          <span>Vibrato Depth</span>
+          <span class="value-display" id="wobbleDepthValue">10%</span>
+        </label>
+        <input type="range" id="wobble-depth" min="0" max="100" step="1" value="10">
+      </div>
+    </div>
+
+    <div class="section-header" style="margin:12px 0 8px 0">
+      <div class="label" style="margin-bottom:0">Vocal Wah</div>
+      <button class="toggle-btn" id="toggle-wah">OFF</button>
+    </div>
+    <div class="grid-container hidden-section" id="wah-controls">
+      <div>
+        <label class="label">
+          <span>Wah Speed</span>
+          <span class="value-display" id="wahSpeedValue">1.0 Hz</span>
+        </label>
+        <input type="range" id="wah-speed" min="0.1" max="10" step="0.05" value="1.0">
+      </div>
+      <div>
+        <label class="label">
+          <span>Wah Depth</span>
+          <span class="value-display" id="wahDepthValue">20%</span>
+        </label>
+        <input type="range" id="wah-depth" min="0" max="100" step="1" value="20">
+      </div>
+    </div>
+
+    <div class="section-header" style="margin:12px 0 8px 0">
+      <div class="label" style="margin-bottom:0">Tremolo</div>
+      <button class="toggle-btn" id="toggle-tremolo">OFF</button>
+    </div>
+    <div class="grid-container hidden-section" id="tremolo-controls">
+      <div>
+        <label class="label">
+          <span>Tremolo Rate</span>
+          <span class="value-display" id="tremoloSpeedValue">4.0 Hz</span>
+        </label>
+        <input type="range" id="tremolo-speed" min="0.1" max="30" step="0.1" value="4">
+      </div>
+      <div>
+        <label class="label">
+          <span>Tremolo Depth</span>
+          <span class="value-display" id="tremoloDepthValue">30%</span>
+        </label>
+        <input type="range" id="tremolo-depth" min="0" max="100" step="1" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="control-group advanced-section">
+    <div class="label">⚙️ ADVANCED</div>
+    
+    <div class="grid-container">
+      <div>
+        <label class="label">
+          <span>Attack</span>
+          <span class="value-display" id="attackValue">0.20 s</span>
+        </label>
+        <input type="range" id="attack" min="0.01" max="3" step="0.01" value="0.2">
+      </div>
+      <div>
+        <label class="label">
+          <span>Release</span>
+          <span class="value-display" id="releaseValue">0.50 s</span>
+        </label>
+        <input type="range" id="release" min="0.01" max="3" step="0.01" value="0.5">
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div>
+        <label class="label">
+          <span>Detune</span>
+          <span class="value-display" id="detuneValue">0¢</span>
+        </label>
+        <input type="range" id="detune" min="-100" max="100" step="1" value="0">
+      </div>
+      <div>
+        <label class="label">
+          <span>Distortion</span>
+          <span class="value-display" id="distortionValue">0%</span>
+        </label>
+        <input type="range" id="distortion" min="0" max="100" step="1" value="0">
+      </div>
+      <div>
+        <label class="label">
+          <span>Chorus</span>
+          <span class="value-display" id="chorusValue">0%</span>
+        </label>
+        <input type="range" id="chorus" min="0" max="100" step="1" value="0">
+      </div>
+    </div>
+
+    <div class="section-header" style="margin:12px 0 8px 0">
+      <div class="label" style="margin-bottom:0">Reverb</div>
+      <button class="toggle-btn" id="toggle-reverb">OFF</button>
+    </div>
+    <div class="grid-container hidden-section" id="reverb-controls">
+      <div>
+        <label class="label">
+          <span>Room Size</span>
+          <span class="value-display" id="reverbSizeValue">50%</span>
+        </label>
+        <input type="range" id="reverb-size" min="0" max="100" step="1" value="50">
+      </div>
+      <div>
+        <label class="label">
+          <span>Reverb Mix</span>
+          <span class="value-display" id="reverbMixValue">30%</span>
+        </label>
+        <input type="range" id="reverb-mix" min="0" max="100" step="1" value="30">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let audioContext, masterGain, envelopeGain, 
+      // Voice 1
+      osc1, noise1, noiseGain1, noiseFilter1, voice1Gain, voice1Filter1, voice1Filter2, voice1Filter3, voice1Mix,
+      // Voice 2  
+      osc2, noise2, noiseGain2, noiseFilter2, voice2Gain, voice2Filter1, voice2Filter2, voice2Filter3, voice2Mix,
+      // Modulators
+      vibratoOsc, vibratoGain, wahOsc, wahGain, tremoloOsc, tremoloGain,
+      // Effects
+      distortionNode, chorusDelay, chorusGain, reverbConvolver, reverbGain, reverbMix,
+      // State
+      isPlaying = false, isInitialized = false;
+  const SMOOTH_TIME = 0.01;
+  const LOG_RANGE = Math.log(20);
+  const pitchToFreq = (val, max) => 80 * Math.exp(LOG_RANGE * val / max);
+  // Enhanced vowel formants with more precision
+  const VOWEL_FORMANTS = {
+    'Ii': [240, 2400, 3200], 'Ih': [400, 2000, 2800], 'Eh': [550, 1770, 2490],
+    'Ae': [690, 1750, 2500], 'Aa': [730, 1090, 2440], 'Ah': [600, 1040, 2250],
+    'Ao': [570, 840, 2410], 'Oo': [300, 870, 2240], 'Uu': [250, 600, 2200],
+    'Er': [500, 1400, 2500], 'Aw': [600, 1100, 2300], 'Oy': [400, 1200, 2600]
+  };
+  const VOWEL_NAMES = Object.keys(VOWEL_FORMANTS);
+  let wahModulation = 0;
+
+  function getVowelFormants(vowelPos, voiceNum) {
+    const wahActive = document.getElementById('toggle-wah')?.classList.contains('active');
+    const wahDepth = wahActive ? parseFloat(document.getElementById('wah-depth')?.value || 0) : 0;
+    const adjustedPos = Math.max(0, Math.min(100, vowelPos + wahModulation * wahDepth)) / 100 * (VOWEL_NAMES.length - 1);
+    
+    const index = Math.floor(adjustedPos);
+    const nextIndex = Math.min(index + 1, VOWEL_NAMES.length - 1);
+    const fraction = adjustedPos - index;
+    
+    const current = VOWEL_FORMANTS[VOWEL_NAMES[index]];
+    const next = VOWEL_FORMANTS[VOWEL_NAMES[nextIndex]];
+    
+    return {
+      f1: current[0] + (next[0] - current[0]) * fraction,
+      f2: current[1] + (next[1] - current[1]) * fraction,
+      f3: current[2] + (next[2] - current[2]) * fraction,
+      label: VOWEL_NAMES[index] + (fraction > 0.5 && index < VOWEL_NAMES.length - 1 ? `-${VOWEL_NAMES[nextIndex]}` : '')
+    };
+  }
+
+  function createDistortion(amount) {
+    const samples = 44100;
+    const curve = new Float32Array(samples);
+    const deg = Math.PI / 180;
+    
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
+  }
+
+  function createReverbImpulse(duration, decay) {
+    const sampleRate = audioContext.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = audioContext.createBuffer(2, length, sampleRate);
+    for (let channel = 0; channel < 2; channel++) {
+      const channelData = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i++) {
+        const n = length - i;
+        channelData[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay);
+      }
+    }
+    return impulse;
+  }
+
+  function updateSynthesis() {
+    if (!isInitialized) return;
+    
+    const now = audioContext.currentTime;
+    const masterVol = parseFloat(document.getElementById('masterGain').value);
+    const q = parseFloat(document.getElementById('q').value);
+    const formantShift = 1 + parseFloat(document.getElementById('timbre').value) / 100;
+    const mix = parseFloat(document.getElementById('mix').value);
+    const voice2Active = document.getElementById('toggle-voice2').classList.contains('active');
+    // Voice 1
+    const pitch1 = pitchToFreq(document.getElementById('pitch-1').value, 800);
+    const wave1 = document.querySelector('#wave-type-1 .active')?.dataset.wave ?? 'sawtooth';
+    const breath1 = parseFloat(document.getElementById('breath-1').value);
+    const gain1 = parseFloat(document.getElementById('gain-1').value);
+    const vowel1 = parseFloat(document.getElementById('vowel-1').value);
+    
+    osc1.frequency.setTargetAtTime(pitch1, now, SMOOTH_TIME);
+    osc1.type = wave1;
+    noiseGain1.gain.setTargetAtTime(breath1, now, SMOOTH_TIME);
+    voice1Gain.gain.setTargetAtTime(gain1, now, SMOOTH_TIME);
+    
+    const formants1 = getVowelFormants(vowel1, 1);
+    voice1Filter1.frequency.setTargetAtTime(formants1.f1 * formantShift, now, SMOOTH_TIME);
+    voice1Filter2.frequency.setTargetAtTime(formants1.f2 * formantShift, now, SMOOTH_TIME);
+    voice1Filter3.frequency.setTargetAtTime(formants1.f3 * formantShift, now, SMOOTH_TIME);
+    [voice1Filter1, voice1Filter2, voice1Filter3].forEach(filter => {
+      filter.Q.setTargetAtTime(q, now, SMOOTH_TIME);
+    });
+    // Voice 2
+    const pitch2 = pitchToFreq(document.getElementById('pitch-2').value, 800);
+    const wave2 = document.querySelector('#wave-type-2 .active')?.dataset.wave ?? 'sawtooth';
+    const breath2 = parseFloat(document.getElementById('breath-2').value);
+    const gain2 = parseFloat(document.getElementById('gain-2').value);
+    const vowel2 = parseFloat(document.getElementById('vowel-2').value);
+    
+    osc2.frequency.setTargetAtTime(pitch2, now, SMOOTH_TIME);
+    osc2.type = wave2;
+    noiseGain2.gain.setTargetAtTime(breath2, now, SMOOTH_TIME);
+    voice2Gain.gain.setTargetAtTime(gain2, now, SMOOTH_TIME);
+    
+    const formants2 = getVowelFormants(vowel2, 2);
+    voice2Filter1.frequency.setTargetAtTime(formants2.f1 * formantShift, now, SMOOTH_TIME);
+    voice2Filter2.frequency.setTargetAtTime(formants2.f2 * formantShift, now, SMOOTH_TIME);
+    voice2Filter3.frequency.setTargetAtTime(formants2.f3 * formantShift, now, SMOOTH_TIME);
+    [voice2Filter1, voice2Filter2, voice2Filter3].forEach(filter => {
+      filter.Q.setTargetAtTime(q, now, SMOOTH_TIME);
+    });
+    // Voice mixing
+    voice1Mix.gain.setTargetAtTime(1 - mix, now, SMOOTH_TIME);
+    voice2Mix.gain.setTargetAtTime(voice2Active ? mix : 0, now, SMOOTH_TIME);
+    // Master output
+    masterGain.gain.setTargetAtTime(masterVol, now, SMOOTH_TIME);
+    
+    // Modulation
+    const vibratoSpeed = parseFloat(document.getElementById('wobble-speed').value);
+    const vibratoDepth = parseFloat(document.getElementById('wobble-depth').value);
+    const wahSpeed = parseFloat(document.getElementById('wah-speed').value);
+    const tremoloSpeed = parseFloat(document.getElementById('tremolo-speed')?.value || 4);
+    const tremoloDepth = parseFloat(document.getElementById('tremolo-depth')?.value || 30);
+    vibratoOsc.frequency.setTargetAtTime(vibratoSpeed, now, SMOOTH_TIME);
+    vibratoGain.gain.setTargetAtTime(vibratoDepth, now, SMOOTH_TIME);
+    wahOsc.frequency.setTargetAtTime(wahSpeed, now, SMOOTH_TIME);
+    
+    if (tremoloOsc) {
+      tremoloOsc.frequency.setTargetAtTime(tremoloSpeed, now, SMOOTH_TIME);
+      tremoloGain.gain.setTargetAtTime(tremoloDepth / 100, now, SMOOTH_TIME);
+    }
+    
+    // Noise filtering
+    const noiseFreq = parseFloat(document.getElementById('noise-filter').value);
+    noiseFilter1.frequency.setTargetAtTime(noiseFreq, now, SMOOTH_TIME);
+    noiseFilter2.frequency.setTargetAtTime(noiseFreq, now, SMOOTH_TIME);
+    
+    // Effects
+    const detune = parseFloat(document.getElementById('detune')?.value || 0);
+    const distortion = parseFloat(document.getElementById('distortion')?.value || 0);
+    const chorus = parseFloat(document.getElementById('chorus')?.value || 0);
+    if (distortionNode && distortion > 0) {
+      distortionNode.curve = createDistortion(distortion);
+      distortionNode.oversample = '4x';
+    }
+    
+    if (chorusGain) {
+      chorusGain.gain.setTargetAtTime(chorus / 100, now, SMOOTH_TIME);
+    }
+    
+    // Reverb
+    const reverbActive = document.getElementById('toggle-reverb')?.classList.contains('active');
+    const reverbSize = parseFloat(document.getElementById('reverb-size')?.value || 50);
+    const reverbMixAmt = parseFloat(document.getElementById('reverb-mix')?.value || 30);
+    if (reverbActive && reverbConvolver && reverbGain && reverbMix) {
+      reverbConvolver.buffer = createReverbImpulse(reverbSize / 25, 2);
+      reverbMix.gain.setTargetAtTime(reverbMixAmt / 100, now, SMOOTH_TIME);
+    }
+    
+    // Update UI displays
+    updateDisplays();
+  }
+
+  function updateDisplays() {
+    const updates = [
+      ['masterGainValue', (parseFloat(document.getElementById('masterGain').value) * 100).toFixed(0) + '%'],
+      ['pitch1Value', Math.round(pitchToFreq(document.getElementById('pitch-1').value, 800)) + ' Hz'],
+      ['pitch2Value', Math.round(pitchToFreq(document.getElementById('pitch-2').value, 800)) + ' Hz'],
+      ['vowel1Value', getVowelFormants(parseFloat(document.getElementById('vowel-1').value), 1).label],
+      ['vowel2Value', getVowelFormants(parseFloat(document.getElementById('vowel-2').value), 2).label],
+      ['breath1Value', (parseFloat(document.getElementById('breath-1').value) * 333).toFixed(0) + '%'],
+      ['breath2Value', (parseFloat(document.getElementById('breath-2').value) * 333).toFixed(0) + '%'],
+      ['gain1Value', (parseFloat(document.getElementById('gain-1').value) * 100).toFixed(0) + '%'],
+      ['gain2Value', (parseFloat(document.getElementById('gain-2').value) * 100).toFixed(0) + '%'],
+      ['mixValue', (100 - parseFloat(document.getElementById('mix').value) * 100).toFixed(0) + '% / ' + (parseFloat(document.getElementById('mix').value) * 100).toFixed(0) + '%'],
+      ['timbreValue', parseFloat(document.getElementById('timbre').value).toFixed(0) + '%'],
+      ['qValue', parseFloat(document.getElementById('q').value).toFixed(1)],
+      ['noiseFilterValue', (parseFloat(document.getElementById('noise-filter').value) / 1000).toFixed(1) + 'kHz'],
+      ['wobbleSpeedValue', parseFloat(document.getElementById('wobble-speed').value).toFixed(1) + ' Hz'],
+      ['wobbleDepthValue', parseFloat(document.getElementById('wobble-depth').value).toFixed(0) + '%'],
+      ['wahSpeedValue', parseFloat(document.getElementById('wah-speed')?.value || 1).toFixed(1) + ' Hz'],
+      ['wahDepthValue', parseFloat(document.getElementById('wah-depth')?.value || 20).toFixed(0) + '%'],
+      ['tremoloSpeedValue', parseFloat(document.getElementById('tremolo-speed')?.value || 4).toFixed(1) + ' Hz'],
+      ['tremoloDepthValue', parseFloat(document.getElementById('tremolo-depth')?.value || 30).toFixed(0) + '%'],
+      ['attackValue', parseFloat(document.getElementById('attack')?.value || 0.2).toFixed(2) + ' s'],
+      ['releaseValue', parseFloat(document.getElementById('release')?.value || 0.5).toFixed(2) + ' s'],
+      ['detuneValue', parseFloat(document.getElementById('detune')?.value || 0).toFixed(0) + '¢'],
+      ['distortionValue', parseFloat(document.getElementById('distortion')?.value || 0).toFixed(0) + '%'],
+      ['chorusValue', parseFloat(document.getElementById('chorus')?.value || 0).toFixed(0) + '%'],
+      ['reverbSizeValue', parseFloat(document.getElementById('reverb-size')?.value || 50).toFixed(0) + '%'],
+      ['reverbMixValue', parseFloat(document.getElementById('reverb-mix')?.value || 30).toFixed(0) + '%']
+    ];
+    
+    updates.forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    });
+  }
+
+  function initializeAudio() {
+    if (isInitialized) return;
+    
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    // Master chain
+    masterGain = audioContext.createGain();
+    envelopeGain = audioContext.createGain();
+    // Voice 1
+    osc1 = audioContext.createOscillator();
+    noise1 = audioContext.createBufferSource();
+    noiseGain1 = audioContext.createGain();
+    noiseFilter1 = audioContext.createBiquadFilter();
+    voice1Gain = audioContext.createGain();
+    voice1Filter1 = audioContext.createBiquadFilter();
+    voice1Filter2 = audioContext.createBiquadFilter();
+    voice1Filter3 = audioContext.createBiquadFilter();
+    voice1Mix = audioContext.createGain();
+    // Voice 2
+    osc2 = audioContext.createOscillator();
+    noise2 = audioContext.createBufferSource();
+    noiseGain2 = audioContext.createGain();
+    noiseFilter2 = audioContext.createBiquadFilter();
+    voice2Gain = audioContext.createGain();
+    voice2Filter1 = audioContext.createBiquadFilter();
+    voice2Filter2 = audioContext.createBiquadFilter();
+    voice2Filter3 = audioContext.createBiquadFilter();
+    voice2Mix = audioContext.createGain();
+    // Modulation
+    vibratoOsc = audioContext.createOscillator();
+    vibratoGain = audioContext.createGain();
+    wahOsc = audioContext.createOscillator();
+    wahGain = audioContext.createGain();
+    tremoloOsc = audioContext.createOscillator();
+    tremoloGain = audioContext.createGain();
+    
+    // Effects
+    distortionNode = audioContext.createWaveShaper();
+    chorusDelay = audioContext.createDelay();
+    chorusGain = audioContext.createGain();
+    reverbConvolver = audioContext.createConvolver();
+    reverbGain = audioContext.createGain();
+    reverbMix = audioContext.createGain();
+    
+    // Create noise buffers
+    const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i++) {
+      noiseData[i] = Math.random() * 2 - 1;
+    }
+    
+    noise1.buffer = noiseBuffer;
+    noise1.loop = true;
+    noise2.buffer = noiseBuffer;
+    noise2.loop = true;
+    // Configure filters
+    [voice1Filter1, voice1Filter2, voice1Filter3, voice2Filter1, voice2Filter2, voice2Filter3].forEach(filter => {
+      filter.type = 'bandpass';
+    });
+    [noiseFilter1, noiseFilter2].forEach(filter => {
+      filter.type = 'lowpass';
+    });
+    // Configure oscillators
+    osc1.type = 'sawtooth';
+    osc2.type = 'sawtooth';
+    vibratoOsc.type = 'sine';
+    wahOsc.type = 'sine';
+    tremoloOsc.type = 'sine';
+    
+    // Configure effects
+    chorusDelay.delayTime.value = 0.02;
+    distortionNode.oversample = '2x';
+
+    // *** FIX: Corrected audio graph for parallel formant filtering ***
+
+    // Voice 1 chain (Parallel Filters)
+    // Route oscillator to all three formant filters
+    osc1.connect(voice1Filter1);
+    osc1.connect(voice1Filter2);
+    osc1.connect(voice1Filter3);
+    
+    // Route pre-filtered breath noise to all three formant filters
+    noise1.connect(noiseGain1);
+    noiseGain1.connect(noiseFilter1);
+    noiseFilter1.connect(voice1Filter1);
+    noiseFilter1.connect(voice1Filter2);
+    noiseFilter1.connect(voice1Filter3);
+
+    // Sum the output of the filters into the voice's gain node
+    voice1Filter1.connect(voice1Gain);
+    voice1Filter2.connect(voice1Gain);
+    voice1Filter3.connect(voice1Gain);
+    voice1Gain.connect(voice1Mix);
+    
+    // Voice 2 chain (Parallel Filters)
+    // Route oscillator to all three formant filters
+    osc2.connect(voice2Filter1);
+    osc2.connect(voice2Filter2);
+    osc2.connect(voice2Filter3);
+    
+    // Route pre-filtered breath noise to all three formant filters
+    noise2.connect(noiseGain2);
+    noiseGain2.connect(noiseFilter2);
+    noiseFilter2.connect(voice2Filter1);
+    noiseFilter2.connect(voice2Filter2);
+    noiseFilter2.connect(voice2Filter3);
+
+    // Sum the output of the filters into the voice's gain node
+    voice2Filter1.connect(voice2Gain);
+    voice2Filter2.connect(voice2Gain);
+    voice2Filter3.connect(voice2Gain);
+    voice2Gain.connect(voice2Mix);
+
+    // Modulation connections
+    vibratoOsc.connect(vibratoGain);
+    vibratoGain.connect(osc1.detune); // Use detune for vibrato for better performance
+    vibratoGain.connect(osc2.detune);
+    
+    wahOsc.connect(wahGain);
+    
+    tremoloOsc.connect(tremoloGain);
+    tremoloGain.connect(envelopeGain.gain);
+    // Effects chain
+    const effectsInput = audioContext.createGain();
+    voice1Mix.connect(effectsInput);
+    voice2Mix.connect(effectsInput);
+    
+    effectsInput.connect(distortionNode);
+    effectsInput.connect(chorusDelay);
+    chorusDelay.connect(chorusGain);
+    
+    const effectsOutput = audioContext.createGain();
+    distortionNode.connect(effectsOutput);
+    chorusGain.connect(effectsOutput);
+    effectsInput.connect(effectsOutput);
+    
+    effectsOutput.connect(reverbConvolver);
+    reverbConvolver.connect(reverbGain);
+    reverbGain.connect(reverbMix);
+    
+    effectsOutput.connect(envelopeGain);
+    reverbMix.connect(envelopeGain);
+    
+    envelopeGain.connect(masterGain);
+    masterGain.connect(audioContext.destination);
+    
+    // Start oscillators
+    osc1.start();
+    osc2.start();
+    noise1.start();
+    noise2.start();
+    vibratoOsc.start();
+    wahOsc.start();
+    tremoloOsc.start();
+    
+    // Initialize values
+    envelopeGain.gain.setValueAtTime(0, audioContext.currentTime);
+    vibratoGain.gain.setValueAtTime(0, audioContext.currentTime);
+    wahGain.gain.setValueAtTime(0, audioContext.currentTime);
+    tremoloGain.gain.setValueAtTime(0, audioContext.currentTime);
+    
+    isInitialized = true;
+    updateSynthesis();
+  }
+
+  function startSynth() {
+    if (!isInitialized) initializeAudio();
+    if (isPlaying) return;
+    
+    const now = audioContext.currentTime;
+    const attack = parseFloat(document.getElementById('attack')?.value || 0.2);
+    
+    envelopeGain.gain.cancelScheduledValues(now);
+    envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now); // Start from current value
+    envelopeGain.gain.linearRampToValueAtTime(1, now + attack);
+    
+    isPlaying = true;
+    document.getElementById('statusIndicator').style.display = 'block';
+    document.getElementById('startButton').style.opacity = '0.5';
+  }
+
+  function stopSynth() {
+    if (!isPlaying) return;
+    
+    const now = audioContext.currentTime;
+    const release = parseFloat(document.getElementById('release')?.value || 0.5);
+    
+    envelopeGain.gain.cancelScheduledValues(now);
+    envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, now);
+    envelopeGain.gain.linearRampToValueAtTime(0, now + release);
+    
+    isPlaying = false;
+    document.getElementById('statusIndicator').style.display = 'none';
+    document.getElementById('startButton').style.opacity = '1';
+  }
+
+  // Wah modulation update
+  function updateWahModulation() {
+    const wahActive = document.getElementById('toggle-wah')?.classList.contains('active');
+    if (wahActive && audioContext) {
+      // Use a sine wave calculation to modulate the vowel position
+      wahModulation = Math.sin(audioContext.currentTime * parseFloat(document.getElementById('wah-speed')?.value || 1) * 2 * Math.PI);
+      updateSynthesis();
+    }
+    requestAnimationFrame(updateWahModulation);
+  }
+
+  // Event listeners
+  document.getElementById('startButton').addEventListener('click', startSynth);
+  document.getElementById('stopButton').addEventListener('click', stopSynth);
+  // Control updates
+  document.querySelectorAll('input[type="range"]').forEach(input => {
+    input.addEventListener('input', updateSynthesis);
+  });
+  // Toggle buttons
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.classList.toggle('active');
+      const targetId = this.id.replace('toggle-', '') + '-controls';
+      const targetEl = document.getElementById(targetId);
+      
+      if (this.classList.contains('active')) {
+        this.textContent = 'ON';
+        targetEl?.classList.remove('hidden-section');
+      } else {
+        this.textContent = 'OFF';
+        targetEl?.classList.add('hidden-section');
+      }
+      
+      updateSynthesis();
+    });
+  });
+  // Wave type buttons
+  document.querySelectorAll('.preset-buttons').forEach(container => {
+    container.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON') {
+        container.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+        updateSynthesis();
+      }
+    });
+  });
+  // Initialize displays
+  updateDisplays();
+  updateWahModulation();
+  
+  // Touch events for mobile
+  document.addEventListener('touchstart', function() {
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+  }, { once: true });
+});
+</script>
+</body>
+</html>
