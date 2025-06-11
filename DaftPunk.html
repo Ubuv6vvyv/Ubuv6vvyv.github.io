@@ -177,7 +177,7 @@ margin-top: 0px;
 
 <div id="app">
     <div class="group">
-        <button id="startStopButton">🎤 Start</button>
+        <button id="startStopButton">🎤 Start That Noise</button>
     </div>
 
     <div class="group">
@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioContext, isPlaying = false, isInitialized = false;
     let osc, noise, oscGain, noiseGain, toneFilter, masterGain;
     let formant1, formant2, formant3, reverb, reverbGain, distortion, vibratoOsc, vibratoGain;
+    let distortionCurves = new Map();
 
     const VOWELS = {
         'Ee': [270, 2300, 3000], 'Er': [500, 1400, 2500], 'Uu': [250, 600, 2200],
@@ -288,19 +289,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const ui = {};
     document.querySelectorAll('[id]').forEach(el => ui[el.id] = el);
 
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL = 16; // ~60fps
+    let cachedValues = {};
+    let needsUpdate = true;
+
     function makeDistortionCurve(amount) {
-        const k = typeof amount === 'number' ? amount : 50;
-        const n_samples = 44100;
+        const rounded = Math.round(amount);
+        if (distortionCurves.has(rounded)) return distortionCurves.get(rounded);
+        
+        const k = rounded;
+        const n_samples = 8192; // Reduced from 44100
         const curve = new Float32Array(n_samples);
         const deg = Math.PI / 180;
         for (let i = 0; i < n_samples; ++i) {
             const x = i * 2 / n_samples - 1;
             curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
         }
+        
+        if (distortionCurves.size > 20) distortionCurves.clear(); // Memory management
+        distortionCurves.set(rounded, curve);
         return curve;
     }
 
-    function createReverbImpulse(duration = 2.0, decay = 1.5) {
+    function createReverbImpulse(duration = 1.5, decay = 1.2) { // Reduced duration
         const sampleRate = audioContext.sampleRate;
         const length = sampleRate * duration;
         const impulse = audioContext.createBuffer(2, length, sampleRate);
@@ -329,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         vibratoOsc.connect(vibratoGain);
         vibratoGain.connect(osc.detune);
 
-        const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate, audioContext.sampleRate);
+        const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.1, audioContext.sampleRate); // Smaller buffer
         const data = noiseBuffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
         noise.buffer = noiseBuffer; noise.loop = true;
@@ -362,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         masterGain.connect(audioContext.destination);
 
-        osc.type = 'sawtooth'; // Default to sawtooth
+        osc.type = 'sawtooth';
         toneFilter.type = 'lowpass';
         masterGain.gain.value = 0;
         
@@ -387,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isPlaying = !isPlaying;
         const now = audioContext.currentTime;
         if (isPlaying) {
-            masterGain.gain.setTargetAtTime(parseFloat(ui.volume.value), now, 0.1);
+            masterGain.gain.setTargetAtTime(+ui.volume.value, now, 0.1);
             ui.startStopButton.innerHTML = "🎤 Stop";
         } else {
             masterGain.gain.setTargetAtTime(0, now, 0.2);
@@ -395,48 +407,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function animationLoop(time) {
-        if (!isInitialized) { requestAnimationFrame(animationLoop); return; }
-        
+    function updateAudioParams(time) {
         const now = audioContext.currentTime;
-        const lfo1 = parseFloat(ui.lfo1Depth.value) * Math.sin(2 * Math.PI * parseFloat(ui.lfo1Rate.value) * time / 1000);
-        const lfo2 = parseFloat(ui.lfo2Depth.value) * Math.sin(2 * Math.PI * parseFloat(ui.lfo2Rate.value) * time / 1000);
+        const lfo1 = +ui.lfo1Depth.value * Math.sin(2 * Math.PI * +ui.lfo1Rate.value * time / 1000);
+        const lfo2 = +ui.lfo2Depth.value * Math.sin(2 * Math.PI * +ui.lfo2Rate.value * time / 1000);
         let mods = { vowelX: 0, vowelY: 0, pitch: 0, tone: 0, voiceSize: 0 };
         
-        [ {v: lfo1, t: ui.lfo1Target.value}, {v: lfo2, t: ui.lfo2Target.value} ].forEach(lfo => {
-            if (lfo.t === "vowelX") mods.vowelX += lfo.v * 0.5;
-            if (lfo.t === "vowelY") mods.vowelY += lfo.v * 0.5;
-            if (lfo.t === "pitch") mods.pitch += lfo.v * 100;
-            if (lfo.t === "tone") mods.tone += lfo.v * 2000;
-            if (lfo.t === "voiceSize") mods.voiceSize += lfo.v * 0.5;
-        });
+        const targets = [ui.lfo1Target.value, ui.lfo2Target.value];
+        const values = [lfo1, lfo2];
+        for (let i = 0; i < 2; i++) {
+            const t = targets[i], v = values[i];
+            if (t === "vowelX") mods.vowelX += v * 0.5;
+            else if (t === "vowelY") mods.vowelY += v * 0.5;
+            else if (t === "pitch") mods.pitch += v * 100;
+            else if (t === "tone") mods.tone += v * 2000;
+            else if (t === "voiceSize") mods.voiceSize += v * 0.5;
+        }
 
         const gx = Math.max(0, Math.min(1, xyPos.x + mods.vowelX)) * 2;
         const gy = Math.max(0, Math.min(1, xyPos.y + mods.vowelY)) * 2;
         const col = Math.min(1, Math.floor(gx));
         const row = Math.min(1, Math.floor(gy));
-        const localX = gx - col;
-        const localY = gy - row;
-        const formants = bilerp(VOWEL_GRID[row][col], VOWEL_GRID[row][col + 1], VOWEL_GRID[row + 1][col], VOWEL_GRID[row + 1][col + 1], localX, localY);
-        const voiceSize = parseFloat(ui.voiceSize.value) + mods.voiceSize;
-        formant1.frequency.setTargetAtTime(formants[0] * voiceSize, now, 0.02);
-        formant2.frequency.setTargetAtTime(formants[1] * voiceSize, now, 0.02);
-        formant3.frequency.setTargetAtTime(formants[2] * voiceSize, now, 0.02);
-
-        const basePitch = parseFloat(ui.pitch.value);
-        osc.frequency.setTargetAtTime(basePitch + mods.pitch, now, 0.02);
-        oscGain.gain.setTargetAtTime(1.0 - parseFloat(ui.breathiness.value), now, 0.02);
-        noiseGain.gain.setTargetAtTime(parseFloat(ui.breathiness.value), now, 0.02);
-        toneFilter.frequency.setTargetAtTime(Math.max(20, parseFloat(ui.tone.value) + mods.tone), now, 0.02);
+        const formants = bilerp(VOWEL_GRID[row][col], VOWEL_GRID[row][col + 1], VOWEL_GRID[row + 1][col], VOWEL_GRID[row + 1][col + 1], gx - col, gy - row);
+        const voiceSize = +ui.voiceSize.value + mods.voiceSize;
         
-        const resonance = parseFloat(ui.resonance.value);
-        [formant1.Q, formant2.Q, formant3.Q].forEach(q => q.setTargetAtTime(resonance, now, 0.02));
-        
-        reverbGain.gain.setTargetAtTime(parseFloat(ui.reverb.value), now, 0.02);
-        distortion.curve = makeDistortionCurve(parseFloat(ui.distortion.value));
-        vibratoGain.gain.setTargetAtTime(parseFloat(ui.vibrato.value) * 100, now, 0.02);
+        formant1.frequency.setTargetAtTime(formants[0] * voiceSize, now, 0.03);
+        formant2.frequency.setTargetAtTime(formants[1] * voiceSize, now, 0.03);
+        formant3.frequency.setTargetAtTime(formants[2] * voiceSize, now, 0.03);
 
-        if (isPlaying) masterGain.gain.setTargetAtTime(parseFloat(ui.volume.value), now, 0.02);
+        osc.frequency.setTargetAtTime(+ui.pitch.value + mods.pitch, now, 0.03);
+        oscGain.gain.setTargetAtTime(1.0 - +ui.breathiness.value, now, 0.03);
+        noiseGain.gain.setTargetAtTime(+ui.breathiness.value, now, 0.03);
+        toneFilter.frequency.setTargetAtTime(Math.max(20, +ui.tone.value + mods.tone), now, 0.03);
+        
+        const resonance = +ui.resonance.value;
+        formant1.Q.setTargetAtTime(resonance, now, 0.03);
+        formant2.Q.setTargetAtTime(resonance, now, 0.03);
+        formant3.Q.setTargetAtTime(resonance, now, 0.03);
+        
+        reverbGain.gain.setTargetAtTime(+ui.reverb.value, now, 0.03);
+        
+        const distVal = +ui.distortion.value;
+        if (Math.abs(distVal - (cachedValues.lastDistortion || 0)) > 1) {
+            distortion.curve = makeDistortionCurve(distVal);
+            cachedValues.lastDistortion = distVal;
+        }
+        
+        vibratoGain.gain.setTargetAtTime(+ui.vibrato.value * 100, now, 0.03);
+        if (isPlaying) masterGain.gain.setTargetAtTime(+ui.volume.value, now, 0.03);
+    }
+
+    function animationLoop(time) {
+        if (!isInitialized) { requestAnimationFrame(animationLoop); return; }
+        
+        if (time - lastUpdateTime >= UPDATE_INTERVAL) {
+            updateAudioParams(time);
+            lastUpdateTime = time;
+        }
+        
         requestAnimationFrame(animationLoop);
     }
 
@@ -463,20 +491,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('touchmove', e => { if (isDragging) handleInteraction(e); }, { passive: false });
         document.addEventListener('touchend', () => { isDragging = false; });
         
+        let displayUpdateTimer;
         const updateDisplays = () => {
-            ui.pitchVal.textContent = `${ui.pitch.value} Hz`;
-            ui.breathinessVal.textContent = `${Math.round(ui.breathiness.value * 100)}%`;
-            ui.toneVal.textContent = `${ui.tone.value} Hz`;
-            ui.resonanceVal.textContent = parseFloat(ui.resonance.value).toFixed(1);
-            ui.voiceSizeVal.textContent = `${parseFloat(ui.voiceSize.value).toFixed(2)}x`;
-            ui.reverbVal.textContent = `${Math.round(ui.reverb.value * 100)}%`;
-            ui.distortionVal.textContent = `${Math.round(ui.distortion.value)}%`;
-            ui.vibratoVal.textContent = `${Math.round(ui.vibrato.value * 100)}%`;
-            ui.lfo1RateVal.textContent = `${parseFloat(ui.lfo1Rate.value).toFixed(1)} Hz`;
-            ui.lfo1DepthVal.textContent = `${Math.round(ui.lfo1Depth.value * 100)}%`;
-            ui.lfo2RateVal.textContent = `${parseFloat(ui.lfo2Rate.value).toFixed(1)} Hz`;
-            ui.lfo2DepthVal.textContent = `${Math.round(ui.lfo2Depth.value * 100)}%`;
-            ui.volumeVal.textContent = `${Math.round(ui.volume.value * 100)}%`;
+            clearTimeout(displayUpdateTimer);
+            displayUpdateTimer = setTimeout(() => {
+                ui.pitchVal.textContent = `${ui.pitch.value} Hz`;
+                ui.breathinessVal.textContent = `${Math.round(ui.breathiness.value * 100)}%`;
+                ui.toneVal.textContent = `${ui.tone.value} Hz`;
+                ui.resonanceVal.textContent = (+ui.resonance.value).toFixed(1);
+                ui.voiceSizeVal.textContent = `${(+ui.voiceSize.value).toFixed(2)}x`;
+                ui.reverbVal.textContent = `${Math.round(ui.reverb.value * 100)}%`;
+                ui.distortionVal.textContent = `${Math.round(ui.distortion.value)}%`;
+                ui.vibratoVal.textContent = `${Math.round(ui.vibrato.value * 100)}%`;
+                ui.lfo1RateVal.textContent = `${(+ui.lfo1Rate.value).toFixed(1)} Hz`;
+                ui.lfo1DepthVal.textContent = `${Math.round(ui.lfo1Depth.value * 100)}%`;
+                ui.lfo2RateVal.textContent = `${(+ui.lfo2Rate.value).toFixed(1)} Hz`;
+                ui.lfo2DepthVal.textContent = `${Math.round(ui.lfo2Depth.value * 100)}%`;
+                ui.volumeVal.textContent = `${Math.round(ui.volume.value * 100)}%`;
+            }, 50);
         };
         document.querySelectorAll('input[type="range"]').forEach(slider => {
             slider.addEventListener('input', updateDisplays);
@@ -488,6 +520,5 @@ document.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(animationLoop);
 });
 </script>
-
 </body>
 </html>
