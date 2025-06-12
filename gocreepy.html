@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google API Endpoint Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        details > summary {
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .generated-url {
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Google API Endpoint Builder</h1>
+            <p class="text-gray-600 mt-2">A simple utility to find your IDs and construct valid API URLs.</p>
+        </header>
+
+        <!-- Section 1: User Guide & Inputs -->
+        <section class="mb-12 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800 border-b pb-3">1. Get Your Details</h2>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-semibold text-lg text-gray-700 mb-2">How to find your Google ID (Gaia ID):</h3>
+                    <ol class="list-decimal list-inside text-gray-600 space-y-1 pl-2">
+                        <li>Visit the <a href="https://developers.google.com/people/api/rest/v1/people/get" target="_blank" class="text-blue-600 hover:underline">People API Explorer</a>.</li>
+                        <li>In the `resourceName` field, enter <strong>people/me</strong>.</li>
+                        <li>Click "Execute", authorize your account, and find the 21-digit number next to `"id":` in the results.</li>
+                    </ol>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg text-gray-700 mb-2">How to get an API Key:</h3>
+                    <ol class="list-decimal list-inside text-gray-600 space-y-1 pl-2">
+                        <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="text-blue-600 hover:underline">Google Cloud Credentials page</a>.</li>
+                        <li>Create or select a project.</li>
+                        <li>Click <strong>+ CREATE CREDENTIALS</strong> and choose <strong>API key</strong>. Copy the key.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold mt-8 mb-4 text-gray-800 border-b pb-3">2. Enter Your Details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                    <label for="gaiaId" class="block text-sm font-medium text-gray-700 mb-1">Your Google ID (Gaia ID)</label>
+                    <input type="text" id="gaiaId" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 112233445566778899001">
+                </div>
+                <div>
+                    <label for="apiKey" class="block text-sm font-medium text-gray-700 mb-1">Your API Key</label>
+                    <input type="text" id="apiKey" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., AIzaSy...">
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Endpoint Explorer -->
+        <section>
+            <h2 class="text-2xl font-semibold mb-6 text-gray-800 text-center">Endpoint Explorer</h2>
+            <div class="space-y-4" id="endpoint-container">
+                <!-- Endpoint categories will be injected here by JS -->
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Hidden element for clipboard operations -->
+    <textarea id="clipboard-helper" class="absolute -left-full"></textarea>
+
+    <script>
+        const endpoints = {
+            "Core Identity & Profile": [
+                { method: "GET", desc: "Get your own profile info (name, photo, etc.).", template: "https://people.googleapis.com/v1/people/me?personFields=names,photos,emailAddresses&key={apiKey}" },
+                { method: "GET", desc: "Get a specific user's profile by their ID.", template: "https://people.googleapis.com/v1/people/{gaiaId}?personFields=names,photos&key={apiKey}" },
+                { method: "GET", desc: "Get basic user info via OAuth2 endpoint.", template: "https://www.googleapis.com/oauth2/v3/userinfo?key={apiKey}" }
+            ],
+            "YouTube": [
+                { method: "GET", desc: "Get info for a specific YouTube channel.", template: "https://www.googleapis.com/youtube/v3/channels?id={channelId_placeholder}&part=snippet,statistics&key={apiKey}" },
+                { method: "GET", desc: "Search for videos, channels, or playlists.", template: "https://www.googleapis.com/youtube/v3/search?part=snippet&q={query_placeholder}&key={apiKey}" },
+                { method: "GET", desc: "Get items from a specific playlist.", template: "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlistId_placeholder}&key={apiKey}" }
+            ],
+            "Productivity & Media": [
+                { method: "GET", desc: "Get metadata for a specific Drive file.", template: "https://www.googleapis.com/drive/v3/files/{fileId_placeholder}?fields=name,id,owners&key={apiKey}" },
+                { method: "GET", desc: "List permissions for a Drive file.", template: "https://www.googleapis.com/drive/v3/files/{fileId_placeholder}/permissions?key={apiKey}" },
+                { method: "GET", desc: "List events from a public calendar.", template: "https://www.googleapis.com/calendar/v3/calendars/{calendar_email_placeholder}/events?key={apiKey}" },
+                { method: "POST", desc: "Search your own media items in Google Photos.", template: "https://photoslibrary.googleapis.com/v1/mediaItems:search" },
+                 { method: "GET", desc: "List your Google Tasks lists.", template: "https://tasks.googleapis.com/tasks/v1/users/@me/lists?key={apiKey}" }
+            ],
+             "Web Scraping & Undocumented": [
+                { method: "URL", desc: "View a user's public Maps reviews.", template: "https://www.google.com/maps/contrib/{gaiaId}/reviews" },
+                { method: "URL", desc: "View a user's public Maps photos.", template: "https://www.google.com/maps/contrib/{gaiaId}/photos" },
+            ]
+        };
+
+        const container = document.getElementById('endpoint-container');
+
+        function generateUrl(template, index) {
+            const gaiaId = document.getElementById('gaiaId').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            let url = template;
+            url = url.replace(/{gaiaId}/g, gaiaId || '{gaiaId_placeholder}');
+            url = url.replace(/{apiKey}/g, apiKey || '{YOUR_API_KEY}');
+
+            // Handle non-standard placeholders for user input
+            url = url.replace(/{channelId_placeholder}/g, prompt("Enter YouTube Channel ID:") || '{channelId_placeholder}');
+            url = url.replace(/{query_placeholder}/g, prompt("Enter YouTube search query:") || '{query_placeholder}');
+            url = url.replace(/{playlistId_placeholder}/g, prompt("Enter YouTube Playlist ID:") || '{playlistId_placeholder}');
+            url = url.replace(/{fileId_placeholder}/g, prompt("Enter Google Drive File ID:") || '{fileId_placeholder}');
+            url = url.replace(/{calendar_email_placeholder}/g, prompt("Enter Calendar Email/ID:") || '{calendar_email_placeholder}');
+
+            const outputField = document.getElementById(`output-${index}`);
+            outputField.textContent = url;
+            outputField.classList.remove('text-gray-400');
+            outputField.classList.add('text-gray-900');
+        }
+
+        function copyToClipboard(index) {
+            const textToCopy = document.getElementById(`output-${index}`).textContent;
+            const clipboardHelper = document.getElementById('clipboard-helper');
+            clipboardHelper.value = textToCopy;
+            clipboardHelper.select();
+            try {
+                document.execCommand('copy');
+                alert('URL copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy URL.');
+            }
+        }
+
+        let endpointIndex = 0;
+        for (const category in endpoints) {
+            const details = document.createElement('details');
+            details.className = "bg-white p-4 rounded-lg shadow-sm border border-gray-200";
+            details.open = true;
+
+            const summary = document.createElement('summary');
+            summary.className = "flex justify-between items-center cursor-pointer";
+            summary.innerHTML = `<h3 class="text-xl font-semibold text-gray-800">${category}</h3>
+                                 <svg class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
+            details.appendChild(summary);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = "mt-4 space-y-4";
+            
+            endpoints[category].forEach(endpoint => {
+                const currentIndex = endpointIndex++;
+                const item = document.createElement('div');
+                item.className = "p-4 border rounded-md bg-gray-50";
+
+                const methodBadge = `<span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${endpoint.method === 'GET' ? 'bg-green-100 text-green-800' : (endpoint.method === 'POST' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800')}">${endpoint.method}</span>`;
+
+                item.innerHTML = `
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+                        <p class="font-medium text-gray-700">${endpoint.desc}</p>
+                        ${methodBadge}
+                    </div>
+                    <p class="text-sm text-gray-500 mb-3 font-mono">${endpoint.template.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                    <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                        <button onclick="generateUrl('${endpoint.template}', ${currentIndex})" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition">Generate URL</button>
+                        <div class="flex-grow bg-white border border-gray-300 rounded-md p-2 text-sm generated-url text-gray-400" id="output-${currentIndex}">{generated_url_appears_here}</div>
+                        <button onclick="copyToClipboard(${currentIndex})" class="w-full sm:w-auto bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 transition">Copy</button>
+                    </div>
+                `;
+                contentDiv.appendChild(item);
+            });
+
+            details.appendChild(contentDiv);
+            container.appendChild(details);
+
+            // Toggle arrow rotation
+            details.addEventListener('toggle', () => {
+                const arrow = summary.querySelector('svg');
+                arrow.classList.toggle('rotate-180', details.open);
+            });
+        }
+    </script>
+
+</body>
+</html>
