@@ -37,9 +37,10 @@
             <div class="space-y-6">
                 <div>
                     <h3 class="font-semibold text-lg text-gray-700 mb-2">How to find your Google ID (Gaia ID):</h3>
-                    <ol class="list-decimal list-inside text-gray-600 space-y-1 pl-2">
+                    <ol class="list-decimal list-inside text-gray-600 space-y-2 pl-2">
                         <li>Visit the <a href="https://developers.google.com/people/api/rest/v1/people/get" target="_blank" class="text-blue-600 hover:underline">People API Explorer</a>.</li>
                         <li>In the `resourceName` field, enter <strong>people/me</strong>.</li>
+                        <li><strong>(Important)</strong> In the `personFields` field, enter <strong>metadata,names</strong>.</li>
                         <li>Click "Execute", authorize your account, and find the 21-digit number next to `"id":` in the results.</li>
                     </ol>
                 </div>
@@ -104,23 +105,42 @@
             ]
         };
 
-        const container = document.getElementById('endpoint-container');
-
         function generateUrl(template, index) {
             const gaiaId = document.getElementById('gaiaId').value.trim();
             const apiKey = document.getElementById('apiKey').value.trim();
             
             let url = template;
-            url = url.replace(/{gaiaId}/g, gaiaId || '{gaiaId_placeholder}');
-            url = url.replace(/{apiKey}/g, apiKey || '{YOUR_API_KEY}');
 
-            // Handle non-standard placeholders for user input
-            url = url.replace(/{channelId_placeholder}/g, prompt("Enter YouTube Channel ID:") || '{channelId_placeholder}');
-            url = url.replace(/{query_placeholder}/g, prompt("Enter YouTube search query:") || '{query_placeholder}');
-            url = url.replace(/{playlistId_placeholder}/g, prompt("Enter YouTube Playlist ID:") || '{playlistId_placeholder}');
-            url = url.replace(/{fileId_placeholder}/g, prompt("Enter Google Drive File ID:") || '{fileId_placeholder}');
-            url = url.replace(/{calendar_email_placeholder}/g, prompt("Enter Calendar Email/ID:") || '{calendar_email_placeholder}');
+            // Replace common placeholders
+            if (url.includes('{gaiaId}')) {
+                url = url.replace(/{gaiaId}/g, gaiaId || '{gaiaId_placeholder}');
+            }
+            if (url.includes('{apiKey}')) {
+                url = url.replace(/{apiKey}/g, apiKey || '{YOUR_API_KEY}');
+            }
 
+            // Conditionally prompt for other specific IDs only if the template requires them.
+            if (url.includes('{channelId_placeholder}')) {
+                const val = prompt("This endpoint requires a YouTube Channel ID:");
+                url = url.replace('{channelId_placeholder}', val || '{channelId_placeholder}');
+            }
+            if (url.includes('{query_placeholder}')) {
+                const val = prompt("This endpoint requires a YouTube search query:");
+                url = url.replace('{query_placeholder}', val || '{query_placeholder}');
+            }
+            if (url.includes('{playlistId_placeholder}')) {
+                const val = prompt("This endpoint requires a YouTube Playlist ID:");
+                url = url.replace('{playlistId_placeholder}', val || '{playlistId_placeholder}');
+            }
+            if (url.includes('{fileId_placeholder}')) {
+                const val = prompt("This endpoint requires a Google Drive File ID:");
+                url = url.replace(/{fileId_placeholder}/g, val || '{fileId_placeholder}');
+            }
+            if (url.includes('{calendar_email_placeholder}')) {
+                const val = prompt("This endpoint requires a Calendar Email or ID (e.g., primary):");
+                url = url.replace('{calendar_email_placeholder}', val || '{calendar_email_placeholder}');
+            }
+            
             const outputField = document.getElementById(`output-${index}`);
             outputField.textContent = url;
             outputField.classList.remove('text-gray-400');
@@ -129,6 +149,10 @@
 
         function copyToClipboard(index) {
             const textToCopy = document.getElementById(`output-${index}`).textContent;
+            if (textToCopy.includes('{') || textToCopy.includes('}')) {
+                alert('Please generate the URL first.');
+                return;
+            }
             const clipboardHelper = document.getElementById('clipboard-helper');
             clipboardHelper.value = textToCopy;
             clipboardHelper.select();
@@ -139,7 +163,9 @@
                 alert('Failed to copy URL.');
             }
         }
-
+        
+        // --- UI Generation ---
+        const container = document.getElementById('endpoint-container');
         let endpointIndex = 0;
         for (const category in endpoints) {
             const details = document.createElement('details');
@@ -180,7 +206,6 @@
             details.appendChild(contentDiv);
             container.appendChild(details);
 
-            // Toggle arrow rotation
             details.addEventListener('toggle', () => {
                 const arrow = summary.querySelector('svg');
                 arrow.classList.toggle('rotate-180', details.open);
