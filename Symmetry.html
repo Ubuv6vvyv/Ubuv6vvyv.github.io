@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Symmetry Mirror Tool (Expanded Modes)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --surface-color: #2a2a2a;
+            --primary-color: #16A085; /* A calming teal */
+            --primary-hover: #1ABC9C;
+            --text-color: #e0e0e0;
+            --border-color: #444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 8px;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            font-weight: 600;
+            padding-block: 4px;
+            flex-shrink: 0;
+        }
+
+        .upload-area {
+            text-align: center;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        input[type="file"] { display: none; }
+
+        .upload-btn {
+            background: var(--primary-color);
+            color: #fff;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .upload-btn:hover { background: var(--primary-hover); }
+
+        .controls-panel {
+            background: var(--surface-color);
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn-group {
+            display: grid;
+            /* Expanded grid to 4 columns */
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background: #3c3c3c;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 4px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s ease;
+            text-align: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            font-weight: bold;
+            color: #fff;
+        }
+        .btn:hover:not(.active) { background: #555; }
+
+        .slider-group {
+            display: grid;
+            grid-template-columns: 80px 1fr 40px;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        
+        .slider-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #ccc;
+            white-space: nowrap;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: var(--bg-color);
+            outline: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        .slider-value {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-align: right;
+            color: #fff;
+        }
+
+        .canvas-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            cursor: move;
+            flex-grow: 1;
+            min-height: 200px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        
+        .footer-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+        
+        .action-btn {
+            background: #3c3c3c;
+            color: #fff;
+            border: none;
+            padding: 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .action-btn:hover { background: #555; }
+        .action-btn:disabled { background: #666; cursor: not-allowed; }
+        #resetBtn { background: #d32f2f; grid-column: 3 / 4; }
+        #resetBtn:hover { background: #c62828; }
+
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <h1>Seamless Mirror</h1>
+
+    <div class="upload-area">
+        <label for="imageUpload" class="upload-btn">⬆️ Upload Image</label>
+        <input type="file" id="imageUpload" accept="image/*">
+    </div>
+
+    <div class="controls-panel">
+        <div class="btn-group">
+            <!-- Original Buttons -->
+            <button class="btn active" data-mode="vertical">Vertical</button>
+            <button class="btn" data-mode="horizontal">Horizontal</button>
+            <button class="btn" data-mode="quad">Quad</button>
+            <button class="btn" data-mode="cross">Cross</button>
+            <button class="btn" data-mode="kaleidoscope">Kaleido</button>
+            <button class="btn" data-mode="diamond">Diamond</button>
+            <button class="btn" data-mode="spiral">Spiral</button>
+            <button class="btn" data-mode="radial">Radial</button>
+            <button class="btn" data-mode="tunnel">Tunnel</button>
+            <!-- Seamless/Tiling Buttons -->
+            <button class="btn" data-mode="infini-grid">Infini-Grid</button>
+            <button class="btn" data-mode="droste-tile">Droste Tile</button>
+            <button class="btn" data-mode="mirror-weave">Weave</button>
+            <!-- NEW Simple Expansion Buttons -->
+            <button class="btn" data-mode="quad-echo">Quad Echo</button>
+            <button class="btn" data-mode="quad-tile">Quad Tile</button>
+            <button class="btn" data-mode="v-layers">V-Layers</button>
+            <button class="btn" data-mode="h-layers">H-Layers</button>
+        </div>
+
+        <div class="slider-group">
+            <label for="count" class="slider-label" id="count-label-text">Repeats</label>
+            <input type="range" id="count" min="1" max="40" value="1">
+            <span class="slider-value" id="countVal">1</span>
+        </div>
+        <div class="slider-group">
+            <label for="scale" class="slider-label">Scale</label>
+            <input type="range" id="scale" min="0.1" max="4" step="0.05" value="1">
+            <span class="slider-value" id="scaleVal">1.0</span>
+        </div>
+        <div class="slider-group">
+            <label for="angle" class="slider-label">Rotation</label>
+            <input type="range" id="angle" min="0" max="360" step="1" value="0">
+            <span class="slider-value" id="angleVal">0°</span>
+        </div>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="footer-actions">
+        <button class="action-btn" id="downloadJPG" disabled>Download JPG</button>
+        <button class="action-btn" id="downloadPNG" disabled>Download PNG</button>
+        <button class="action-btn" id="resetBtn">Reset All</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const offscreenCanvas = document.createElement('canvas');
+    const offscreenCtx = offscreenCanvas.getContext('2d');
+
+    const modeButtons = document.querySelectorAll('[data-mode]');
+    const sliders = {
+        count: document.getElementById('count'),
+        scale: document.getElementById('scale'),
+        angle: document.getElementById('angle'),
+    };
+    const valueDisplays = {
+        count: document.getElementById('countVal'),
+        scale: document.getElementById('scaleVal'),
+        angle: document.getElementById('angleVal'),
+    };
+    const countLabelText = document.getElementById('count-label-text');
+
+    const defaults = {
+        count: 1,
+        scale: 1,
+        angle: 0,
+        mode: 'vertical'
+    };
+
+    let sourceImage = null;
+    let currentMode = defaults.mode;
+    let reflectionPoint = { x: 0.5, y: 0.5 };
+    let isDragging = false;
+
+    function updateSliderDisplays() {
+        valueDisplays.count.textContent = sliders.count.value;
+        valueDisplays.scale.textContent = parseFloat(sliders.scale.value).toFixed(2);
+        valueDisplays.angle.textContent = `${sliders.angle.value}°`;
+    }
+    
+    function updateControlsForMode(mode) {
+        const needsSegments = ['kaleidoscope', 'radial', 'spiral'];
+        const needsLayers = ['tunnel', 'diamond', 'quad-echo', 'v-layers', 'h-layers'];
+        const needsDensity = ['infini-grid', 'mirror-weave', 'quad-tile'];
+        const needsDepth = ['droste-tile'];
+
+        if (needsSegments.includes(mode)) {
+            countLabelText.textContent = 'Segments';
+            sliders.count.min = 2;
+             sliders.count.max = 40;
+        } else if (needsLayers.includes(mode)) {
+            countLabelText.textContent = 'Layers';
+            sliders.count.min = 2;
+            sliders.count.max = 20;
+        } else if (needsDensity.includes(mode)) {
+            countLabelText.textContent = 'Density';
+            sliders.count.min = 2;
+            sliders.count.max = 20;
+        } else if (needsDepth.includes(mode)) {
+            countLabelText.textContent = 'Depth';
+            sliders.count.min = 1;
+            sliders.count.max = 6;
+        } else {
+            countLabelText.textContent = 'Repeats';
+            sliders.count.min = 1;
+            sliders.count.max = 40;
+        }
+        updateSliderDisplays();
+    }
+
+    function resetControls() {
+        currentMode = defaults.mode;
+        sliders.count.value = defaults.count;
+        sliders.scale.value = defaults.scale;
+        sliders.angle.value = defaults.angle;
+        reflectionPoint = { x: 0.5, y: 0.5 };
+        
+        modeButtons.forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-mode="${defaults.mode}"]`).classList.add('active');
+        
+        updateControlsForMode(currentMode);
+        drawSymmetry();
+    }
+
+    document.getElementById('resetBtn').onclick = resetControls;
+
+    document.getElementById('imageUpload').onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = event => {
+            sourceImage = new Image();
+            sourceImage.onload = () => {
+                const maxW = 800;
+                let w = sourceImage.width;
+                let h = sourceImage.height;
+                if (w > maxW) {
+                    const ratio = maxW / w;
+                    w = maxW;
+                    h *= ratio;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                offscreenCanvas.width = w;
+                offscreenCanvas.height = h;
+                resetControls();
+                document.getElementById('downloadJPG').disabled = false;
+                document.getElementById('downloadPNG').disabled = false;
+            };
+            sourceImage.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    modeButtons.forEach(btn => {
+        btn.onclick = () => {
+            currentMode = btn.dataset.mode;
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateControlsForMode(currentMode);
+            drawSymmetry();
+        };
+    });
+
+    Object.values(sliders).forEach(slider => {
+        slider.oninput = () => {
+            updateSliderDisplays();
+            requestAnimationFrame(drawSymmetry);
+        };
+    });
+
+    function handleDrag(e) {
+        if (isDragging && sourceImage) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            reflectionPoint.x = Math.max(0.01, Math.min(0.99, (clientX - rect.left) / rect.width));
+            reflectionPoint.y = Math.max(0.01, Math.min(0.99, (clientY - rect.top) / rect.height));
+            requestAnimationFrame(drawSymmetry);
+        }
+    }
+
+    canvas.addEventListener('mousedown', (e) => isDragging = true);
+    canvas.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mouseleave', () => isDragging = false);
+    canvas.addEventListener('mousemove', handleDrag);
+    canvas.addEventListener('touchstart', (e) => isDragging = true, { passive: false });
+    canvas.addEventListener('touchend', () => isDragging = false);
+    canvas.addEventListener('touchmove', handleDrag, { passive: false });
+
+    function drawSingleMirror(type, targetCtx = ctx) {
+        const w = targetCtx.canvas.width;
+        const h = targetCtx.canvas.height;
+        const imgW = sourceImage.width;
+        const imgH = sourceImage.height;
+        const sourceClipX = imgW * reflectionPoint.x;
+        const sourceClipY = imgH * reflectionPoint.y;
+        const destClipX = w * reflectionPoint.x;
+        const destClipY = h * reflectionPoint.y;
+        
+        targetCtx.save();
+        targetCtx.rotate(sliders.angle.value * Math.PI / 180);
+        targetCtx.scale(sliders.scale.value, sliders.scale.value);
+        
+        switch(type) {
+            case 'vertical':
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, imgH, -destClipX, -h/2, destClipX, h);
+                targetCtx.scale(-1, 1);
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, imgH, -destClipX, -h/2, destClipX, h);
+                break;
+            case 'horizontal':
+                targetCtx.drawImage(sourceImage, 0, 0, imgW, sourceClipY, -w/2, -destClipY, w, destClipY);
+                targetCtx.scale(1, -1);
+                targetCtx.drawImage(sourceImage, 0, 0, imgW, sourceClipY, -w/2, -destClipY, w, destClipY);
+                break;
+            case 'quad':
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, sourceClipY, -destClipX, -destClipY, destClipX, destClipY);
+                targetCtx.scale(-1, 1);
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, sourceClipY, -destClipX, -destClipY, destClipX, destClipY);
+                ctx.scale(1, -1); // Bug fix: use main ctx for correct quad drawing
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, sourceClipY, -destClipX, -destClipY, destClipX, destClipY);
+                ctx.scale(-1, 1); // Bug fix
+                targetCtx.drawImage(sourceImage, 0, 0, sourceClipX, sourceClipY, -destClipX, -destClipY, destClipX, destClipY);
+                break;
+        }
+        targetCtx.restore();
+    }
+
+    function drawSymmetry() {
+        if (!sourceImage) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        const w = canvas.width;
+        const h = canvas.height;
+        const count = +sliders.count.value;
+        const scale = +sliders.scale.value;
+        const angle = sliders.angle.value * Math.PI / 180;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.save();
+
+        switch(currentMode) {
+            // --- SEAMLESS & TILING EFFECTS ---
+            case 'infini-grid':
+            case 'droste-tile':
+            case 'mirror-weave':
+                // This logic is preserved as it works well.
+                if(currentMode === 'infini-grid') {
+                    const density = count; const cellW = w / density; const cellH = h / density;
+                    for (let y = 0; y < density; y++) for (let x = 0; x < density; x++) {
+                        ctx.save(); ctx.translate(x * cellW, y * cellH);
+                        ctx.beginPath(); ctx.rect(0, 0, cellW, cellH); ctx.clip();
+                        ctx.translate(cellW / 2, cellH / 2);
+                        if (x % 2 === 1) ctx.scale(-1, 1); if (y % 2 === 1) ctx.scale(1, -1);
+                        ctx.rotate(angle); ctx.scale(scale, scale);
+                        ctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2);
+                        ctx.restore();
+                    }
+                } else if (currentMode === 'droste-tile') {
+                    const depth = count;
+                    offscreenCtx.fillStyle = '#000'; offscreenCtx.fillRect(0, 0, w, h);
+                    offscreenCtx.save(); offscreenCtx.translate(w / 2, h / 2);
+                    drawSingleMirror('quad', offscreenCtx);
+                    offscreenCtx.restore();
+                    for (let i = 0; i < depth; i++) {
+                        ctx.drawImage(offscreenCanvas, 0, 0, w / 2, h / 2); ctx.drawImage(offscreenCanvas, w / 2, 0, w / 2, h / 2);
+                        ctx.drawImage(offscreenCanvas, 0, h / 2, w / 2, h / 2); ctx.drawImage(offscreenCanvas, w / 2, h / 2, w / 2, h / 2);
+                        offscreenCtx.drawImage(canvas, 0, 0);
+                    }
+                } else if (currentMode === 'mirror-weave') {
+                    const density = count; const cellW = w / density; const cellH = h / density;
+                    for (let y = 0; y < density; y++) for (let x = 0; x < density; x++) {
+                        ctx.save(); ctx.translate(x * cellW, y * cellH);
+                        ctx.beginPath(); ctx.rect(0, 0, cellW, cellH); ctx.clip();
+                        ctx.translate(cellW / 2, cellH / 2);
+                        if ((x + y) % 2 === 1) { ctx.scale(-1, 1); }
+                        ctx.rotate(angle); ctx.scale(scale, scale);
+                        ctx.drawImage(sourceImage, -sourceImage.width * reflectionPoint.x, -sourceImage.height * reflectionPoint.y);
+                        ctx.restore();
+                    }
+                }
+                break;
+
+            // --- NEW SIMPLE EXPANSION EFFECTS ---
+            case 'quad-echo': {
+                const layers = count;
+                ctx.translate(w / 2, h / 2);
+                for (let i = layers; i >= 0; i--) {
+                    ctx.save();
+                    const layerScale = scale * Math.pow(0.8, i);
+                    ctx.rotate(angle + i * 0.1);
+                    ctx.scale(layerScale, layerScale);
+                    drawSingleMirror('quad');
+                    ctx.restore();
+                }
+                break;
+            }
+            case 'quad-tile': {
+                const density = count;
+                const cellW = w / density; const cellH = h / density;
+                for (let y = 0; y < density; y++) for (let x = 0; x < density; x++) {
+                    ctx.save();
+                    ctx.translate(x * cellW + cellW/2, y * cellH + cellH/2);
+                    ctx.beginPath(); ctx.rect(-cellW/2, -cellH/2, cellW, cellH); ctx.clip();
+                    drawSingleMirror('quad');
+                    ctx.restore();
+                }
+                break;
+            }
+            case 'v-layers': {
+                const layers = count;
+                ctx.translate(w / 2, h / 2);
+                for (let i = layers; i >= 0; i--) {
+                    ctx.save();
+                    const offset = (i - layers / 2) * 20 * (scale - 1);
+                    const layerScale = Math.pow(0.9, i) * scale;
+                    ctx.translate(offset, 0);
+                    ctx.scale(layerScale, layerScale);
+                    drawSingleMirror('vertical');
+                    ctx.restore();
+                }
+                break;
+            }
+            case 'h-layers': {
+                const layers = count;
+                ctx.translate(w / 2, h / 2);
+                for (let i = layers; i >= 0; i--) {
+                    ctx.save();
+                    const offset = (i - layers / 2) * 20 * (scale - 1);
+                    const layerScale = Math.pow(0.9, i) * scale;
+                    ctx.translate(0, offset);
+                    ctx.scale(layerScale, layerScale);
+                    drawSingleMirror('horizontal');
+                    ctx.restore();
+                }
+                break;
+            }
+
+
+            // --- ORIGINAL & STABLE EFFECTS ---
+            default: { 
+                const originalComplexEffects = ['kaleidoscope', 'diamond', 'spiral', 'radial', 'tunnel', 'cross'];
+                if (originalComplexEffects.includes(currentMode)) {
+                     if (currentMode === 'kaleidoscope') {
+                        ctx.translate(w * reflectionPoint.x, h * reflectionPoint.y); ctx.rotate(angle);
+                        const sliceAngle = (2 * Math.PI) / count;
+                        for (let i = 0; i < count; i++) {
+                            ctx.save(); ctx.rotate(i * sliceAngle);
+                            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, Math.max(w, h) * 2, -sliceAngle / 2, sliceAngle / 2); ctx.closePath();
+                            ctx.clip();
+                            if (i % 2 === 1) ctx.scale(-1, 1);
+                            ctx.drawImage(sourceImage, -sourceImage.width/2 * scale, -sourceImage.height/2 * scale, sourceImage.width * scale, sourceImage.height * scale);
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'diamond') {
+                        const layers = count; const centerX = w * reflectionPoint.x; const centerY = h * reflectionPoint.y;
+                        for (let layer = 0; layer < layers; layer++) {
+                            const layerScale = scale * (1 - layer / layers * 0.8);
+                            ctx.save(); ctx.translate(centerX, centerY); ctx.rotate(angle + layer * Math.PI / 8); ctx.scale(layerScale, layerScale);
+                            for (let i = 0; i < 4; i++) {
+                                ctx.save(); ctx.rotate(i * Math.PI / 2);
+                                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+                                ctx.clip();
+                                if (i % 2 === 1) ctx.scale(-1, 1);
+                                ctx.drawImage(sourceImage, -sourceImage.width/2, -sourceImage.height/2);
+                                ctx.restore();
+                            }
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'spiral') {
+                        const segments = count; ctx.translate(w * reflectionPoint.x, h * reflectionPoint.y);
+                        const spiralAngle = (2 * Math.PI) / segments;
+                        for (let i = 0; i < segments * 3; i++) {
+                            const spiralScale = scale * (1 - i / (segments * 3) * 0.7); const rotation = angle + i * spiralAngle * 0.3; const radius = i * 10 * (scale * 0.5);
+                            ctx.save(); ctx.translate(Math.cos(rotation) * radius, Math.sin(rotation) * radius); ctx.rotate(rotation); ctx.scale(spiralScale, spiralScale);
+                            if (i % 2 === 1) ctx.scale(-1, 1);
+                            ctx.drawImage(sourceImage, -sourceImage.width/2, -sourceImage.height/2);
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'radial') {
+                         const radialSegments = count; ctx.translate(w * reflectionPoint.x, h * reflectionPoint.y); ctx.rotate(angle);
+                        const radialAngle = (2 * Math.PI) / radialSegments;
+                        for (let i = 0; i < radialSegments; i++) {
+                            ctx.save(); ctx.rotate(i * radialAngle);
+                            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, Math.max(w, h), -radialAngle / 2, radialAngle / 2); ctx.closePath();
+                            ctx.clip(); ctx.scale(scale, scale);
+                            if (i % 2 === 1) ctx.scale(1, -1);
+                            ctx.drawImage(sourceImage, -sourceImage.width*reflectionPoint.x, -sourceImage.height*reflectionPoint.y);
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'tunnel') {
+                        const tunnelLayers = count; const tunnelCenterX = w * reflectionPoint.x; const tunnelCenterY = h * reflectionPoint.y;
+                        for (let layer = 0; layer < tunnelLayers; layer++) {
+                            const layerScale = scale * Math.pow(0.85, layer); const layerAngle = angle + layer * Math.PI / 6;
+                            ctx.save(); ctx.translate(tunnelCenterX, tunnelCenterY); ctx.rotate(layerAngle); ctx.scale(layerScale, layerScale); ctx.globalAlpha = 1 - layer / tunnelLayers * 0.3;
+                            ctx.drawImage(sourceImage, -sourceImage.width/2, -sourceImage.height/2);
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(sourceImage, -sourceImage.width/2, -sourceImage.height/2);
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'cross') {
+                        const crossRepeats = count;
+                        for (let i = 0; i < crossRepeats; i++) {
+                            const offset = (i - Math.floor(crossRepeats/2)) * (Math.min(w, h) / (crossRepeats * 2));
+                            ctx.save(); ctx.translate(w * reflectionPoint.x + offset, h * reflectionPoint.y); ctx.rotate(angle); ctx.scale(scale, scale);
+                            ctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2); ctx.scale(-1, 1); ctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2);
+                            ctx.restore();
+                            ctx.save(); ctx.translate(w * reflectionPoint.x, h * reflectionPoint.y + offset); ctx.rotate(angle + Math.PI/2); ctx.scale(scale, scale);
+                            ctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2); ctx.scale(1, -1); ctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2);
+                            ctx.restore();
+                        }
+                    }
+                } else { 
+                    if (currentMode === 'vertical') {
+                        const panelWidth = w / count;
+                        for (let i = 0; i < count; i++) {
+                            ctx.save();
+                            ctx.translate(i * panelWidth + panelWidth / 2, h / 2);
+                            if (i % 2 === 1) { ctx.scale(-1, 1); }
+                            ctx.beginPath(); ctx.rect(-panelWidth/2, -h/2, panelWidth, h); ctx.clip();
+                            drawSingleMirror('vertical');
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'horizontal') {
+                        const panelHeight = h / count;
+                        for (let i = 0; i < count; i++) {
+                            ctx.save();
+                            ctx.translate(w / 2, i * panelHeight + panelHeight / 2);
+                            if (i % 2 === 1) { ctx.scale(1, -1); }
+                            ctx.beginPath(); ctx.rect(-w/2, -panelHeight/2, w, panelHeight); ctx.clip();
+                            drawSingleMirror('horizontal');
+                            ctx.restore();
+                        }
+                    } else if (currentMode === 'quad') {
+                        const panelW = w / count;
+                        const panelH = h / count;
+                         for (let y = 0; y < count; y++) {
+                            for (let x = 0; x < count; x++) {
+                                ctx.save();
+                                ctx.translate(x * panelW + panelW/2, y * panelH + panelH/2);
+                                if(x % 2 === 1) ctx.scale(-1,1);
+                                if(y % 2 === 1) ctx.scale(1,-1);
+                                ctx.beginPath(); ctx.rect(-panelW/2, -panelH/2, panelW, panelH); ctx.clip();
+                                drawSingleMirror('quad');
+                                ctx.restore();
+                            }
+                        }
+                    } else {
+                        ctx.translate(w/2, h/2);
+                        drawSingleMirror(currentMode);
+                    }
+                }
+            }
+        }
+        ctx.restore();
+    }
+    
+    function downloadImage(format) {
+        const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const a = document.createElement('a');
+        a.download = `symmetry-${currentMode}.${format}`;
+        a.href = canvas.toDataURL(mimeType, 0.95);
+        a.click();
+    }
+
+    document.getElementById('downloadJPG').onclick = () => downloadImage('jpeg');
+    document.getElementById('downloadPNG').onclick = () => downloadImage('png');
+    
+    (function promptUpload(){
+        canvas.width = document.querySelector('.canvas-container').clientWidth;
+        canvas.height = 300;
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.font = "16px Inter";
+        ctx.textAlign = "center";
+        ctx.fillText("Please upload an image to begin", canvas.width/2, canvas.height/2);
+    })();
+
+</script>
+</body>
+</html>
