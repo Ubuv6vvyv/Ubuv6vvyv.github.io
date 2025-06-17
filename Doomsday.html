@@ -1,301 +1,1149 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Explosion Blast Visualizer</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        /* --- General & Body --- */
-        body, html {
-            height: 100%; margin: 0; padding: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: #000;
-            color: #E5E7EB;
-            overflow: hidden;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width,initial-scale=1.0,user-scalable=no">
+  <title>Blast Effect Visualizer</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet">
+  <style>
+  body,
+  html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+    color: #E5E7EB;
+    overflow: hidden;
+    position: relative
+  }
 
-        /* --- Map & Overlay Effects --- */
-        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        
-        .fireball {
-            position: absolute; border-radius: 50%;
-            background: radial-gradient(circle, #fff 0%, #fffee0 20%, #ffc382 50%, #f77831 80%, rgba(247,120,49,0) 70%);
-            pointer-events: none; z-index: 90;
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0);
-            mix-blend-mode: screen;
-        }
-        @keyframes fireball-animation {
-            0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; filter: brightness(1.2); }
-            15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: brightness(2.0); } /* Exaggerated expansion */
-            40% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; filter: brightness(1.5); } /* Pulsing effect */
-            100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; filter: brightness(1); }
-        }
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 118, 117, 0.1) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.05) 0%, transparent 50%);
+    animation: float 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0
+  }
 
-        .whitewash {
-            position: absolute; border-radius: 50%;
-            background-color: #FFF;
-            mix-blend-mode: color-dodge;
-            pointer-events: none; z-index: 95;
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0);
-        }
-        @keyframes whitewash-animation {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-        }
+  @keyframes float {
 
-        .shockwave {
-            position: absolute; border-radius: 50%;
-            transform: translate(-50%, -50%) scale(0);
-            opacity: 0;
-            border-width: 4px; /* Thicker for more impact */
-            border-style: solid;
-            pointer-events: none; z-index: 80;
-            box-shadow: 0 0 15px 3px var(--shockwave-color, #FFF); /* Glow effect */
-        }
-        @keyframes shockwave-animation {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-        }
+    0%,
+    100% {
+      transform: translate(0, 0) rotate(0deg)
+    }
 
-        /* Camera Shake Animation */
-        @keyframes camera-shake {
-            0% { transform: translate(0, 0); }
-            10%, 90% { transform: translate(-2px, 2px); }
-            20%, 80% { transform: translate(3px, -3px); }
-            30%, 50%, 70% { transform: translate(-5px, 4px); }
-            40%, 60% { transform: translate(5px, -2px); }
-            100% { transform: translate(0, 0); }
-        }
-        .shake-effect { animation: camera-shake var(--shake-duration, 0.5s) cubic-bezier(.36,.07,.19,.97) both; }
+    33% {
+      transform: translate(30px, -30px) rotate(120deg)
+    }
 
+    66% {
+      transform: translate(-20px, 20px) rotate(240deg)
+    }
+  }
 
-        /* --- UI Panels & Controls (Identical to v5) --- */
-        .ui-panel { position: absolute; background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(55, 65, 81, 0.6); border-radius: 12px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); z-index: 10; }
-        #controls-container { top: 1rem; left: 1rem; bottom: 1rem; width: 120px; display: flex; flex-direction: column; }
-        #controls-container h1 { font-size: 0.9rem; font-weight: 700; color: #F87171; padding: 0.75rem; text-align: center; border-bottom: 1px solid rgba(55, 65, 81, 0.6); flex-shrink: 0; }
-        #controls { overflow-y: auto; flex-grow: 1; padding: 0.2rem; }
-        #controls::-webkit-scrollbar { width: 6px; } #controls::-webkit-scrollbar-track { background: transparent; } #controls::-webkit-scrollbar-thumb { background: #4B5563; border-radius: 3px; }
-        .munition-label { display: block; padding: 0.4rem 0.6rem; font-size: 0.5rem; color: #D1D5DB; border-radius: 6px; cursor: pointer; transition: background-color 0.2s, color 0.2s; margin-bottom: 2px; }
-        .munition-label:hover { background-color: #374151; }
-        .munition-label input { display: none; }
-        .munition-label input:checked + span { color: #F87171; font-weight: 700; }
-        #info-container { bottom: 1rem; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; padding: 1rem; }
-        #info-panel #info-title { font-size: 0.71rem; font-weight: 700; color: #F9FAFB; margin-bottom: 0.1rem; }
-        #info-panel #info-yield { font-family: 'Roboto Mono', monospace; font-size: 0.6rem; color: #F87171; margin-bottom: 0.5rem; }
-        #info-panel #info-details { font-size: 0.6rem; line-height: 1.5; color: #D1D5DB; max-height: 60px; overflow-y: auto; }
-        #legend { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(55, 65, 81, 0.6); display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.55rem; }
-        .legend-item { display: flex; align-items: center; }
-        .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 0.5rem; flex-shrink: 0; }
-        #address-search-container { position: absolute; top: 1rem; left: 70%; transform: translateX(-50%); width: 90%; max-width: 300px; z-index: 11; }
-        #address-input { width: 100%; padding: 0.75rem 1rem; font-size: 0.6rem; color: #E5E7EB; background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(55, 65, 81, 0.6); border-radius: 12px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); outline: none; transition: border-color 0.3s; }
-        #address-input:focus { border-color: #F87171; }
-        .pac-container { background-color: #1F2937; border: 1px solid #4B5563; border-radius: 8px; color: #D1D5DB; }
-        .pac-item { padding: 8px; font-size: 0.9rem; cursor: pointer; border-top: 1px solid #374151; } .pac-item:first-child { border-top: none; } .pac-item:hover, .pac-item-selected { background-color: #374151; } .pac-item-query { font-weight: 500; color: #F9FAFB; }
-        @media (min-width: 888px) { #info-container { left: calc(110px + 1rem); transform: translateX(0); max-width: 400px; } #address-search-container { left: calc(220px + 2rem); transform: translateX(0); max-width: 400px; } }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
+  #map {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    border-radius: 0;
+    filter: contrast(1.1) brightness(0.9)
+  }
+
+  .fireball {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, #fff9e6 10%, #ffed4e 25%, #ff8c42 50%, #ff6b35 70%, #cc2936 85%, rgba(204, 41, 54, 0) 100%);
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+    mix-blend-mode: screen;
+    box-shadow: 0 0 100px rgba(255, 140, 66, 0.8)
+  }
+
+  @keyframes fireball-animation {
+    0% {
+      transform: translate(-50%, -50%) scale(0.1);
+      opacity: 0.3;
+      filter: blur(2px) brightness(3)
+    }
+
+    8% {
+      transform: translate(-50%, -50%) scale(0.6);
+      opacity: 1;
+      filter: blur(0px) brightness(4)
+    }
+
+    25% {
+      transform: translate(-50%, -50%) scale(1.3);
+      opacity: 1;
+      filter: blur(1px) brightness(2.5)
+    }
+
+    50% {
+      transform: translate(-50%, -50%) scale(1.1);
+      opacity: 0.9;
+      filter: blur(2px) brightness(1.8)
+    }
+
+    100% {
+      transform: translate(-50%, -50%) scale(0.7);
+      opacity: 0;
+      filter: blur(4px) brightness(1)
+    }
+  }
+
+  .whitewash {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.9) 20%, rgba(255, 255, 255, 0.3) 60%, rgba(255, 255, 255, 0) 100%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 95;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+    filter: blur(1px)
+  }
+
+  @keyframes whitewash-animation {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0
+    }
+
+    15% {
+      transform: translate(-50%, -50%) scale(0.8);
+      opacity: 1
+    }
+
+    100% {
+      transform: translate(-50%, -50%) scale(1.5);
+      opacity: 0
+    }
+  }
+
+  .shockwave {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    border-width: 3px;
+    border-style: solid;
+    pointer-events: none;
+    z-index: 80;
+    filter: drop-shadow(0 0 15px var(--shockwave-color))
+  }
+
+  @keyframes shockwave-animation {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 1;
+      border-width: 6px
+    }
+
+    30% {
+      opacity: 0.8;
+      border-width: 4px
+    }
+
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0;
+      border-width: 1px
+    }
+  }
+
+  @keyframes camera-shake {
+    0% {
+      transform: translate(0, 0) rotate(0deg)
+    }
+
+    5% {
+      transform: translate(-3px, 4px) rotate(-0.5deg)
+    }
+
+    10% {
+      transform: translate(4px, -3px) rotate(0.5deg)
+    }
+
+    15% {
+      transform: translate(-6px, 2px) rotate(-0.3deg)
+    }
+
+    20% {
+      transform: translate(5px, -5px) rotate(0.7deg)
+    }
+
+    25% {
+      transform: translate(-4px, 6px) rotate(-0.4deg)
+    }
+
+    30% {
+      transform: translate(7px, -2px) rotate(0.6deg)
+    }
+
+    35% {
+      transform: translate(-2px, -7px) rotate(-0.8deg)
+    }
+
+    40% {
+      transform: translate(3px, 8px) rotate(0.2deg)
+    }
+
+    45% {
+      transform: translate(-8px, -1px) rotate(-0.9deg)
+    }
+
+    50% {
+      transform: translate(6px, 4px) rotate(0.5deg)
+    }
+
+    55% {
+      transform: translate(-3px, -6px) rotate(-0.3deg)
+    }
+
+    60% {
+      transform: translate(4px, 2px) rotate(0.7deg)
+    }
+
+    65% {
+      transform: translate(-5px, 5px) rotate(-0.6deg)
+    }
+
+    70% {
+      transform: translate(2px, -4px) rotate(0.4deg)
+    }
+
+    75% {
+      transform: translate(-3px, 3px) rotate(-0.2deg)
+    }
+
+    80% {
+      transform: translate(3px, -2px) rotate(0.3deg)
+    }
+
+    85% {
+      transform: translate(-2px, 2px) rotate(-0.1deg)
+    }
+
+    90% {
+      transform: translate(1px, -1px) rotate(0.1deg)
+    }
+
+    95% {
+      transform: translate(-1px, 1px) rotate(-0.05deg)
+    }
+
+    100% {
+      transform: translate(0, 0) rotate(0deg)
+    }
+  }
+
+  .shake-effect {
+    animation: camera-shake var(--shake-duration, 0.5s) cubic-bezier(.36, .07, .19, .97) both
+  }
+
+  .ui-panel {
+    position: absolute;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    z-index: 10
+  }
+
+  #instructions {
+    position: relative;
+    top: 10px;
+   right: 10px;
+    width: 120px;
+    padding: 16px;
+    z-index: 992;
+    font-size: 12px;
+    line-height: 1.4
+  }
+
+  #instructions h3 {
+    margin: 0 0 12px 0;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: #ef4444;
+    text-align: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px
+  }
+
+  #instructions ol {
+    margin: 0;
+    padding-left: 1px;
+    color: #cbd5e1
+  }
+
+  #instructions li {
+    margin-bottom: 1px;
+    padding-left: 1px
+  }
+
+  #instructions .highlight {
+    color: #fbbf24;
+    font-weight: 600
+  }
+
+  #controls-container {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 500px;
+    max-height: 180px;
+    display: flex;
+    flex-direction: column
+  }
+
+  #controls-container h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 900;
+    color: #ef4444;
+    padding: 12px 16px;
+    text-align: center;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    flex-shrink: 0;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text
+  }
+
+  #controls {
+    overflow-y: auto;
+    flex-grow: 1;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px
+  }
+
+  #controls::-webkit-scrollbar {
+    width: 4px
+  }
+
+  #controls::-webkit-scrollbar-track {
+    background: transparent
+  }
+
+  #controls::-webkit-scrollbar-thumb {
+    background: #64748b;
+    border-radius: 2px
+  }
+
+  .munition-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 8px;
+    font-size: 11px;
+    color: #cbd5e1;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(51, 65, 85, 0.6));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+    line-height: 1.2;
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px
+  }
+
+  .munition-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s
+  }
+
+  .munition-btn:hover::before {
+    left: 100%
+  }
+
+  .munition-btn:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(147, 51, 234, 0.2));
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
+    color: #bfdbfe
+  }
+
+  .munition-btn.active {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border-color: #f87171;
+    color: #fff;
+    transform: translateY(-1px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4);
+    font-weight: 700
+  }
+
+  .munition-btn.active::after {
+    content: '●';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    color: #fca5a5;
+    font-size: 8px;
+    animation: pulse 2s infinite
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1)
+    }
+
+    50% {
+      opacity: 0.5;
+      transform: scale(1.2)
+    }
+  }
+
+  #info-container {
+    top: 20px;
+    left: 20px;
+    width: calc(50% - 30px);
+    max-width: 300px;
+    padding: 16px
+  }
+
+  #info-panel #info-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px
+  }
+
+  #info-panel #info-yield {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: #ef4444;
+    margin-bottom: 12px;
+    font-weight: 600
+  }
+
+  #info-panel #info-details {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    max-height: 80px;
+    overflow-y: auto
+  }
+
+  #legend {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 10px
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center
+  }
+
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 8px var(--legend-glow, transparent)
+  }
+
+  #address-search-container {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    left: calc(50% + 10px);
+    max-width: 150px;
+    z-index: 11
+  }
+
+  #address-input {
+    width: 100%;
+    padding: 6px 5px;
+    font-size: 12px;
+    color: #f1f5f9;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    outline: none;
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif
+  }
+
+  #address-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 25px 50px -12px rgba(0, 0, 0, 0.5)
+  }
+
+  #address-input::placeholder {
+    color: #94a3b8
+  }
+
+  .pac-container {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95));
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    color: #cbd5e1;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5)
+  }
+
+  .pac-item {
+    padding: 12px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+    transition: background-color 0.2s ease
+  }
+
+  .pac-item:first-child {
+    border-top: none
+  }
+
+  .pac-item:hover,
+  .pac-item-selected {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.1))
+  }
+
+  .pac-item-query {
+    font-weight: 600;
+    color: #f1f5f9
+  }
+
+  @media (max-width:768px) {
+    #instructions {
+      display: none;
+    }
+
+    #info-container {
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      width: calc(100% - 20px);
+      max-width: 250px;
+      padding: 10px;
+      max-height: 150px;
+    }
+
+    #info-panel #info-title {
+      font-size: 12px;
+    }
+
+    #info-panel #info-yield {
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+
+    #info-panel #info-details {
+      font-size: 9px;
+      max-height: 60px;
+    }
+
+    #legend {
+      margin-top: 8px;
+      padding-top: 8px;
+      gap: 4px;
+      font-size: 8px;
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 10px;
+    }
+
+    #address-search-container {
+      top: 1px;
+      left: 1px;
+      right: 1px;
+      max-width: 250px;
+    }
     
-    <div id="address-search-container"><input id="address-input" type="text" placeholder="Search for a location..."></div>
-    <aside id="controls-container" class="ui-panel"><h1>Munitions</h1><div id="controls"></div></aside>
-    <div id="info-container" class="ui-panel">
-        <div id="info-panel"><h3 id="info-title">Select a Munition</h3><p id="info-yield"></p><p id="info-details">Details will appear here.</p></div>
-        <div id="legend">
-            <div class="legend-item"><span class="legend-color" style="background-color: #ff4545; opacity: 0.6;"></span>Fireball</div>
-            <div class="legend-item"><span class="legend-color" style="background-color: #ffa500; opacity: 0.6;"></span>Severe Blast</div>
-            <div class="legend-item"><span class="legend-color" style="background-color: #ffff00; opacity: 0.6;"></span>Thermal</div>
-        </div>
+    #address-input {
+        padding: 5px 6px;
+        font-size: 7px;
+    }
+
+    #controls {
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 4px;
+      padding: 4px;
+    }
+
+    #controls-container {
+      max-height: 140px;
+       width: calc(100% - 20px);
+    }
+
+    .munition-btn {
+      font-size: 9px;
+      padding: 6px 4px;
+      font-weight: 500;
+    }
+    
+    .munition-btn.active {
+        font-weight: 700;
+    }
+  }
+
+  .loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    color: #ef4444;
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700
+  }
+
+  .loading::after {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ef4444;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+    margin-left: 10px
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg)
+    }
+  }
+  </style>
+</head>
+
+<body>
+  <div class="loading" id="loading">INITIALIZING</div>
+  <div id="map"></div>
+  
+<div id="instructions" class="ui-panel">
+    <h3>⚠️ How to Use</h3>
+    <ol>
+      <li><span class="highlight">Search</span> for any location</li>
+      <li><span class="highlight">Select</span> a weapon below</li>
+      <li><span class="highlight">Drag</span> the red crosshair to
+        move target</li>
+      <li>Watch the <span class="highlight">blast simulation</span>
+      </li>
+    </ol>
+
+  </div>
+  <div id="info-container" class="ui-panel">
+
+    <div id="info-panel">
+      <h3 id="info-title">Select a Weapon</h3>
+      <p id="info-yield"></p>
+      <p id="info-details">Choose a weapon from the list below to see
+        its destructive potential.</p>
     </div>
+    <div id="legend">
+      <div class="legend-item">
+        <span class="legend-color"
+          style="background-color:#ff4545;--legend-glow:#ff4545;"></span>
+        <span>Fireball/Destruction</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color"
+          style="background-color:#ffa500;--legend-glow:#ffa500;"></span>
+        <span>Severe Blast Damage</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color"
+          style="background-color:#ffff00;--legend-glow:#ffff00;"></span>
+        <span>Thermal Radiation</span>
+      </div>
+    </div>
+  </div>
+  <aside id="controls-container" class="ui-panel">
+    <h1>⚡ Weapons</h1>
 
-    <script>
-        function initMap() {
-            let map;
-            let persistentOverlays = [];
-            let groundZeroMarker;
-            let currentCenter = { lat: -37.8255, lng: 144.9637 };
-
-            const munitionData = {
-                'sdb': { name: 'GBU-39 SDB', yield: '110kg HE', yieldKt: 0.0001, radii: { ruin: 20, severe: 70, thermal: 0 }, details: "Small Diameter Bomb. A precision-guided glide bomb that can be carried in larger numbers, allowing a single aircraft to engage multiple targets." },
-                'hellfire': { name: 'AGM-114 Hellfire', yield: '9kg (Tandem HEAT)', yieldKt: 0.00001, radii: { ruin: 5, severe: 20, thermal: 0 }, details: "Primary US air-to-ground anti-armor missile. Famously used on drones like the Predator and Reaper. The R9X variant uses blades instead of explosives." },
-                'shahed-136': { name: 'Shahed-136 Drone', yield: '~50kg HE', yieldKt: 0.00005, radii: { ruin: 15, severe: 50, thermal: 0 }, details: "Iranian 'suicide drone', known for its use by Russia in Ukraine. Slow and noisy, but effective against static targets due to precision and low cost." },
-                'jdam': { name: 'JDAM (GBU-31)', yield: '900kg (2000lb) Warhead', yieldKt: 0.0009, radii: { ruin: 80, severe: 350, thermal: 0 }, details: "A guidance kit that turns unguided bombs into 'smart' munitions. A cost-effective, widely used weapon by the US and its allies." },
-                'moab': { name: 'GBU-43/B MOAB', yield: '11 tons HE', yieldKt: 0.011, radii: { ruin: 150, severe: 500, thermal: 1500 }, details: "'Mother of All Bombs,' one of the largest conventional weapons. Used once in Afghanistan." },
-                'foab': { name: 'ATBIP FOAB', yield: '44 tons HE', yieldKt: 0.044, radii: { ruin: 300, severe: 1000, thermal: 2500 }, details: "Russia's 'Father of All Bombs.' A thermobaric weapon claimed to be the most powerful conventional bomb, creating a longer blast wave." },
-                'little-boy': { name: 'Little Boy (Hiroshima)', yield: '15 kilotons', yieldKt: 15, radii: { ruin: 500, severe: 1600, thermal: 2800 }, details: "First nuclear weapon used in warfare (Aug 6, 1945). Detonation over Hiroshima helped end WWII." },
-                'fat-man': { name: 'Fat Man (Nagasaki)', yield: '21 kilotons', yieldKt: 21, radii: { ruin: 800, severe: 1900, thermal: 3500 }, details: "Second nuclear weapon used (Aug 9, 1945). Its implosion design was more complex and efficient." },
-                'b61-12': { name: 'B61-12 Nuclear Bomb', yield: '50 kilotons (Variable)', yieldKt: 50, radii: { ruin: 900, severe: 2500, thermal: 4500 }, details: "Newest US 'smart' nuclear gravity bomb with a guided tail kit and 'dial-a-yield' feature, making it controversially 'more usable'." },
-                'w87': { name: 'W87/Mk21 (US ICBM)', yield: '300 kilotons', yieldKt: 300, radii: { ruin: 2100, severe: 5700, thermal: 10500 }, details: "Standard thermonuclear warhead for US ICBMs. A key component of the US strategic nuclear deterrent." },
-                'ivy-mike': { name: 'Ivy Mike (H-Bomb)', yield: '10.4 megatons', yieldKt: 10400, radii: { ruin: 3200, severe: 12000, thermal: 20000 }, details: "First-ever hydrogen bomb tested by the US (1952). Its massive yield proved the terrifying potential of fusion weapons. Not a deliverable weapon." },
-                'tsar-bomba': { name: 'Tsar Bomba (50 Megaton Test)', yield: '50 megatons', yieldKt: 50000, radii: { ruin: 5500, severe: 35000, thermal: 60000 }, details: "Most powerful nuclear weapon ever detonated (1961). Its shockwave circled Earth three times. A display of ultimate destructive capability." },
-            };
-            
-            // --- Overlay Class for animations --- //
-            class AnimatedOverlay extends google.maps.OverlayView {
-                constructor(center, radius, className, animation) {
-                    super(); this.center = center; this.radius = radius; this.className = className; this.animation = animation; this.div = null;
-                }
-                onAdd() {
-                    this.div = document.createElement('div');
-                    this.div.className = this.className;
-                    this.div.style.animation = `${this.animation.name} ${this.animation.duration}s ${this.animation.easing} forwards`;
-                    if (this.animation.delay) this.div.style.animationDelay = `${this.animation.delay}s`;
-                    if (this.animation.color) this.div.style.borderColor = this.animation.color;
-                    this.div.style.setProperty('--shockwave-color', this.animation.color);
-                    this.getPanes().overlayLayer.appendChild(this.div);
-                }
-                draw() {
-                    const projection = this.getProjection();
-                    const centerPx = projection.fromLatLngToDivPixel(this.center);
-                    const earthRadius = 6378137;
-                    const metersPerPx = (Math.cos(this.center.lat() * Math.PI / 180) * 2 * Math.PI * earthRadius) / (256 * Math.pow(2, this.getMap().getZoom()));
-                    const radiusPx = this.radius / metersPerPx;
-                    if (centerPx) {
-                        this.div.style.left = `${centerPx.x}px`;
-                        this.div.style.top = `${centerPx.y}px`;
-                        this.div.style.width = `${radiusPx * 2}px`;
-                        this.div.style.height = `${radiusPx * 2}px`;
-                    }
-                }
-                onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
-            }
-            
-            // --- Core Functions --- //
-            function triggerBlast(munition) {
-                clearPersistentOverlays();
-                const centerLatLng = new google.maps.LatLng(currentCenter);
-
-                // 1. Camera Shake
-                if (munition.yieldKt >= 1) {
-                    const mapDiv = document.getElementById('map');
-                    // Clamp shake duration for sanity
-                    const shakeDuration = Math.min(Math.max(0.5, Math.log10(munition.yieldKt) * 0.8), 4);
-                    mapDiv.style.setProperty('--shake-duration', `${shakeDuration}s`);
-                    mapDiv.classList.add('shake-effect');
-                    setTimeout(() => mapDiv.classList.remove('shake-effect'), shakeDuration * 700);
-                }
-
-                // 2. Initial Whitewash flash
-                const whitewash = new AnimatedOverlay(centerLatLng, munition.radii.ruin * 2.5, 'whitewash', {
-                    name: 'whitewash-animation', duration: 0.4, easing: 'ease-out'
-                });
-                whitewash.setMap(map);
-                setTimeout(() => whitewash.setMap(null), 400);
-
-                // 3. Dynamic Fireball
-                // Duration and size scale logarithmically for dramatic effect
-                const fireballRadius = munition.radii.ruin;
-                const fireballDuration = Math.max(2.5, Math.log(munition.yieldKt + 1) * 2.5 + 1);
-                const fireball = new AnimatedOverlay(centerLatLng, fireballRadius, 'fireball', {
-                    name: 'fireball-animation', duration: fireballDuration, easing: 'ease-out'
-                });
-                fireball.setMap(map);
-                setTimeout(() => fireball.setMap(null), fireballDuration * 1000);
-
-                // 4. Propagating Shockwaves & Persistent Circles
-                const colors = { ruin: '#ff4545', severe: '#ffa500', thermal: '#ffff00' };
-                let shockwaveDelay = 0.3; // Start after initial flash
-                
-                ['thermal', 'severe', 'ruin'].forEach(key => {
-                    const radius = munition.radii[key];
-                    if (radius > 0) {
-                        const shockwaveDuration = Math.max(1.5, Math.log10(radius) * 0.9);
-                        const shockwave = new AnimatedOverlay(centerLatLng, radius, 'shockwave', {
-                            name: 'shockwave-animation',
-                            duration: shockwaveDuration,
-                            delay: shockwaveDelay,
-                            easing: 'cubic-bezier(0.1, 0.5, 0.4, 1)', // Fast start, slow end
-                            color: colors[key]
-                        });
-                        shockwave.setMap(map);
-                        setTimeout(() => shockwave.setMap(null), (shockwaveDelay + shockwaveDuration) * 1000);
-
-                        // Create the persistent circle to appear as the animation finishes
-                        setTimeout(() => {
-                            const persistentCircle = new google.maps.Circle({
-                                strokeColor: colors[key], strokeWeight: 1, strokeOpacity: 0.9,
-                                fillColor: colors[key], fillOpacity: 0.25,
-                                map: map, center: centerLatLng, radius: radius, clickable: false,
-                            });
-                            persistentOverlays.push(persistentCircle);
-                        }, shockwaveDelay * 1000 + 500); // Appear mid-shockwave for smooth transition
-                    }
-                });
-            }
-            
-            function clearPersistentOverlays() {
-                persistentOverlays.forEach(overlay => overlay.setMap(null));
-                persistentOverlays.length = 0;
-            }
-
-            // --- Setup & UI Functions (unchanged) --- //
-            function handleSelection() {
-                const selectedKey = document.querySelector('input[name="munition"]:checked').value;
-                const data = munitionData[selectedKey];
-                triggerBlast(data);
-                updateInfoPanel(data);
-                autoZoomToRadius(Math.max(...Object.values(data.radii)));
-            }
-            function setGroundZero(location) {
-                currentCenter = { lat: location.lat(), lng: location.lng() };
-                if (groundZeroMarker) {
-                    groundZeroMarker.setPosition(currentCenter);
-                } else {
-                    groundZeroMarker = new google.maps.Marker({
-                        position: currentCenter, map: map, draggable: true,
-                        icon: { path: 'M -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0 M 0,-3 l 0,6 M -3,0 l 6,0', scale: 4, strokeColor: '#FF0000', strokeWeight: 2, zIndex: 999 }
-                    });
-                    groundZeroMarker.addListener('dragend', () => setGroundZero(groundZeroMarker.getPosition()));
-                }
-                map.panTo(currentCenter);
-            }
-            function updateInfoPanel(data) { document.getElementById('info-title').textContent = data.name; document.getElementById('info-yield').textContent = `Yield: ${data.yield}`; document.getElementById('info-details').innerHTML = data.details; }
-            function autoZoomToRadius(radius) {
-                 if (!radius) { map.setZoom(14); map.panTo(currentCenter); return; }
-                 const bounds = new google.maps.LatLngBounds();
-                 const effectiveRadius = radius * 0.3; const centerLatLng = new google.maps.LatLng(currentCenter);
-                 bounds.extend(google.maps.geometry.spherical.computeOffset(centerLatLng, effectiveRadius, 0));
-                 bounds.extend(google.maps.geometry.spherical.computeOffset(centerLatLng, effectiveRadius, 90));
-                 bounds.extend(google.maps.geometry.spherical.computeOffset(centerLatLng, effectiveRadius, 180));
-                 bounds.extend(google.maps.geometry.spherical.computeOffset(centerLatLng, effectiveRadius, 270));
-                 map.fitBounds(bounds, { top: 60, bottom: 180, left: 240, right: 20 });
-            }
-            function populateControls() {
-                const controlsContainer = document.getElementById('controls');
-                Object.keys(munitionData).forEach(key => {
-                    const munition = munitionData[key];
-                    const label = document.createElement('label'); label.className = "munition-label";
-                    const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'munition'; radio.value = key;
-                    radio.addEventListener('change', handleSelection);
-                    const span = document.createElement('span'); span.textContent = munition.name;
-                    label.appendChild(radio); label.appendChild(span); controlsContainer.appendChild(label);
-                });
-            }
-
-            // --- INITIALIZATION --- //
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: currentCenter, zoom: 11, mapTypeId: 'satellite',
-                disableDefaultUI: true, zoomControl: true, heading: 0, tilt: 45,
-                gestureHandling: 'cooperative', styles: [ { stylers: [ { "saturation": -100 }, { "gamma": 0.8 }, { "lightness": -20 } ] } ]
-            });
-            setGroundZero(new google.maps.LatLng(currentCenter.lat, currentCenter.lng));
-            const autocomplete = new google.maps.places.Autocomplete(document.getElementById('address-input'));
-            autocomplete.bindTo('bounds', map); autocomplete.setFields(['geometry', 'name']);
-            autocomplete.addListener('place_changed', () => {
-                const place = autocomplete.getPlace();
-                if (place.geometry && place.geometry.location) {
-                    setGroundZero(place.geometry.location);
-                    if (document.querySelector('input[name="munition"]:checked')) { handleSelection(); } else { map.setZoom(15); }
-                }
-            });
-            populateControls();
+    <div id="controls"></div>
+  </aside>
+  <div id="address-search-container">
+    <input id="address-input" type="text"
+      placeholder="🔍 Search for any location...">
+  </div>
+  <script>
+  function initMap() {
+    document.getElementById('loading').style.display = 'none';
+    let map, persistentOverlays = [],
+      groundZeroMarker, currentCenter = {
+        lat: -37.8255,
+        lng: 144.9637
+      };
+    const munitionData = {
+      'grenade': {
+        name: 'Hand Grenade',
+        yield: '400g Explosive',
+        yieldKt: 0.0000004,
+        radii: {
+          ruin: 3,
+          severe: 15,
+          thermal: 0
+        },
+        details: "Standard infantry explosive. Causes localized damage and harm from fragments."
+      },
+      'hellfire': {
+        name: 'Hellfire Missile',
+        yield: '9kg Explosive',
+        yieldKt: 0.00001,
+        radii: {
+          ruin: 5,
+          severe: 20,
+          thermal: 0
+        },
+        details: "Precision anti-tank missile often used by drones. Small but deadly accurate."
+      },
+      'suicide-drone': {
+        name: 'Suicide Drone',
+        yield: '50kg Explosive',
+        yieldKt: 0.00005,
+        radii: {
+          ruin: 15,
+          severe: 50,
+          thermal: 0
+        },
+        details: "A modern, low-cost weapon that is precise and increasingly common in conflicts."
+      },
+      'car-bomb': {
+        name: 'Car Bomb',
+        yield: '500kg Explosive',
+        yieldKt: 0.0005,
+        radii: {
+          ruin: 50,
+          severe: 200,
+          thermal: 0
+        },
+        details: "An improvised explosive device hidden in a vehicle. A common tool of terrorists."
+      },
+      'smart-bomb': {
+        name: 'Smart Bomb',
+        yield: '900kg Explosive',
+        yieldKt: 0.0009,
+        radii: {
+          ruin: 80,
+          severe: 350,
+          thermal: 0
+        },
+        details: "A GPS-guided conventional bomb. The workhorse of most modern air forces."
+      },
+      'moab': {
+        name: 'MOAB',
+        yield: '11 tons Explosive',
+        yieldKt: 0.011,
+        radii: {
+          ruin: 150,
+          severe: 500,
+          thermal: 1500
+        },
+        details: "Known as the 'Mother of All Bombs', this is a massive conventional air-blast weapon."
+      },
+      'foab': {
+        name: 'FOAB',
+        yield: '44 tons Explosive',
+        yieldKt: 0.044,
+        radii: {
+          ruin: 300,
+          severe: 1000,
+          thermal: 2500
+        },
+        details: "Russia's 'Father of All Bombs', a thermobaric weapon even more powerful than the MOAB."
+      },
+      'davy-crockett': {
+        name: 'Davy Crockett',
+        yield: '20 tons Nuclear',
+        yieldKt: 0.02,
+        radii: {
+          ruin: 250,
+          severe: 600,
+          thermal: 1000
+        },
+        details: "One of the smallest nuclear weapons ever built, designed for tactical battlefield use."
+      },
+      'atomic-bomb': {
+        name: 'Atomic Bomb',
+        yield: '15 kilotons Nuclear',
+        yieldKt: 15,
+        radii: {
+          ruin: 500,
+          severe: 1600,
+          thermal: 2800
+        },
+        details: "The first type of nuclear weapon used in war. Changed warfare forever in 1945."
+      },
+      'fat-man': {
+        name: 'Fat Man Nuclear',
+        yield: '21 kilotons Nuclear',
+        yieldKt: 21,
+        radii: {
+          ruin: 800,
+          severe: 1900,
+          thermal: 3500
+        },
+        details: "The second nuclear weapon used in war, with a more powerful and efficient design."
+      },
+      'modern-nuke': {
+        name: 'Modern Nuclear',
+        yield: '50 kilotons Nuclear',
+        yieldKt: 50,
+        radii: {
+          ruin: 900,
+          severe: 2500,
+          thermal: 4500
+        },
+        details: "A typical variable-yield nuclear weapon. Can be precise and terrifyingly 'usable'."
+      },
+      'icbm-warhead': {
+        name: 'ICBM Warhead',
+        yield: '300 kilotons Nuclear',
+        yieldKt: 300,
+        radii: {
+          ruin: 2100,
+          severe: 5700,
+          thermal: 10500
+        },
+        details: "A standard nuclear missile warhead. Forms the backbone of nuclear deterrence."
+      },
+      'hydrogen-bomb': {
+        name: 'Hydrogen Bomb',
+        yield: '10.4 megatons Nuclear',
+        yieldKt: 10400,
+        radii: {
+          ruin: 3200,
+          severe: 12000,
+          thermal: 20000
+        },
+        details: "The first hydrogen bomb test. Uses fusion power, thousands of times stronger than older nukes."
+      },
+      'tsar-bomba': {
+        name: 'Tsar Bomba',
+        yield: '50 megatons Nuclear',
+        yieldKt: 50000,
+        radii: {
+          ruin: 5500,
+          severe: 35000,
+          thermal: 60000
+        },
+        details: "The most powerful weapon ever detonated. Its shockwave circled the Earth three times."
+      }
+    };
+    class AnimatedOverlay extends google.maps.OverlayView {
+      constructor(center, radius, className, animation) {
+        super();
+        this.center = center;
+        this.radius = radius;
+        this.className = className;
+        this.animation = animation;
+        this.div = null
+      }
+      onAdd() {
+        this.div = document.createElement('div');
+        this.div.className = this.className;
+        this.div.style.animation =
+          `${this.animation.name} ${this.animation.duration}s ${this.animation.easing} forwards`;
+        if (this.animation.delay) this.div.style.animationDelay =
+          `${this.animation.delay}s`;
+        if (this.animation.color) {
+          this.div.style.borderColor = this.animation.color;
+          this.div.style.setProperty('--shockwave-color', this
+            .animation.color)
         }
-    </script>
-    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap&libraries=places,geometry"></script>
+        this.getPanes().overlayLayer.appendChild(this.div)
+      }
+      draw() {
+        const projection = this.getProjection();
+        const centerPx = projection.fromLatLngToDivPixel(this
+          .center);
+        const earthRadius = 6378137;
+        const metersPerPx = (Math.cos(this.center.lat() * Math
+          .PI / 180) * 2 * Math.PI * earthRadius) / (256 * Math
+          .pow(2, this.getMap().getZoom()));
+        const radiusPx = this.radius / metersPerPx;
+        if (centerPx) {
+          this.div.style.left = `${centerPx.x}px`;
+          this.div.style.top = `${centerPx.y}px`;
+          this.div.style.width = `${radiusPx*2}px`;
+          this.div.style.height = `${radiusPx*2}px`
+        }
+      }
+      onRemove() {
+        if (this.div) {
+          this.div.parentNode.removeChild(this.div);
+          this.div = null
+        }
+      }
+    }
+
+    function triggerBlast(munition) {
+      clearPersistentOverlays();
+      const centerLatLng = new google.maps.LatLng(currentCenter);
+      if (munition.yieldKt >= 0.001) {
+        const mapDiv = document.getElementById('map');
+        const shakeDuration = Math.min(Math.max(0.8, Math.log10(
+          munition.yieldKt + 0.01) * 1.2 + 2), 6);
+        mapDiv.style.setProperty('--shake-duration',
+          `${shakeDuration}s`);
+        mapDiv.classList.add('shake-effect');
+        setTimeout(() => mapDiv.classList.remove('shake-effect'),
+          shakeDuration * 800)
+      }
+      const whitewash = new AnimatedOverlay(centerLatLng, munition
+        .radii.ruin * 3, 'whitewash', {
+          name: 'whitewash-animation',
+          duration: 0.6,
+          easing: 'cubic-bezier(0.25,0.46,0.45,0.94)'
+        });
+      whitewash.setMap(map);
+      setTimeout(() => whitewash.setMap(null), 600);
+      const fireballRadius = Math.max(munition.radii.ruin, 50);
+      const fireballDuration = Math.max(3, Math.log(munition.yieldKt +
+        1) * 2);
+      const fireball = new AnimatedOverlay(centerLatLng,
+        fireballRadius, 'fireball', {
+          name: 'fireball-animation',
+          duration: fireballDuration,
+          easing: 'cubic-bezier(0.23,1,0.32,1)'
+        });
+      fireball.setMap(map);
+      setTimeout(() => fireball.setMap(null), fireballDuration *
+      1000);
+      const shockwaves = [{
+        radius: munition.radii.ruin,
+        color: '#ff4545',
+        delay: 0.1,
+        duration: 2
+      }, {
+        radius: munition.radii.severe,
+        color: '#ffa500',
+        delay: 0.3,
+        duration: 3
+      }, {
+        radius: munition.radii.thermal,
+        color: '#ffff00',
+        delay: 0.6,
+        duration: 4
+      }];
+      shockwaves.forEach(wave => {
+        if (wave.radius > 0) {
+          const shockwave = new AnimatedOverlay(centerLatLng, wave
+            .radius, 'shockwave', {
+              name: 'shockwave-animation',
+              duration: wave.duration,
+              delay: wave.delay,
+              easing: 'cubic-bezier(0.25,0.46,0.45,0.94)',
+              color: wave.color
+            });
+          shockwave.setMap(map);
+          setTimeout(() => shockwave.setMap(null), (wave
+            .duration + wave.delay) * 1000)
+        }
+      });
+      setTimeout(() => {
+        ['ruin', 'severe', 'thermal'].forEach((type, i) => {
+          if (munition.radii[type] > 0) {
+            const colors = {
+              ruin: '#ff4545',
+              severe: '#ffa500',
+              thermal: '#ffff00'
+            };
+            const circle = new google.maps.Circle({
+              strokeColor: colors[type],
+              strokeOpacity: 0.8,
+              strokeWeight: 2,
+              fillColor: colors[type],
+              fillOpacity: 0.15,
+              map: map,
+              center: centerLatLng,
+              radius: munition.radii[type]
+            });
+            persistentOverlays.push(circle)
+          }
+        })
+      }, 1000)
+    }
+    map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 12,
+      center: currentCenter,
+      mapTypeId: 'satellite',
+      tilt: 45,
+      styles: [{
+        elementType: 'labels.text.fill',
+        stylers: [{
+          color: '#ffffff'
+        }]
+      }, {
+        elementType: 'labels.text.stroke',
+        stylers: [{
+          color: '#000000'
+        }, {
+          weight: 2
+        }]
+      }, {
+        featureType: 'administrative.country',
+        elementType: 'geometry.stroke',
+        stylers: [{
+          color: '#4b6878'
+        }]
+      }, {
+        featureType: 'administrative.land_parcel',
+        stylers: [{
+          visibility: 'off'
+        }]
+      }, {
+        featureType: 'administrative.province',
+        elementType: 'geometry.stroke',
+        stylers: [{
+          color: '#4b6878'
+        }]
+      }, {
+        featureType: 'poi',
+        stylers: [{
+          visibility: 'off'
+        }]
+      }, {
+        featureType: 'road',
+        elementType: 'labels.icon',
+        stylers: [{
+          visibility: 'off'
+        }]
+      }, {
+        featureType: 'transit',
+        stylers: [{
+          visibility: 'off'
+        }]
+      }],
+      disableDefaultUI: true,
+      zoomControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+      rotateControl: true,
+      scaleControl: true
+    });
+    groundZeroMarker = new google.maps.Marker({
+      position: currentCenter,
+      map: map,
+      draggable: true,
+      icon: {
+        path: 'M -10,0 10,0 M 0,-10 0,10',
+        strokeColor: '#ff0000',
+        strokeWeight: 3,
+        strokeOpacity: 0.9,
+        scale: 1.5
+      },
+      title: 'Ground Zero - Drag to move target'
+    });
+    groundZeroMarker.addListener('dragend', () => {
+      const pos = groundZeroMarker.getPosition();
+      currentCenter = {
+        lat: pos.lat(),
+        lng: pos.lng()
+      }
+    });
+    const addressInput = document.getElementById('address-input');
+    const autocomplete = new google.maps.places.Autocomplete(
+      addressInput);
+    autocomplete.bindTo('bounds', map);
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry) return;
+      if (place.geometry.viewport) {
+        map.fitBounds(place.geometry.viewport)
+      } else {
+        map.setCenter(place.geometry.location);
+        map.setZoom(17)
+      }
+      currentCenter = {
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng()
+      };
+      groundZeroMarker.setPosition(place.geometry.location)
+    });
+
+    function clearPersistentOverlays() {
+      persistentOverlays.forEach(overlay => overlay.setMap(null));
+      persistentOverlays = []
+    }
+
+    function selectMunition(key) {
+      document.querySelectorAll('.munition-btn').forEach(btn => btn
+        .classList.remove('active'));
+      document.querySelector(`[data-munition="${key}"]`).classList
+        .add('active');
+      const munition = munitionData[key];
+      document.getElementById('info-title').textContent = munition
+        .name;
+      document.getElementById('info-yield').textContent = munition
+        .yield;
+      document.getElementById('info-details').textContent = munition
+        .details;
+      triggerBlast(munition)
+    }
+    const controls = document.getElementById('controls');
+    Object.entries(munitionData).forEach(([key, munition]) => {
+      const btn = document.createElement('button');
+      btn.className = 'munition-btn';
+      btn.setAttribute('data-munition', key);
+      btn.textContent = munition.name;
+      btn.onclick = () => selectMunition(key);
+      controls.appendChild(btn)
+    });
+    selectMunition('atomic-bomb')
+  }
+  window.initMap = initMap
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places&callback=initMap">
+  </script>
 </body>
+
 </html>
