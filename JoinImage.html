@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Image Collage Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        #canvas { max-width: 100%; max-height: 100%; height: auto; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        #imageList::-webkit-scrollbar { width: 8px; }
+        #imageList::-webkit-scrollbar-track { background: #f1f5f9; }
+        #imageList::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); z-index: 9999; }
+        .spinner { border: 5px solid #f3f3f3; border-top: 5px solid #5850ec; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+    <!-- Loading Spinner (initially hidden) -->
+    <div id="loader" class="hidden items-center justify-center">
+        <div class="text-center">
+             <div class="spinner mx-auto mb-4"></div>
+             <p class="text-white font-semibold">Generating high-quality image...</p>
+        </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row h-screen">
+        <!-- Controls Panel -->
+        <aside class="w-full md:w-96 bg-white p-6 shadow-lg flex flex-col">
+            <header class="mb-6">
+                <h1 class="text-2xl font-bold text-slate-900">Image Collage Tool</h1>
+                <p class="text-sm text-slate-500">A simple, reliable image stitcher.</p>
+            </header>
+
+            <div class="mb-4">
+                <label for="imageUpload" class="block text-sm font-medium text-slate-700 mb-2">1. Upload Images</label>
+                <input type="file" id="imageUpload" multiple accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 cursor-pointer">
+            </div>
+            
+            <div class="mb-4 flex-grow flex flex-col min-h-0">
+                 <label class="block text-sm font-medium text-slate-700 mb-2">2. Manage Images</label>
+                 <div id="imageList" class="flex-grow bg-slate-50 p-3 rounded-lg overflow-y-auto border border-slate-200">
+                    <p id="no-images-text" class="text-center text-slate-400 text-sm">No images uploaded yet.</p>
+                 </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="layoutType" class="block text-sm font-medium text-slate-700 mb-2">3. Choose Layout</label>
+                <select id="layoutType" class="w-full p-2 border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                    <option value="auto">Auto Grid</option>
+                    <option value="horizontal">Single Row</option>
+                    <option value="vertical">Single Column</option>
+                </select>
+            </div>
+
+            <div class="mt-auto pt-4 border-t border-slate-200">
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="clearBtn" class="w-full py-2 px-4 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 disabled:bg-red-300" disabled>Clear All</button>
+                    <button id="downloadBtn" class="w-full py-2 px-4 bg-violet-600 text-white font-semibold rounded-lg shadow-md hover:bg-violet-700 disabled:bg-violet-300" disabled>Download JPG</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Canvas Area -->
+        <main class="flex-1 p-6 flex items-center justify-center bg-slate-100">
+            <div id="canvas-container"><canvas id="canvas"></canvas></div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Globals & Constants ---
+    const PREVIEW_MAX_DIM = 400;
+    const MAX_OUTPUT_DIMENSION = 4096; // New: Cap final image size
+    const PADDING = 10;
+    let images = []; // { full: Image, preview: Image, rotation: 0, flipH: false }
+
+    // --- DOM Elements ---
+    const imageUpload = document.getElementById('imageUpload');
+    const imageList = document.getElementById('imageList');
+    const noImagesText = document.getElementById('no-images-text');
+    const layoutType = document.getElementById('layoutType');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const loader = document.getElementById('loader');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- Core Functions ---
+    const createPreview = (fullImage, callback) => {
+        const pCanvas = document.createElement('canvas');
+        const pCtx = pCanvas.getContext('2d');
+        let { width, height } = fullImage;
+        const ratio = width / height;
+
+        if (ratio > 1 && width > PREVIEW_MAX_DIM) {
+            width = PREVIEW_MAX_DIM;
+            height = PREVIEW_MAX_DIM / ratio;
+        } else if (height > PREVIEW_MAX_DIM) {
+            height = PREVIEW_MAX_DIM;
+            width = PREVIEW_MAX_DIM * ratio;
+        }
+        pCanvas.width = width;
+        pCanvas.height = height;
+        pCtx.drawImage(fullImage, 0, 0, width, height);
+
+        const previewImage = new Image();
+        previewImage.onload = () => callback(previewImage);
+        previewImage.src = pCanvas.toDataURL();
+    };
+    
+    /**
+     * Calculates the position and size of all images for a given layout.
+     * @param {boolean} usePreview Determines if full-res or preview images are used for calculation.
+     * @returns {object} An object containing the calculated positions and overall dimensions.
+     */
+    const calculateLayout = (usePreview) => {
+        const getEffectiveDims = (imgObj) => {
+            const img = usePreview ? imgObj.preview : imgObj.full;
+            const isSideways = imgObj.rotation === 90 || imgObj.rotation === 270;
+            return {
+                width: isSideways ? img.height : img.width,
+                height: isSideways ? img.width : img.height
+            };
+        };
+
+        let totalWidth = 0, totalHeight = 0;
+        const positions = [];
+        if (images.length === 0) return { positions, width: 0, height: 0 };
+        
+        const layout = layoutType.value;
+
+        if (layout === 'auto') {
+            const n = images.length;
+            const cols = Math.ceil(Math.sqrt(n));
+            const rows = Math.ceil(n / cols);
+            let maxCellW = 0, maxCellH = 0;
+            images.forEach(img => {
+                const dims = getEffectiveDims(img);
+                if (dims.width > maxCellW) maxCellW = dims.width;
+                if (dims.height > maxCellH) maxCellH = dims.height;
+            });
+            totalWidth = (maxCellW * cols) + (PADDING * (cols + 1));
+            totalHeight = (maxCellH * rows) + (PADDING * (rows + 1));
+            images.forEach((img, i) => {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                const dims = getEffectiveDims(img);
+                const ratio = Math.min(maxCellW / dims.width, maxCellH / dims.height);
+                const w = dims.width * ratio;
+                const h = dims.height * ratio;
+                const x = (c * maxCellW) + (PADDING * (c + 1)) + (maxCellW - w) / 2;
+                const y = (r * maxCellH) + (PADDING * (r + 1)) + (maxCellH - h) / 2;
+                positions.push({ img, x, y, w, h });
+            });
+        } else { // Horizontal or Vertical
+            const isHorizontal = layout === 'horizontal';
+            let maxPerpDim = 0;
+            images.forEach(img => {
+                const d = getEffectiveDims(img);
+                const pDim = isHorizontal ? d.height : d.width;
+                if (pDim > maxPerpDim) maxPerpDim = pDim;
+            });
+
+            let currentMainPos = PADDING;
+            images.forEach(img => {
+                const d = getEffectiveDims(img);
+                const ratio = maxPerpDim / (isHorizontal ? d.height : d.width);
+                const mainDim = (isHorizontal ? d.width : d.height) * ratio;
+                const x = isHorizontal ? currentMainPos : PADDING;
+                const y = isHorizontal ? PADDING : currentMainPos;
+                const w = isHorizontal ? mainDim : maxPerpDim;
+                const h = isHorizontal ? maxPerpDim : mainDim;
+                positions.push({ img, x, y, w, h });
+                currentMainPos += mainDim + PADDING;
+            });
+            if (isHorizontal) {
+                totalWidth = currentMainPos;
+                totalHeight = maxPerpDim + PADDING * 2;
+            } else {
+                totalHeight = currentMainPos;
+                totalWidth = maxPerpDim + PADDING * 2;
+            }
+        }
+        return { positions, width: totalWidth, height: totalHeight };
+    };
+
+    /**
+     * Draws a calculated layout onto a given canvas context.
+     * @param {CanvasRenderingContext2D} targetCtx The context for drawing.
+     * @param {object} layout The layout object from calculateLayout().
+     * @param {boolean} usePreview Determines if full-res or preview images are used.
+     */
+    const drawLayout = (targetCtx, layout, usePreview) => {
+        targetCtx.canvas.width = layout.width;
+        targetCtx.canvas.height = layout.height;
+        if (images.length === 0) return;
+
+        targetCtx.fillStyle = '#fff';
+        targetCtx.fillRect(0, 0, layout.width, layout.height);
+        layout.positions.forEach(p => {
+            const imgToDraw = usePreview ? p.img.preview : p.img.full;
+            targetCtx.save();
+            targetCtx.translate(p.x + p.w / 2, p.y + p.h / 2);
+            if (p.img.flipH) targetCtx.scale(-1, 1);
+            targetCtx.rotate(p.img.rotation * Math.PI / 180);
+            targetCtx.drawImage(imgToDraw, -p.w / 2, -p.h / 2, p.w, p.h);
+            targetCtx.restore();
+        });
+    };
+
+    const updateImageListUI = () => {
+        imageList.innerHTML = '';
+        if (images.length === 0) {
+            imageList.innerHTML = `<p id="no-images-text" class="text-center text-slate-400 text-sm">No images uploaded yet.</p>`;
+            return;
+        }
+        images.forEach((imgObj, index) => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2 mb-2 bg-white rounded-md shadow-sm';
+            item.innerHTML = `
+                <img src="${imgObj.preview.src}" class="w-12 h-12 rounded object-cover">
+                <div class="flex items-center space-x-2">
+                    <button data-action="rotate" data-index="${index}" title="Rotate 90°" class="w-8 h-8 rounded-full hover:bg-slate-200 text-lg">&#x21bb;</button>
+                    <button data-action="flip" data-index="${index}" title="Flip Horizontally" class="w-8 h-8 rounded-full hover:bg-slate-200 text-lg">&#x21c4;</button>
+                    <button data-action="remove" data-index="${index}" title="Remove Image" class="w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 font-bold text-lg">&times;</button>
+                </div>`;
+            imageList.appendChild(item);
+        });
+    };
+    
+    const refreshUI = () => {
+        const previewLayout = calculateLayout(true);
+        drawLayout(ctx, previewLayout, true);
+        updateImageListUI();
+        const hasImages = images.length > 0;
+        clearBtn.disabled = !hasImages;
+        downloadBtn.disabled = !hasImages;
+    };
+
+    // --- Event Handlers ---
+    imageUpload.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        let processed = 0;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const fullImage = new Image();
+                fullImage.onload = () => {
+                    createPreview(fullImage, (previewImage) => {
+                        images.push({ full: fullImage, preview: previewImage, rotation: 0, flipH: false });
+                        processed++;
+                        if (processed === files.length) refreshUI();
+                    });
+                };
+                fullImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = '';
+    });
+
+    imageList.addEventListener('click', (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+        const { action, index } = target.dataset;
+        if (action === 'remove') images.splice(index, 1);
+        else if (action === 'rotate') images[index].rotation = (images[index].rotation + 90) % 360;
+        else if (action === 'flip') images[index].flipH = !images[index].flipH;
+        refreshUI();
+    });
+
+    layoutType.addEventListener('change', refreshUI);
+
+    clearBtn.addEventListener('click', () => {
+        images = [];
+        refreshUI();
+    });
+
+    downloadBtn.addEventListener('click', () => {
+        if (images.length === 0) return;
+        
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+        downloadBtn.disabled = true;
+
+        setTimeout(() => {
+            // Calculate final layout with full-res images
+            const finalLayout = calculateLayout(false);
+            
+            // NEW: Calculate scale factor to cap resolution
+            const { width: fullWidth, height: fullHeight } = finalLayout;
+            const scale = Math.min(1, MAX_OUTPUT_DIMENSION / fullWidth, MAX_OUTPUT_DIMENSION / fullHeight);
+            
+            const offscreenCanvas = document.createElement('canvas');
+            const offscreenCtx = offscreenCanvas.getContext('2d');
+            
+            // Set canvas size to the new, scaled dimensions
+            offscreenCanvas.width = fullWidth * scale;
+            offscreenCanvas.height = fullHeight * scale;
+            
+            // Scale the context to draw the large layout into the smaller canvas
+            offscreenCtx.scale(scale, scale);
+            
+            // Draw the full-res layout, which will be scaled down by the context
+            drawLayout(offscreenCtx, finalLayout, false);
+
+            const link = document.createElement('a');
+            // NEW: Change file name and type to JPG
+            link.download = `collage-${Date.now()}.jpg`;
+            link.href = offscreenCanvas.toDataURL('image/jpeg', 0.9); // 0.9 is high quality
+            link.click();
+            
+            loader.classList.add('hidden');
+            loader.classList.remove('flex');
+            downloadBtn.disabled = false;
+        }, 50);
+    });
+});
+</script>
+</body>
+</html>
