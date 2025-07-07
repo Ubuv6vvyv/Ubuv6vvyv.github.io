@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Speed HUD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --base-bg-color: rgb(240, 240, 240);
+            --drawer-bg-color: rgba(255, 255, 255, 0.92);
+            --text-color: #222;
+            --sub-text-color: #555;
+            --shadow-color: rgba(0, 0, 0, 0.15);
+            --accent-color: #007AFF;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            background-color: var(--base-bg-color);
+            transition: background-color 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        @keyframes pulse {
+            0% { background-color: rgb(135, 206, 250); } /* LightSkyBlue */
+            50% { background-color: rgb(155, 216, 255); }
+            100% { background-color: rgb(135, 206, 250); }
+        }
+        .is-steady {
+            animation: pulse 4s infinite ease-in-out;
+        }
+
+        .viewport {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 1rem;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .speed-container {
+            position: relative;
+        }
+
+        .speed-display, .unit {
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .is-stale .speed-display, .is-stale .unit {
+            opacity: 0.5;
+        }
+        
+        #viewport-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 999;
+            display: none;
+        }
+        
+        #viewport-overlay.is-active {
+            display: block;
+        }
+
+        .speed-display {
+            font-size: clamp(6rem, 25vw, 12rem);
+            font-weight: 700;
+            color: var(--text-color);
+            line-height: 1;
+        }
+
+        .unit {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: var(--sub-text-color);
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .drawer-toggle-button {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            z-index: 1001;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .drawer-toggle-button.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-50%) translateY(20px);
+        }
+
+        .drawer-toggle-icon {
+            width: 40px;
+            height: 40px;
+            color: var(--sub-text-color);
+            opacity: 0.7;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .drawer-toggle-button:hover .drawer-toggle-icon {
+            opacity: 1;
+        }
+
+        .drawer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--drawer-bg-color);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-shadow: 0 -5px 30px var(--shadow-color);
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 1000;
+            padding: 2rem;
+            padding-top: 3rem;
+            box-sizing: border-box;
+        }
+
+        .drawer.is-open {
+            transform: translateY(0);
+        }
+
+        .drawer-handle {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 5px;
+            background-color: #ccc;
+            border-radius: 2.5px;
+        }
+
+        .drawer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+            max-width: 400px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        #test-mode-trigger {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+
+        .info-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .info-item { text-align: center; }
+        .info-value { font-size: 2rem; font-weight: 700; color: var(--text-color); }
+        .info-label { font-size: 0.9rem; color: var(--sub-text-color); text-transform: uppercase; }
+
+        .toggles-section { display: flex; flex-direction: column; gap: 1rem; }
+        .toggle-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; color: var(--text-color); }
+
+        .switch { position: relative; display: inline-block; width: 51px; height: 31px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 31px; }
+        .slider:before { position: absolute; content: ""; height: 27px; width: 27px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .reset-button { padding: 1rem; font-size: 1.1rem; font-weight: 700; font-family: 'Orbitron', sans-serif; border: none; border-radius: 12px; cursor: pointer; background-color: #E5E5EA; color: var(--text-color); transition: background-color 0.2s ease, transform 0.1s ease; }
+        .reset-button:active { background-color: #DCDCE0; transform: scale(0.98); }
+        
+        #message-box { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.75); color: white; padding: 12px 20px; border-radius: 12px; z-index: 2000; opacity: 0; transition: opacity 0.3s ease, top 0.3s ease; pointer-events: none; }
+        #message-box.show { opacity: 1; top: 30px; }
+    </style>
+</head>
+<body>
+    <div id="viewport-overlay"></div>
+    <div class="viewport">
+        <div class="speed-container" id="speed-container">
+            <div id="speed" class="speed-display">0.0</div>
+            <div class="unit">km/h</div>
+        </div>
+        <button class="drawer-toggle-button" id="drawer-toggle">
+            <svg class="drawer-toggle-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg>
+        </button>
+    </div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-content">
+            <div id="test-mode-trigger"></div>
+            <div class="info-section">
+                <div class="info-item">
+                    <span id="top-speed" class="info-value">0.0</span>
+                    <span class="info-label">Top Speed</span>
+                </div>
+                <div class="info-item" id="accuracy-display" style="display: none;">
+                    <span id="accuracy" class="info-value">--</span>
+                    <span class="info-label">Accuracy (m)</span>
+                </div>
+                <div class="info-item" id="sensor-display" style="display: none;">
+                    <span id="g-force" class="info-value">--</span>
+                    <span class="info-label">G-Force</span>
+                </div>
+            </div>
+            <div class="toggles-section">
+                <div class="toggle-item">
+                    <span>Background Color Effect</span>
+                    <label class="switch"><input type="checkbox" id="toggle-bg-effect"><span class="slider"></span></label>
+                </div>
+                 <div class="toggle-item">
+                    <span>Show Accuracy (GPS)</span>
+                     <label class="switch"><input type="checkbox" id="toggle-accuracy"><span class="slider"></span></label>
+                </div>
+                 <div class="toggle-item">
+                    <span>Show Sensor (G-Force)</span>
+                     <label class="switch"><input type="checkbox" id="toggle-sensor"><span class="slider"></span></label>
+                </div>
+            </div>
+            <button id="reset-button" class="reset-button">Reset Top Speed</button>
+        </div>
+    </div>
+    <div id="message-box"></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const speedEl = document.getElementById('speed'), topSpeedEl = document.getElementById('top-speed'),
+              speedContainer = document.getElementById('speed-container'),
+              accuracyEl = document.getElementById('accuracy'), accuracyDisplay = document.getElementById('accuracy-display'),
+              gForceEl = document.getElementById('g-force'), sensorDisplay = document.getElementById('sensor-display'),
+              resetBtn = document.getElementById('reset-button'), body = document.body,
+              messageBox = document.getElementById('message-box'), drawer = document.getElementById('drawer'),
+              drawerToggle = document.getElementById('drawer-toggle'), overlay = document.getElementById('viewport-overlay'),
+              testModeTrigger = document.getElementById('test-mode-trigger');
+
+        // --- Toggles ---
+        const toggleAccuracy = document.getElementById('toggle-accuracy'),
+              toggleBgEffect = document.getElementById('toggle-bg-effect'),
+              toggleSensor = document.getElementById('toggle-sensor');
+        const toggles = { toggleAccuracy, toggleBgEffect, toggleSensor };
+
+        // --- State ---
+        let lastSpeed = 0.0, topSpeed = 0.0, watchId = null,
+            isTestingMode = false, testLoopTimeout = null, isSensorMode = false,
+            lastGeoUpdate = Date.now(), staleDataTimer = null;
+
+        // --- Constants ---
+        const MAX_SPEED_CHANGE = 2.5;
+        const ACCEL_COLOR = { r: 0, g: 255, b: 127 }, DECEL_COLOR = { r: 255, g: 40, b: 40 },
+              STEADY_COLOR = { r: 135, g: 206, b: 250 }, BASE_COLOR = { r: 240, g: 240, b: 240 };
+        const SMOOTHING_FACTOR = 0.15, GRAVITY = 9.81;
+        const GEO_OPTIONS = { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 };
+
+        // --- Main Speed & UI Update Logic ---
+        function updateSpeedDisplay(speedKmh) {
+            let displaySpeed = speedKmh;
+            if (!isTestingMode) {
+                displaySpeed = (speedKmh * SMOOTHING_FACTOR) + (lastSpeed * (1 - SMOOTHING_FACTOR));
+            }
+            if (displaySpeed < 0.05) displaySpeed = 0;
+            
+            speedEl.textContent = displaySpeed.toFixed(1);
+
+            if (displaySpeed > topSpeed) {
+                topSpeed = displaySpeed;
+                topSpeedEl.textContent = topSpeed.toFixed(1);
+            }
+            updateBackgroundColor(displaySpeed - lastSpeed);
+            lastSpeed = displaySpeed;
+        }
+
+        function updateBackgroundColor(speedChange) {
+            body.classList.remove('is-steady');
+            if (!toggleBgEffect.checked) {
+                body.style.backgroundColor = '';
+                return;
+            }
+
+            let targetColor = BASE_COLOR;
+            const absSpeedChange = Math.abs(speedChange);
+            const intensity = Math.min(1, absSpeedChange / MAX_SPEED_CHANGE);
+            
+            const ACCEL_THRESHOLD = 0.15, STEADY_THRESHOLD = 0.1;
+
+            if (speedChange > ACCEL_THRESHOLD) {
+                targetColor = ACCEL_COLOR;
+            } else if (speedChange < -ACCEL_THRESHOLD) {
+                targetColor = DECEL_COLOR;
+            } else if (lastSpeed > 5 && absSpeedChange < STEADY_THRESHOLD) {
+                targetColor = STEADY_COLOR;
+                body.classList.add('is-steady');
+            }
+            
+            if (targetColor === STEADY_COLOR) {
+                body.style.backgroundColor = '';
+            } else {
+                const r = BASE_COLOR.r + (targetColor.r - BASE_COLOR.r) * intensity;
+                const g = BASE_COLOR.g + (targetColor.g - BASE_COLOR.g) * intensity;
+                const b = BASE_COLOR.b + (targetColor.b - BASE_COLOR.b) * intensity;
+                body.style.backgroundColor = `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+            }
+        }
+
+        // --- Geolocation & Stale Data Logic ---
+        function checkStaleData() {
+            if (Date.now() - lastGeoUpdate > 2500 && !isTestingMode && watchId) {
+                speedContainer.classList.add('is-stale');
+            }
+        }
+
+        function geoSuccess(position) {
+            lastGeoUpdate = Date.now();
+            speedContainer.classList.remove('is-stale');
+            if (position.coords.speed === null) return;
+            updateSpeedDisplay(position.coords.speed * 3.6);
+            if (toggleAccuracy.checked) accuracyEl.textContent = position.coords.accuracy.toFixed(0);
+        }
+
+        function geoError(err) {
+            let message = "Could not get speed. Try moving to an open area.";
+            if (err.code === 1) message = "Please enable location access.";
+            showMessage(message);
+            console.warn(`ERROR(${err.code}): ${err.message}`);
+        }
+
+        function startWatching() {
+            if (isTestingMode || watchId) return;
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(geoSuccess, geoError, GEO_OPTIONS);
+            } else {
+                showMessage("Geolocation not supported by this browser.");
+            }
+        }
+
+        function stopWatching() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+        }
+
+        // --- Settings Persistence ---
+        function saveSettings() {
+            Object.keys(toggles).forEach(key => {
+                localStorage.setItem(key, toggles[key].checked);
+            });
+        }
+
+        function loadSettings() {
+            Object.keys(toggles).forEach(key => {
+                const savedState = localStorage.getItem(key);
+                if (savedState !== null) {
+                    toggles[key].checked = (savedState === 'true');
+                } else {
+                    // Default 'Background Effect' to on if no setting saved
+                    if (key === 'toggleBgEffect') {
+                        toggles[key].checked = true;
+                    }
+                }
+            });
+            // Manually trigger change events to update UI based on loaded settings
+            Object.values(toggles).forEach(toggle => toggle.dispatchEvent(new Event('change')));
+        }
+
+        // --- General UI Functions ---
+        function resetTopSpeed() {
+            topSpeed = 0.0;
+            topSpeedEl.textContent = '0.0';
+            showMessage("Top speed has been reset.");
+        }
+
+        let messageTimer;
+        function showMessage(text) {
+            clearTimeout(messageTimer);
+            messageBox.textContent = text;
+            messageBox.classList.add('show');
+            messageTimer = setTimeout(() => messageBox.classList.remove('show'), 3000);
+        }
+
+        function setDrawerOpen(isOpen) {
+            drawer.classList.toggle('is-open', isOpen);
+            drawerToggle.classList.toggle('is-hidden', isOpen);
+            overlay.classList.toggle('is-active', isOpen);
+        }
+
+        // --- Sensor Logic ---
+        function handleMotionEvent(event) {
+            const accel = event.accelerationIncludingGravity;
+            if (!accel || !accel.x) return;
+            const magnitude = Math.sqrt(accel.x**2 + accel.y**2 + accel.z**2);
+            const gForce = magnitude / GRAVITY;
+            gForceEl.textContent = gForce.toFixed(2);
+        }
+
+        function toggleSensorMode() {
+            isSensorMode = toggleSensor.checked;
+            sensorDisplay.style.display = isSensorMode ? 'block' : 'none';
+            if (isSensorMode) {
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    DeviceMotionEvent.requestPermission().then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('devicemotion', handleMotionEvent);
+                        } else {
+                            showMessage("Permission denied for motion sensors.");
+                            toggleSensor.checked = false;
+                            isSensorMode = false;
+                            sensorDisplay.style.display = 'none';
+                        }
+                    }).catch(console.error);
+                } else {
+                    window.addEventListener('devicemotion', handleMotionEvent);
+                }
+            } else {
+                window.removeEventListener('devicemotion', handleMotionEvent);
+            }
+        }
+
+        // --- Testing Mode Logic ---
+        function runSpeedAnimation(start, end, duration, onComplete) {
+            let startTime = null;
+            function animate(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const progress = Math.min((currentTime - startTime) / duration, 1);
+                const easeProgress = progress * progress;
+                const currentSpeed = start + (end - start) * easeProgress;
+                updateSpeedDisplay(currentSpeed);
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    updateSpeedDisplay(end);
+                    if (onComplete) onComplete();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function startSpeedSimulation() {
+            if (!isTestingMode) return;
+            const sequence = [
+                () => new Promise(res => runSpeedAnimation(0, 1000, 4000, res)),
+                () => new Promise(res => runSpeedAnimation(1000, 0, 4000, res)),
+                () => new Promise(res => { updateSpeedDisplay(1000); setTimeout(res, 500); }),
+                () => new Promise(res => { updateSpeedDisplay(0); setTimeout(res, 500); }),
+            ];
+            let currentStep = 0;
+            async function runSequence() {
+                await sequence[currentStep]();
+                currentStep = (currentStep + 1) % sequence.length;
+                if (isTestingMode) testLoopTimeout = setTimeout(runSequence, 500);
+            }
+            runSequence();
+        }
+
+        function toggleTestMode() {
+            isTestingMode = !isTestingMode;
+            clearTimeout(testLoopTimeout);
+            resetTopSpeed();
+            if (isTestingMode) {
+                stopWatching();
+                showMessage("Testing Mode Activated");
+                startSpeedSimulation();
+            } else {
+                updateSpeedDisplay(0);
+                showMessage("Testing Mode Deactivated");
+                startWatching();
+            }
+        }
+
+        // --- Event Listeners & Initialization ---
+        function initialize() {
+            // Drawer and Reset
+            drawerToggle.addEventListener('click', () => setDrawerOpen(true));
+            overlay.addEventListener('click', () => setDrawerOpen(false));
+            resetBtn.addEventListener('click', resetTopSpeed);
+            testModeTrigger.addEventListener('click', toggleTestMode);
+
+            // Toggles
+            toggleAccuracy.addEventListener('change', () => {
+                accuracyDisplay.style.display = toggleAccuracy.checked ? 'block' : 'none';
+                saveSettings();
+            });
+            toggleBgEffect.addEventListener('change', () => {
+                saveSettings();
+                // Immediately update background if toggled
+                const lastSpeedChange = lastSpeed - (lastSpeed * (1 - SMOOTHING_FACTOR));
+                updateBackgroundColor(lastSpeedChange);
+            });
+            toggleSensor.addEventListener('change', () => {
+                toggleSensorMode();
+                saveSettings();
+            });
+            
+            loadSettings();
+            startWatching();
+            staleDataTimer = setInterval(checkStaleData, 1000);
+        }
+        
+        initialize();
+    });
+    </script>
+</body>
+</html>
