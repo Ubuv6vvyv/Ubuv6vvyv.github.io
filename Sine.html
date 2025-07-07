@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ringtone Generator (Optimized)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .slider { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: #4a5568; border-radius: 5px; outline: none; opacity: 0.8; transition: opacity .2s; }
+        .slider:hover { opacity: 1; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #63b3ed; cursor: pointer; border-radius: 50%; }
+        .slider::-moz-range-thumb { width: 20px; height: 20px; background: #63b3ed; cursor: pointer; border-radius: 50%; }
+        details > summary { list-style: none; cursor: pointer; padding: 0.5rem; background-color: #2d3748; border-radius: 0.25rem; transition: background-color 0.2s; }
+        details > summary::-webkit-details-marker { display: none; }
+        details > summary:hover { background-color: #4a5568; }
+        details[open] > summary { background-color: #4a5568; }
+        .grid-3 { display: grid; grid-template-columns: 80px 1fr 65px; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .label { font-weight: 500; font-size: 0.8rem; }
+        .value { font-size: 0.8rem; text-align: right; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 md:p-6">
+    <div class="max-w-xl mx-auto bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-4 text-center text-cyan-400">Ringtone Generator</h1>
+        <div class="flex justify-center flex-wrap gap-2 sm:gap-4 mb-4">
+            <button id="playBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm sm:text-base">Play</button>
+            <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm sm:text-base">Stop</button>
+            <button id="addBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm sm:text-base">Add Tone</button>
+            <button id="exportBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg text-sm sm:text-base">Export 5s</button>
+        </div>
+        <div id="loader" class="text-center my-4 hidden"><p class="text-cyan-400 animate-pulse">Generating...</p></div>
+        <div id="container" class="space-y-4"></div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const getEl = (id) => document.getElementById(id);
+        const playBtn = getEl('playBtn'), stopBtn = getEl('stopBtn'), addBtn = getEl('addBtn');
+        const exportBtn = getEl('exportBtn'), container = getEl('container'), loader = getEl('loader');
+        let tones = [], idCounter = 0;
+
+        const presets = {
+            '-- Alarms --': {dis:1},
+            'Siren': {f:900,t:'sine',d:0,vr:2,vd:500,tr:0,td:0,wf:200,wo:8,wq:5},
+            'Klaxon': {f:700,t:'sawtooth',d:0,vr:0,vd:0,tr:2.5,td:100,wf:100,wo:6,wq:2},
+            'High Alert': {f:2500,t:'square',d:0,vr:15,vd:100,tr:15,td:100,wf:1500,wo:8,wq:10},
+            '-- Sci-Fi --': {dis:1},
+            'Warble': {f:120,t:'sawtooth',d:0,vr:0,vd:0,tr:0,td:0,wf:100,wo:10,wq:15},
+            'Alien Signal': {f:4000,t:'square',d:0,vr:40,vd:2000,tr:0,td:0,wf:2000,wo:6,wq:20},
+            'UFO': {f:400,t:'sine',d:0,vr:0.5,vd:1800,tr:0,td:0,wf:100,wo:10,wq:5},
+            '-- Annoying --': {dis:1},
+            'Mosquito': {f:17500,t:'sine',d:0,vr:25,vd:500,tr:0,td:0,wf:100,wo:6,wq:2},
+            'Feedback': {f:3500,t:'sawtooth',d:20,vr:30,vd:200,tr:0,td:0,wf:3000,wo:4,wq:25},
+            '-- Reset --': {dis:1},
+            'Default': {f:1000,t:'sine',d:0,vr:0,vd:0,tr:0,td:0,wf:100,wo:6,wq:2}
+        };
+
+        const createToneBlock = () => {
+            const id = ++idCounter;
+            const block = document.createElement('div');
+            block.className = 'bg-gray-700 p-3 rounded-lg border border-gray-600';
+            block.dataset.id = id;
+
+            let presetHtml = '';
+            for (const n in presets) {
+                if (presets[n].dis) presetHtml += `<span class="w-full text-left text-xs text-cyan-300 font-bold pt-2 col-span-full">${n}</span>`;
+                else presetHtml += `<button class="preset-btn bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium py-1 px-2 rounded-full" data-p="${n}" data-id="${id}">${n}</button>`;
+            }
+
+            block.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-3">
+                       <h2 class="text-lg font-semibold text-cyan-300">T${id}</h2>
+                       <select id="type-${id}" class="bg-gray-600 text-white rounded px-2 py-1 text-sm">
+                            <option value="sine">Sine</option><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Tri</option>
+                       </select>
+                    </div>
+                    <button class="rm-btn bg-red-700 hover:bg-red-800 text-white font-bold py-1 px-3 rounded-md text-sm" data-id="${id}">X</button>
+                </div>
+                <div class="space-y-2">
+                    <div class="grid-3"><label class="label">Freq</label><input type="range" id="freq-${id}" min="20" max="20000" value="1000" class="slider"><span id="freq-v-${id}" class="value">1k</span></div>
+                    <div class="grid-3"><label class="label">Detune</label><input type="range" id="detune-${id}" min="-1200" max="1200" value="0" class="slider"><span id="detune-v-${id}" class="value">0c</span></div>
+                    <details><summary class="font-semibold text-sm">Vibrato</summary><div class="p-2 space-y-2">
+                        <div class="grid-3"><label class="label">Rate</label><input type="range" id="vr-${id}" min="0" max="50" value="0" step="0.1" class="slider"><span id="vr-v-${id}" class="value">0Hz</span></div>
+                        <div class="grid-3"><label class="label">Depth</label><input type="range" id="vd-${id}" min="0" max="2500" value="0" class="slider"><span id="vd-v-${id}" class="value">0Hz</span></div>
+                    </div></details>
+                    <details><summary class="font-semibold text-sm">Tremolo</summary><div class="p-2 space-y-2">
+                        <div class="grid-3"><label class="label">Rate</label><input type="range" id="tr-${id}" min="0" max="50" value="0" step="0.1" class="slider"><span id="tr-v-${id}" class="value">0Hz</span></div>
+                        <div class="grid-3"><label class="label">Depth</label><input type="range" id="td-${id}" min="0" max="100" value="0" class="slider"><span id="td-v-${id}" class="value">0%</span></div>
+                    </div></details>
+                    <details><summary class="font-semibold text-sm">AutoWah</summary><div class="p-2 space-y-2">
+                        <div class="grid-3"><label class="label">Freq</label><input type="range" id="wf-${id}" min="50" max="8000" value="100" class="slider"><span id="wf-v-${id}" class="value">100Hz</span></div>
+                        <div class="grid-3"><label class="label">Octaves</label><input type="range" id="wo-${id}" min="1" max="15" value="6" class="slider"><span id="wo-v-${id}" class="value">6</span></div>
+                        <div class="grid-3"><label class="label">Resonance</label><input type="range" id="wq-${id}" min="1" max="30" value="2" step="0.5" class="slider"><span id="wq-v-${id}" class="value">2</span></div>
+                    </div></details>
+                    <details><summary class="font-semibold text-sm">Pitch Sweep</summary><div class="p-2 space-y-2">
+                        <div class="grid-3"><label class="label">Start</label><input type="range" id="swS-${id}" min="20" max="20000" value="200" class="slider"><span id="swS-v-${id}" class="value">200Hz</span></div>
+                        <div class="grid-3"><label class="label">End</label><input type="range" id="swE-${id}" min="20" max="20000" value="2000" class="slider"><span id="swE-v-${id}" class="value">2k</span></div>
+                        <div class="grid-3"><label class="label">Time</label><input type="range" id="swT-${id}" min="0.1" max="5" value="1" step="0.1" class="slider"><span id="swT-v-${id}" class="value">1s</span></div>
+                        <button class="sweep-btn w-full bg-cyan-600 hover:bg-cyan-500 rounded py-1 mt-2 text-sm" data-id="${id}">Sweep</button>
+                    </div></details>
+                    <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-2">${presetHtml}</div>
+                </div>
+            `;
+            container.appendChild(block);
+
+            const wah = new Tone.AutoWah({baseFrequency:100, octaves:6, sensitivity:-5, Q:2, gain:2, follower:{attack:0.1, release:0.2}}).toDestination();
+            const trem = new Tone.Tremolo(0, 0).toDestination().start();
+            const osc = new Tone.Oscillator(1000, 'sine');
+            const lfo = new Tone.LFO(0, 1000, 1000).connect(osc.frequency).start();
+            osc.chain(trem, wah);
+            tones.push({id, osc, wah, trem, lfo, playing: false});
+            addListeners(id);
+            applyPreset(id, 'Default');
+        }
+
+        const fmtFreq = v => v >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+'Hz';
+        
+        const applyPreset = (id, pName) => {
+            const p = presets[pName];
+            if (!p || p.dis) return;
+            const update = (sId, val, lblId, fmt) => {
+                const el = getEl(sId);
+                el.value = val;
+                getEl(lblId).textContent = fmt(val);
+                el.dispatchEvent(new Event('input', {bubbles:1}));
+            };
+            getEl(`type-${id}`).value = p.t; getEl(`type-${id}`).dispatchEvent(new Event('input'));
+            update(`freq-${id}`, p.f, `freq-v-${id}`, fmtFreq);
+            update(`detune-${id}`, p.d, `detune-v-${id}`, v => `${v}c`);
+            update(`vr-${id}`, p.vr, `vr-v-${id}`, v => `${v}Hz`);
+            update(`vd-${id}`, p.vd, `vd-v-${id}`, v => `${v}Hz`);
+            update(`tr-${id}`, p.tr, `tr-v-${id}`, v => `${v}Hz`);
+            update(`td-${id}`, p.td, `td-v-${id}`, v => `${v}%`);
+            update(`wf-${id}`, p.wf, `wf-v-${id}`, v => `${v}Hz`);
+            update(`wo-${id}`, p.wo, `wo-v-${id}`, v => v);
+            update(`wq-${id}`, p.wq, `wq-v-${id}`, v => v);
+        }
+
+        const addListeners = (id) => {
+            const t = tones.find(t => t.id === id);
+            if (!t) return;
+            const listen = (elId, cb) => getEl(elId).addEventListener('input', cb);
+            
+            listen(`type-${id}`, e => { t.osc.type = e.target.value; });
+            listen(`freq-${id}`, e => {
+                const v = parseFloat(e.target.value);
+                t.osc.frequency.value = v;
+                const d = parseFloat(getEl(`vd-${id}`).value);
+                t.lfo.min = v - d; t.lfo.max = v + d;
+                getEl(`freq-v-${id}`).textContent = fmtFreq(v);
+            });
+            listen(`detune-${id}`, e => { const v = parseFloat(e.target.value); t.osc.detune.value = v; getEl(`detune-v-${id}`).textContent = `${Math.round(v)}c`; });
+            listen(`vr-${id}`, e => { const v = parseFloat(e.target.value); t.lfo.frequency.value = v; getEl(`vr-v-${id}`).textContent = `${v.toFixed(1)}Hz`; });
+            listen(`vd-${id}`, e => {
+                const d = parseFloat(e.target.value);
+                const base = parseFloat(getEl(`freq-${id}`).value);
+                t.lfo.min = base - d; t.lfo.max = base + d;
+                getEl(`vd-v-${id}`).textContent = `${Math.round(d)}Hz`;
+            });
+            listen(`tr-${id}`, e => { const v = parseFloat(e.target.value); t.trem.frequency.value = v; getEl(`tr-v-${id}`).textContent = `${v.toFixed(1)}Hz`; });
+            listen(`td-${id}`, e => { const v = parseFloat(e.target.value) / 100; t.trem.depth.value = v; getEl(`td-v-${id}`).textContent = `${Math.round(v*100)}%`; });
+            listen(`wf-${id}`, e => { const v = parseFloat(e.target.value); t.wah.baseFrequency = v; getEl(`wf-v-${id}`).textContent = `${Math.round(v)}Hz`; });
+            listen(`wo-${id}`, e => { const v = parseFloat(e.target.value); t.wah.octaves = v; getEl(`wo-v-${id}`).textContent = v; });
+            listen(`wq-${id}`, e => { const v = parseFloat(e.target.value); t.wah.Q.value = v; getEl(`wq-v-${id}`).textContent = v; });
+
+            listen(`swS-${id}`, e => { getEl(`swS-v-${id}`).textContent = fmtFreq(e.target.value); });
+            listen(`swE-${id}`, e => { getEl(`swE-v-${id}`).textContent = fmtFreq(e.target.value); });
+            listen(`swT-${id}`, e => { getEl(`swT-v-${id}`).textContent = `${parseFloat(e.target.value).toFixed(1)}s`; });
+
+            document.querySelector(`.rm-btn[data-id='${id}']`).addEventListener('click', () => removeTone(id));
+            document.querySelectorAll(`.preset-btn[data-id='${id}']`).forEach(b => b.addEventListener('click', () => applyPreset(id, b.dataset.p)));
+            document.querySelector(`.sweep-btn[data-id='${id}']`).addEventListener('click', () => {
+                const start = parseFloat(getEl(`swS-${id}`).value);
+                const end = parseFloat(getEl(`swE-${id}`).value);
+                const time = parseFloat(getEl(`swT-${id}`).value);
+                const now = Tone.now();
+                t.osc.frequency.cancelScheduledValues(now);
+                t.osc.frequency.setValueAtTime(start, now);
+                t.osc.frequency.linearRampToValueAtTime(end, now + time);
+            });
+        }
+        
+        const removeTone = (id) => {
+            const idx = tones.findIndex(t => t.id === id);
+            if (idx > -1) {
+                const t = tones[idx];
+                if (t.playing) t.osc.stop();
+                t.osc.dispose(); t.wah.dispose(); t.trem.dispose(); t.lfo.dispose();
+                tones.splice(idx, 1);
+                getEl('container').querySelector(`div[data-id='${id}']`)?.remove();
+            }
+        }
+
+        playBtn.addEventListener('click', async () => {
+            await Tone.start();
+            tones.forEach(t => { if (!t.playing) { t.osc.start(); t.playing = true; } });
+        });
+        stopBtn.addEventListener('click', () => {
+            tones.forEach(t => { if (t.playing) { t.osc.stop(); t.playing = false; } });
+        });
+        addBtn.addEventListener('click', createToneBlock);
+
+        const bufferToWave = (buf) => {
+            const nCh = buf.numberOfChannels, len = buf.length * nCh * 2 + 44;
+            const buffer = new ArrayBuffer(len);
+            const view = new DataView(buffer);
+            const chans = []; let offset = 0, pos = 0;
+            const setU16 = d => { view.setUint16(pos, d, true); pos += 2; };
+            const setU32 = d => { view.setUint32(pos, d, true); pos += 4; };
+            setU32(0x46464952); setU32(len - 8); setU32(0x45564157); setU32(0x20746d66);
+            setU32(16); setU16(1); setU16(nCh); setU32(buf.sampleRate);
+            setU32(buf.sampleRate * 2 * nCh); setU16(nCh * 2); setU16(16);
+            setU32(0x61746164); setU32(len - pos - 4);
+            for (let i = 0; i < nCh; i++) chans.push(buf.getChannelData(i));
+            while (pos < len) {
+                for (let i = 0; i < nCh; i++) {
+                    let s = Math.max(-1, Math.min(1, chans[i][offset]));
+                    s = (0.5 + s < 0 ? s * 32768 : s * 32767) | 0;
+                    view.setInt16(pos, s, true); pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([view], {type: 'audio/wav'});
+        }
+
+        exportBtn.addEventListener('click', async () => {
+            if (tones.length === 0) return alert("Add a tone first.");
+            loader.classList.remove('hidden');
+            try {
+                const dur = 5;
+                const buf = await Tone.Offline(async (transport) => {
+                    const now = transport.now();
+                    tones.forEach(t => {
+                        const osc = new Tone.Oscillator({type: t.osc.type, frequency: t.osc.frequency.value, detune: t.osc.detune.value});
+                        const wah = new Tone.AutoWah({baseFrequency: t.wah.baseFrequency, octaves: t.wah.octaves, Q: t.wah.Q.value, sensitivity: -5});
+                        const trem = new Tone.Tremolo({frequency: t.trem.frequency.value, depth: t.trem.depth.value}).start(now);
+                        const lfo = new Tone.LFO({frequency: t.lfo.frequency.value, min: t.lfo.min, max: t.lfo.max}).connect(osc.frequency).start(now);
+                        osc.chain(trem, wah, transport.destination).start(now).stop(now + dur);
+                    });
+                }, dur);
+                const blob = bufferToWave(buf);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none'; a.href = url; a.download = 'ringtone.wav';
+                document.body.appendChild(a); a.click();
+                URL.revokeObjectURL(url); document.body.removeChild(a);
+            } catch (err) {
+                console.error("Export error:", err);
+                alert("Error exporting audio.");
+            } finally {
+                loader.classList.add('hidden');
+            }
+        });
+        createToneBlock();
+    });
+    </script>
+</body>
+</html>
