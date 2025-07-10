@@ -1,703 +1,467 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Enhanced Code Editor</title>
+  <title>Pro HTML Editor & Sandbox</title>
   
-  <!-- Import js-beautify for beautification -->
+  <!-- External Libraries (Beautify only) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-  
+
+  <!-- All Styles are now Vanilla CSS, embedded in the page -->
   <style>
-    /* Base styles */
+    :root {
+      --bg-primary: #f3f4f6; --bg-secondary: #ffffff; --bg-tertiary: #e5e7eb;
+      --text-primary: #111827; --text-secondary: #4b5563; --border-color: #d1d5db;
+      --accent-color: #3b82f6; --accent-hover: #2563eb; --shadow-color: rgba(0, 0, 0, 0.07);
+      --editor-bg: #1f2937; --editor-text: #f9fafb; --editor-border: #4b5563;
+    }
+    [data-theme="dark"] {
+      --bg-primary: #111827; --bg-secondary: #1f2937; --bg-tertiary: #374151;
+      --text-primary: #f9fafb; --text-secondary: #d1d5db; --border-color: #4b5563;
+      --editor-bg: #000000; --editor-text: #e5e7eb; --editor-border: #6b7280;
+    }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 15px;
-      background-color: #f5f5f5;
-      color: #000;
-      max-width: 1200px;
-      margin: 0 auto;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0;
+      font-size: 13px; background-color: var(--bg-primary); color: var(--text-primary);
     }
-    .section {
-      background-color: #ffffff;
-      border: 1px solid #000;
-      padding: 20px;
-      margin: 5px 0;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    .container { max-width: 1400px; margin: 0 auto; padding: 0.5rem; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .header-actions a { font-size: 0.75rem; color: var(--text-secondary); text-decoration: none; }
+    .header-actions a:hover { color: var(--accent-color); }
+    main { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+    @media (min-width: 1024px) { main { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem;
+      box-shadow: 0 2px 4px var(--shadow-color); display: flex; flex-direction: column;
     }
-    .section-title {
-      margin-top: 0;
-      color: #333;
-      font-size: 1.4em;
-      font-weight: 700;
-      margin-bottom: 5px;
+    .card h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.6rem 0; }
+    textarea, input[type="text"], select {
+      width: 100%; padding: 0.4rem; font-family: 'Consolas', monospace; font-size: 0.75rem;
+      border: 1px solid var(--border-color); border-radius: 0.25rem;
+      background-color: var(--bg-tertiary); color: var(--text-primary); box-sizing: border-box;
     }
-    textarea {
-      width: 95%;
-      height: 450px;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 11px;
-      line-height: 1.6;
-      padding: 15px;
-      border: 2px solid #000;
-      border-radius: 6px;
-      background-color: #2b2b2b;
-      color: #f8f8f8;
-      transition: all 0.3s ease;
-      tab-size: 4;
-      margin-bottom: 1px;
-    }
-    textarea:focus {
-      border-color: #4CAF50;
-      outline: none;
-      box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
-    }
-    .button-group {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 2fr));
-      gap: 8px;
-      margin-top: 1px;
-    }
+    #code-textarea, #foldable-view { height: 22rem; background-color: var(--editor-bg); color: var(--editor-text); border-color: var(--editor-border); }
+    #code-textarea:focus, input:focus, select:focus { outline: 1px solid var(--accent-color); outline-offset: 1px; }
+    .button-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.25rem; margin-top: 0.5rem; }
     button {
-      padding: 8px 12px;
-      font-size: 10px;
-      font-weight: 500;
-      border: none;
-      border-radius: 5px;
-      background-color: #050545;
-      color: #fff;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: 500; border: none;
+      border-radius: 0.25rem; color: #ffffff; cursor: pointer; transition: background-color 0.2s;
     }
-    button:hover {
-      background-color: #3461c4;
-      transform: translateY(-1px);
+    .btn-blue { background-color: #3b82f6; } .btn-blue:hover { background-color: #2563eb; }
+    .btn-green { background-color: #10b981; } .btn-green:hover { background-color: #059669; }
+    .btn-gray { background-color: #6b7280; } .btn-gray:hover { background-color: #4b5563; }
+    .btn-red { height: 45px; background-color: #ef4444; } .btn-red:hover { background-color: #dc2626; }
+    .btn-yellow { background-color: #f59e0b; } .btn-yellow:hover { background-color: #d97706; }
+    .btn-indigo { background-color: #6366f1; } .btn-indigo:hover { background-color: #4f46e5; }
+    .btn-purple { background-color: #8b5cf6; } .btn-purple:hover { background-color: #7c3aed; }
+    .btn-teal { background-color: #14b8a6; } .btn-teal:hover { background-color: #0d9488; }
+    .btn-full { grid-column: 1 / -1; }
+    .tab-buttons { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 0.6rem; }
+    .tab-button {
+      padding: 0.4rem 0.6rem; cursor: pointer; border: none; background-color: transparent;
+      color: var(--text-secondary); font-weight: 600; font-size: 0.75rem;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
-    button:active {
-      transform: translateY(0);
+    .tab-button.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+    .tab-content { display: none; flex-direction: column; gap: 0.6rem; }
+    .tab-content.active { display: flex; }
+    .tool-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .tool-group-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.4rem; }
+    .diff-card { flex-grow: 1; }
+    .diff-container { flex-grow: 1; display: grid; grid-template-rows: 1fr 1fr; gap: 0.4rem; }
+    .diff-container textarea { height: 100%; resize: vertical; }
+    #diff-output {
+      margin-top: 0.6rem; padding: 0.4rem; height: 12rem; overflow-y: auto;
+      background-color: var(--bg-primary); border-radius: 0.25rem; border: 1px solid var(--border-color);
+      font-family: 'Consolas', monospace; font-size: 0.7rem;
     }
-    /* Text Tools Styles */
-    .text-tools-section {
-      background-color: #ffffff;
-      border: 1px solid #000;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 8px;
-    }
-    .text-tools-search-box {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .text-tools-search-box input,
-    .text-tools-search-box select {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      flex: 1;
-      min-width: 200px;
-    }
-    .match-count {
-      color: #666;
-      font-size: 0.9em;
-    }
-    /* Diff Checker Styles */
-    .diff-section {
-      margin-top: 20px;
-    }
-    .diff-container {
-      display: grid;
-      grid-template-rows: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 15px;
-    }
-    .diff-output {
-      margin-top: 15px;
-      padding: 15px;
-      background-color: #f8f9fa;
-      border-radius: 6px;
-      font-family: monospace;
-      white-space: pre-wrap;
-    }
-    .diff-line {
-      padding: 2px 4px;
-      margin: 1px 0;
-    }
-    .diff-added {
-      background-color: #e6ffe6;
-      color: #0a3d0a;
-    }
-    .diff-removed {
-      background-color: #ffe6e6;
-      color: #3d0a0a;
-    }
-    #file-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 15px;
-    }
-    #file-buttons button {
-      background-color: #28a745;
-    }
-    #file-buttons button:hover {
-      background-color: #218838;
-    }
-    .regex-templates {
-      margin-bottom: 10px;
-    }
-    /* Foldable view styles */
-    #foldable-view {
-      width: 95%;
-      max-height: 350px;
-      overflow: auto;
-      background-color: #2b2b2b;
-      color: #f8f8f8;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 10px;
-      padding: 15px;
-      border: 2px solid #000;
-      border-radius: 6px;
-      display: none;
-      white-space: pre-wrap;
-    }
-    .foldable-node {
-      margin-left: 20px;
-      border-left: 1px dotted #ccc;
-      padding-left: 5px;
-    }
-    .fold-toggle {
-      cursor: pointer;
-      color: #00f;
-      user-select: none;
-      margin-right: 5px;
-    }
-    .foldable-text {
-      margin-left: 20px;
-    }
-    .foldable-comment {
-      margin-left: 20px;
-      font-style: italic;
-      color: #888;
-    }
+    .diff-line { padding: 1px 4px; white-space: pre-wrap; word-break: break-all; }
+    .diff-added { background-color: rgba(16, 185, 129, 0.1); }
+    .diff-removed { background-color: rgba(239, 68, 68, 0.1); }
+    .diff-common { color: var(--text-secondary); }
+    #foldable-view { display: none; overflow: auto; padding: 0.6rem; white-space: pre-wrap; }
+    .foldable-node { margin-left: 15px; border-left: 1px dotted var(--text-secondary); padding-left: 4px; }
+    .fold-toggle { cursor: pointer; color: var(--accent-color); user-select: none; margin-right: 4px; font-weight: bold; }
+    .foldable-text { margin-left: 15px; }
+    .foldable-comment { margin-left: 15px; font-style: italic; color: var(--text-secondary); }
+    .modal { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 1rem; z-index: 100; }
+    .modal-content { background-color: var(--bg-secondary); border-radius: 0.5rem; padding: 1rem; width: 100%; max-width: 28rem; box-shadow: 0 10px 15px -3px var(--shadow-color); }
+    .modal-content h3 { margin-top: 0; font-size: 1rem; font-weight: 600; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
+    .toast { position: fixed; bottom: 1rem; right: 1rem; color: white; padding: 0.5rem 0.8rem; border-radius: 0.375rem; box-shadow: 0 4px 6px -1px var(--shadow-color); opacity: 0; transform: translateY(2rem); transition: opacity 0.3s, transform 0.3s; z-index: 101; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    #file-buttons-container { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }
+    #file-buttons-container button { background-color: #2dd4bf; }
+    #file-buttons-container button:hover { background-color: #14b8a6; }
   </style>
 </head>
 <body>
-  <div class="section">
-    <h2 class="section-title">Code</h2>
-    <div class="file-input-wrapper">
-      <button onclick="handleMultipleFiles()">Select Files</button>
-      <a href="https://ubuv6vvyv.github.io/home.html">Bugged Hall of Shame</a>
-      <div id="file-buttons"></div>
-    </div>
-    <textarea id="code-textarea" placeholder="Enter or paste code here..."></textarea>
-    <div id="foldable-view"></div>
-    <div class="button-group">
-      <button onclick="undoChange()">Undo</button>
-      <button onclick="openInNewTab()">Execute in New Tab</button>
-      <button onclick="copyToClipboard()">Copy</button>
-      <button onclick="clearEditor()">Clear</button>
-      <button onclick="handleFileOpen()">Open File</button>
-      <button onclick="saveFile()">Save File</button>
-      <button onclick="minifyCode()">Minify</button>
-      <button onclick="beautifyCode()">Beautify</button>
-      <button onclick="toggleFoldView()">Toggle Collapse</button>
-    </div>
+
+  <div class="container">
+    <header>
+      <h1>HTML Editor & Sandbox</h1>
+      <div class="header-actions">
+        <a href="https://ubuv6vvyv.github.io/home.html" target="_blank" rel="noopener noreferrer">Bugged Hall of Shame</a>
+        <button id="theme-toggle" title="Toggle Theme">
+          <svg id="theme-icon-light" style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          <svg id="theme-icon-dark" style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <div class="card">
+        <h2>Code Editor</h2>
+        <div id="file-buttons-container"></div>
+        <textarea id="code-textarea" placeholder="Paste your HTML, CSS, or JS code here..."></textarea>
+        <div id="foldable-view"></div>
+        <div class="button-grid">
+<button onclick="actions.openInNewTab()" class="btn-red btn-full">Preview</button>
+          <button onclick="actions.openFile()" class="btn-blue">Open</button>
+          <button onclick="actions.saveFile()" class="btn-green">Save</button>
+          <button onclick="actions.copy()" class="btn-gray">Copy</button>
+          <button onclick="actions.clear()" class="btn-yellow">Clear</button>
+          <button onclick="actions.undo()" class="btn-yellow">Undo</button>
+          <button onclick="actions.beautify()" class="btn-indigo">Beautify</button>
+          <button onclick="actions.minify()" class="btn-purple">Minify</button>
+          <button onclick="actions.toggleFoldView()" class="btn-gray">Collapse</button>
+          
+          <button onclick="actions.handleMultipleFiles()" class="btn-teal btn-full">Open Multiple</button>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <div class="card">
+          <h2>Text Tools</h2>
+          <div class="tab-buttons">
+            <button class="tab-button active" onclick="textTools.switchTab(event, 'find-replace')">Find & Replace</button>
+            <button class="tab-button" onclick="textTools.switchTab(event, 'line-tools')">Line Tools</button>
+            <button class="tab-button" onclick="textTools.switchTab(event, 'regex-tools')">Regex Tools</button>
+          </div>
+          <div id="find-replace" class="tab-content active"><div class="tool-group"><input type="text" id="find-input" placeholder="Find..."><input type="text" id="replace-input" placeholder="Replace with..."><div style="text-align: right; color: var(--text-secondary); font-size: 0.7rem;" id="match-count">0 matches</div><div class="tool-group-row"><button onclick="textTools.highlightMatches()" class="btn-blue">Highlight</button><button onclick="textTools.replaceNext()" class="btn-blue">Replace Next</button><button onclick="textTools.replaceAll()" class="btn-blue">Replace All</button></div></div></div>
+          <div id="line-tools" class="tab-content"><div class="tool-group"><input type="text" id="filter-input" placeholder="Filter lines containing..."><button onclick="textTools.filterLines()" class="btn-gray">Apply Filter</button><div class="tool-group-row"><button onclick="textTools.removeEmpty()" class="btn-gray">Remove Empty</button><button onclick="textTools.removeDuplicates()" class="btn-gray">Remove Duplicates</button></div></div></div>
+          <div id="regex-tools" class="tab-content"><div class="tool-group"><select id="regex-template" onchange="textTools.applyRegexTemplate()"><option value="">Select Regex Template...</option><option value="email">Email</option><option value="url">URL</option><option value="phone">Phone</option><option value="date">Date</option><option value="name">Name</option><option value="ipv4">IPv4</option><option value="hexcolor">Hex Color</option><option value="twitter">Twitter</option><option value="htmltag">HTML Tag</option></select><input type="text" id="regex-input" placeholder="Enter regex pattern"><div class="tool-group-row"><button onclick="textTools.extractMatches()" class="btn-purple">Extract</button><button onclick="textTools.removeMatches()" class="btn-purple">Remove</button></div></div></div>
+        </div>
+
+        <div class="card diff-card">
+          <h2>Difference Checker</h2>
+          <div class="diff-container">
+            <textarea id="original-code" placeholder="Original Code"></textarea>
+            <textarea id="new-code" placeholder="New Code"></textarea>
+          </div>
+          <button onclick="diffChecker.compare()" class="btn-green" style="width: 100%; margin-top: 0.6rem;">Compare</button>
+          <div id="diff-output"></div>
+        </div>
+      </div>
+    </main>
   </div>
 
-  <!-- Text Tools Section -->
-  <div class="text-tools-section">
-    <h2 class="section-title">Text Tools</h2>
-    <div class="text-tools-search-box">
-      <input type="text" id="find-input" placeholder="Find text" />
-      <input type="text" id="replace-input" placeholder="Replace with" />
-      <button onclick="findAndReplace()">Replace All</button>
-      <span class="match-count" id="match-count"></span>
-    </div>
-    <div class="regex-templates">
-      <select id="regex-template" onchange="applyRegexTemplate()">
-        <option value="">Select Regex Template...</option>
-        <option value="email">Email Addresses</option>
-        <option value="url">URLs</option>
-        <option value="phone">Phone Numbers</option>
-        <option value="date">Dates</option>
-        <option value="name">Names</option>
-        <option value="ipv4">IPv4 Addresses</option>
-        <option value="hexcolor">Hex Color Codes</option>
-        <option value="twitter">Twitter Handles</option>
-        <option value="htmltag">HTML Tags</option>
-      </select>
-    </div>
-    <div class="text-tools-search-box">
-      <input type="text" id="regex-input" placeholder="Enter regex pattern" />
-      <select id="regex-action">
-        <option value="highlight">Highlight Matches</option>
-        <option value="extract">Extract Matches</option>
-        <option value="remove">Remove Matches</option>
-      </select>
-      <button onclick="applyRegex()">Apply Regex</button>
-    </div>
-    <div class="button-group">
-      <button onclick="filterLines()">Filter Lines</button>
-      <button onclick="removeEmptyLines()">Remove Empty Lines</button>
-      <button onclick="removeDuplicateLines()">Remove Duplicate Lines</button>
-    </div>
-  </div>
-
-  <!-- Diff Checker Section -->
-  <div class="section diff-section">
-    <h2 class="section-title">Diff Checker</h2>
-    <div class="diff-container">
-      <textarea id="original-code" placeholder="Original code"></textarea>
-      <textarea id="new-code" placeholder="Modified code"></textarea>
-    </div>
-    <button onclick="checkDiff()">Compare Changes</button>
-    <div id="diff-output" class="diff-output"></div>
-  </div>
+  <div id="save-modal" class="modal"><div class="modal-content"><h3>Save File As</h3><input type="text" id="filename-input" placeholder="e.g., my-page.html" style="margin: 0.75rem 0;"><div class="modal-actions"><button id="cancel-save" class="btn-gray">Cancel</button><button id="confirm-save" class="btn-blue">Save</button></div></div></div>
+  <div id="toast" class="toast"></div>
 
   <script>
-    /* ===============================
-       CUSTOM MINIFICATION FUNCTIONS
-       =============================== */
-    function minifyJS(code) {
-      // Simple JS minifier: remove block and line comments and extra whitespace.
-      return code
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\/\/[^\n\r]*/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-    function minifyCSS(code) {
-      // Simple CSS minifier: remove comments and collapse whitespace.
-      return code
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-    function customMinifyHTML(code) {
-      try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(code, "text/html");
-        // Remove HTML comments recursively.
-        function removeComments(node) {
-          for (let i = node.childNodes.length - 1; i >= 0; i--) {
-            let child = node.childNodes[i];
-            if (child.nodeType === Node.COMMENT_NODE) {
-              node.removeChild(child);
-            } else if (child.nodeType === Node.ELEMENT_NODE) {
-              removeComments(child);
-            }
-          }
-        }
-        removeComments(doc);
-        // Minify inline JS and CSS.
-        doc.querySelectorAll("script").forEach(script => {
-          if (script.textContent) {
-            script.textContent = minifyJS(script.textContent);
-          }
-        });
-        doc.querySelectorAll("style").forEach(style => {
-          if (style.textContent) {
-            style.textContent = minifyCSS(style.textContent);
-          }
-        });
-        const voidElements = new Set([
-          "area", "base", "br", "col", "embed", "hr", "img", "input",
-          "link", "meta", "param", "source", "track", "wbr"
-        ]);
-        function serializeMinified(node) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent.trim();
-          }
-          if (node.nodeType === Node.COMMENT_NODE) {
-            return "";
-          }
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            let tagName = node.tagName.toLowerCase();
-            let str = "<" + tagName;
-            for (let attr of node.attributes) {
-              str += " " + attr.name + '="' + attr.value + '"';
-            }
-            str += ">";
-            let children = "";
-            for (let child of node.childNodes) {
-              children += serializeMinified(child);
-            }
-            if (!voidElements.has(tagName)) {
-              str += children + "</" + tagName + ">";
-            }
-            return str;
-          }
-          return "";
-        }
-        let minified = "";
-        if (doc.doctype) {
-          minified += "<!DOCTYPE " + doc.doctype.name + ">";
-        }
-        minified += serializeMinified(doc.documentElement);
-        return minified;
-      } catch (e) {
-        console.error("Minification error:", e);
-        return code;
-      }
-    }
-    function minifyCode() {
-      const textarea = document.getElementById("code-textarea");
-      if (!textarea) return;
-      let code = textarea.value;
-      code = customMinifyHTML(code);
-      textarea.value = code;
-    }
-    
-    /* ===============================
-       BEAUTIFICATION (using js-beautify)
-       =============================== */
-    function beautifyCode() {
-      const textarea = document.getElementById("code-textarea");
-      if (!textarea) return;
-      let code = textarea.value;
-      const options = {
-        indent_size: 4,
-        wrap_line_length: 0,
-        preserve_newlines: true,
-        unformatted: [] // format inline JS/CSS as well
-      };
-      code = html_beautify(code, options);
-      textarea.value = code;
-    }
-    
-    /* ===============================
-       FILE HANDLING & OTHER UTILITIES
-       =============================== */
-    let fileContents = new Map();
-    function handleMultipleFiles() {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      input.accept = ".html,.js,.css,.txt";
-      input.onchange = e => {
-        const files = Array.from(e.target.files);
-        const buttonContainer = document.getElementById("file-buttons");
-        buttonContainer.innerHTML = "";
-        files.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = e => {
-            const content = e.target.result;
-            fileContents.set(file.name, content);
-            const button = document.createElement("button");
-            button.textContent = file.name;
-            button.onclick = () => executeCode(content);
-            buttonContainer.appendChild(button);
-          };
-          reader.readAsText(file);
-        });
-      };
-      input.click();
-    }
-    function executeCode(content) {
-      const blob = new Blob([content], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    }
-    let undoHistory = [];
-    const codeTextarea = document.getElementById("code-textarea");
-    codeTextarea.addEventListener("input", () => {
-      if (
-        undoHistory.length === 0 ||
-        undoHistory[undoHistory.length - 1] !== codeTextarea.value
-      ) {
-        undoHistory.push(codeTextarea.value);
-      }
-    });
-    function undoChange() {
-      if (undoHistory.length > 1) {
-        undoHistory.pop();
-        codeTextarea.value = undoHistory[undoHistory.length - 1];
-      }
-    }
-    function handleFileOpen() {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".html,.js,.css,.txt";
-      input.onchange = e => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = e => (codeTextarea.value = e.target.result);
-        reader.readAsText(file);
-      };
-      input.click();
-    }
-    function saveFile() {
-      const code = codeTextarea.value;
-      const title = document.title || "code";
-      const date = new Date().toISOString().slice(0, 10);
-      const filename = title.replace(/\s+/g, "_") + "_" + date + ".txt";
-      const blob = new Blob([code], { type: "text/plain" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-    }
-    function openInNewTab() {
-      const code = codeTextarea.value;
-      const blob = new Blob([code], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    }
-    function copyToClipboard() {
-      codeTextarea.select();
-      document.execCommand("copy");
-    }
-    function clearEditor() {
-      codeTextarea.value = "";
-      undoHistory = [];
-    }
-    
-    /* ===============================
-       FOLD/UNFOLD (COLLAPSIBLE) VIEW
-       =============================== */
-    var foldViewActive = false;
-    function toggleFoldView() {
-      const textarea = document.getElementById("code-textarea");
-      const foldView = document.getElementById("foldable-view");
-      if (!foldView) return;
-      if (!foldViewActive) {
-        // Generate foldable view from the raw code.
-        let code = textarea.value;
-        let parser = new DOMParser();
-        let doc = parser.parseFromString(code, "text/html");
-        foldView.innerHTML = "";
-        let rendered = renderFoldableNode(doc.documentElement);
-        foldView.appendChild(rendered);
-        textarea.style.display = "none";
-        foldView.style.display = "block";
-        foldViewActive = true;
-      } else {
-        // Switch back to raw view.
-        foldView.style.display = "none";
-        textarea.style.display = "block";
-        foldViewActive = false;
-      }
-    }
-    function renderFoldableNode(node) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        let el = document.createElement("div");
-        el.className = "foldable-node";
-        let header = document.createElement("div");
-        let toggleSpan = document.createElement("span");
-        toggleSpan.className = "fold-toggle";
-        // If there are child nodes, show a toggle.
-        if (node.childNodes.length > 0) {
-          toggleSpan.textContent = "[-]";
-        } else {
-          toggleSpan.textContent = "   ";
-        }
-        header.appendChild(toggleSpan);
-        let openingTag = document.createElement("span");
-        let tagText = "<" + node.tagName.toLowerCase();
-        for (let attr of node.attributes) {
-          tagText += " " + attr.name + '="' + attr.value + '"';
-        }
-        tagText += ">";
-        openingTag.textContent = tagText;
-        header.appendChild(openingTag);
-        el.appendChild(header);
-        let childContainer = document.createElement("div");
-        childContainer.className = "foldable-children";
-        for (let child of node.childNodes) {
-          let childEl = renderFoldableNode(child);
-          if (childEl) {
-            childContainer.appendChild(childEl);
-          }
-        }
-        el.appendChild(childContainer);
-        const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
-        if (!voidElements.has(node.tagName.toLowerCase())) {
-          let footer = document.createElement("div");
-          footer.style.marginLeft = "20px";
-          footer.textContent = "</" + node.tagName.toLowerCase() + ">";
-          el.appendChild(footer);
-        }
-        toggleSpan.onclick = function() {
-          if (childContainer.style.display === "none") {
-            childContainer.style.display = "block";
-            toggleSpan.textContent = "[-]";
-          } else {
-            childContainer.style.display = "none";
-            toggleSpan.textContent = "[+]";
+    const elements = {
+      codeTextarea: document.getElementById('code-textarea'),
+      foldableView: document.getElementById('foldable-view'),
+      themeToggle: document.getElementById('theme-toggle'),
+      themeIconLight: document.getElementById('theme-icon-light'),
+      themeIconDark: document.getElementById('theme-icon-dark'),
+      html: document.documentElement,
+      toast: document.getElementById('toast'),
+      saveModal: document.getElementById('save-modal'),
+      filenameInput: document.getElementById('filename-input'),
+      confirmSaveBtn: document.getElementById('confirm-save'),
+      cancelSaveBtn: document.getElementById('cancel-save'),
+      diff: {
+        original: document.getElementById('original-code'),
+        modified: document.getElementById('new-code'),
+        output: document.getElementById('diff-output'),
+      },
+      textTools: {
+        find: document.getElementById('find-input'),
+        replace: document.getElementById('replace-input'),
+        filter: document.getElementById('filter-input'),
+        regexTemplate: document.getElementById('regex-template'),
+        regexInput: document.getElementById('regex-input'),
+        matchCount: document.getElementById('match-count'),
+        tabButtons: document.querySelectorAll('.tab-button'),
+        tabContents: document.querySelectorAll('.tab-content'),
+      },
+      fileButtonsContainer: document.getElementById('file-buttons-container'),
+    };
+
+    let undoHistory = [''];
+    let currentUndoIndex = 0;
+    let foldViewActive = false;
+
+    // --- UTILITIES & CORE ACTIONS ---
+    const utils = {
+      showToast(message, type = 'success') {
+        elements.toast.textContent = message;
+        elements.toast.className = `toast show ${type === 'success' ? 'btn-green' : 'btn-red'}`;
+        setTimeout(() => { elements.toast.classList.remove('show'); }, 2500);
+      },
+      minifyJS: c => c.replace(/\/\*[\s\S]*?\*\/|(?<=[^:])\/\/.*$/gm, "").replace(/\s+/g, " ").trim(),
+      minifyCSS: c => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s{2,}/g, " ").replace(/; /g, ";").replace(/: /g, ":").trim(),
+    };
+
+    const actions = {
+      setTheme(theme) {
+        elements.html.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        elements.themeIconLight.style.display = theme === 'dark' ? 'none' : 'block';
+        elements.themeIconDark.style.display = theme === 'dark' ? 'block' : 'none';
+      },
+      openFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.html,.js,.css,.txt';
+        input.onchange = e => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+              elements.codeTextarea.value = e.target.result;
+              undoHistory = [e.target.result];
+              currentUndoIndex = 0;
+            };
+            reader.readAsText(file);
           }
         };
-        return el;
-      } else if (node.nodeType === Node.TEXT_NODE) {
-        let text = node.textContent.trim();
-        if (text) {
-          let span = document.createElement("div");
-          span.className = "foldable-text";
-          span.textContent = text;
-          return span;
+        input.click();
+      },
+      handleMultipleFiles() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.accept = '.html,.js,.css,.txt';
+        input.onchange = e => {
+            elements.fileButtonsContainer.innerHTML = "";
+            Array.from(e.target.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const button = document.createElement("button");
+                    button.textContent = file.name;
+                    button.onclick = () => actions.executeCodeInNewTab(e.target.result);
+                    elements.fileButtonsContainer.appendChild(button);
+                };
+                reader.readAsText(file);
+            });
+        };
+        input.click();
+      },
+      executeCodeInNewTab(content) {
+        if (!content) return;
+        try {
+            const url = URL.createObjectURL(new Blob([content], { type: "text/html" }));
+            window.open(url, "_blank");
+        } catch(e) { utils.showToast("Could not execute code.", "error"); }
+      },
+      saveFile() {
+        elements.filenameInput.value = 'index.html';
+        elements.saveModal.style.display = 'flex';
+        elements.filenameInput.focus();
+        const handleSave = () => {
+          const code = elements.codeTextarea.value;
+          let filename = elements.filenameInput.value.trim() || 'index.html';
+          if (!/\.(html|htm|txt|css|js)$/i.test(filename)) filename += '.html';
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' }));
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          closeModal();
+          utils.showToast(`File saved as ${filename}`);
+        };
+        const closeModal = () => {
+          elements.saveModal.style.display = 'none';
+          elements.confirmSaveBtn.removeEventListener('click', handleSave);
+          elements.cancelSaveBtn.removeEventListener('click', closeModal);
+        };
+        elements.confirmSaveBtn.addEventListener('click', handleSave);
+        elements.cancelSaveBtn.addEventListener('click', closeModal);
+      },
+      copy: () => navigator.clipboard.writeText(elements.codeTextarea.value).then(() => utils.showToast('Copied!'), () => utils.showToast('Copy failed!', 'error')),
+      clear: () => { elements.codeTextarea.value = ''; undoHistory = ['']; currentUndoIndex = 0; },
+      undo() {
+        if (currentUndoIndex > 0) {
+            currentUndoIndex--;
+            elements.codeTextarea.value = undoHistory[currentUndoIndex];
         }
+      },
+      beautify: () => elements.codeTextarea.value && (elements.codeTextarea.value = html_beautify(elements.codeTextarea.value, { indent_size: 2, space_in_empty_paren: true })),
+      minify() {
+        if (!elements.codeTextarea.value) return;
+        try {
+            const doc = new DOMParser().parseFromString(elements.codeTextarea.value, 'text/html');
+            doc.querySelectorAll('script:not([src])').forEach(s => s.textContent = utils.minifyJS(s.textContent));
+            doc.querySelectorAll('style').forEach(s => s.textContent = utils.minifyCSS(s.textContent));
+            elements.codeTextarea.value = `<!DOCTYPE html>${doc.documentElement.outerHTML.replace(/\s{2,}/g, ' ')}`;
+        } catch (e) { utils.showToast('Minification failed.', 'error'); }
+      },
+      openInNewTab: () => actions.executeCodeInNewTab(elements.codeTextarea.value),
+      toggleFoldView() {
+        foldViewActive = !foldViewActive;
+        elements.codeTextarea.style.display = foldViewActive ? "none" : "block";
+        elements.foldableView.style.display = foldViewActive ? "block" : "none";
+        if (foldViewActive) {
+            try {
+                const doc = new DOMParser().parseFromString(elements.codeTextarea.value, "text/html");
+                elements.foldableView.innerHTML = "";
+                elements.foldableView.appendChild(this.renderFoldableNode(doc.documentElement));
+            } catch(e) { utils.showToast('Could not parse HTML for folding.', 'error'); }
+        }
+      },
+      renderFoldableNode(node) {
+        if (node.nodeType === 1) { // ELEMENT_NODE
+            const el = document.createElement("div");
+            el.className = "foldable-node";
+            const hasChildren = Array.from(node.childNodes).some(n => n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim()));
+            let tagText = `<${node.tagName.toLowerCase()}`;
+            for (let attr of node.attributes) { tagText += ` ${attr.name}="${attr.value}"`; }
+            tagText += ">";
+            el.innerHTML = `<div class="fold-toggle">${hasChildren ? "[-]" : "&nbsp;"}</div><span>${tagText}</span>`;
+            const childContainer = document.createElement("div");
+            if (hasChildren) {
+              for (let child of node.childNodes) {
+                const childEl = this.renderFoldableNode(child);
+                if (childEl) childContainer.appendChild(childEl);
+              }
+            }
+            el.appendChild(childContainer);
+            if (!/^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(node.tagName)) {
+                el.innerHTML += `</${node.tagName.toLowerCase()}>`;
+            }
+            el.firstElementChild.onclick = e => {
+                e.stopPropagation();
+                const isHidden = childContainer.style.display === "none";
+                childContainer.style.display = isHidden ? "" : "none";
+                e.target.innerHTML = isHidden ? "[-]" : "[+]";
+            };
+            return el;
+        }
+        if (node.nodeType === 3 && node.textContent.trim()) return Object.assign(document.createElement("div"), { className: "foldable-text", textContent: node.textContent.trim() });
+        if (node.nodeType === 8) return Object.assign(document.createElement("div"), { className: "foldable-comment", textContent: `<!-- ${node.textContent.trim()} -->` });
         return null;
-      } else if (node.nodeType === Node.COMMENT_NODE) {
-        let comment = document.createElement("div");
-        comment.className = "foldable-comment";
-        comment.textContent = "<!-- " + node.textContent.trim() + " -->";
-        return comment;
-      }
-      return null;
-    }
-    
-    /* ===============================
-       REGEX & DIFF FUNCTIONS
-       =============================== */
-    const regexTemplates = {
-      email: {
-        pattern: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
-        description: "Email addresses"
-      },
-      url: {
-        pattern: "https?:\\/\\/[\\w\\-\\.]+\\.[a-zA-Z]{2,}[\\w\\-\\._~:\\/?#[\\]@!\\$&'\\(\\)\\*\\+,;=]*",
-        description: "URLs"
-      },
-      phone: {
-        pattern: "\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}",
-        description: "Phone numbers"
-      },
-      date: {
-        pattern: "\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{2,4}",
-        description: "Dates"
-      },
-      name: {
-        pattern: "\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+\\b",
-        description: "Names (First Last)"
-      },
-      ipv4: {
-        pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b",
-        description: "IPv4 addresses"
-      },
-      hexcolor: {
-        pattern: "#(?:[0-9a-fA-F]{3}){1,2}\\b",
-        description: "Hex color codes"
-      },
-      twitter: {
-        pattern: "@[A-Za-z0-9_]+",
-        description: "Twitter handles"
-      },
-      htmltag: {
-        pattern: "</?[a-zA-Z]+[^>]*>",
-        description: "HTML tags"
       }
     };
-    function applyRegexTemplate() {
-      const template = document.getElementById("regex-template").value;
-      if (template && regexTemplates[template]) {
-        document.getElementById("regex-input").value = regexTemplates[template].pattern;
-      }
-    }
-    function findAndReplace() {
-      const textarea = document.getElementById("code-textarea");
-      const findText = document.getElementById("find-input").value;
-      const replaceText = document.getElementById("replace-input").value;
-      if (!findText) return;
-      try {
-        const regex = new RegExp(findText, "g");
-        const matches = textarea.value.match(regex);
-        document.getElementById("match-count").textContent =
-          matches ? `${matches.length} matches found` : "No matches found";
-        textarea.value = textarea.value.replace(regex, replaceText);
-      } catch (e) {
-        alert("Invalid search pattern");
-      }
-    }
-    function filterLines() {
-      const textarea = document.getElementById("code-textarea");
-      const filterText = document.getElementById("find-input").value;
-      if (!filterText) return;
-      const lines = textarea.value.split("\n");
-      const filteredLines = lines.filter(line => line.includes(filterText));
-      textarea.value = filteredLines.join("\n");
-    }
-    function removeEmptyLines() {
-      const textarea = document.getElementById("code-textarea");
-      const lines = textarea.value.split("\n");
-      const nonEmptyLines = lines.filter(line => line.trim());
-      textarea.value = nonEmptyLines.join("\n");
-    }
-    function removeDuplicateLines() {
-      const textarea = document.getElementById("code-textarea");
-      const lines = textarea.value.split("\n");
-      const uniqueLines = [...new Set(lines)];
-      textarea.value = uniqueLines.join("\n");
-    }
-    function applyRegex() {
-      const textarea = document.getElementById("code-textarea");
-      const pattern = document.getElementById("regex-input").value;
-      const action = document.getElementById("regex-action").value;
-      if (!pattern) return;
-      try {
-        const regex = new RegExp(pattern, "g");
-        const text = textarea.value;
-        switch (action) {
-          case "highlight":
-            const matches = text.match(regex);
-            document.getElementById("match-count").textContent =
-              matches ? `${matches.length} matches found` : "No matches found";
-            break;
-          case "extract":
-            const extracted = text.match(regex);
-            textarea.value = extracted ? extracted.join("\n") : "";
-            break;
-          case "remove":
-            textarea.value = text.replace(regex, "");
-            break;
-        }
-      } catch (e) {
-        alert("Invalid regex pattern");
-      }
-    }
-    function checkDiff() {
-      const original = document.getElementById("original-code").value;
-      const modified = document.getElementById("new-code").value;
-      const originalLines = original.split("\n");
-      const modifiedLines = modified.split("\n");
-      const output = document.getElementById("diff-output");
-      output.innerHTML = "";
-      let i = 0;
-      let j = 0;
-      while (i < originalLines.length || j < modifiedLines.length) {
-        const originalLine = originalLines[i] || "";
-        const modifiedLine = modifiedLines[j] || "";
-        if (originalLine === modifiedLine) {
-          const line = document.createElement("div");
-          line.textContent = "  " + originalLine;
-          line.className = "diff-line";
-          output.appendChild(line);
-          i++;
-          j++;
-        } else {
-          if (i < originalLines.length) {
-            const removedLine = document.createElement("div");
-            removedLine.textContent = "- " + originalLines[i];
-            removedLine.className = "diff-line diff-removed";
-            output.appendChild(removedLine);
-            i++;
-          }
-          if (j < modifiedLines.length) {
-            const addedLine = document.createElement("div");
-            addedLine.textContent = "+ " + modifiedLines[j];
-            addedLine.className = "diff-line diff-added";
-            output.appendChild(addedLine);
-            j++;
+
+    // --- TEXT TOOLS ---
+    const textTools = {
+      regexTemplates: { email: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", url: "https?:\\/\\/[\\w\\-\\.]+\\.[a-zA-Z]{2,}[\\w\\-\\._~:\\/?#[\\]@!\\$&'\\(\\)\\*\\+,;=]*", phone: "\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}", date: "\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{2,4}", name: "\\b[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+\\b", ipv4: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", hexcolor: "#(?:[0-9a-fA-F]{3}){1,2}\\b", twitter: "@[A-Za-z0-9_]{1,15}\\b", htmltag: "<\\/?[a-zA-Z]+[^>]*>" },
+      switchTab(event, tabName) {
+        elements.textTools.tabContents.forEach(c => c.classList.remove('active'));
+        elements.textTools.tabButtons.forEach(b => b.classList.remove('active'));
+        document.getElementById(tabName).classList.add('active');
+        event.currentTarget.classList.add('active');
+      },
+      highlightMatches() {
+        const findText = elements.textTools.find.value;
+        if (!findText) return elements.textTools.matchCount.textContent = '0 matches';
+        try {
+            const count = (elements.codeTextarea.value.match(new RegExp(findText, 'g')) || []).length;
+            elements.textTools.matchCount.textContent = `${count} ${count === 1 ? 'match' : 'matches'}`;
+        } catch (e) { elements.textTools.matchCount.textContent = 'Invalid Regex'; }
+      },
+      replaceNext() {
+        const { value: findText } = elements.textTools.find;
+        if (!findText) return;
+        const { selectionEnd } = elements.codeTextarea;
+        const nextMatch = elements.codeTextarea.value.substring(selectionEnd).search(findText);
+        if (nextMatch !== -1) {
+            const index = selectionEnd + nextMatch;
+            elements.codeTextarea.setRangeText(elements.textTools.replace.value, index, index + findText.length);
+            elements.codeTextarea.focus();
+            this.highlightMatches();
+        } else { utils.showToast('No more matches found.', 'info'); }
+      },
+      replaceAll() {
+        const { value: findText } = elements.textTools.find;
+        if (!findText) return;
+        try {
+            elements.codeTextarea.value = elements.codeTextarea.value.replace(new RegExp(findText, 'g'), elements.textTools.replace.value);
+            this.highlightMatches();
+        } catch (e) { utils.showToast('Invalid find pattern (regex).', 'error'); }
+      },
+      filterLines: () => {
+        const filterText = elements.textTools.filter.value;
+        if (filterText) elements.codeTextarea.value = elements.codeTextarea.value.split('\n').filter(line => line.includes(filterText)).join('\n');
+      },
+      removeEmpty: () => elements.codeTextarea.value = elements.codeTextarea.value.split('\n').filter(line => line.trim()).join('\n'),
+      removeDuplicates: () => elements.codeTextarea.value = [...new Set(elements.codeTextarea.value.split('\n'))].join('\n'),
+      applyRegexTemplate: () => elements.textTools.regexInput.value = textTools.regexTemplates[elements.textTools.regexTemplate.value] || "",
+      runRegex(action) {
+        const pattern = elements.textTools.regexInput.value;
+        if (!pattern) return;
+        try {
+            const regex = new RegExp(pattern, 'g');
+            if (action === 'extract') {
+                const matches = elements.codeTextarea.value.match(regex);
+                elements.codeTextarea.value = matches ? matches.join('\n') : '';
+                utils.showToast(matches ? `Extracted ${matches.length} matches.` : 'No matches found.');
+            } else {
+                elements.codeTextarea.value = elements.codeTextarea.value.replace(regex, '');
+            }
+        } catch (e) { utils.showToast('Invalid regex pattern.', 'error'); }
+      },
+      extractMatches: () => textTools.runRegex('extract'),
+      removeMatches: () => textTools.runRegex('remove'),
+    };
+
+    // --- CUSTOM VANILLA JS DIFF CHECKER (LCS Algorithm) ---
+    const diffChecker = {
+      compare() {
+        const a = elements.diff.original.value.split('\n');
+        const b = elements.diff.modified.value.split('\n');
+        const n = a.length, m = b.length;
+        const lcsMatrix = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+        for (let i = 1; i <= n; i++) {
+          for (let j = 1; j <= m; j++) {
+            lcsMatrix[i][j] = a[i - 1] === b[j - 1]
+              ? lcsMatrix[i - 1][j - 1] + 1
+              : Math.max(lcsMatrix[i - 1][j], lcsMatrix[i][j - 1]);
           }
         }
+        const result = [];
+        let i = n, j = m;
+        while (i > 0 || j > 0) {
+          if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+            result.unshift({ line: a[i - 1], type: 'common' }); i--; j--;
+          } else if (j > 0 && (i === 0 || lcsMatrix[i][j - 1] >= lcsMatrix[i - 1][j])) {
+            result.unshift({ line: b[j - 1], type: 'added' }); j--;
+          } else if (i > 0 && (j === 0 || lcsMatrix[i][j - 1] < lcsMatrix[i - 1][j])) {
+            result.unshift({ line: a[i - 1], type: 'removed' }); i--;
+          } else { break; }
+        }
+        const fragment = document.createDocumentFragment();
+        result.forEach(part => {
+          const span = document.createElement('span');
+          span.className = `diff-line diff-${part.type}`;
+          span.textContent = `${part.type === 'added' ? '+' : part.type === 'removed' ? '-' : ' '} ${part.line}`;
+          fragment.appendChild(span);
+        });
+        elements.diff.output.innerHTML = '';
+        elements.diff.output.appendChild(fragment);
       }
-    }
+    };
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      actions.setTheme(savedTheme);
+      elements.themeToggle.addEventListener('click', () => actions.setTheme(elements.html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+      elements.codeTextarea.addEventListener('input', () => {
+        if (undoHistory.length > currentUndoIndex + 1) undoHistory.splice(currentUndoIndex + 1);
+        undoHistory.push(elements.codeTextarea.value);
+        if (undoHistory.length > 50) undoHistory.shift(); else currentUndoIndex++;
+      });
+      elements.textTools.find.addEventListener('input', textTools.highlightMatches);
+    });
   </script>
 </body>
 </html>
