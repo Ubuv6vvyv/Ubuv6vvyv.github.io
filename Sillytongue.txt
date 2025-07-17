@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Silly Pink Trombone</title>
+    <style>
+        body{margin:0;background:#222;color:#eee;overflow:hidden;font-family:sans-serif;touch-action:none}
+        canvas{position:absolute;top:0;left:0;cursor:pointer}
+        #startBtn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:20px 40px;font-size:24px;background:#f39;color:#fff;border:none;border-radius:10px;cursor:pointer;transition:all 0.3s}
+        #startBtn:hover{background:#f5a;transform:translate(-50%,-50%) scale(1.05)}
+        #info{position:absolute;bottom:10px;left:10px;font-size:12px;opacity:0.7}
+        #vowelDisplay{position:absolute;top:20px;right:20px;font-size:48px;font-weight:bold;color:#f39;text-shadow:2px 2px 4px rgba(0,0,0,0.5);animation:pulse 0.5s ease-in-out infinite alternate}
+        @keyframes pulse{0%{transform:scale(1)}100%{transform:scale(1.1)}}
+        .hidden{display:none}
+    </style>
+</head>
+<body>
+    <button id="startBtn">🎤 Start Silly Voice Synth</button>
+    <canvas id="canvas" class="hidden"></canvas>
+    <div id="vowelDisplay" class="hidden">AH</div>
+    <div id="info" class="hidden">Touch/drag to control voice • Bottom area: pitch/tension • Top area: tongue position</div>
+
+<script>
+let audioContext, workletNode, isAudioReady = false;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const info = document.getElementById('info');
+const vowelDisplay = document.getElementById('vowelDisplay');
+
+// Audio worklet processor code
+const processorCode = `
+class TromboneProcessor extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.phase = 0;
+        this.frequency = 100;
+        this.amplitude = 0;
+        this.targetAmp = 0;
+        this.tonguePos = 0.5;
+        this.tenseness = 0.6;
+        this.f1Phase = 0;
+        this.f2Phase = 0;
+        this.f3Phase = 0;
+        this.wobblePhase = 0;
+        this.glitchPhase = 0;
+        this.lastVowel = '';
+        this.transitionTime = 0;
+        this.isTransitioning = false;
+        
+        this.port.onmessage = (e) => {
+            const {frequency, amplitude, tonguePos, tenseness, vowelCombo} = e.data;
+            this.frequency = frequency || this.frequency;
+            this.targetAmp = amplitude || this.targetAmp;
+            this.tonguePos = tonguePos || this.tonguePos;
+            this.tenseness = tenseness || this.tenseness;
+            if (vowelCombo && vowelCombo !== this.lastVowel) {
+                this.lastVowel = vowelCombo;
+                this.isTransitioning = true;
+                this.transitionTime = 0;
+            }
+        };
+    }
+    
+    getVowelFormants(tonguePos) {
+        const vowels = [
+            {f1: 270, f2: 2300, f3: 3000, vowel: 'U'},
+            {f1: 300, f2: 870, f3: 2240, vowel: 'O'},
+            {f1: 570, f2: 840, f3: 2410, vowel: 'A'},
+            {f1: 440, f2: 1800, f3: 2580, vowel: 'E'},
+            {f1: 270, f2: 2290, f3: 3010, vowel: 'I'}
+        ];
+        
+        const idx = Math.floor(tonguePos * (vowels.length - 1));
+        const nextIdx = Math.min(idx + 1, vowels.length - 1);
+        let t = (tonguePos * (vowels.length - 1)) - idx;
+        
+        // Add silly transitions with overshoot
+        if (this.isTransitioning) {
+            this.transitionTime += 0.02;
+            const overshoot = Math.sin(this.transitionTime * 15) * 0.3 * Math.exp(-this.transitionTime * 3);
+            t += overshoot;
+            t = Math.max(0, Math.min(1, t));
+            
+            if (this.transitionTime > 0.5) {
+                this.isTransitioning = false;
+            }
+        }
+        
+        const current = vowels[idx];
+        const next = vowels[nextIdx];
+        
+        return {
+            f1: current.f1 + (next.f1 - current.f1) * t,
+            f2: current.f2 + (next.f2 - current.f2) * t,
+            f3: current.f3 + (next.f3 - current.f3) * t,
+            vowel: t < 0.5 ? current.vowel : next.vowel
+        };
+    }
+    
+    process(inputs, outputs) {
+        const output = outputs[0][0];
+        if (!output) return true;
+        
+        for (let i = 0; i < output.length; i++) {
+            this.amplitude += (this.targetAmp - this.amplitude) * 0.01;
+            
+            // Add silly wobble effects
+            this.wobblePhase += 0.001;
+            const wobble = Math.sin(this.wobblePhase * 13) * 0.1 + Math.sin(this.wobblePhase * 7) * 0.05;
+            const wobbledFreq = this.frequency * (1 + wobble);
+            
+            // Generate harmonics with silly distortion
+            const fundamental = Math.sin(this.phase * 2 * Math.PI);
+            const harm2 = Math.sin(this.phase * 2 * Math.PI * 2) * 0.4;
+            const harm3 = Math.sin(this.phase * 2 * Math.PI * 3) * 0.2;
+            const harm4 = Math.sin(this.phase * 2 * Math.PI * 4) * 0.1;
+            
+            // Add glitch effects for fun
+            this.glitchPhase += 0.003;
+            const glitch = Math.random() > 0.95 ? Math.sin(this.glitchPhase * 50) * 0.2 : 0;
+            
+            const formants = this.getVowelFormants(this.tonguePos);
+            
+            const f1Freq = formants.f1 / sampleRate;
+            const f2Freq = formants.f2 / sampleRate;
+            const f3Freq = formants.f3 / sampleRate;
+            
+            // Add silly modulation to formants
+            const sillyMod = Math.sin(this.wobblePhase * 5) * 0.1 + 1;
+            const f1 = Math.sin(this.f1Phase * 2 * Math.PI) * 0.8 * sillyMod;
+            const f2 = Math.sin(this.f2Phase * 2 * Math.PI) * 0.5 * sillyMod;
+            const f3 = Math.sin(this.f3Phase * 2 * Math.PI) * 0.3 * sillyMod;
+            
+            const source = fundamental + harm2 + harm3 + harm4 + glitch;
+            const formantResponse = (f1 + f2 * 0.6 + f3 * 0.3) * 0.3;
+            
+            // Add extra silliness with random bursts
+            const burst = Math.random() > 0.98 ? Math.sin(this.phase * 50) * 0.1 : 0;
+            
+            const noise = (Math.random() - 0.5) * 0.08 * (1 - this.tenseness);
+            
+            let sample = (source * 0.7 + formantResponse + noise + burst) * this.amplitude;
+            
+            // Add ring modulation for extra weirdness
+            const ringMod = Math.sin(this.wobblePhase * 3) * 0.1 + 1;
+            sample *= ringMod;
+            
+            output[i] = sample * 0.15;
+            
+            this.phase += wobbledFreq / sampleRate;
+            this.f1Phase += f1Freq * sillyMod;
+            this.f2Phase += f2Freq * sillyMod;
+            this.f3Phase += f3Freq * sillyMod;
+            
+            if (this.phase >= 1) this.phase -= 1;
+            if (this.f1Phase >= 1) this.f1Phase -= 1;
+            if (this.f2Phase >= 1) this.f2Phase -= 1;
+            if (this.f3Phase >= 1) this.f3Phase -= 1;
+        }
+        
+        return true;
+    }
+}
+registerProcessor('trombone-processor', TromboneProcessor);
+`;
+
+let isMouseDown = false;
+let currentFreq = 100;
+let currentAmp = 0;
+let tonguePos = 0.5;
+let tenseness = 0.6;
+let currentVowel = 'A';
+let lastTonguePos = 0.5;
+
+// Silly vowel combinations
+const sillyVowels = [
+    {pos: 0.0, combo: 'UUUUU', display: 'UUUUU'},
+    {pos: 0.1, combo: 'UOOOO', display: 'UOOOO'},
+    {pos: 0.2, combo: 'OOOOO', display: 'OOOOO'},
+    {pos: 0.3, combo: 'OOOAAA', display: 'OAAAA'},
+    {pos: 0.4, combo: 'OAHHH', display: 'OAHHH'},
+    {pos: 0.5, combo: 'AHHHHH', display: 'AHHHHH'},
+    {pos: 0.6, combo: 'AAEEE', display: 'AAEEE'},
+    {pos: 0.7, combo: 'EEEEE', display: 'EEEEE'},
+    {pos: 0.8, combo: 'EEIII', display: 'EEIII'},
+    {pos: 0.9, combo: 'EEIIII', display: 'EEIIII'},
+    {pos: 1.0, combo: 'IIIII', display: 'IIIII'}
+];
+
+// Dynamic combinations based on speed
+const speedCombos = [
+    {speed: 0.1, combo: 'OOOEEE', display: 'OOOEEE'},
+    {speed: 0.2, combo: 'UUUAAAH', display: 'UUUAAAH'},
+    {speed: 0.3, combo: 'YAAAYEEE', display: 'YAAAYEEE'},
+    {speed: 0.4, combo: 'OOOEEEIII', display: 'OOOEEEIII'},
+    {speed: 0.5, combo: 'WAAAHOOO', display: 'WAAAHOOO'},
+    {speed: 0.6, combo: 'EEEEYAAA', display: 'EEEEYAAA'},
+    {speed: 0.7, combo: 'IIIYAAAOOO', display: 'IIIYAAAOOO'},
+    {speed: 0.8, combo: 'WOOOWEEE', display: 'WOOOWEEE'},
+    {speed: 0.9, combo: 'YEEEHAWWW', display: 'YEEEHAWWW'},
+    {speed: 1.0, combo: 'WAAAAHHHHH', display: 'WAAAAHHHHH'}
+];
+
+async function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const blob = new Blob([processorCode], {type: 'application/javascript'});
+        const url = URL.createObjectURL(blob);
+        await audioContext.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        
+        workletNode = new AudioWorkletNode(audioContext, 'trombone-processor');
+        workletNode.connect(audioContext.destination);
+        
+        isAudioReady = true;
+        startBtn.classList.add('hidden');
+        canvas.classList.remove('hidden');
+        info.classList.remove('hidden');
+        vowelDisplay.classList.remove('hidden');
+        
+        resize();
+        setupEvents();
+        animate();
+    } catch (error) {
+        console.error('Audio initialization failed:', error);
+        startBtn.textContent = 'Audio Error - Try Again';
+    }
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function setupEvents() {
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive: false});
+    canvas.addEventListener('touchmove', handleMove, {passive: false});
+    canvas.addEventListener('touchend', handleEnd);
+    window.addEventListener('resize', resize);
+}
+
+function getCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top
+    };
+}
+
+function handleStart(e) {
+    e.preventDefault();
+    isMouseDown = true;
+    updateFromEvent(e);
+}
+
+function handleMove(e) {
+    if (!isMouseDown) return;
+    e.preventDefault();
+    updateFromEvent(e);
+}
+
+function handleEnd(e) {
+    isMouseDown = false;
+    currentAmp = 0;
+    vowelDisplay.textContent = '';
+    updateAudio();
+}
+
+function updateFromEvent(e) {
+    const {x, y} = getCoords(e);
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const voiceboxHeight = h * 0.3;
+    const isInVoicebox = y > h - voiceboxHeight;
+    
+    if (isInVoicebox) {
+        currentFreq = 60 + (x / w) * 180;
+        tenseness = Math.max(0.1, (h - y) / voiceboxHeight);
+    } else {
+        lastTonguePos = tonguePos;
+        tonguePos = x / w;
+        
+        // Calculate movement speed for dynamic effects
+        const speed = Math.abs(tonguePos - lastTonguePos) * 10;
+        
+        // Get silly vowel combination
+        let vowelCombo = getSillyVowel(tonguePos, speed);
+        
+        // Add extra silliness for rapid movements
+        if (speed > 0.5) {
+            const speedCombo = speedCombos.find(sc => speed >= sc.speed) || speedCombos[speedCombos.length - 1];
+            vowelCombo = speedCombo;
+        }
+        
+        vowelDisplay.textContent = vowelCombo.display;
+        vowelDisplay.style.fontSize = Math.min(48 + speed * 20, 72) + 'px';
+        
+        // Add rainbow colors for fast movements
+        if (speed > 0.3) {
+            const hue = (Date.now() * 0.01) % 360;
+            vowelDisplay.style.color = 'hsl(' + hue + ', 70%, 60%)';
+        } else {
+            vowelDisplay.style.color = '#f39';
+        }
+    }
+    
+    currentAmp = 0.8;
+    updateAudio();
+}
+
+function getSillyVowel(pos, speed) {
+    // Find closest vowel combination
+    let closestVowel = sillyVowels[0];
+    let minDistance = Math.abs(pos - closestVowel.pos);
+    
+    for (let vowel of sillyVowels) {
+        const distance = Math.abs(pos - vowel.pos);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestVowel = vowel;
+        }
+    }
+    
+    // Add speed-based modifications
+    if (speed > 0.2) {
+        closestVowel = {...closestVowel, display: closestVowel.display + '!!!!'};
+    }
+    
+    return closestVowel;
+}
+
+function updateAudio() {
+    if (!isAudioReady || !workletNode) return;
+    
+    workletNode.port.postMessage({
+        frequency: currentFreq,
+        amplitude: currentAmp,
+        tonguePos: tonguePos,
+        tenseness: tenseness,
+        vowelCombo: vowelDisplay.textContent
+    });
+}
+
+function animate() {
+    draw();
+    requestAnimationFrame(animate);
+}
+
+function draw() {
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Animated background
+    const time = Date.now() * 0.001;
+    const bgHue = (time * 10) % 360;
+    ctx.fillStyle = 'hsl(' + bgHue + ', 20%, 10%)';
+    ctx.fillRect(0, 0, w, h);
+    
+    const voiceboxHeight = h * 0.3;
+    
+    // Animated voicebox
+    const voiceboxHue = (time * 20) % 360;
+    ctx.fillStyle = isMouseDown && currentAmp > 0 ? 'hsl(' + voiceboxHue + ', 40%, 15%)' : '#0f1419';
+    ctx.fillRect(0, h - voiceboxHeight, w, voiceboxHeight);
+    
+    // Pulsing divider
+    ctx.strokeStyle = 'hsl(' + ((time * 50) % 360) + ', 80%, 60%)';
+    ctx.lineWidth = 2 + Math.sin(time * 5) * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, h - voiceboxHeight);
+    ctx.lineTo(w, h - voiceboxHeight);
+    ctx.stroke();
+    
+    // Rainbow tongue area
+    for (let i = 0; i < h - voiceboxHeight; i += 20) {
+        const hue = (i * 2 + time * 30) % 360;
+        ctx.fillStyle = 'hsl(' + hue + ', 30%, 20%)';
+        ctx.fillRect(0, i, w, 20);
+    }
+    
+    if (isMouseDown && currentAmp > 0) {
+        // Animated pitch indicator
+        const pitchX = ((currentFreq - 60) / 180) * w;
+        const pitchY = h - (tenseness * voiceboxHeight);
+        
+        ctx.fillStyle = 'hsl(' + ((time * 100) % 360) + ', 80%, 60%)';
+        ctx.beginPath();
+        ctx.arc(pitchX, pitchY, 15 + Math.sin(time * 10) * 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bouncing tongue indicator
+        const tongueX = tonguePos * w;
+        const tongueY = (h - voiceboxHeight) * 0.5 + Math.sin(time * 8) * 20;
+        
+        ctx.fillStyle = 'hsl(' + ((time * 80) % 360) + ', 70%, 50%)';
+        ctx.beginPath();
+        ctx.arc(tongueX, tongueY, 20 + Math.sin(time * 15) * 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Crazy waveform
+        ctx.strokeStyle = 'hsl(' + ((time * 60) % 360) + ', 90%, 70%)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < w; i += 2) {
+            const wave1 = Math.sin((i / w) * Math.PI * 8 + time * currentFreq / 20) * 20;
+            const wave2 = Math.sin((i / w) * Math.PI * 12 + time * currentFreq / 30) * 10;
+            const wave3 = Math.sin((i / w) * Math.PI * 6 + time * currentFreq / 40) * 5;
+            const y = h * 0.8 + (wave1 + wave2 + wave3) * currentAmp;
+            if (i === 0) ctx.moveTo(i, y);
+            else ctx.lineTo(i, y);
+        }
+        ctx.stroke();
+        
+        // Sparkle effects
+        for (let i = 0; i < 20; i++) {
+            const sparkleX = Math.random() * w;
+            const sparkleY = Math.random() * h;
+            const sparkleSize = Math.random() * 3 + 1;
+            const sparkleHue = (time * 200 + i * 30) % 360;
+            
+            ctx.fillStyle = 'hsl(' + sparkleHue + ', 100%, 80%)';
+            ctx.beginPath();
+            ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    // Animated info
+    const infoHue = (time * 30) % 360;
+    ctx.fillStyle = 'hsl(' + infoHue + ', 60%, 80%)';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('Frequency: ' + Math.round(currentFreq) + 'Hz', 20, 30);
+    ctx.fillText('Tongue: ' + Math.round(tonguePos * 100) + '%', 20, 50);
+    ctx.fillText('Tension: ' + Math.round(tenseness * 100) + '%', 20, 70);
+    
+    // Silly vowel guide
+    ctx.fillStyle = 'hsl(' + ((time * 40) % 360) + ', 50%, 60%)';
+    ctx.font = 'bold 14px sans-serif';
+    const vowelGuide = 'UUUUU ← OOOOO ← AHHHHH ← EEEEE ← IIIII';
+    ctx.fillText(vowelGuide, 20, h - voiceboxHeight - 20);
+}
+
+startBtn.addEventListener('click', initAudio);
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && audioContext && audioContext.state === 'running') {
+        audioContext.suspend();
+    } else if (!document.hidden && audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+});
+</script>
+</body>
+</html>

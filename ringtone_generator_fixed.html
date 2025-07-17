@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ringtone Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #4a5568; border-radius: 3px; outline: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #63b3ed; cursor: pointer; border-radius: 50%; }
+        .slider::-moz-range-thumb { width: 16px; height: 16px; background: #63b3ed; cursor: pointer; border-radius: 50%; border: none; }
+        .slider:disabled::-webkit-slider-thumb { background: #4a5568; }
+        details > summary { list-style: none; cursor: pointer; padding: 0.4rem; background: #2d3748; border-radius: 0.2rem; }
+        details > summary::-webkit-details-marker { display: none; }
+        details > summary:hover { background: #4a5568; }
+        .grid-ctrl { display: grid; grid-template-columns: 60px 1fr 50px; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+        .label { font-weight: 500; font-size: 0.7rem; }
+        .num-input { width: 100%; background: #1a202c; border: 1px solid #4a5568; border-radius: 0.2rem; text-align: right; font-size: 0.7rem; padding: 1px 3px; }
+        .toggle-label { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-label input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #4a5568; transition: .3s; border-radius: 22px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: .3s; border-radius: 50%; }
+        input:checked + .toggle-slider { background: #2563eb; }
+        input:checked + .toggle-slider:before { transform: translateX(18px); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-2">
+    <div class="max-w-md mx-auto bg-gray-800 p-3 rounded-lg shadow-lg">
+        <h1 class="text-xl font-bold mb-3 text-center text-cyan-400">Ringtone Generator</h1>
+        <div class="flex justify-center flex-wrap gap-2 mb-3">
+            <button id="playBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">Play</button>
+            <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm">Stop</button>
+            <button id="addBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded text-sm">Add</button>
+            <button id="export1sBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-1 px-3 rounded text-sm">1s</button>
+            <button id="export5sBtn" class="bg-purple-700 hover:bg-purple-600 text-white font-bold py-1 px-3 rounded text-sm">5s</button>
+        </div>
+        <div id="loader" class="text-center my-3 hidden"><p class="text-cyan-400 animate-pulse text-sm">Generating...</p></div>
+        <div id="container" class="space-y-3"></div>
+    </div>
+
+    <script>
+    function bufferToWave(buf) {
+        const nCh = buf.numberOfChannels, len = buf.length * nCh * 2 + 44;
+        const buffer = new ArrayBuffer(len);
+        const view = new DataView(buffer);
+        const chans = []; let offset = 0, pos = 0;
+        const setU16 = d => { view.setUint16(pos, d, true); pos += 2; };
+        const setU32 = d => { view.setUint32(pos, d, true); pos += 4; };
+        setU32(0x46464952); setU32(len - 8); setU32(0x45564157); setU32(0x20746d66);
+        setU32(16); setU16(1); setU16(nCh); setU32(buf.sampleRate);
+        setU32(buf.sampleRate * 2 * nCh); setU16(nCh * 2); setU16(16);
+        setU32(0x61746164); setU32(len - pos - 4);
+        for (let i = 0; i < nCh; i++) chans.push(buf.getChannelData(i));
+        while (pos < len) {
+            for (let i = 0; i < nCh; i++) {
+                let s = Math.max(-1, Math.min(1, chans[i][offset]));
+                s = (0.5 + s < 0 ? s * 32768 : s * 32767) | 0;
+                view.setInt16(pos, s, true); pos += 2;
+            }
+            offset++;
+        }
+        return new Blob([view], {type: 'audio/wav'});
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const getEl = (id) => document.getElementById(id);
+        const playBtn=getEl('playBtn'), stopBtn=getEl('stopBtn'), addBtn=getEl('addBtn');
+        const export1sBtn=getEl('export1sBtn'), export5sBtn=getEl('export5sBtn');
+        const container=getEl('container'), loader=getEl('loader');
+        let tones = [], idCounter = 0;
+
+        const presets = {
+            '-- Ultra High Freq --':{d:1},
+            'Dog Whistle':{f:19000,t:'sine',dt:0,vr:35,vd:1800,tr:0,td:0,wf:100,wo:8,wq:3,ds:0},
+            'Ultrasonic Scream':{f:17500,t:'sawtooth',dt:0,vr:45,vd:2500,tr:0,td:0,wf:100,wo:12,wq:5,ds:0.2},
+            'Mosquito Tone':{f:16000,t:'sine',dt:50,vr:20,vd:500,tr:0,td:0,wf:100,wo:6,wq:2,ds:0},
+            'Bat Screech':{f:18500,t:'square',dt:0,vr:50,vd:3000,tr:0,td:0,wf:100,wo:10,wq:8,ds:0.3},
+            'Crystal Shatter':{f:15000,t:'sine',dt:0,vr:5,vd:200,tr:0,td:0,wf:100,wo:4,wq:15,ds:0.1},
+            '-- Piercing Alerts --':{d:1},
+            'Smoke Alarm':{f:4000,t:'square',dt:0,vr:0,vd:0,tr:8,td:90,wf:100,wo:6,wq:2,ds:0.8},
+            'Emergency Siren':{f:2800,t:'sawtooth',dt:0,vr:1.5,vd:2000,tr:0,td:0,wf:100,wo:8,wq:5,ds:0.2},
+            'Panic Alarm':{f:3500,t:'square',dt:0,vr:25,vd:1500,tr:20,td:80,wf:100,wo:10,wq:10,ds:0.6},
+            'Klaxon Horn':{f:750,t:'sawtooth',dt:0,vr:0,vd:0,tr:3,td:95,wf:100,wo:6,wq:2,ds:0.4},
+            'Car Alarm':{f:2500,t:'square',dt:0,vr:12,vd:800,tr:15,td:70,wf:100,wo:8,wq:8,ds:0.5},
+            '-- Dental Horrors --':{d:1},
+            'Dentist Drill':{f:6000,t:'sawtooth',dt:30,vr:50,vd:400,tr:0,td:0,wf:5500,wo:6,wq:25,ds:0.3},
+            'Bone Saw':{f:7500,t:'sawtooth',dt:0,vr:40,vd:600,tr:0,td:0,wf:6000,wo:5,wq:20,ds:0.5},
+            'Ultrasonic Cleaner':{f:8000,t:'sine',dt:0,vr:30,vd:1000,tr:0,td:0,wf:100,wo:8,wq:3,ds:0.1},
+            'Dental Suction':{f:5000,t:'sawtooth',dt:0,vr:45,vd:800,tr:0,td:0,wf:4500,wo:7,wq:18,ds:0.4},
+            '-- Electronic Distress --':{d:1},
+            'CRT Whine':{f:15734,t:'sine',dt:5,vr:2,vd:50,tr:0,td:0,wf:100,wo:6,wq:2,ds:0},
+            'Feedback Loop':{f:4500,t:'sine',dt:0,vr:15,vd:200,tr:0,td:0,wf:4000,wo:10,wq:35,ds:0.6},
+            'Capacitor Squeal':{f:12000,t:'square',dt:0,vr:35,vd:1500,tr:0,td:0,wf:100,wo:8,wq:12,ds:0.2},
+            'Digital Artifact':{f:9000,t:'square',dt:0,vr:50,vd:2000,tr:50,td:60,wf:100,wo:12,wq:20,ds:0.8},
+            'System Error':{f:6000,t:'sawtooth',dt:0,vr:40,vd:1200,tr:40,td:80,wf:100,wo:8,wq:15,ds:0.7},
+            '-- Torture Frequencies --':{d:1},
+            'Tinnitus Sim':{f:13000,t:'sine',dt:20,vr:1,vd:10,tr:0,td:0,wf:100,wo:6,wq:2,ds:0},
+            'Nail on Glass':{f:4200,t:'sawtooth',dt:0,vr:45,vd:300,tr:0,td:0,wf:3800,wo:5,wq:22,ds:0.8},
+            'Chalk Scrape':{f:3600,t:'sawtooth',dt:25,vr:35,vd:200,tr:0,td:0,wf:3200,wo:6,wq:18,ds:0.9},
+            'Styrofoam Rub':{f:5500,t:'square',dt:0,vr:40,vd:500,tr:0,td:0,wf:100,wo:8,wq:12,ds:0.6},
+            'Metal Scrape':{f:2800,t:'sawtooth',dt:0,vr:25,vd:400,tr:0,td:0,wf:2500,wo:7,wq:25,ds:0.7},
+            '-- Reset --':{d:1},
+            'Default':{f:1000,t:'sine',dt:0,vr:0,vd:0,tr:0,td:0,wf:100,wo:6,wq:2,ds:0}
+        };
+
+        const createToneBlock = (id) => {
+            const block = document.createElement('div');
+            block.className = 'bg-gray-700 p-2 rounded border border-gray-600';
+            block.dataset.id = id;
+
+            let presetHtml = '';
+            for (const n in presets) {
+                if (presets[n].d) presetHtml += `<span class="w-full text-left text-xs text-cyan-300 font-bold pt-1 col-span-full">${n}</span>`;
+                else presetHtml += `<button class="preset-btn bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium py-1 px-2 rounded" data-p="${n}" data-id="${id}">${n}</button>`;
+            }
+
+            const ctrlHtml = (name, id, min, max, val, step) => `
+                <div class="grid-ctrl">
+                    <label class="label">${name}</label>
+                    <input type="range" id="${id}" min="${min}" max="${max}" value="${val}" step="${step}" class="slider">
+                    <input type="number" id="${id}-num" min="${min}" max="${max}" value="${val}" step="${step}" class="num-input">
+                </div>`;
+
+            block.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-semibold text-cyan-300">T${id}</h2>
+                        <select id="type-${id}" class="bg-gray-600 text-white rounded px-1 py-0.5 text-xs">
+                            <option value="sine">Sine</option><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Tri</option>
+                        </select>
+                    </div>
+                    <button class="rm-btn bg-red-700 hover:bg-red-800 text-white font-bold py-0.5 px-2 rounded text-xs" data-id="${id}">X</button>
+                </div>
+                <div class="space-y-1">
+                    ${ctrlHtml('Freq', `freq-${id}`, 20, 20000, 1000, 1)}
+                    ${ctrlHtml('Detune', `detune-${id}`, -1200, 1200, 0, 1)}
+                    <details><summary class="font-semibold text-xs">Vibrato</summary><div class="p-1 space-y-1">
+                        ${ctrlHtml('Rate', `vr-${id}`, 0, 50, 0, 0.1)}
+                        ${ctrlHtml('Depth', `vd-${id}`, 0, 3000, 0, 1)}
+                    </div></details>
+                    <details><summary class="font-semibold text-xs">Tremolo</summary><div class="p-1 space-y-1">
+                        ${ctrlHtml('Rate', `tr-${id}`, 0, 50, 0, 0.1)}
+                        ${ctrlHtml('Depth', `td-${id}`, 0, 100, 0, 1)}
+                    </div></details>
+                    <details><summary class="font-semibold text-xs">AutoWah</summary><div class="p-1 space-y-1">
+                        ${ctrlHtml('Freq', `wf-${id}`, 50, 8000, 100, 1)}
+                        ${ctrlHtml('Octaves', `wo-${id}`, 1, 15, 6, 1)}
+                        ${ctrlHtml('Resonance', `wq-${id}`, 1, 40, 2, 0.5)}
+                    </div></details>
+                    <details><summary class="font-semibold text-xs">Distortion</summary><div class="p-1 space-y-1">
+                        ${ctrlHtml('Amount', `ds-${id}`, 0, 1, 0, 0.01)}
+                    </div></details>
+                    <details><summary class="font-semibold text-xs">Sweep</summary><div class="p-1 space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="label">Loop</span>
+                            <label class="toggle-label"><input type="checkbox" id="sw-toggle-${id}"><span class="toggle-slider"></span></label>
+                        </div>
+                        ${ctrlHtml('Start', `swS-${id}`, 20, 20000, 200, 1)}
+                        ${ctrlHtml('End', `swE-${id}`, 20, 20000, 2000, 1)}
+                        ${ctrlHtml('Time', `swT-${id}`, 0.1, 10, 1, 0.1)}
+                    </div></details>
+                    <div class="grid grid-cols-2 gap-1 pt-1">${presetHtml}</div>
+                </div>`;
+            container.appendChild(block);
+
+            const wah = new Tone.AutoWah({baseFrequency:100, octaves:6, sensitivity:-5, Q:2, gain:2});
+            const dist = new Tone.Distortion(0);
+            const trem = new Tone.Tremolo(0, 0).start();
+            const osc = new Tone.Oscillator(1000, 'sine');
+            const lfo = new Tone.LFO(0, 1000, 1000).start();
+            
+            osc.connect(trem);
+            trem.connect(wah);
+            wah.connect(dist);
+            dist.toDestination();
+            lfo.connect(osc.frequency);
+            
+            tones.push({id, osc, wah, trem, dist, lfo, playing: false, sweepLoop: null});
+            addListeners(id);
+            applyPreset(id, 'Default');
+        }
+        
+        const applyPreset = (id, pName) => {
+            const p = presets[pName];
+            if (!p || p.d) return;
+            const update = (ctrlId, val) => {
+                const slider = getEl(ctrlId), numInput = getEl(`${ctrlId}-num`);
+                if (slider && numInput) {
+                    slider.value = val; numInput.value = val;
+                    slider.dispatchEvent(new Event('input', {bubbles:1}));
+                }
+            };
+            const typeEl = getEl(`type-${id}`);
+            if (typeEl) {
+                typeEl.value = p.t;
+                typeEl.dispatchEvent(new Event('input'));
+            }
+            update(`freq-${id}`, p.f); update(`detune-${id}`, p.dt);
+            update(`vr-${id}`, p.vr); update(`vd-${id}`, p.vd);
+            update(`tr-${id}`, p.tr); update(`td-${id}`, p.td);
+            update(`wf-${id}`, p.wf); update(`wo-${id}`, p.wo); update(`wq-${id}`, p.wq);
+            update(`ds-${id}`, p.ds);
+        }
+
+        const addListeners = (id) => {
+            const t = tones.find(t => t.id === id);
+            if (!t) return;
+            
+            const sync = (baseId, cb) => {
+                const slider = getEl(baseId), numInput = getEl(`${baseId}-num`);
+                if (!slider || !numInput) return;
+                const update = (val) => {
+                    const cleanVal = parseFloat(val);
+                    if (isNaN(cleanVal)) return;
+                    slider.value = cleanVal; numInput.value = cleanVal; cb(cleanVal); 
+                };
+                slider.addEventListener('input', () => update(slider.value));
+                numInput.addEventListener('change', () => update(numInput.value));
+            };
+            
+            const typeEl = getEl(`type-${id}`);
+            if (typeEl) typeEl.addEventListener('input', e => { t.osc.type = e.target.value; });
+            
+            sync(`freq-${id}`, v => { 
+                t.osc.frequency.value = v; 
+                const d = parseFloat(getEl(`vd-${id}-num`)?.value || 0); 
+                t.lfo.min = v - d; t.lfo.max = v + d; 
+            });
+            sync(`detune-${id}`, v => { t.osc.detune.value = v; });
+            sync(`vr-${id}`, v => { t.lfo.frequency.value = v; });
+            sync(`vd-${id}`, v => { 
+                const base = parseFloat(getEl(`freq-${id}-num`)?.value || 1000); 
+                t.lfo.min = base - v; t.lfo.max = base + v; 
+            });
+            sync(`tr-${id}`, v => { t.trem.frequency.value = v; });
+            sync(`td-${id}`, v => { t.trem.depth.value = v / 100; });
+            sync(`wf-${id}`, v => { t.wah.baseFrequency = v; });
+            sync(`wo-${id}`, v => { t.wah.octaves = v; });
+            sync(`wq-${id}`, v => { t.wah.Q.value = v; });
+            sync(`ds-${id}`, v => { t.dist.distortion = v; });
+
+            const swS = getEl(`swS-${id}`), swE = getEl(`swE-${id}`);
+            if (swS && swE) {
+                sync(`swS-${id}`, v => { swE.min = v; });
+                sync(`swE-${id}`, v => { swS.max = v; });
+                sync(`swT-${id}`, v => {});
+            }
+
+            const swToggle = getEl(`sw-toggle-${id}`);
+            if (swToggle) {
+                swToggle.addEventListener('change', e => {
+                    const freqSlider = getEl(`freq-${id}`), detuneSlider = getEl(`detune-${id}`);
+                    const freqNum = getEl(`freq-${id}-num`), detuneNum = getEl(`detune-${id}-num`);
+                    const disable = e.target.checked;
+                    [freqSlider, detuneSlider, freqNum, detuneNum].forEach(el => {
+                        if (el) el.disabled = disable;
+                    });
+                    
+                    if (disable && swS && swE) {
+                        const start = parseFloat(swS.value), end = parseFloat(swE.value);
+                        const time = parseFloat(getEl(`swT-${id}`)?.value || 1);
+                        if (t.sweepLoop) t.sweepLoop.dispose();
+                        t.sweepLoop = new Tone.Loop(loopTime => {
+                            t.osc.frequency.rampTo(end, time, loopTime);
+                            t.osc.frequency.rampTo(start, time, loopTime + time);
+                        }, time * 2).start(0);
+                    } else {
+                        if (t.sweepLoop) { t.sweepLoop.stop(0).dispose(); t.sweepLoop = null; }
+                        t.osc.frequency.cancelScheduledValues(Tone.now());
+                        if (freqSlider) t.osc.frequency.value = freqSlider.value;
+                    }
+                });
+            }
+
+            const rmBtn = document.querySelector(`.rm-btn[data-id='${id}']`);
+            if (rmBtn) rmBtn.addEventListener('click', () => removeTone(id));
+            
+            document.querySelectorAll(`.preset-btn[data-id='${id}']`).forEach(b => 
+                b.addEventListener('click', () => applyPreset(id, b.dataset.p)));
+        }
+        
+        const removeTone = (id) => {
+            const idx = tones.findIndex(t => t.id === id);
+            if (idx > -1) {
+                const t = tones[idx];
+                if (t.playing) t.osc.stop();
+                if (t.sweepLoop) t.sweepLoop.dispose();
+                t.osc.dispose(); t.wah.dispose(); t.trem.dispose(); t.dist.dispose(); t.lfo.dispose();
+                tones.splice(idx, 1);
+                container.querySelector(`div[data-id='${id}']`)?.remove();
+            }
+        }
+
+        playBtn.addEventListener('click', async () => { 
+            await Tone.start(); 
+            tones.forEach(t => { 
+                if (!t.playing) { 
+                    t.osc.start(); 
+                    t.playing = true; 
+                } 
+            }); 
+        });
+        
+        stopBtn.addEventListener('click', () => { 
+            tones.forEach(t => { 
+                if (t.playing) { 
+                    t.osc.stop(); 
+                    t.playing = false; 
+                } 
+            }); 
+        });
+        
+        addBtn.addEventListener('click', () => createToneBlock(++idCounter));
+        
+        const exportAudio = async (duration) => {
+            if (tones.length === 0) return alert("Add a tone first.");
+            loader.classList.remove('hidden');
+            
+            try {
+                await Tone.start();
+                
+                const toneStates = tones.map(t => ({
+                    freq: t.osc.frequency.value,
+                    detune: t.osc.detune.value,
+                    type: t.osc.type,
+                    lfoFreq: t.lfo.frequency.value,
+                    lfoMin: t.lfo.min,
+                    lfoMax: t.lfo.max,
+                    tremFreq: t.trem.frequency.value,
+                    tremDepth: t.trem.depth.value,
+                    wahBase: t.wah.baseFrequency,
+                    wahOct: t.wah.octaves,
+                    wahQ: t.wah.Q.value,
+                    distAmt: t.dist.distortion,
+                    isSweeping: getEl(`sw-toggle-${t.id}`)?.checked || false,
+                    sweepStart: parseFloat(getEl(`swS-${t.id}-num`)?.value || 200),
+                    sweepEnd: parseFloat(getEl(`swE-${t.id}-num`)?.value || 2000),
+                    sweepTime: parseFloat(getEl(`swT-${t.id}-num`)?.value || 1)
+                }));
+
+                const buf = await Tone.Offline(async (context) => {
+                    const now = context.now();
+                    
+                    toneStates.forEach(state => {
+                        const osc = new Tone.Oscillator(state.freq, state.type);
+                        const lfo = new Tone.LFO(state.lfoFreq, state.lfoMin, state.lfoMax);
+                        const trem = new Tone.Tremolo(state.tremFreq, state.tremDepth);
+                        const wah = new Tone.AutoWah(state.wahBase, state.wahOct, -5);
+                        const dist = new Tone.Distortion(state.distAmt);
+                        
+                        osc.detune.value = state.detune;
+                        wah.Q.value = state.wahQ;
+                        
+                        lfo.connect(osc.frequency);
+                        osc.connect(trem);
+                        trem.connect(wah);
+                        wah.connect(dist);
+                        dist.connect(context.destination);
+                        
+                        lfo.start(now);
+                        trem.start(now);
+                        osc.start(now).stop(now + duration);
+                        
+                        if (state.isSweeping) {
+                            let pos = 0;
+                            osc.frequency.setValueAtTime(state.sweepStart, now);
+                            while(pos < duration) {
+                                osc.frequency.linearRampTo(state.sweepEnd, state.sweepTime, now + pos);
+                                pos += state.sweepTime;
+                                if (pos >= duration) break;
+                                osc.frequency.linearRampTo(state.sweepStart, state.sweepTime, now + pos);
+                                pos += state.sweepTime;
+                            }
+                        }
+                    });
+                }, duration);
+
+                const blob = bufferToWave(buf);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none'; a.href = url; a.download = `ringtone-${duration}s.wav`;
+                document.body.appendChild(a); a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (err) {
+                console.error("Export error:", err);
+                alert("Export failed. Check console for details.");
+            } finally {
+                loader.classList.add('hidden');
+            }
+        };
+        
+        export1sBtn.addEventListener('click', () => exportAudio(1));
+        export5sBtn.addEventListener('click', () => exportAudio(5));
+        
+        createToneBlock(++idCounter);
+    });
+    </script>
+</body>
+</html>
