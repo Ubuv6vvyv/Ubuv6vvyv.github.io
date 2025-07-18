@@ -354,7 +354,7 @@ function downloadPdfLinks() {
     return;
   }
 
-  const textContent = collectedPdfLinks.join('\n');
+  const textContent = collectedPdfLinks.join('\n\n');
   const blob = new Blob([textContent], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
 
