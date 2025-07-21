@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compact Image Metadata Extractor</title>
+    <script src="https://unpkg.com/exifreader@4.21.0/dist/exif-reader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        /* General Styles */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            padding: 8px;
+            font-size: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        .text-center { text-align: center; }
+        .hidden { display: none; }
+
+        /* Header */
+        .header h1 {
+            font-size: 20px;
+            margin: 0 0 4px 0;
+            font-weight: 600;
+        }
+        .header p {
+            font-size: 12px;
+            color: #606770;
+            margin: 0 0 12px 0;
+        }
+
+        /* File Upload */
+        .file-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            height: 100px;
+            border: 2px dashed #ccd0d5;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            padding: 10px;
+        }
+        .file-upload-label:hover { border-color: #1877f2; }
+        .file-upload-label svg { width: 24px; height: 24px; color: #606770; margin-bottom: 8px; }
+        .file-upload-label span { font-size: 13px; color: #606770; }
+        .file-upload-label span .browse-link { color: #1877f2; text-decoration: underline; }
+        #file-info { font-size: 11px; color: #606770; margin-top: 4px; }
+
+        /* Buttons */
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .button-group-single {
+             grid-template-columns: 1fr;
+        }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s, opacity 0.2s;
+            text-align: center;
+        }
+        .btn-primary { background-color: #1877f2; color: white; }
+        .btn-primary:hover { background-color: #166fe5; }
+        .btn-secondary { background-color: #42b72a; color: white; }
+        .btn-secondary:hover { background-color: #36a420; }
+        .btn-tertiary { background-color: #e4e6eb; color: #1c1e21; }
+        .btn-tertiary:hover { background-color: #d8dbdf; }
+        .btn:disabled { background-color: #dce1e6; color: #a0a6ad; cursor: not-allowed; }
+
+        /* View Toggle */
+        .view-toggle { margin-bottom: 12px; }
+        .view-toggle .btn-group {
+            display: inline-flex;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ccd0d5;
+        }
+        .view-toggle .btn {
+            border-radius: 0;
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .view-toggle .btn.active { background-color: #1877f2; color: white; }
+        .view-toggle .btn.inactive { background-color: #f0f2f5; color: #606770; }
+
+        /* Results & Tables */
+        #results-container { space-y: 8px; }
+        .table-container { max-height: 250px; overflow-y: auto; border: 1px solid #e4e6eb; border-radius: 6px; }
+        .detailed-item { background-color: #f7f8fa; padding: 8px; border-radius: 6px; }
+        .detailed-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .detailed-item-header h3 { font-size: 14px; font-weight: 600; margin: 0; word-break: break-all; }
+        .thumbnail { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 12px;
+            border-bottom: 1px solid #e4e6eb;
+            vertical-align: top;
+        }
+        thead th { background-color: #e9ebee; font-weight: 600; }
+        tbody tr:last-child td { border-bottom: none; }
+        td:first-child { font-weight: 500; color: #333; word-break: break-word; }
+        td:last-child { color: #606770; word-break: break-word; }
+        
+        /* Message Box */
+        #message-box { padding: 8px; font-size: 12px; border-radius: 4px; border: 1px solid transparent; }
+        .msg-success { background-color: #e9f6ea; border-color: #42b72a; color: #36a420; }
+        .msg-error { background-color: #fbe9e8; border-color: #fa383e; color: #c72b30; }
+        .msg-info { background-color: #e7f3ff; border-color: #1877f2; color: #166fe5; }
+        .msg-warning { background-color: #fff4e0; border-color: #ffba00; color: #ad7e00; }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header text-center">
+            <h1>Metadata Extractor</h1>
+            <p>Upload images (JPG, PNG, HEIC) or ZIP archives.</p>
+        </div>
+
+        <!-- File Upload Area -->
+        <div>
+            <label for="file-upload" class="file-upload-label">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+                <span>Drop files or <span class="browse-link">browse</span></span>
+                <input type="file" id="file-upload" multiple class="hidden" accept="image/*,.heic,.heif,.zip">
+            </label>
+            <p id="file-info" class="text-center">No files selected</p>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="button-group">
+            <button id="extract-btn" class="btn btn-primary" disabled>Extract Metadata</button>
+            <button id="rename-zip-btn" class="btn btn-tertiary" disabled>Rename & Download Zip</button>
+        </div>
+         <div id="download-csv-container" class="button-group button-group-single hidden">
+             <button id="download-csv-btn" class="btn btn-secondary" disabled>Download All Data (CSV)</button>
+        </div>
+        
+        <!-- View Toggle Area -->
+        <div id="view-toggle-container" class="hidden text-center view-toggle">
+             <div class="btn-group">
+                <button type="button" id="detailed-view-btn" class="btn active">Detailed View</button>
+                <button type="button" id="simple-view-btn" class="btn inactive">Date/Time View</button>
+            </div>
+        </div>
+
+        <!-- Results Area -->
+        <div id="results-container"></div>
+        
+        <!-- Message Box -->
+        <div id="message-box" class="hidden" style="margin-top: 12px;"></div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const fileUpload = document.getElementById('file-upload');
+        const fileInfo = document.getElementById('file-info');
+        const extractBtn = document.getElementById('extract-btn');
+        const renameZipBtn = document.getElementById('rename-zip-btn');
+        const downloadCsvBtn = document.getElementById('download-csv-btn');
+        const downloadCsvContainer = document.getElementById('download-csv-container');
+        const resultsContainer = document.getElementById('results-container');
+        const messageBox = document.getElementById('message-box');
+        const viewToggleContainer = document.getElementById('view-toggle-container');
+        const detailedViewBtn = document.getElementById('detailed-view-btn');
+        const simpleViewBtn = document.getElementById('simple-view-btn');
+
+        // State
+        let imageData = [];
+        let currentView = 'detailed';
+
+        // Event listener for file input changes
+        fileUpload.addEventListener('change', () => {
+            imageData.forEach(img => URL.revokeObjectURL(img.thumbnailUrl));
+            if (fileUpload.files.length > 0) {
+                fileInfo.textContent = `${fileUpload.files.length} file(s) selected.`;
+                extractBtn.disabled = false;
+            } else {
+                fileInfo.textContent = 'No files selected';
+                extractBtn.disabled = true;
+            }
+            resultsContainer.innerHTML = '';
+            downloadCsvBtn.disabled = true;
+            renameZipBtn.disabled = true;
+            viewToggleContainer.classList.add('hidden');
+            downloadCsvContainer.classList.add('hidden');
+            imageData = [];
+            hideMessage();
+        });
+
+        // Event listener for the extract button
+        extractBtn.addEventListener('click', async () => {
+            resultsContainer.innerHTML = '<div class="text-center" style="padding: 10px;">Processing...</div>';
+            imageData = [];
+            const files = fileUpload.files;
+            
+            if (files.length === 0) {
+                showMessage('Please select at least one file.', 'error');
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            const processFile = async (fileBlob, filename) => {
+                try {
+                    const tags = await ExifReader.load(fileBlob);
+                    let thumbnailUrl = 'https://placehold.co/50x50/e2e8f0/4a5568?text=HEIC';
+                    if (fileBlob.type && fileBlob.type.startsWith('image/')) {
+                         thumbnailUrl = URL.createObjectURL(fileBlob);
+                    }
+                    if (tags['Thumbnail'] && tags['Thumbnail'].base64) {
+                        thumbnailUrl = `data:image/jpeg;base64,${tags['Thumbnail'].base64}`;
+                    }
+
+                    return {
+                        filename: filename,
+                        metadata: Object.keys(tags).length > 0 ? tags : { "Status": { "description": "No EXIF data found" } },
+                        thumbnailUrl: thumbnailUrl,
+                        fileBlob: fileBlob // Keep the blob for zipping
+                    };
+                } catch (error) {
+                    return {
+                        filename: filename,
+                        metadata: { "Error": { "description": "Could not read file." } },
+                        thumbnailUrl: 'https://placehold.co/50x50/fecaca/991b1b?text=Error',
+                        fileBlob: fileBlob
+                    };
+                }
+            };
+
+            const processingPromises = Array.from(files).map(file => {
+                const lowerCaseName = file.name.toLowerCase();
+                if (lowerCaseName.endsWith('.zip')) {
+                    return JSZip.loadAsync(file).then(zip => {
+                        const imagePromises = [];
+                        zip.forEach((relativePath, zipEntry) => {
+                            const isImage = /\.(jpe?g|png|gif|tiff?|heic|heif)$/i.test(zipEntry.name);
+                            if (!zipEntry.dir && isImage) {
+                                const imagePromise = zipEntry.async('blob').then(blob => processFile(blob, zipEntry.name));
+                                imagePromises.push(imagePromise);
+                            }
+                        });
+                        return Promise.all(imagePromises);
+                    });
+                } else {
+                     return processFile(file, file.name);
+                }
+            });
+
+            try {
+                const results = await Promise.all(processingPromises);
+                imageData = results.flat().filter(item => item !== null);
+                displayResults();
+            } catch (error) {
+                showMessage('An error occurred while processing files.', 'error');
+                resultsContainer.innerHTML = '';
+            }
+        });
+        
+        function displayResults() {
+            resultsContainer.innerHTML = '';
+            if (imageData.length === 0) {
+                showMessage('No processable images found.', 'info');
+                viewToggleContainer.classList.add('hidden');
+                downloadCsvContainer.classList.add('hidden');
+                return;
+            }
+            
+            if (currentView === 'detailed') displayDetailedView();
+            else displaySimpleView();
+            
+            downloadCsvBtn.disabled = false;
+            renameZipBtn.disabled = false;
+            viewToggleContainer.classList.remove('hidden');
+            downloadCsvContainer.classList.remove('hidden');
+            showMessage(`Successfully extracted data from ${imageData.length} image(s).`, 'success');
+        }
+
+        function displayDetailedView() {
+            imageData.forEach(img => {
+                const itemContainer = document.createElement('div');
+                itemContainer.className = 'detailed-item';
+                
+                let tableHTML = `
+                    <div class="detailed-item-header">
+                         <img src="${img.thumbnailUrl}" alt="${img.filename}" class="thumbnail" onerror="this.src='https://placehold.co/50x50/e2e8f0/4a5568?text=Preview';">
+                         <h3>${img.filename}</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>`;
+
+                for (const key in img.metadata) {
+                    if (key === 'Thumbnail') continue; 
+                    let value = img.metadata[key].description || img.metadata[key].value;
+                    if (typeof value === 'object') value = JSON.stringify(value);
+                    value = String(value).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    tableHTML += `<tr><td>${key}</td><td>${value}</td></tr>`;
+                }
+                tableHTML += `</tbody></table></div>`;
+                itemContainer.innerHTML = tableHTML;
+                resultsContainer.appendChild(itemContainer);
+            });
+        }
+
+        function displaySimpleView() {
+            let tableHTML = `
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th></th><th>Filename</th><th>Date/Time Original</th></tr></thead><tbody>`;
+
+            imageData.forEach(img => {
+                const dtOriginal = img.metadata.DateTimeOriginal ? img.metadata.DateTimeOriginal.description : 'N/A';
+                const dt = img.metadata.DateTime ? img.metadata.DateTime.description : 'N/A';
+                const dateTime = dtOriginal !== 'N/A' ? dtOriginal : dt;
+                
+                tableHTML += `
+                    <tr>
+                        <td><img src="${img.thumbnailUrl}" alt="${img.filename}" class="thumbnail" onerror="this.src='https://placehold.co/50x50/e2e8f0/4a5568?text=Preview';"></td>
+                        <td>${img.filename}</td>
+                        <td>${dateTime}</td>
+                    </tr>`;
+            });
+            tableHTML += `</tbody></table></div>`;
+            resultsContainer.innerHTML = tableHTML;
+        }
+        
+        function getFormattedDate(metadata) {
+            const dateStr = metadata.DateTimeOriginal?.description || metadata.DateTime?.description;
+            if (!dateStr) return null;
+            // EXIF format is 'YYYY:MM:DD HH:MM:SS'
+            const parts = dateStr.split(' ')[0].split(':');
+            if (parts.length === 3) {
+                const [year, month, day] = parts;
+                return `${day}${month}${year}`;
+            }
+            return null;
+        }
+
+        renameZipBtn.addEventListener('click', () => {
+            if (imageData.length === 0) {
+                showMessage('No image data to process.', 'error');
+                return;
+            }
+            showMessage('Zipping files with new names...', 'info');
+            const zip = new JSZip();
+            imageData.forEach(img => {
+                const formattedDate = getFormattedDate(img.metadata);
+                const extension = img.filename.split('.').pop();
+                const baseName = img.filename.substring(0, img.filename.length - extension.length - 1);
+                let newFilename = img.filename;
+                if (formattedDate) {
+                    newFilename = `${formattedDate}_${baseName}.${extension}`;
+                }
+                zip.file(newFilename, img.fileBlob);
+            });
+
+            zip.generateAsync({type:"blob"}).then(function(content) {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = "renamed_images.zip";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                showMessage('Zip file has been created and downloaded.', 'success');
+            });
+        });
+
+        downloadCsvBtn.addEventListener('click', () => {
+            if (imageData.length === 0) return;
+            let csvContent = "data:text/csv;charset=utf-8,Filename,Property,Value\r\n";
+            imageData.forEach(img => {
+                for (const key in img.metadata) {
+                    if (key === 'Thumbnail') continue;
+                    let value = img.metadata[key].description || img.metadata[key].value;
+                    if (typeof value === 'string') value = `"${value.replace(/"/g, '""')}"`;
+                    else if (typeof value === 'object') value = `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+                    csvContent += `${img.filename},${key},${value}\r\n`;
+                }
+            });
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "image_metadata.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        detailedViewBtn.addEventListener('click', () => {
+            if (currentView === 'detailed') return;
+            currentView = 'detailed';
+            detailedViewBtn.classList.add('active');
+            detailedViewBtn.classList.remove('inactive');
+            simpleViewBtn.classList.add('inactive');
+            simpleViewBtn.classList.remove('active');
+            displayResults();
+        });
+
+        simpleViewBtn.addEventListener('click', () => {
+            if (currentView === 'simple') return;
+            currentView = 'simple';
+            simpleViewBtn.classList.add('active');
+            simpleViewBtn.classList.remove('inactive');
+            detailedViewBtn.classList.add('inactive');
+            detailedViewBtn.classList.remove('active');
+            displayResults();
+        });
+
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = `msg-${type}`;
+        }
+
+        function hideMessage() {
+            messageBox.className = 'hidden';
+        }
+
+    </script>
+</body>
+</html>
