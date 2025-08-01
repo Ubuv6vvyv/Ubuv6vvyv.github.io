@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thai Tonal Generator</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:11px Arial;background:#222;color:#fff;padding:8px}
+        .container{max-width:700px;margin:0 auto;background:#333;padding:12px;border-radius:4px}
+        h1{text-align:center;margin-bottom:12px;font-size:14px;color:#4a9}
+        .controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+        .control{background:#444;padding:6px;border-radius:2px}
+        label{display:block;font-size:10px;margin-bottom:3px}
+        input[type="range"]{width:100%;height:16px}
+        .value{color:#4a9;font-weight:bold;font-size:9px}
+        .patterns{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:12px}
+        button{padding:5px;border:none;background:#555;color:#fff;border-radius:2px;cursor:pointer;font-size:10px}
+        button:hover{background:#666}
+        #output{background:#111;padding:12px;border-radius:2px;font-family:monospace;font-size:16px;line-height:1.1;word-break:break-all;min-height:120px;margin-bottom:8px;overflow-x:auto}
+        .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+        @media(max-width:600px){.controls{grid-template-columns:repeat(2,1fr)}.patterns{grid-template-columns:repeat(2,1fr)}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Thai Tonal Field Breaker</h1>
+        
+        <div class="controls">
+            <div class="control">
+                <label>Height: <span class="value" id="hv">12</span></label>
+                <input type="range" id="h" min="8" max="35" value="12">
+            </div>
+            <div class="control">
+                <label>Width: <span class="value" id="wv">15</span></label>
+                <input type="range" id="w" min="8" max="50" value="15">
+            </div>
+            <div class="control">
+                <label>Stack: <span class="value" id="dv">6</span></label>
+                <input type="range" id="d" min="2" max="15" value="6">
+            </div>
+            <div class="control">
+                <label>Frequency: <span class="value" id="fv">0.5</span></label>
+                <input type="range" id="f" min="0.1" max="2" step="0.1" value="0.5">
+            </div>
+            <div class="control">
+                <label>Amplitude: <span class="value" id="av">3</span></label>
+                <input type="range" id="a" min="1" max="8" value="3">
+            </div>
+            <div class="control">
+                <label>Phase: <span class="value" id="pv">0</span></label>
+                <input type="range" id="p" min="0" max="6.3" step="0.1" value="0">
+            </div>
+            <div class="control">
+                <label>Rotation: <span class="value" id="rv">0</span></label>
+                <input type="range" id="r" min="0" max="360" value="0">
+            </div>
+            <div class="control">
+                <label>Distortion: <span class="value" id="tv">1</span></label>
+                <input type="range" id="t" min="0.1" max="5" step="0.1" value="1">
+            </div>
+        </div>
+
+        <div class="patterns">
+            <button onclick="gen('wave')">Wave</button>
+            <button onclick="gen('interference')">Interference</button>
+            <button onclick="gen('vortex')">Vortex</button>
+            <button onclick="gen('fractal')">Fractal</button>
+            <button onclick="gen('plasma')">Plasma</button>
+            <button onclick="gen('mandala')">Mandala</button>
+            <button onclick="gen('chaos')">Chaos</button>
+            <button onclick="gen('random')">Randomize</button>
+        </div>
+
+        <div id="output">Click pattern or randomize</div>
+
+        <div class="actions">
+            <button onclick="copy()">Copy</button>
+            <button onclick="save()">Save</button>
+            <button onclick="scramble()">Scramble All</button>
+        </div>
+    </div>
+
+    <script>
+        const marks=['็','่','้','๊','๋','์','ํ','ฺ'];
+        
+        // Your exact patterns from the table
+        const presets=[
+            '็็็็็็่่่่่่้้้้้้๊๊๊๊๊๊๋๋๋๋๋๋์์์์์์ํํํํํฺฺฺฺฺฺฺ',
+            '็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ',
+            '์์์์์์ํํํํํฺฺฺฺฺฺฺ็็็็็็่่่่่่้้้้้้๊๊๊๊๊๊',
+            '็็็็็็็็็็็่่่่่่่่่่้้้้้้้้้้๊๊๊๊๊๊๊๊๊๊',
+            '๊๊๊๊๊๊็็็็็็่่่่่่้้้้้้๊๊๊๊๊๊๋๋๋๋๋๋์์์์์์',
+            '์์์์์์์์์์์ํํํํํํํํฺฺฺฺฺฺฺฺฺฺฺฺ็็็็็็็็็็',
+            '็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ็่้๊๋์ํฺ',
+            '์์์์์์์์์์์ํํํํํํํํํฺฺฺฺฺฺฺฺฺฺฺฺฺ็็็็็็็็',
+            '็็็็็็็็็็็็็็็็็็่่่่่่่่่่่่่้้้้้้้้้้'
+        ];
+        
+        // Extreme stacks - up to 15 repeats each
+        const extremeStacks=[
+            '็'.repeat(15),'่'.repeat(12),'้'.repeat(18),'๊'.repeat(14),'๋'.repeat(16),
+            '์'.repeat(20),'ํ'.repeat(13),'ฺ'.repeat(17),'็่'.repeat(8),'๊๋'.repeat(9),
+            '์ํ'.repeat(7),'ฺ็'.repeat(10),'่้๊'.repeat(6),'๋์ํ'.repeat(5),
+            '็่้๊๋์ํฺ'.repeat(4),'์์์์์์์์์์์์์์์์์์์์',
+            'ํํํํํํํํํํํํํํํํํํํํํํํํํํํํํํ',
+            'ฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺฺ'
+        ];
+        
+        const allMarks=[...marks,...presets,...extremeStacks];
+        const g=id=>document.getElementById(id);
+        
+        ['h','w','d','f','a','p','r','t'].forEach(id=>{
+            const s=g(id),v=g(id+'v');
+            s.oninput=()=>{v.textContent=s.value;update()};
+        });
+        
+        let currentType='wave',seed=Date.now();
+        
+        function rnd(){return Math.sin(seed++)*0.5+0.5}
+        function update(){if(currentType)gen(currentType)}
+        
+        function scramble(){
+            ['h','w','d','f','a','p','r','t'].forEach(id=>{
+                const s=g(id),min=+s.min,max=+s.max,step=s.step||1;
+                const val=min+rnd()*(max-min);
+                s.value=step==1?Math.floor(val):Math.round(val/step)*step;
+                g(id+'v').textContent=s.value;
+            });
+            update();
+        }
+        
+        function gen(type){
+            currentType=type;
+            if(type==='random'){
+                seed=Date.now()+Math.random()*1000;
+                const types=['wave','interference','vortex','fractal','plasma','mandala','chaos'];
+                type=types[Math.floor(rnd()*types.length)];
+            }
+            
+            const h=+g('h').value,w=+g('w').value,d=+g('d').value;
+            const freq=+g('f').value,amp=+g('a').value,phase=+g('p').value;
+            const rot=+g('r').value*Math.PI/180,dist=+g('t').value;
+            let result='';
+            
+            // Add preset patterns occasionally
+            const usePreset=rnd()>0.6;
+            let basePattern='';
+            if(usePreset){
+                basePattern=presets[Math.floor(rnd()*presets.length)];
+            }
+            
+            for(let y=0;y<h;y++){
+                for(let x=0;x<w;x++){
+                    let idx=0,nx=x-w/2,ny=y-h/2;
+                    
+                    // Apply rotation
+                    const rx=nx*Math.cos(rot)-ny*Math.sin(rot);
+                    const ry=nx*Math.sin(rot)+ny*Math.cos(rot);
+                    
+                    switch(type){
+                        case 'wave':
+                            idx=Math.floor(Math.abs(Math.sin(rx*freq+phase)*Math.cos(ry*freq)*amp))%allMarks.length;
+                            break;
+                        case 'interference':
+                            const wave1=Math.sin(rx*freq+phase)*amp;
+                            const wave2=Math.cos(ry*freq*1.3+phase*0.7)*amp;
+                            const wave3=Math.sin((rx+ry)*freq*0.8+phase*1.5)*amp*0.5;
+                            idx=Math.floor(Math.abs(wave1+wave2+wave3))%allMarks.length;
+                            break;
+                        case 'vortex':
+                            const angle=Math.atan2(ry,rx);
+                            const radius=Math.sqrt(rx*rx+ry*ry);
+                            const spiral=angle+radius*freq*dist+phase;
+                            idx=Math.floor(Math.abs(Math.sin(spiral)*amp))%allMarks.length;
+                            break;
+                        case 'fractal':
+                            let zx=rx*freq,zy=ry*freq,iter=0;
+                            while(zx*zx+zy*zy<4&&iter<amp){
+                                const tmp=zx*zx-zy*zy+phase;
+                                zy=2*zx*zy+dist;
+                                zx=tmp;iter++;
+                            }
+                            idx=iter%allMarks.length;
+                            break;
+                        case 'plasma':
+                            const p1=Math.sin(rx*freq+phase);
+                            const p2=Math.sin(ry*freq*1.2+phase*0.8);
+                            const p3=Math.sin((rx+ry)*freq*0.7+phase*1.3);
+                            const p4=Math.sin(Math.sqrt(rx*rx+ry*ry)*freq*dist+phase*1.7);
+                            idx=Math.floor(Math.abs((p1+p2+p3+p4)*amp))%allMarks.length;
+                            break;
+                        case 'mandala':
+                            const mr=Math.sqrt(rx*rx+ry*ry);
+                            const ma=Math.atan2(ry,rx);
+                            const mandala=Math.sin(ma*amp+phase)*Math.cos(mr*freq*dist);
+                            idx=Math.floor(Math.abs(mandala*8))%allMarks.length;
+                            break;
+                        case 'chaos':
+                            const cx=rx*freq+Math.sin(ry*dist)*amp;
+                            const cy=ry*freq+Math.cos(rx*dist)*amp;
+                            const chaos=Math.sin(cx+phase)*Math.cos(cy+phase*1.4)*Math.sin((cx+cy)*0.5+phase*0.7);
+                            idx=Math.floor(Math.abs(chaos*allMarks.length))%allMarks.length;
+                            break;
+                    }
+                    
+                    let output='';
+                    if(usePreset&&rnd()>0.7){
+                        // Use segments from preset patterns
+                        const segStart=Math.floor(rnd()*(basePattern.length-d));
+                        output=basePattern.substr(segStart,d*2);
+                    }else{
+                        output=allMarks[idx];
+                        // Add extra stacking
+                        if(rnd()>0.5)output+=allMarks[Math.floor(rnd()*allMarks.length)];
+                    }
+                    result+=output;
+                }
+                result+='\n';
+            }
+            g('output').textContent=result;
+        }
+        
+        function copy(){
+            const t=g('output').textContent;
+            if(!t||t==='Click pattern or randomize')return alert('Generate first');
+            navigator.clipboard.writeText(t).then(()=>alert('Copied!')).catch(()=>alert('Copy failed'));
+        }
+        
+        function save(){
+            const t=g('output').textContent;
+            if(!t||t==='Click pattern or randomize')return alert('Generate first');
+            
+            const canvas=document.createElement('canvas');
+            const ctx=canvas.getContext('2d');
+            canvas.width=1000;canvas.height=700;
+            
+            ctx.fillStyle='#222';
+            ctx.fillRect(0,0,1000,700);
+            ctx.fillStyle='#fff';
+            ctx.font='16px monospace';
+            ctx.textAlign='center';
+            
+            const lines=t.split('\n');
+            const lh=20,sy=(700-lines.length*lh)/2;
+            lines.forEach((line,i)=>ctx.fillText(line,500,sy+i*lh));
+            
+            const a=document.createElement('a');
+            a.download=`thai-chaos-${Date.now()}.png`;
+            a.href=canvas.toDataURL();
+            a.click();
+        }
+        
+        gen('plasma');
+    </script>
+</body>
+</html>

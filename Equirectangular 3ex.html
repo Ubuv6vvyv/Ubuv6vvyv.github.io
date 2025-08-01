@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced 360° Panorama Transformer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            color: #fff;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        h1 {
+            text-align: center;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .upload-zone {
+            border: 3px dashed rgba(255,255,255,0.3);
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #ff6b6b;
+            background: rgba(255,107,107,0.1);
+            transform: scale(1.02);
+        }
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s;
+            opacity: 0;
+        }
+        .upload-zone:hover::before { opacity: 1; animation: shine 1s ease-in-out; }
+        @keyframes shine { 0%, 100% { transform: translateX(-100%) rotate(45deg); } 50% { transform: translateX(100%) rotate(45deg); } }
+        .upload-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.8; }
+        #fileInput { display: none; }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        input[type="range"], select {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 0.9rem;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            background: rgba(255,255,255,0.3);
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        select option { background: #333; color: #fff; }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+            width: 100%;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,107,107,0.4); }
+        .btn:disabled {
+            background: rgba(255,255,255,0.2);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .preview-container {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .preview-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+        }
+        .preview-box h3 {
+            margin-bottom: 10px;
+            color: #feca57;
+            font-size: 1.1rem;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin: 10px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px;
+            font-weight: 600;
+            display: none;
+        }
+        .status.success { background: rgba(72,187,120,0.2); color: #48bb78; }
+        .status.error { background: rgba(245,101,101,0.2); color: #f56565; }
+        .status.info { background: rgba(66,153,225,0.2); color: #4299e1; }
+        .download-btn {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            margin-top: 10px;
+            width: auto;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
+        @media (min-width: 768px) {
+            .container { max-width: 1200px; padding: 40px; }
+            .preview-container { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Enhanced 360° Panorama Transformer</h1>
+        
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📸</div>
+            <h3>Drop panorama images or click to browse</h3>
+            <p>Converts to equirectangular 2:1 format for panorama viewers</p>
+            <input type="file" id="fileInput" accept="image/*" multiple>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="outputWidth">Output Width:</label>
+                <input type="range" id="outputWidth" min="2048" max="8192" value="4096" step="512">
+                <span id="widthValue">4096px</span>
+            </div>
+            <div class="control-group">
+                <label for="quality">Quality:</label>
+                <input type="range" id="quality" min="0.5" max="1.0" value="0.9" step="0.1">
+                <span id="qualityValue">90%</span>
+            </div>
+            <div class="control-group">
+                <label for="stretchMode">Mode:</label>
+                <select id="stretchMode">
+                    <option value="auto">Auto (Detect 360°)</option>
+                    <option value="force">Force Equirectangular</option>
+                    <option value="preserve">Preserve Aspect</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="hfov">Horizontal FOV (°):</label>
+                <input type="range" id="hfov" min="90" max="360" value="360" step="1">
+                <span id="hfovValue">360°</span>
+            </div>
+            <div class="control-group">
+                <label for="blendWidth">Edge Blending:</label>
+                <input type="range" id="blendWidth" min="0" max="25" value="0" step="1">
+                <span id="blendWidthValue">Off</span>
+            </div>
+            </div>
+
+        <button class="btn" id="processBtn" onclick="processImages()" disabled>Transform to Equirectangular</button>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="preview-container" id="previewContainer"></div>
+    </div>
+
+    <script>
+        let loadedImages = [];
+        const els = {
+            fileInput: document.getElementById('fileInput'),
+            uploadZone: document.querySelector('.upload-zone'),
+            previewContainer: document.getElementById('previewContainer'),
+            processBtn: document.getElementById('processBtn'),
+            progressBar: document.getElementById('progressBar'),
+            progressFill: document.getElementById('progressFill'),
+            status: document.getElementById('status')
+        };
+
+        // Range input updates
+        document.getElementById('outputWidth').oninput = e => document.getElementById('widthValue').textContent = e.target.value + 'px';
+        document.getElementById('quality').oninput = e => document.getElementById('qualityValue').textContent = Math.round(e.target.value * 100) + '%';
+        
+        // --- NEW EVENT LISTENERS ---
+        document.getElementById('hfov').oninput = e => document.getElementById('hfovValue').textContent = e.target.value + '°';
+        document.getElementById('blendWidth').oninput = e => {
+            const value = e.target.value;
+            document.getElementById('blendWidthValue').textContent = value > 0 ? `${value}%` : 'Off';
+        };
+
+        // Drag & drop
+        els.uploadZone.ondragover = e => { e.preventDefault(); els.uploadZone.classList.add('dragover'); };
+        els.uploadZone.ondragleave = () => els.uploadZone.classList.remove('dragover');
+        els.uploadZone.ondrop = e => { e.preventDefault(); els.uploadZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); };
+        els.fileInput.onchange = e => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            loadedImages = [];
+            els.previewContainer.innerHTML = '';
+            let loaded = 0;
+            const total = Array.from(files).filter(f => f.type.startsWith('image/')).length;
+            
+            if (!total) return showStatus('No valid images selected', 'error');
+
+            Array.from(files).forEach((file, i) => {
+                if (file.type.startsWith('image/')) {
+                    const img = new Image();
+                    img.onload = () => {
+                        loadedImages.push({ img, name: file.name, index: i });
+                        displayPreview(img, file.name, i);
+                        if (++loaded === total) els.processBtn.disabled = false;
+                    };
+                    img.src = URL.createObjectURL(file);
+                }
+            });
+        }
+
+        function displayPreview(img, name, index) {
+            const aspectRatio = img.width / img.height;
+            const isPanorama = aspectRatio > 3;
+            const previewBox = document.createElement('div');
+            previewBox.className = 'preview-box';
+            previewBox.innerHTML = `
+                <h3>${name} ${isPanorama ? '(360° Detected)' : ''}</h3>
+                <canvas id="preview-${index}"></canvas>
+                <p>${img.width} × ${img.height} (${aspectRatio.toFixed(1)}:1)</p>
+            `;
+            els.previewContainer.appendChild(previewBox);
+
+            const canvas = document.getElementById(`preview-${index}`);
+            const ctx = canvas.getContext('2d');
+            const scale = Math.min(400 / img.width, 200 / img.height);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+
+        function showStatus(message, type = 'info') {
+            els.status.textContent = message;
+            els.status.className = `status ${type}`;
+            els.status.style.display = 'block';
+            if (type !== 'error' && type !== 'info') setTimeout(() => els.status.style.display = 'none', 3000);
+        }
+
+        function updateProgress(percent) {
+            els.progressBar.style.display = 'block';
+            els.progressFill.style.width = percent + '%';
+            if (percent >= 100) setTimeout(() => els.progressBar.style.display = 'none', 1000);
+        }
+
+        async function processImages() {
+            if (!loadedImages.length) return showStatus('No images loaded', 'error');
+            
+            els.processBtn.disabled = true;
+            const outputWidth = parseInt(document.getElementById('outputWidth').value);
+            const quality = parseFloat(document.getElementById('quality').value);
+            const stretchMode = document.getElementById('stretchMode').value;
+            // --- GET NEW CONTROL VALUES ---
+            const hfov = parseInt(document.getElementById('hfov').value);
+            const blendWidthPercent = parseInt(document.getElementById('blendWidth').value);
+            
+            document.querySelectorAll('.result-box').forEach(el => el.remove());
+            
+            for (let i = 0; i < loadedImages.length; i++) {
+                const { img, name } = loadedImages.find(item => item.index === i);
+                updateProgress((i / loadedImages.length) * 100);
+                showStatus(`Transforming ${name}...`, 'info');
+                
+                // --- CALL ENHANCED FUNCTIONS ---
+                const canvas = transformToEquirectangular(img, outputWidth, stretchMode, hfov);
+                
+                if (blendWidthPercent > 0) {
+                    const blendPixelWidth = canvas.width * (blendWidthPercent / 100);
+                    blendEdges(canvas, blendPixelWidth);
+                }
+
+                displayResult(canvas, name, i);
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            updateProgress(100);
+            els.processBtn.disabled = false;
+            showStatus(`✅ Transformed ${loadedImages.length} images to equirectangular format`, 'success');
+        }
+
+        /**
+         * --- ENHANCED TRANSFORMATION FUNCTION ---
+         * Projects the image onto a 2:1 canvas based on the horizontal field of view (HFOV).
+         */
+        function transformToEquirectangular(img, outputWidth, mode, hfov) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const outputHeight = outputWidth / 2;
+            
+            canvas.width = outputWidth;
+            canvas.height = outputHeight;
+            
+            const aspectRatio = img.width / img.height;
+            const isPanorama = aspectRatio > 2.5; // More reliable threshold
+            
+            if (mode === 'force' || (mode === 'auto' && isPanorama)) {
+                // Correctly project based on HFOV
+                const projectionWidth = (hfov / 360) * outputWidth;
+                const xOffset = (outputWidth - projectionWidth) / 2;
+                
+                ctx.fillStyle = '#000'; // Black background for padding
+                ctx.fillRect(0, 0, outputWidth, outputHeight);
+                ctx.drawImage(img, xOffset, 0, projectionWidth, outputHeight);
+            } else {
+                // Preserve aspect with letterboxing for regular images
+                const scale = Math.min(outputWidth / img.width, outputHeight / img.height);
+                const scaledWidth = img.width * scale;
+                const scaledHeight = img.height * scale;
+                const x = (outputWidth - scaledWidth) / 2;
+                const y = (outputHeight - scaledHeight) / 2;
+                
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, outputWidth, outputHeight);
+                ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+            }
+            
+            return canvas;
+        }
+
+        /**
+         * --- NEW EDGE BLENDING FUNCTION ---
+         * Creates a seamless join between the left and right edges of the canvas.
+         */
+        function blendEdges(canvas, blendWidth) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            if (blendWidth <= 0 || blendWidth > width / 2) return;
+
+            // 1. Draw the right edge on top of the left edge to create the wrap-around.
+            const rightEdge = ctx.getImageData(width - blendWidth, 0, blendWidth, height);
+            ctx.putImageData(rightEdge, 0, 0);
+
+            // 2. Draw the original left edge back over it, but use a gradient to fade it in.
+            // This creates a smooth blend instead of a hard seam.
+            const leftEdge = ctx.getImageData(0, 0, blendWidth, height);
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = blendWidth;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.putImageData(leftEdge, 0, 0);
+
+            // Create a gradient that acts as an alpha mask
+            const gradient = tempCtx.createLinearGradient(0, 0, blendWidth, 0);
+            gradient.addColorStop(0, 'rgba(0,0,0,0)'); // Transparent on the left (at the seam)
+            gradient.addColorStop(1, 'rgba(0,0,0,1)'); // Opaque on the right
+
+            tempCtx.globalCompositeOperation = 'destination-in';
+            tempCtx.fillStyle = gradient;
+            tempCtx.fillRect(0, 0, blendWidth, height);
+            
+            // Draw the faded-in left edge back onto the main canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        function displayResult(canvas, originalName, index) {
+            const resultBox = document.createElement('div');
+            resultBox.className = 'preview-box result-box';
+            const filename = `equirectangular_${originalName.replace(/\.[^/.]+$/, '')}_${canvas.width}x${canvas.height}.jpg`;
+            
+            resultBox.innerHTML = `
+                <h3>✅ Equirectangular: ${originalName}</h3>
+                <canvas id="result-${index}"></canvas>
+                <p>${canvas.width} × ${canvas.height} (Perfect 2:1 for VR/360° viewers)</p>
+                <button class="btn download-btn" onclick="downloadImage(${index}, '${filename}')">📥 Download JPG</button>
+            `;
+            
+            els.previewContainer.appendChild(resultBox);
+            
+            const previewCanvas = document.getElementById(`result-${index}`);
+            const previewCtx = previewCanvas.getContext('2d');
+            const scale = Math.min(400 / canvas.width, 200 / canvas.height);
+            previewCanvas.width = canvas.width * scale;
+            previewCanvas.height = canvas.height * scale;
+            previewCtx.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+            
+            window[`canvas_${index}`] = canvas;
+        }
+
+        function downloadImage(index, filename) {
+            const canvas = window[`canvas_${index}`];
+            if (!canvas) return showStatus('Canvas not found', 'error');
+            
+            const quality = parseFloat(document.getElementById('quality').value);
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+                showStatus(`📥 Downloaded ${filename}`, 'success');
+            }, 'image/jpeg', quality);
+        }
+    </script>
+</body>
+</html>

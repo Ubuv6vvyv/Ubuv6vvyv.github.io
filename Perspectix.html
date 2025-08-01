@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Panoramic Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 12px;
+            z-index: 100;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        #uploadBtn {
+            background: #007AFF;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            touch-action: manipulation;
+            min-height: 32px;
+        }
+        
+        #uploadBtn:active {
+            background: #0056CC;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        select {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            min-height: 24px;
+        }
+        
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .slider-group label {
+            font-size: 10px;
+            min-width: 32px;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+            height: 20px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        #resetBtn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            min-height: 24px;
+        }
+        
+        #resetBtn:active {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        @media (max-width: 480px) {
+            #ui {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .slider-group {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="ui">
+        <button id="uploadBtn">Upload Image</button>
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <select id="projectionSelect">
+            <option value="equirectangular">Equirectangular</option>
+            <option value="fisheye">Fisheye</option>
+            <option value="stereographic">Stereographic</option>
+            <option value="gnomonic">Gnomonic</option>
+        </select>
+        
+        <div class="slider-group">
+            <label>Dist</label>
+            <input type="range" id="distortionSlider" min="-1" max="1" step="0.01" value="0">
+        </div>
+        
+        <div class="slider-group">
+            <label>CA</label>
+            <input type="range" id="chromaticSlider" min="0" max="0.02" step="0.001" value="0">
+        </div>
+        
+        <div class="slider-group">
+            <label>Vig</label>
+            <input type="range" id="vignetteSlider" min="0" max="1" step="0.01" value="0">
+        </div>
+        
+        <button id="resetBtn">Reset</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        class ViewerEngine {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
+                
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                
+                this.sphere = null;
+                this.material = null;
+                this.texture = null;
+                
+                this.rotation = { x: 0, y: 0 };
+                this.velocity = { x: 0, y: 0 };
+                this.damping = 0.95;
+                
+                this.uniforms = {
+                    uTexture: { value: null },
+                    uProjection: { value: 0 },
+                    uDistortion: { value: 0.0 },
+                    uChromatic: { value: 0.0 },
+                    uVignette: { value: 0.0 },
+                    uTime: { value: 0.0 }
+                };
+                
+                this.createSphere();
+                this.setupCamera();
+                this.startRenderLoop();
+                
+                window.addEventListener('resize', () => this.handleResize());
+            }
+            
+            createSphere() {
+                const geometry = new THREE.SphereGeometry(500, 64, 32);
+                geometry.scale(-1, 1, 1);
+                
+                this.material = new THREE.ShaderMaterial({
+                    uniforms: this.uniforms,
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform sampler2D uTexture;
+                        uniform float uProjection;
+                        uniform float uDistortion;
+                        uniform float uChromatic;
+                        uniform float uVignette;
+                        varying vec2 vUv;
+                        
+                        vec2 equirectangular(vec2 uv) {
+                            return uv;
+                        }
+                        
+                        vec2 fisheye(vec2 uv) {
+                            vec2 center = uv - 0.5;
+                            float r = length(center);
+                            if (r > 0.5) return vec2(-1.0);
+                            float theta = atan(center.y, center.x);
+                            float phi = r * 3.14159;
+                            return vec2(
+                                (theta / 3.14159 + 1.0) * 0.5,
+                                phi / 3.14159
+                            );
+                        }
+                        
+                        vec2 stereographic(vec2 uv) {
+                            vec2 center = (uv - 0.5) * 4.0;
+                            float r2 = dot(center, center);
+                            float scale = 2.0 / (1.0 + r2);
+                            vec3 p = vec3(center * scale, (r2 - 1.0) / (r2 + 1.0));
+                            float theta = atan(p.y, p.x);
+                            float phi = acos(p.z);
+                            return vec2(
+                                (theta / 3.14159 + 1.0) * 0.5,
+                                phi / 3.14159
+                            );
+                        }
+                        
+                        vec2 gnomonic(vec2 uv) {
+                            vec2 center = (uv - 0.5) * 2.0;
+                            float r = length(center);
+                            if (r > 1.5) return vec2(-1.0);
+                            float theta = atan(center.y, center.x);
+                            float rho = atan(r);
+                            return vec2(
+                                (theta / 3.14159 + 1.0) * 0.5,
+                                rho / 1.5708
+                            );
+                        }
+                        
+                        vec2 applyDistortion(vec2 uv, float distortion) {
+                            vec2 center = uv - 0.5;
+                            float r2 = dot(center, center);
+                            float distortionFactor = 1.0 + distortion * r2;
+                            return 0.5 + center * distortionFactor;
+                        }
+                        
+                        void main() {
+                            vec2 uv = vUv;
+                            
+                            // Apply projection
+                            if (uProjection < 0.5) {
+                                uv = equirectangular(uv);
+                            } else if (uProjection < 1.5) {
+                                uv = fisheye(uv);
+                            } else if (uProjection < 2.5) {
+                                uv = stereographic(uv);
+                            } else {
+                                uv = gnomonic(uv);
+                            }
+                            
+                            if (uv.x < 0.0) {
+                                discard;
+                            }
+                            
+                            // Apply lens distortion
+                            uv = applyDistortion(uv, uDistortion);
+                            
+                            if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                                discard;
+                            }
+                            
+                            vec4 color = texture2D(uTexture, uv);
+                            
+                            // Chromatic aberration
+                            if (uChromatic > 0.0) {
+                                vec2 center = vUv - 0.5;
+                                float r = length(center);
+                                vec2 offset = normalize(center) * uChromatic * r;
+                                
+                                color.r = texture2D(uTexture, applyDistortion(uv + offset, uDistortion)).r;
+                                color.b = texture2D(uTexture, applyDistortion(uv - offset, uDistortion)).b;
+                            }
+                            
+                            // Vignette
+                            if (uVignette > 0.0) {
+                                vec2 center = vUv - 0.5;
+                                float vignetteFactor = 1.0 - smoothstep(0.3, 0.8, length(center) * (1.0 + uVignette));
+                                color.rgb *= vignetteFactor;
+                            }
+                            
+                            gl_FragColor = color;
+                        }
+                    `
+                });
+                
+                this.sphere = new THREE.Mesh(geometry, this.material);
+                this.scene.add(this.sphere);
+            }
+            
+            setupCamera() {
+                this.camera.position.set(0, 0, 0);
+            }
+            
+            loadTexture(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const loader = new THREE.TextureLoader();
+                    loader.load(e.target.result, (texture) => {
+                        texture.minFilter = THREE.LinearFilter;
+                        texture.magFilter = THREE.LinearFilter;
+                        texture.wrapS = THREE.RepeatWrapping;
+                        texture.wrapT = THREE.ClampToEdgeWrapping;
+                        
+                        if (this.texture) this.texture.dispose();
+                        this.texture = texture;
+                        this.uniforms.uTexture.value = texture;
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            updateRotation(deltaX, deltaY) {
+                this.rotation.y += deltaX * 0.005;
+                this.rotation.x += deltaY * 0.005;
+                this.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotation.x));
+            }
+            
+            setVelocity(velocityX, velocityY) {
+                this.velocity.x = velocityY * 0.005;
+                this.velocity.y = velocityX * 0.005;
+            }
+            
+            updateProjection(type) {
+                const projectionMap = {
+                    'equirectangular': 0,
+                    'fisheye': 1,
+                    'stereographic': 2,
+                    'gnomonic': 3
+                };
+                this.uniforms.uProjection.value = projectionMap[type] || 0;
+            }
+            
+            updateDistortion(value) {
+                this.uniforms.uDistortion.value = value;
+            }
+            
+            updateChromatic(value) {
+                this.uniforms.uChromatic.value = value;
+            }
+            
+            updateVignette(value) {
+                this.uniforms.uVignette.value = value;
+            }
+            
+            updateFOV(fov) {
+                this.camera.fov = Math.max(10, Math.min(190, fov));
+                this.camera.updateProjectionMatrix();
+            }
+            
+            reset() {
+                this.rotation = { x: 0, y: 0 };
+                this.velocity = { x: 0, y: 0 };
+                this.camera.fov = 75;
+                this.camera.updateProjectionMatrix();
+            }
+            
+            startRenderLoop() {
+                const render = () => {
+                    // Apply inertial movement
+                    if (Math.abs(this.velocity.x) > 0.001 || Math.abs(this.velocity.y) > 0.001) {
+                        this.rotation.x += this.velocity.x;
+                        this.rotation.y += this.velocity.y;
+                        this.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotation.x));
+                        
+                        this.velocity.x *= this.damping;
+                        this.velocity.y *= this.damping;
+                    }
+                    
+                    // Update camera rotation
+                    this.camera.rotation.order = 'YXZ';
+                    this.camera.rotation.y = this.rotation.y;
+                    this.camera.rotation.x = this.rotation.x;
+                    
+                    this.renderer.render(this.scene, this.camera);
+                    requestAnimationFrame(render);
+                };
+                render();
+            }
+            
+            handleResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+        
+        class ViewerUI {
+            constructor(engine) {
+                this.engine = engine;
+                this.touches = {};
+                this.lastPinchDistance = 0;
+                this.lastTouchTime = 0;
+                this.lastTouchPos = { x: 0, y: 0 };
+                this.touchVelocity = { x: 0, y: 0 };
+                
+                this.setupElements();
+                this.bindEvents();
+            }
+            
+            setupElements() {
+                this.uploadBtn = document.getElementById('uploadBtn');
+                this.fileInput = document.getElementById('fileInput');
+                this.projectionSelect = document.getElementById('projectionSelect');
+                this.distortionSlider = document.getElementById('distortionSlider');
+                this.chromaticSlider = document.getElementById('chromaticSlider');
+                this.vignetteSlider = document.getElementById('vignetteSlider');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.canvas = document.getElementById('canvas');
+            }
+            
+            bindEvents() {
+                // Upload functionality
+                this.uploadBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.fileInput.click();
+                });
+                
+                this.fileInput.addEventListener('change', (e) => {
+                    if (e.target.files[0]) {
+                        this.engine.loadTexture(e.target.files[0]);
+                    }
+                });
+                
+                // UI controls
+                this.projectionSelect.addEventListener('change', (e) => {
+                    this.engine.updateProjection(e.target.value);
+                });
+                
+                this.distortionSlider.addEventListener('input', (e) => {
+                    this.engine.updateDistortion(parseFloat(e.target.value));
+                });
+                
+                this.chromaticSlider.addEventListener('input', (e) => {
+                    this.engine.updateChromatic(parseFloat(e.target.value));
+                });
+                
+                this.vignetteSlider.addEventListener('input', (e) => {
+                    this.engine.updateVignette(parseFloat(e.target.value));
+                });
+                
+                this.resetBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.reset();
+                });
+                
+                // Touch controls
+                this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+                this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+                this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+            }
+            
+            handleTouchStart(e) {
+                e.preventDefault();
+                
+                for (let touch of e.changedTouches) {
+                    this.touches[touch.identifier] = {
+                        x: touch.clientX,
+                        y: touch.clientY,
+                        startTime: Date.now()
+                    };
+                }
+                
+                if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    this.lastPinchDistance = Math.sqrt(
+                        Math.pow(touch2.clientX - touch1.clientX, 2) +
+                        Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                }
+                
+                this.lastTouchTime = Date.now();
+                if (e.touches.length === 1) {
+                    this.lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            }
+            
+            handleTouchMove(e) {
+                e.preventDefault();
+                
+                if (e.touches.length === 1) {
+                    // Single finger pan
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - this.lastTouchPos.x;
+                    const deltaY = touch.clientY - this.lastTouchPos.y;
+                    
+                    this.engine.updateRotation(deltaX, deltaY);
+                    
+                    // Calculate velocity for inertia
+                    const currentTime = Date.now();
+                    const timeDelta = Math.max(currentTime - this.lastTouchTime, 1);
+                    this.touchVelocity.x = deltaX / timeDelta * 16;
+                    this.touchVelocity.y = deltaY / timeDelta * 16;
+                    
+                    this.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+                    this.lastTouchTime = currentTime;
+                    
+                } else if (e.touches.length === 2) {
+                    // Two finger pinch-to-zoom
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const pinchDistance = Math.sqrt(
+                        Math.pow(touch2.clientX - touch1.clientX, 2) +
+                        Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                    
+                    if (this.lastPinchDistance > 0) {
+                        const scale = pinchDistance / this.lastPinchDistance;
+                        const currentFOV = this.engine.camera.fov;
+                        this.engine.updateFOV(currentFOV / scale);
+                    }
+                    
+                    this.lastPinchDistance = pinchDistance;
+                }
+            }
+            
+            handleTouchEnd(e) {
+                e.preventDefault();
+                
+                for (let touch of e.changedTouches) {
+                    delete this.touches[touch.identifier];
+                }
+                
+                if (e.touches.length === 0) {
+                    // Apply inertia when all fingers are lifted
+                    this.engine.setVelocity(this.touchVelocity.x, this.touchVelocity.y);
+                    this.touchVelocity = { x: 0, y: 0 };
+                }
+                
+                if (e.touches.length < 2) {
+                    this.lastPinchDistance = 0;
+                }
+            }
+            
+            reset() {
+                this.engine.reset();
+                this.projectionSelect.value = 'equirectangular';
+                this.distortionSlider.value = 0;
+                this.chromaticSlider.value = 0;
+                this.vignetteSlider.value = 0;
+                
+                this.engine.updateProjection('equirectangular');
+                this.engine.updateDistortion(0);
+                this.engine.updateChromatic(0);
+                this.engine.updateVignette(0);
+            }
+        }
+        
+        // Initialize application
+        const canvas = document.getElementById('canvas');
+        const engine = new ViewerEngine(canvas);
+        const ui = new ViewerUI(engine);
+        
+        // Load default texture
+        const defaultImage = 'data:image/svg+xml;base64,' + btoa(`
+            <svg width="512" height="256" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#1a1a2e"/>
+                        <stop offset="50%" style="stop-color:#16213e"/>
+                        <stop offset="100%" style="stop-color:#0f3460"/>
+                    </linearGradient>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grad)"/>
+                <text x="256" y="128" text-anchor="middle" dominant-baseline="middle" 
+                      fill="white" font-family="Arial" font-size="24" opacity="0.7">
+                    Upload an image to begin
+                </text>
+            </svg>
+        `);
+        
+        const loader = new THREE.TextureLoader();
+        loader.load(defaultImage, (texture) => {
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            engine.uniforms.uTexture.value = texture;
+        });
+    </script>
+</body>
+</html>
