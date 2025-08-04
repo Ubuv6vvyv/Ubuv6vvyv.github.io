@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Color Replacer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.0/spectrum.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            padding-top: 100%; /* 1:1 Aspect Ratio */
+            background-color: #e5e7eb; /* gray-200 */
+            background-image:
+                linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
+                linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
+                linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        #inputCanvas {
+            cursor: crosshair;
+        }
+        .sp-replacer {
+            width: 100%;
+            height: 2.5rem; /* h-10 */
+            padding: 0.5rem; /* p-2 */
+            border-radius: 0.5rem; /* rounded-lg */
+            background: #fff;
+            border: 1px solid #d1d5db; /* border-gray-300 */
+        }
+        .sp-preview {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .sp-dd {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl bg-white rounded-xl shadow-lg p-6 md:p-8 space-y-6">
+        <header class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Image Color Replacer</h1>
+            <p class="text-gray-600 mt-2">Upload an image, pick a color to replace, and see the magic happen.</p>
+        </header>
+
+        <!-- Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+            <div>
+                <label for="imageLoader" class="block text-sm font-medium text-gray-700 mb-1">1. Upload Image</label>
+                <input type="file" id="imageLoader" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+            </div>
+            <div>
+                <label for="oldColor" class="block text-sm font-medium text-gray-700 mb-1">2. Color to Replace</label>
+                <input type="text" id="oldColor" value="#00ff00" />
+            </div>
+            <div>
+                <label for="newColor" class="block text-sm font-medium text-gray-700 mb-1">3. New Color</label>
+                <input type="text" id="newColor" value="#ff0000" />
+            </div>
+            <div>
+                <label for="threshold" class="block text-sm font-medium text-gray-700 mb-1">4. Fuzziness: <span id="thresholdValue">30</span></label>
+                <input id="threshold" type="range" min="0" max="100" value="30" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+
+        <div class="text-center">
+            <button id="processBtn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors text-lg shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed">Process Image</button>
+        </div>
+
+        <!-- Canvases -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="text-center">
+                <h2 class="text-xl font-bold mb-2">Original</h2>
+                <div class="canvas-container rounded-lg overflow-hidden shadow-md">
+                    <canvas id="inputCanvas"></canvas>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">Click on the image to select a color.</p>
+            </div>
+            <div class="text-center">
+                <h2 class="text-xl font-bold mb-2">Result</h2>
+                <div class="canvas-container rounded-lg overflow-hidden shadow-md">
+                    <canvas id="outputCanvas"></canvas>
+                </div>
+                 <a id="downloadLink" class="hidden mt-2 inline-block bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors shadow-md">Download Result</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.0/spectrum.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tinycolor2@1.4.2/dist/tinycolor-min.js"></script>
+    <script>
+        // --- DOM Element References ---
+        const imageLoader = document.getElementById('imageLoader');
+        const inputCanvas = document.getElementById('inputCanvas');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const oldColorInput = document.getElementById('oldColor');
+        const newColorInput = document.getElementById('newColor');
+        const thresholdSlider = document.getElementById('threshold');
+        const thresholdValueSpan = document.getElementById('thresholdValue');
+        const processBtn = document.getElementById('processBtn');
+        const downloadLink = document.getElementById('downloadLink');
+        const inputCtx = inputCanvas.getContext('2d');
+        const outputCtx = outputCanvas.getContext('2d');
+
+        let originalImage = null;
+        processBtn.disabled = true;
+
+        // --- Initialize Color Pickers ---
+        $("#oldColor").spectrum({
+            color: "#00ff00",
+            showAlpha: true,
+            showInput: true,
+            preferredFormat: "hex"
+        });
+        $("#newColor").spectrum({
+            color: "#ff0000",
+            showAlpha: true,
+            showInput: true,
+            preferredFormat: "hex"
+        });
+
+        // --- Event Listeners ---
+        imageLoader.addEventListener('change', handleImageUpload);
+        inputCanvas.addEventListener('click', handleColorPick);
+        thresholdSlider.addEventListener('input', () => {
+            thresholdValueSpan.textContent = thresholdSlider.value;
+        });
+        processBtn.addEventListener('click', processImage);
+        downloadLink.addEventListener('click', downloadImage);
+
+        // --- Functions ---
+
+        /**
+         * Handles the image upload event. Reads the file and draws it to the input canvas.
+         * @param {Event} e - The file input change event.
+         */
+        function handleImageUpload(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImage = new Image();
+                originalImage.onload = function() {
+                    // Set canvas dimensions to match image
+                    inputCanvas.width = outputCanvas.width = originalImage.width;
+                    inputCanvas.height = outputCanvas.height = originalImage.height;
+
+                    // Draw the image on the input canvas
+                    inputCtx.drawImage(originalImage, 0, 0);
+                    processBtn.disabled = false;
+                    downloadLink.classList.add('hidden');
+                }
+                originalImage.src = event.target.result;
+            }
+            if (e.target.files[0]) {
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        }
+
+        /**
+         * Handles clicking on the input canvas to pick a color.
+         * @param {MouseEvent} e - The mouse click event.
+         */
+        function handleColorPick(e) {
+            if (!originalImage) return;
+
+            // Get mouse coordinates relative to the canvas
+            const rect = inputCanvas.getBoundingClientRect();
+            const scaleX = inputCanvas.width / rect.width;
+            const scaleY = inputCanvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            // Get the color data for the clicked pixel
+            const pixelData = inputCtx.getImageData(x, y, 1, 1).data;
+            const color = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`;
+            
+            // Update the color picker with the selected color
+            $("#oldColor").spectrum("set", color);
+        }
+        
+        /**
+         * The main image processing function. Replaces colors based on user settings.
+         */
+        function processImage() {
+            if (!originalImage) {
+                alert("Please upload an image first.");
+                return;
+            }
+
+            // Get settings from the UI
+            const oldColor = tinycolor(oldColorInput.value).toRgb();
+            const newColor = tinycolor(newColorInput.value).toRgb();
+            const threshold = parseFloat(thresholdSlider.value);
+
+            // Get pixel data from the input canvas
+            const imageData = inputCtx.getImageData(0, 0, inputCanvas.width, inputCanvas.height);
+            const data = imageData.data;
+
+            // Loop through every pixel
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+
+                const currentPixelColor = { r, g, b, a };
+
+                // Calculate the difference between the current pixel's color and the target color
+                const diff = deltaE(rgba2lab(currentPixelColor), rgba2lab(oldColor));
+                
+                // If the difference is within the threshold, replace the color
+                if (diff <= threshold) {
+                    data[i] = newColor.r;
+                    data[i + 1] = newColor.g;
+                    data[i + 2] = newColor.b;
+                    // Preserve original alpha unless the new color has a different alpha
+                    data[i + 3] = Math.round(newColor.a * 255);
+                }
+            }
+            
+            // Put the modified data onto the output canvas
+            outputCtx.putImageData(imageData, 0, 0);
+            downloadLink.classList.remove('hidden');
+        }
+
+        /**
+         * Creates a download link for the output canvas image.
+         */
+        function downloadImage() {
+            const dataUrl = outputCanvas.toDataURL('image/png');
+            this.href = dataUrl;
+            this.download = 'result.png';
+        }
+
+        // --- Color Difference Calculation (from original script) ---
+        // This is a sophisticated algorithm to compare how similar two colors are to the human eye.
+
+        /**
+         * Converts an RGBA color to the LAB color space.
+         * LAB is a color space that is more perceptually uniform than RGB.
+         * @param {object} rgba - An object with r, g, b, a properties.
+         * @returns {array} - An array representing the color in LAB space [L, a, b].
+         */
+        function rgba2lab(rgba) {
+            let r = rgba.r / 255,
+                g = rgba.g / 255,
+                b = rgba.b / 255,
+                x, y, z;
+
+            r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+            g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+            b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+            x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+            y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+            z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
+            x = (x > 0.008856) ? Math.pow(x, 1 / 3) : (7.787 * x) + 16 / 116;
+            y = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
+            z = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
+
+            return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+        }
+
+        /**
+         * Calculates the Delta E (difference) between two LAB colors.
+         * A value < 1.0 is not perceptible, while > 10 is a completely different color.
+         * @param {array} labA - The first LAB color [L, a, b].
+         * @param {array} labB - The second LAB color [L, a, b].
+         * @returns {number} - The perceptual difference between the colors.
+         */
+        function deltaE(labA, labB) {
+            let deltaL = labA[0] - labB[0];
+            let deltaA = labA[1] - labB[1];
+            let deltaB = labA[2] - labB[2];
+            let c1 = Math.sqrt(labA[1] * labA[1] + labA[2] * labA[2]);
+            let c2 = Math.sqrt(labB[1] * labB[1] + labB[2] * labB[2]);
+            let deltaC = c1 - c2;
+            let deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
+            deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
+            let sc = 1.0 + 0.045 * c1;
+            let sh = 1.0 + 0.015 * c1;
+            let deltaLKlsl = deltaL / (1.0);
+            let deltaCkcsc = deltaC / (sc);
+            let deltaHkhsh = deltaH / (sh);
+            let i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
+            return i < 0 ? 0 : Math.sqrt(i);
+        }
+    </script>
+</body>
+</html>
