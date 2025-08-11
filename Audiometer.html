@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ambient Layer Mixer — HTML + JS</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#7c3aed;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071127 0%,#071323 60%);color:#e6eef8}
+    .app{max-width:1100px;margin:20px auto;padding:18px}
+    header{display:flex;gap:16px;align-items:center;margin-bottom:14px}
+    h1{font-size:1.2rem;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:0.87rem}
+
+    .controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .btn{background:linear-gradient(180deg,var(--accent),#5b21b6);border:none;padding:8px 12px;border-radius:10px;color:white;cursor:pointer}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+
+    .track-list{display:grid;grid-template-columns:1fr;gap:10px}
+    .track{background:var(--card);padding:12px;border-radius:12px;display:grid;grid-template-columns:48px 1fr 140px;gap:12px;align-items:center}
+    .track .thumb{height:48px;width:48px;border-radius:8px;background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.8rem}
+    .track .meta{display:flex;flex-direction:column}
+    .track .meta .title{font-weight:600}
+    .track .meta .src{font-size:0.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    .track .mix{display:flex;flex-direction:column;gap:8px}
+    label.small{font-size:0.72rem;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=range]{width:100%}
+    .row{display:flex;gap:8px;align-items:center}
+    .row > *{flex:1}
+    .mini{font-size:0.82rem;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+
+    .bottom-bar{display:flex;gap:10px;align-items:center;margin-top:14px}
+    .status{color:var(--muted);font-size:0.86rem}
+
+    .uploader{display:flex;gap:8px;align-items:center}
+    .uploader input[type=text]{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:inherit;width:420px}
+
+    @media (max-width:800px){
+      .track{grid-template-columns:44px 1fr 120px}
+      .uploader input[type=text]{width:190px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Ambient Layer Mixer</h1>
+        <p class="lead">Load long audio files (URLs or local files) and layer them. Mix, pan, loop, and record the final output.</p>
+      </div>
+    </header>
+
+    <section class="controls">
+      <div class="uploader">
+        <input id="urlInput" type="text" placeholder="Paste direct audio URL (MP3/OGG/WAV) here" />
+        <button class="btn" id="addUrlBtn">Add URL</button>
+        <label class="mini" for="fileInput">Load local files</label>
+        <input id="fileInput" type="file" accept="audio/*" multiple style="color:transparent;background:transparent;border:none" />
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn secondary" id="stopAll">Stop All</button>
+        <button class="btn" id="recordBtn">Start Recording</button>
+        <button class="btn secondary" id="exportBtn">Export Mix (recorded)</button>
+      </div>
+    </section>
+
+    <main>
+      <div class="track-list" id="trackList"></div>
+    </main>
+
+    <div class="bottom-bar">
+      <div class="status" id="status">No tracks loaded</div>
+      <div style="margin-left:auto;color:var(--muted);font-size:0.85rem">Tip: For YouTube links use a downloader to obtain a direct .mp3/.ogg URL, then paste here.</div>
+    </div>
+  </div>
+
+  <script>
+    // Ambient Layer Mixer — single-file HTML app
+    // Features:
+    // - Add tracks via URL or local file
+    // - Loop, volume, pan, playbackRate, mute, solo
+    // - Use MediaElementAudioSourceNode for streaming long audio
+    // - Master mix recorded using MediaRecorder on the destination stream
+    // - Responsive, mobile-friendly
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const trackListEl = document.getElementById('trackList');
+    const urlInput = document.getElementById('urlInput');
+    const addUrlBtn = document.getElementById('addUrlBtn');
+    const fileInput = document.getElementById('fileInput');
+    const stopAllBtn = document.getElementById('stopAll');
+    const recordBtn = document.getElementById('recordBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const statusEl = document.getElementById('status');
+
+    let tracks = []; // {id, el, audioEl, sourceNode, gainNode, panNode, loop, volume, rate, muted, solo}
+    let masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1.0;
+    masterGain.connect(audioCtx.destination);
+
+    // For recording mix: capture from audioCtx using createMediaStreamDestination
+    const dest = audioCtx.createMediaStreamDestination();
+    masterGain.connect(dest);
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    // Utility: friendly id
+    function uid(prefix='t'){return prefix+Math.random().toString(36).slice(2,9)}
+
+    function setStatus(s){statusEl.textContent = s}
+
+    // Create UI for a track
+    function createTrackUI({id, name, srcUrl, isLocal=false}){
+      const trackEl = document.createElement('div'); trackEl.className='track';
+      trackEl.dataset.id = id;
+
+      const thumb = document.createElement('div'); thumb.className='thumb'; thumb.textContent = '🎧';
+      const meta = document.createElement('div'); meta.className='meta';
+      const title = document.createElement('div'); title.className='title'; title.textContent = name || srcUrl || 'Untitled';
+      const src = document.createElement('div'); src.className='src'; src.textContent = srcUrl || 'local file';
+      meta.appendChild(title); meta.appendChild(src);
+
+      const mix = document.createElement('div'); mix.className='mix';
+
+      // Controls: play/pause, loop, mute, solo
+      const row1 = document.createElement('div'); row1.className='row';
+      const playBtn = document.createElement('button'); playBtn.className='mini'; playBtn.textContent='Play';
+      const muteBtn = document.createElement('button'); muteBtn.className='mini'; muteBtn.textContent='Mute';
+      const soloBtn = document.createElement('button'); soloBtn.className='mini'; soloBtn.textContent='Solo';
+      row1.appendChild(playBtn); row1.appendChild(muteBtn); row1.appendChild(soloBtn);
+
+      // Volume slider
+      const volLabel = document.createElement('label'); volLabel.className='small'; volLabel.textContent='Volume';
+      const volRange = document.createElement('input'); volRange.type='range'; volRange.min=0; volRange.max=1; volRange.step=0.01; volRange.value=0.8;
+
+      // Pan slider
+      const panLabel = document.createElement('label'); panLabel.className='small'; panLabel.textContent='Pan';
+      const panRange = document.createElement('input'); panRange.type='range'; panRange.min=-1; panRange.max=1; panRange.step=0.01; panRange.value=0;
+
+      // Playback rate
+      const rateLabel = document.createElement('label'); rateLabel.className='small'; rateLabel.textContent='Playback rate';
+      const rateRange = document.createElement('input'); rateRange.type='range'; rateRange.min=0.5; rateRange.max=1.5; rateRange.step=0.01; rateRange.value=1;
+
+      // Loop toggle
+      const loopToggle = document.createElement('button'); loopToggle.className='mini'; loopToggle.textContent='Loop: ON';
+
+      // Remove track
+      const removeBtn = document.createElement('button'); removeBtn.className='mini'; removeBtn.textContent='Remove';
+
+      mix.appendChild(row1);
+      mix.appendChild(volLabel); mix.appendChild(volRange);
+      mix.appendChild(panLabel); mix.appendChild(panRange);
+      mix.appendChild(rateLabel); mix.appendChild(rateRange);
+      const row2 = document.createElement('div'); row2.className='row'; row2.appendChild(loopToggle); row2.appendChild(removeBtn);
+      mix.appendChild(row2);
+
+      trackEl.appendChild(thumb); trackEl.appendChild(meta); trackEl.appendChild(mix);
+      trackListEl.appendChild(trackEl);
+
+      // Create audio element and connect into WebAudio
+      const audioEl = document.createElement('audio');
+      audioEl.controls = false; audioEl.crossOrigin = 'anonymous'; audioEl.loop = true;
+      if(srcUrl){ audioEl.src = srcUrl; }
+
+      // For local files, a blob URL will be assigned by caller
+
+      // Nodes
+      const sourceNode = audioCtx.createMediaElementSource(audioEl);
+      const gainNode = audioCtx.createGain(); gainNode.gain.value = parseFloat(volRange.value);
+      const panNode = (audioCtx.createStereoPanner) ? audioCtx.createStereoPanner() : null;
+      if(panNode) panNode.pan.value = parseFloat(panRange.value);
+
+      // Connect: source -> gain -> pan -> masterGain
+      sourceNode.connect(gainNode);
+      if(panNode){ gainNode.connect(panNode); panNode.connect(masterGain); }
+      else { gainNode.connect(masterGain); }
+
+      const trackObj = {id, el:trackEl, audioEl, sourceNode, gainNode, panNode, volRange, panRange, rateRange, playBtn, muteBtn, soloBtn, loopToggle, removeBtn, muted:false, solo:false, isLocal };
+      tracks.push(trackObj);
+      updateStatus();
+
+      // Event handlers
+      playBtn.addEventListener('click', async ()=>{
+        try{ await resumeAudioContext(); }catch(e){}
+        if(audioEl.paused){ audioEl.play(); playBtn.textContent='Pause'; }
+        else { audioEl.pause(); playBtn.textContent='Play'; }
+      });
+
+      muteBtn.addEventListener('click', ()=>{
+        trackObj.muted = !trackObj.muted; trackObj.gainNode.gain.value = trackObj.muted ? 0 : parseFloat(volRange.value);
+        muteBtn.textContent = trackObj.muted ? 'Unmute' : 'Mute';
+      });
+
+      soloBtn.addEventListener('click', ()=>{
+        trackObj.solo = !trackObj.solo; updateSoloStates(); soloBtn.textContent = trackObj.solo ? 'Unsolo' : 'Solo';
+      });
+
+      volRange.addEventListener('input', ()=>{
+        if(!trackObj.muted) trackObj.gainNode.gain.value = parseFloat(volRange.value);
+      });
+
+      panRange.addEventListener('input', ()=>{
+        if(trackObj.panNode) trackObj.panNode.pan.value = parseFloat(panRange.value);
+      });
+
+      rateRange.addEventListener('input', ()=>{
+        audioEl.playbackRate = parseFloat(rateRange.value);
+      });
+
+      loopToggle.addEventListener('click', ()=>{
+        audioEl.loop = !audioEl.loop; loopToggle.textContent = 'Loop: ' + (audioEl.loop ? 'ON' : 'OFF');
+      });
+
+      removeBtn.addEventListener('click', ()=>{ removeTrack(id); });
+
+      // auto-play when loaded enough (optional)
+      audioEl.addEventListener('error', (e)=>{ console.warn('audio error',e); setStatus('Error loading: '+(srcUrl||name)); });
+
+      return trackObj;
+    }
+
+    function updateSoloStates(){
+      const anySolo = tracks.some(t=>t.solo);
+      tracks.forEach(t=>{
+        if(anySolo){
+          const active = t.solo;
+          t.gainNode.gain.value = active ? parseFloat(t.volRange.value) : 0;
+        } else {
+          if(!t.muted) t.gainNode.gain.value = parseFloat(t.volRange.value);
+        }
+      })
+    }
+
+    function removeTrack(id){
+      const idx = tracks.findIndex(t=>t.id===id); if(idx===-1) return;
+      const track = tracks[idx];
+      try{ track.audioEl.pause(); track.sourceNode.disconnect(); track.gainNode.disconnect(); if(track.panNode) track.panNode.disconnect(); }catch(e){}
+      track.el.remove(); tracks.splice(idx,1); updateStatus();
+    }
+
+    async function resumeAudioContext(){ if(audioCtx.state === 'suspended') await audioCtx.resume(); }
+
+    // Add track from URL
+    addUrlBtn.addEventListener('click', async ()=>{
+      const url = urlInput.value.trim(); if(!url) return alert('Paste a direct audio URL (mp3/ogg/wav)');
+      const id = uid();
+      // Simple name extraction
+      let name = url.split('/').pop().split('?')[0];
+      const t = createTrackUI({id,name,srcUrl:url});
+      // no special handling — browser will stream
+      setStatus('Added URL track: '+name);
+      urlInput.value='';
+    });
+
+    // Add track from local files
+    fileInput.addEventListener('change', async (ev)=>{
+      const files = Array.from(ev.target.files);
+      for(const f of files){
+        const blobUrl = URL.createObjectURL(f);
+        const id = uid();
+        const t = createTrackUI({id,name:f.name,srcUrl:blobUrl,isLocal:true});
+        setStatus('Added local file: '+f.name);
+      }
+      fileInput.value='';
+    });
+
+    stopAllBtn.addEventListener('click', ()=>{
+      tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.currentTime = 0; t.playBtn.textContent='Play'; }catch(e){} });
+      setStatus('Stopped all tracks');
+    });
+
+    // Recording logic
+    recordBtn.addEventListener('click', async ()=>{
+      if(mediaRecorder && mediaRecorder.state === 'recording'){
+        mediaRecorder.stop(); recordBtn.textContent='Start Recording';
+        setStatus('Stopped recording — click Export Mix to download');
+        return;
+      }
+      // start recording
+      try{ await resumeAudioContext(); }catch(e){}
+      recordedChunks = [];
+      const stream = dest.stream;
+      // Prefer webm/ogg - browser dependent
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : (MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' : 'audio/webm');
+      mediaRecorder = new MediaRecorder(stream, {mimeType: mime});
+      mediaRecorder.ondataavailable = e=>{ if(e.data && e.data.size>0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = ()=>{ setStatus('Recording stopped. Click Export Mix to download.'); };
+      mediaRecorder.start(); recordBtn.textContent='Stop Recording'; setStatus('Recording mixed output...');
+    });
+
+    exportBtn.addEventListener('click', ()=>{
+      if(recordedChunks.length===0) return alert('No recording available. Start recording first and then stop.');
+      const blob = new Blob(recordedChunks, {type: recordedChunks[0].type});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download = 'ambient-mix.' + (blob.type.includes('webm') ? 'webm' : (blob.type.includes('ogg')?'ogg':'webm'));
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    function updateStatus(){
+      if(tracks.length===0) setStatus('No tracks loaded');
+      else setStatus(tracks.length + ' track(s) loaded');
+    }
+
+    // Optional: small keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if(e.key===' '){ e.preventDefault(); // toggle play/pause all
+        const anyPlaying = tracks.some(t=>!t.audioEl.paused);
+        if(anyPlaying){ tracks.forEach(t=>{ t.audioEl.pause(); t.playBtn.textContent='Play'; }); setStatus('Paused all'); }
+        else { tracks.forEach(t=>{ t.audioEl.play(); t.playBtn.textContent='Pause'; }); setStatus('Playing all'); }
+      }
+    });
+
+    // Provide a few helpful presets (user can copy URLs into input field)
+    (function appendPresets(){
+      const presets = [
+        {name:'City Traffic (sample)',url:'https://cdn.pixabay.com/audio/2021/08/08/audio_6a6d8f9f80.mp3'},
+        {name:'Ocean Waves (sample)',url:'https://cdn.pixabay.com/audio/2021/08/08/audio_bf2f8b9f.mp3'},
+        {name:'Cow Moo (sample)',url:'https://cdn.pixabay.com/audio/2022/10/19/audio_3b2e4a7b.mp3'}
+      ];
+      const info = document.createElement('div'); info.style.marginTop='12px'; info.style.color='var(--muted)'; info.innerHTML = '<strong>Sample URLs (click to add)</strong> — these are CDN-hosted sample SFX you can add immediately:';
+      const list = document.createElement('div'); list.style.display='flex'; list.style.gap='8px'; list.style.marginTop='8px';
+      presets.forEach(p=>{
+        const b = document.createElement('button'); b.className='btn secondary'; b.textContent=p.name; b.addEventListener('click', ()=>{ urlInput.value=p.url; addUrlBtn.click(); });
+        list.appendChild(b);
+      });
+      info.appendChild(list); document.querySelector('.app').insertBefore(info, document.querySelector('main'));
+    })();
+
+    // Final note for user
+    setStatus('Ready — add audio via URL or local files.');
+
+  </script>
+</body>
+</html>
