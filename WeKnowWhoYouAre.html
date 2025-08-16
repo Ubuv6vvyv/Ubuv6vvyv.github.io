@@ -3,89 +3,115 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Comprehensive Device Fingerprint Explorer</title>
-	<!-- Core Libraries -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/2.1.0/fingerprint2.min.js"></script>
+	<script defer src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
+	<script defer src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+	
+	<script defer src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js" integrity="sha384-Nqf05JOUyU9dJ9HwB/1iTc9/89s7j5sI352D0sO5Y1klfjQ7Cr/qYl98vTf4s77y" crossorigin="anonymous"></script>
 
-	<!-- Google Maps API -->
-	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places"></script>
+	<script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&libraries=places"></script>
 
-	<!-- Additional Useful Libraries -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+	<script defer src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+	<script defer src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+	<script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
 
 	<style>
 		body {
-						background-color: #121212;
+			background-color: #121212;
 			color: #00ff00;
 			font-family: 'Fira Code', monospace;
-			font-size: 12px;
-		}
-		.fingerprint-section {
-			background-color: #8888700;
-			border-radius: 12px;
-			padding: 20px;
-			margin-bottom: 20px;
-			box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-			transition: all 0.3s ease;
-		}
-		.fingerprint-section:hover {
-			transform: scale(1.02);
-			box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+			font-size: 14px;
 		}
 		h1, h2 {
-			color: #2c3e50;
+			color: #f39c12;
 		}
 		pre {
 			white-space: pre-wrap;
 			word-wrap: break-word;
 			background-color: #000b07;
-			padding: 10px;
-			border-radius: 5px;
-			max-height: 300px;
-			overflow-y: auto;
-		}
-		.warning {
-			color: red;
-			font-weight: bold;
-			padding: 10px;
-			background-color: #ffeeee;
-			border-radius: 5px;
-		}
-		#mapContainer {
-			height: 400px;
-			width: 100%;
-			margin-top: 20px;
-		}
-	</style>
-	<style>
-		body {
-			font-family: 'Fira Code', sans-serif;
-			padding: 20px;
-			background-color: #f4f4f4;
-		}
-		#mapContainer {
-			height: 500px;
-			width: 100%;
-			margin-top: 20px;
-		}
-		#geoInfo {
-			margin-top: 20px;
-			font-size: 16px;
-			background-color: #fff;
 			padding: 15px;
 			border-radius: 8px;
+			max-height: 350px;
+			overflow-y: auto;
+			border: 1px solid #2c3e50;
 		}
+		.fingerprint-section {
+			background-color: #1a1a1a;
+			border-radius: 12px;
+			padding: 20px;
+			margin-bottom: 20px;
+			box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+			transition: all 0.3s ease;
+			border-left: 5px solid #f39c12;
+		}
+		.fingerprint-section:hover {
+			transform: translateY(-5px);
+			box-shadow: 0 8px 16px rgba(0,0,0,0.6);
+		}
+		.warning {
+			color: #f39c12;
+			font-weight: bold;
+			padding: 15px;
+			background-color: rgba(243, 156, 18, 0.1);
+			border-radius: 8px;
+			border-left: 5px solid #f39c12;
+		}
+		.error {
+			color: #e74c3c;
+			font-weight: bold;
+			padding: 15px;
+			background-color: rgba(231, 76, 60, 0.1);
+			border-radius: 8px;
+			border-left: 5px solid #e74c3c;
+		}
+		#mapContainer {
+			height: 600px;
+			width: 100%;
+			margin-top: 20px;
+			border-radius: 8px;
+		}
+		#privacyScoreContainer {
+			text-align: center;
+			padding: 20px;
+			margin-bottom: 20px;
+			border-radius: 12px;
+		}
+		#privacyScore {
+			font-size: 48px;
+			font-weight: bold;
+		}
+        /* Style for the new location text */
+        #locationText {
+            text-align: center;
+            font-size: 2em; /* Large font size */
+            color: #2ecc71; /* A brighter green */
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #1a1a1a;
+            border-left: 5px solid #2ecc71;
+        }
 	</style>
 </head>
 <body>
 	<h1>🕵️ We Already Know Who You Are</h1>
-	<div id="warningContainer" class="warning"></div>
-	<div id="errorContainer" style="color: darkred;"></div>
+
+    <div class="fingerprint-section" id="liveLocationSection">
+        <h2 id="locationText">Determining your location...</h2>
+        <div id="mapContainer"></div>
+    </div>
+
+	<div id="privacyScoreContainer">
+		<h2>Your Privacy Score</h2>
+		<div id="privacyScore">Calculating...</div>
+	</div>
+
+	<div id="warningContainer" class="warning" style="display: none;"></div>
+	<div id="errorContainer" class="error" style="display: none;"></div>
+
 	<div id="fingerprintResults">
 		<div class="fingerprint-section" id="networkSection">
-			<h2>🌐 Network</h2><pre id="networkInfo">Collecting network information...</pre>
+			<h2>🌐 Network & WebRTC</h2><pre id="networkInfo">Collecting network information...</pre>
 		</div>
 		<div class="fingerprint-section" id="deviceSection">
 			<h2>📱 Device</h2><pre id="deviceInfo">Collecting device information...</pre>
@@ -94,7 +120,7 @@
 			<h2>🔋 Power</h2><pre id="batteryInfo">Collecting battery information...</pre>
 		</div>
 		<div class="fingerprint-section" id="geolocationSection">
-			<h2>📍 Geolocation</h2><pre id="geoLocation">Collecting geolocation data...</pre>
+			<h2>📍 Geolocation (Raw Data)</h2><pre id="geoLocation">Collecting geolocation data...</pre>
 		</div>
 		<div class="fingerprint-section" id="sensorSection">
 			<h2>📡 Sensors</h2><pre id="sensorInfo">Collecting sensor information...</pre>
@@ -102,30 +128,492 @@
 		<div class="fingerprint-section" id="browserSection">
 			<h2>🌈 Browser</h2><pre id="browserEcosystem">Collecting browser data...</pre>
 		</div>
+        <div class="fingerprint-section" id="canvasFingerprintSection">
+            <h2>🎨 Canvas & WebGL Fingerprint</h2><pre id="canvasFingerprintInfo">Generating graphical fingerprints...</pre>
+        </div>
+        <div class="fingerprint-section" id="audioFingerprintSection">
+            <h2>🎵 Audio Fingerprint</h2><pre id="audioFingerprintInfo">Analyzing audio stack...</pre>
+        </div>
+        <div class="fingerprint-section" id="mediaDeviceSection">
+            <h2>🎤 Media Devices</h2><pre id="mediaDeviceInfo">Enumerating connected devices...</pre>
+        </div>
+        <div class="fingerprint-section" id="fontSection">
+            <h2>🔤 Font Fingerprint</h2><pre id="fontInfo">Detecting installed fonts...</pre>
+        </div>
+        <div class="fingerprint-section" id="storageSection">
+            <h2>💾 Storage Analysis</h2><pre id="storageInfo">Analyzing storage capacity...</pre>
+        </div>
+        <div class="fingerprint-section" id="timingSection">
+            <h2>⏱️ Timing Analysis</h2><pre id="timingInfo">Benchmarking performance...</pre>
+        </div>
 		<div class="fingerprint-section" id="advancedSection">
-			<h2>🔍 Advanced</h2><pre id="advancedInfo">Collecting advanced characteristics...</pre>
+			<h2>🔍 Advanced Raw Data</h2><pre id="advancedInfo">Collecting advanced characteristics...</pre>
 		</div>
-		<div class="fingerprint-section" id="mapSection">
-			<h2>🗺️ Geospatial </h2><pre id="mapInfo">Collecting geospatial information...</pre><div id="mapContainer"></div>
-		</div>
-	</div>
-
-
-
-	<h1>📍 Geolocation & Map Rendering</h1>
-	<div id="geoInfo">
-		Fetching geolocation data...
-	</div>
-	<div id="mapContainer"></div>
+        </div>
 
 	<script>
-		class MapHandler {
-			constructor(apiKey) {
-				this.apiKey = apiKey;
-				this.map = null;
-				this.geocoder = new google.maps.Geocoder();
+		class DeviceFingerprinter {
+			constructor() {
+				this.errors = [];
+				this.warnings = [];
+				this.privacyScore = 100;
+                this.map = null; // To hold the map instance
+                this.marker = null; // To hold the marker instance
+                this.geocoder = null; // To hold the geocoder instance
+                this.hasScoredGeolocation = false; // Flag to ensure score is deducted only once
 			}
 
+            updatePrivacyScore(points, reason) {
+                this.privacyScore -= points;
+                console.log(`Privacy Score decreased by ${points} due to: ${reason}`);
+                const scoreElement = document.getElementById('privacyScore');
+                const scoreContainer = document.getElementById('privacyScoreContainer');
+                scoreElement.textContent = `${Math.max(0, this.privacyScore.toFixed(0))}%`;
+
+                if (this.privacyScore >= 80) {
+                    scoreContainer.style.backgroundColor = 'rgba(46, 204, 113, 0.1)';
+                    scoreContainer.style.borderLeft = '5px solid #2ecc71';
+                } else if (this.privacyScore >= 50) {
+                    scoreContainer.style.backgroundColor = 'rgba(241, 196, 15, 0.1)';
+                    scoreContainer.style.borderLeft = '5px solid #f1c40f';
+                } else {
+                    scoreContainer.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+                    scoreContainer.style.borderLeft = '5px solid #e74c3c';
+                }
+            }
+
+
+			logError(message) {
+				console.error(message);
+				this.errors.push(message);
+				const errorContainer = document.getElementById('errorContainer');
+				errorContainer.style.display = 'block';
+				errorContainer.innerHTML += `<p>${message}</p>`;
+			}
+
+			logWarning(message) {
+				console.warn(message);
+				this.warnings.push(message);
+				const warningContainer = document.getElementById('warningContainer');
+				warningContainer.style.display = 'block';
+				warningContainer.innerHTML += `<p>${message}</p>`;
+			}
+
+			async getNetworkInfo() {
+				const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+				if (connection && connection.downlink) this.updatePrivacyScore(2, 'Network information detected');
+				return {
+					connectionType: connection?.type || 'Unknown',
+					effectiveBandwidth: connection?.downlink ? `${connection.downlink} Mbps`: 'N/A',
+					roundTripTime: connection?.rtt ? `${connection.rtt} ms`: 'N/A',
+					saveMode: connection?.saveData ? 'Enabled': 'Disabled'
+				};
+			}
+
+			getDeviceSignature() {
+				const parser = new UAParser();
+				const result = parser.getResult();
+                this.updatePrivacyScore(5, 'Device and OS details identified');
+				return {
+					browser: { name: result.browser.name, version: result.browser.version },
+					device: { model: result.device.model || 'Desktop', type: result.device.type || 'Desktop', vendor: result.device.vendor || 'Unknown' },
+					os: { name: result.os.name, version: result.os.version },
+					system: {
+						architecture: result.cpu.architecture || 'Unknown',
+						screenResolution: `${window.screen.width}x${window.screen.height}`,
+						colorDepth: window.screen.colorDepth,
+						pixelRatio: window.devicePixelRatio,
+						memoryEstimate: navigator.deviceMemory ? `${navigator.deviceMemory} GB`: 'N/A'
+					}
+				};
+			}
+
+            // MODIFIED: This method now sets up a live watch
+            startLiveGeolocation() {
+                if (!navigator.geolocation) {
+                    this.logWarning('Geolocation not supported');
+                    document.getElementById('geoLocation').textContent = 'Geolocation not supported by this browser.';
+                    document.getElementById('locationText').textContent = 'Location unavailable.';
+                    return;
+                }
+
+                // Initialize the geocoder once
+                this.geocoder = new google.maps.Geocoder();
+
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude, accuracy } = position.coords;
+                        const locationData = { latitude, longitude, accuracy };
+                        
+                        if (!this.hasScoredGeolocation) {
+                            this.updatePrivacyScore(20, 'Precise geolocation coordinates obtained');
+                            this.hasScoredGeolocation = true; // Set flag so we don't deduct points again
+                        }
+
+                        // Update the raw data section
+                        document.getElementById('geoLocation').textContent = JSON.stringify(locationData, null, 2);
+                        
+                        // Update the map and the large location text
+                        this.renderMap(locationData);
+                        this.reverseGeocodeAndUpdateUI(locationData);
+                    },
+                    (error) => {
+                        this.logError(`Geolocation Error: ${error.message}`);
+                        document.getElementById('geoLocation').textContent = `Error: ${error.message}`;
+                        document.getElementById('locationText').textContent = 'Could not retrieve location.';
+                    },
+                    options
+                );
+            }
+
+            getWebRtcLeak() {
+                return new Promise((resolve) => {
+					try {
+						const pc = new RTCPeerConnection({iceServers: []});
+						pc.createDataChannel('');
+						pc.createOffer().then(offer => pc.setLocalDescription(offer));
+						pc.onicecandidate = (event) => {
+							if (event?.candidate?.candidate) {
+								const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/;
+								const ipMatch = ipRegex.exec(event.candidate.candidate);
+								if (ipMatch) {
+									this.updatePrivacyScore(10, 'WebRTC leak reveals real IP');
+									pc.onicecandidate = null;
+									resolve({ potentialLeak: ipMatch[1] });
+								}
+							}
+						};
+						setTimeout(() => { 
+							pc.onicecandidate = null;
+							resolve({ potentialLeak: 'Not detected within 1s' });
+						}, 1000);
+					} catch (error) {
+						this.logError('WebRTC Error: ' + error.message);
+						resolve(null);
+					}
+                });
+            }
+
+
+            getCanvasFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const txt = 'i9asdm..$#po((^@KbXrww!~cz';
+                    ctx.textBaseline = "top";
+                    ctx.font = "14px 'Arial'";
+                    ctx.textBaseline = "alphabetic";
+                    ctx.fillStyle = "#f60";
+                    ctx.fillRect(125, 1, 62, 20);
+                    ctx.fillStyle = "#069";
+                    ctx.fillText(txt, 2, 15);
+                    ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+                    ctx.fillText(txt, 4, 17);
+                    const dataUrl = canvas.toDataURL();
+                    this.updatePrivacyScore(8, 'Unique canvas fingerprint generated');
+                    return CryptoJS.MD5(dataUrl).toString();
+                } catch (error) {
+                    this.logError('Canvas Fingerprinting Error: ' + error.message);
+                    return null;
+                }
+            }
+
+            getWebGLFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (!gl) return null;
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    this.updatePrivacyScore(8, 'Graphics card model identified via WebGL');
+                    return {
+                        vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+                        renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL),
+                    };
+                } catch (error) {
+                    this.logError('WebGL Fingerprinting Error: ' + error.message);
+                    return null;
+                }
+            }
+
+            async getAudioFingerprint() {
+                return new Promise((resolve) => {
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioCtx.createOscillator();
+                        const analyser = audioCtx.createAnalyser();
+                        oscillator.type = 'triangle';
+                        oscillator.frequency.setValueAtTime(10000, audioCtx.currentTime);
+                        oscillator.connect(analyser);
+                        analyser.connect(audioCtx.destination);
+                        oscillator.start(0);
+
+                        setTimeout(() => {
+                            const frequencyData = new Float32Array(analyser.frequencyBinCount);
+                            analyser.getFloatFrequencyData(frequencyData);
+                            oscillator.stop(0);
+                            const fingerprint = CryptoJS.MD5(frequencyData.toString()).toString();
+                            this.updatePrivacyScore(8, 'Unique audio hardware fingerprint generated');
+							audioCtx.close();
+                            resolve(fingerprint);
+                        }, 500);
+                    } catch (error) {
+                        this.logError('Audio Fingerprinting Error: ' + error.message);
+                        resolve(null);
+                    }
+                });
+            }
+
+            async getMediaDevices() {
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                        this.logWarning('Media device enumeration not supported.');
+                        return null;
+                    }
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    if (devices.some(d => d.label)) {
+                        this.updatePrivacyScore(7, 'Connected media devices enumerated');
+                    }
+                    return devices.map(({ deviceId, kind, label }) => ({
+                        kind,
+                        label: label || (deviceId ? 'Permission needed to see label' : 'N/A')
+                    }));
+                } catch (error) {
+                    this.logError('Media Device Enumeration Error: ' + error.message);
+                    return null;
+                }
+            }
+
+
+            getFontFingerprint() {
+                const fonts = ["Arial", "Verdana", "Helvetica", "Times New Roman", "Courier New", "Georgia", "Palatino", "Garamond", "Bookman", "Comic Sans MS", "Trebuchet MS", "Impact", "Fira Code", "Menlo", "Consolas"];
+                const detectedFonts = fonts.filter(font => {
+                    const defaultWidth = document.body.clientWidth;
+                    const testElement = document.createElement('span');
+                    testElement.style.fontFamily = font;
+                    testElement.innerHTML = 'wm WM';
+                    document.body.appendChild(testElement);
+                    const width = testElement.clientWidth;
+                    document.body.removeChild(testElement);
+                    return width !== defaultWidth;
+                });
+                if (detectedFonts.length > 0) this.updatePrivacyScore(8, 'Installed fonts detected');
+                return detectedFonts;
+            }
+
+
+            async getStorageInfo() {
+                try {
+                    if (navigator.storage?.estimate) {
+                        const estimate = await navigator.storage.estimate();
+                        this.updatePrivacyScore(3, 'Storage capacity estimated');
+                        return {
+                            quota: `${(estimate.quota / 1024 / 1024 / 1024).toFixed(2)} GB`,
+                            usage: `${(estimate.usage / 1024 / 1024).toFixed(2)} MB`
+                        };
+                    }
+                    return null;
+                } catch (error) {
+                    this.logError('Storage Analysis Error: ' + error.message);
+                    return null;
+                }
+            }
+
+            getTimingAnalysis() {
+                const startTime = performance.now();
+                for (let i = 0; i < 2000000; i++) { Math.sqrt(i); }
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+                this.updatePrivacyScore(2, 'CPU performance profiled');
+                return `${duration} ms to complete benchmark`;
+            }
+
+
+			async getBatteryInfo() {
+				try {
+					if (!navigator.getBattery) {
+						this.logWarning('Battery API not supported.');
+						return null;
+					}
+					const battery = await navigator.getBattery();
+                    this.updatePrivacyScore(3, 'Battery status read');
+					return {
+						charging: battery.charging,
+                        batteryLevel: `${(battery.level * 100).toFixed(2)}%`,
+                        chargingTime: battery.chargingTime === Infinity ? 'N/A': `${battery.chargingTime}s`,
+                        dischargingTime: battery.dischargingTime === Infinity ? 'N/A': `${battery.dischargingTime}s`
+					};
+				} catch (error) {
+					this.logError('Battery Metrics Error: ' + error.message); return null;
+				}
+			}
+
+			getSensorCapabilities() {
+				return {
+					sensors: {
+						accelerometer: 'Accelerometer' in window, gyroscope: 'Gyroscope' in window, magnetometer: 'Magnetometer' in window, ambientLight: 'AmbientLightSensor' in window
+					}, hardware: {
+						hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown', maxTouchPoints: navigator.maxTouchPoints
+					}
+				};
+			}
+
+			async generateBrowserEcosystemFingerprint() {
+                try {
+                    if (typeof FingerprintJS === 'undefined') {
+                        throw new Error('FingerprintJS library not loaded. It may be blocked by a browser extension.');
+                    }
+                    const fp = await FingerprintJS.load();
+                    const result = await fp.get();
+                    this.updatePrivacyScore(15, 'Unique browser fingerprint generated');
+                    return {
+                        visitorId: result.visitorId,
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        languages: navigator.languages,
+                        cookiesEnabled: navigator.cookieEnabled,
+                        doNotTrack: navigator.doNotTrack
+                    };
+                } catch (error) {
+                    this.logError('Browser Fingerprint Error: ' + error.message);
+                    return null;
+                }
+			}
+
+			getAdvancedCharacteristics() {
+				return {
+					userAgent: navigator.userAgent, platform: navigator.platform, vendor: navigator.vendor
+				};
+			}
+
+			async collectFingerprint() {
+				try {
+                    // Start live geolocation updates immediately
+                    this.startLiveGeolocation();
+
+					const [network, battery, browser, webrtc, mediaDevices, storage, audioFingerprint] = await Promise.all([
+						// getGeolocation was removed from here
+						this.getNetworkInfo(),
+						this.getBatteryInfo(),
+						this.generateBrowserEcosystemFingerprint(),
+                        this.getWebRtcLeak(),
+                        this.getMediaDevices(),
+                        this.getStorageInfo(),
+                        this.getAudioFingerprint()
+					]);
+
+                    const device = this.getDeviceSignature();
+                    const sensors = this.getSensorCapabilities();
+                    const canvasFingerprint = this.getCanvasFingerprint();
+                    const webglFingerprint = this.getWebGLFingerprint();
+                    const fonts = this.getFontFingerprint();
+                    const timing = this.getTimingAnalysis();
+
+					this.updateDOMWithFingerprint({
+						network: { ...network, webrtcLeak: webrtc },
+                        device, battery, sensors, browser, // geolocation removed from here
+						advanced: this.getAdvancedCharacteristics(),
+                        canvas: { canvas_md5: canvasFingerprint, ...webglFingerprint },
+                        audio: { audio_md5: audioFingerprint },
+                        mediaDevices,
+                        fonts: { detected: fonts },
+                        storage,
+                        timing: { benchmark: timing }
+					});
+
+				} catch (error) {
+					this.logError('Fingerprint Collection Error: ' + error.message);
+				}
+			}
+
+            // MODIFIED: This function now updates the map instead of always creating a new one
+            renderMap(location) {
+                const currentPos = { lat: location.latitude, lng: location.longitude };
+
+                if (!this.map) { // If the map doesn't exist, create it
+                    this.map = new google.maps.Map(document.getElementById('mapContainer'), {
+                        center: currentPos,
+                        zoom: 17, // Zoom in a bit closer
+                        mapTypeId: 'roadmap',
+                        disableDefaultUI: true, // Cleaner map
+                        styles: [ // Dark mode map style
+                            {elementType: 'geometry', stylers: [{color: '#242f3e'}]},
+                            {elementType: 'labels.text.stroke', stylers: [{color: '#242f3e'}]},
+                            {elementType: 'labels.text.fill', stylers: [{color: '#746855'}]},
+                            {featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}]},
+                            {featureType: 'poi', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}]},
+                            {featureType: 'poi.park', elementType: 'geometry', stylers: [{color: '#263c3f'}]},
+                            {featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{color: '#6b9a76'}]},
+                            {featureType: 'road', elementType: 'geometry', stylers: [{color: '#38414e'}]},
+                            {featureType: 'road', elementType: 'geometry.stroke', stylers: [{color: '#212a37'}]},
+                            {featureType: 'road', elementType: 'labels.text.fill', stylers: [{color: '#9ca5b3'}]},
+                            {featureType: 'road.highway', elementType: 'geometry', stylers: [{color: '#746855'}]},
+                            {featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{color: '#1f2835'}]},
+                            {featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{color: '#f3d19c'}]},
+                            {featureType: 'transit', elementType: 'geometry', stylers: [{color: '#2f3948'}]},
+                            {featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{color: '#d59563'}]},
+                            {featureType: 'water', elementType: 'geometry', stylers: [{color: '#17263c'}]},
+                            {featureType: 'water', elementType: 'labels.text.fill', stylers: [{color: '#515c6d'}]},
+                            {featureType: 'water', elementType: 'labels.text.stroke', stylers: [{color: '#17263c'}]}
+                        ]
+                    });
+                    this.marker = new google.maps.Marker({
+                        position: currentPos,
+                        map: this.map,
+                        title: 'Your Approximate Location'
+                    });
+                } else { // If map already exists, just move the center and marker
+                    this.map.setCenter(currentPos);
+                    this.marker.setPosition(currentPos);
+                }
+            }
+
+            // NEW: Function to convert coordinates to an address and update the UI
+            reverseGeocodeAndUpdateUI(location) {
+                const latlng = { lat: location.latitude, lng: location.longitude };
+                this.geocoder.geocode({ location: latlng }, (results, status) => {
+                    const locationTextElement = document.getElementById('locationText');
+                    if (status === "OK") {
+                        if (results[0]) {
+                            locationTextElement.textContent = results[0].formatted_address;
+                        } else {
+                            locationTextElement.textContent = 'No address found at this location.';
+                        }
+                    } else {
+                        locationTextElement.textContent = `Geocoder failed: ${status}`;
+                        this.logError("Geocoder failed due to: " + status);
+                    }
+                });
+            }
+
+			updateDOMWithFingerprint(data) {
+                Object.entries(data).forEach(([key, value]) => {
+                    const elementIdMap = {
+                        network: 'networkInfo', device: 'deviceInfo', battery: 'batteryInfo',
+                        sensors: 'sensorInfo', browser: 'browserEcosystem', /*geolocation handled separately*/
+                        advanced: 'advancedInfo', canvas: 'canvasFingerprintInfo',
+                        audio: 'audioFingerprintInfo', mediaDevices: 'mediaDeviceInfo', fonts: 'fontInfo',
+                        storage: 'storageInfo', timing: 'timingInfo'
+                    };
+                    const element = document.getElementById(elementIdMap[key]);
+                    if (element) {
+                        element.textContent = value ? JSON.stringify(value, null, 2) : 'Not available or an error occurred.';
+                    }
+                });
+			}
+		}
+
+		document.addEventListener('DOMContentLoaded', () => {
+			const fingerprintInstance = new DeviceFingerprinter();
+			fingerprintInstance.collectFingerprint();
+		});
+	</script>
+</body>
+</html>
 			initMap(lat, lng) {
 				const location = {
 					lat,
