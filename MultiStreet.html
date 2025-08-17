@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Street View Time Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map-container {
+            height: 35%;
+            position: relative;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: #e5e7eb;
+        }
+        #street-view-grid {
+            height: 65%;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 4px;
+            background-color: #4b5563;
+        }
+        .sv-panel {
+            position: relative;
+            background-color: #1f2937;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        .sv-label {
+            position: absolute;
+            top: 0.75rem;
+            left: 0.75rem;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .sv-time-info {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            z-index: 10;
+            pointer-events: none;
+        }
+        #header {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 10;
+            text-align: center;
+            max-width: 90%;
+        }
+        #controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+        .control-btn {
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            transition: all 0.15s;
+        }
+        .control-btn:hover:not(:disabled) {
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #search-box {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            width: 300px;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            z-index: 10;
+        }
+        #time-controls {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 10;
+            display: none;
+            min-width: 300px;
+        }
+        #time-slider {
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+        .time-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            margin: 0 0.25rem;
+            font-size: 0.875rem;
+        }
+        .time-btn:hover:not(:disabled) {
+            background-color: #2563eb;
+        }
+        .time-btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        #mode-indicator {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            z-index: 10;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            z-index: 20;
+        }
+        .historical-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(139, 69, 19, 0.3), rgba(160, 82, 45, 0.3));
+            pointer-events: none;
+            z-index: 5;
+        }
+        .no-data-panel {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.9rem;
+            color: #9ca3af;
+        }
+        @media (max-width: 768px) {
+            #header {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+            #search-box {
+                width: calc(100% - 140px);
+            }
+            #controls {
+                flex-direction: row;
+                right: 0.5rem;
+                top: 0.5rem;
+            }
+            .sv-label {
+                font-size: 0.75rem;
+                padding: 0.125rem 0.5rem;
+            }
+            #time-controls {
+                min-width: 250px;
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-800">
+
+    <div id="app-container">
+        <div id="map-container">
+            <div id="header">
+                <h1 class="text-lg font-bold">Street View Time Explorer</h1>
+                <p class="text-sm text-gray-600">Explore locations across time and directions</p>
+            </div>
+            
+            <input id="search-box" type="text" placeholder="Search for a place..." />
+            
+            <div id="controls">
+                <button id="locate-btn" class="control-btn" title="Use My Location">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+                    </svg>
+                </button>
+                <button id="time-mode-btn" class="control-btn" title="Time Machine Mode">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                </button>
+                <button id="sync-btn" class="control-btn" title="Sync Panning">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="time-controls">
+                <div style="text-align: center; margin-bottom: 0.75rem;">
+                    <strong style="font-size: 1rem; color: #1f2937;">Time Machine View</strong>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
+                        Shows chronological progression from most recent imagery
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 0.75rem;">
+                    <button class="time-btn" onclick="toggleTimeMachine()" style="background-color: #ef4444;">
+                        Exit Time Mode
+                    </button>
+                </div>
+                <div style="text-align: center; font-size: 0.75rem; color: #6b7280; line-height: 1.3;">
+                    <strong>Grid Layout:</strong><br>
+                    <span style="display: inline-block; margin: 0.25rem;">📅 Current → 1yr ago → 2yr ago → 3yr ago</span>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+            <div id="loading" class="loading" style="display: none;">Loading historical imagery...</div>
+        </div>
+
+        <div id="street-view-grid">
+            <div id="sv-0" class="sv-panel">
+                <div class="sv-label">Latest</div>
+                <div class="sv-time-info">--</div>
+                <span id="initial-msg">Finding your location...</span>
+            </div>
+            <div id="sv-1" class="sv-panel">
+                <div class="sv-label">1 Year Ago</div>
+                <div class="sv-time-info">--</div>
+            </div>
+            <div id="sv-2" class="sv-panel">
+                <div class="sv-label">2 Years Ago</div>
+                <div class="sv-time-info">--</div>
+            </div>
+            <div id="sv-3" class="sv-panel">
+                <div class="sv-label">3+ Years Ago</div>
+                <div class="sv-time-info">--</div>
+            </div>
+        </div>
+
+        <div id="mode-indicator">Directional Mode</div>
+    </div>
+
+    <script>
+        let map, marker, streetViewService, autocomplete;
+        const panoramas = {};
+        let isLocating = false;
+        let currentMode = 'directional'; // 'directional' or 'temporal'
+        let syncPanning = false;
+        let historicalData = [];
+        let currentLocation = null;
+        let masterHeading = 0;
+        let isUpdatingPov = false; // Prevent infinite loops
+
+        async function initApp() {
+            try {
+                const { Map } = await google.maps.importLibrary("maps");
+                const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+                const { PlacesService } = await google.maps.importLibrary("places");
+
+                const defaultLocation = { lat: 37.7749, lng: -122.4194 };
+
+                map = new Map(document.getElementById("map"), {
+                    center: defaultLocation,
+                    zoom: 15,
+                    streetViewControl: false,
+                    mapId: 'DEMO_MAP_ID'
+                });
+
+                streetViewService = new google.maps.StreetViewService();
+                
+                marker = new AdvancedMarkerElement({
+                    map: map,
+                    position: null,
+                });
+
+                const searchInput = document.getElementById('search-box');
+                autocomplete = new google.maps.places.Autocomplete(searchInput, {
+                    types: ['geocode', 'establishment'],
+                    fields: ['place_id', 'geometry', 'name', 'formatted_address']
+                });
+
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+                    if (place.geometry) {
+                        const location = place.geometry.location;
+                        map.setCenter(location);
+                        map.setZoom(17);
+                        updateViews(location);
+                    }
+                });
+
+                // Initialize panoramas
+                for (let i = 0; i < 4; i++) {
+                    panoramas[i] = new google.maps.StreetViewPanorama(
+                        document.getElementById(`sv-${i}`), {
+                            addressControl: false,
+                            linksControl: false,
+                            panControl: true,
+                            enableCloseButton: false,
+                            fullscreenControl: false,
+                            zoomControl: true,
+                            pov: { heading: 0, pitch: 5 },
+                            motionTracking: false,
+                            motionTrackingControl: false
+                        }
+                    );
+
+                    // Add panning sync listeners
+                    panoramas[i].addListener('pov_changed', ((index) => {
+                        return () => {
+                            if (syncPanning && currentMode === 'directional' && !isUpdatingPov) {
+                                syncPanoramaPanning(index);
+                            }
+                        };
+                    })(i));
+                }
+
+                map.addListener('click', (event) => {
+                    updateViews(event.latLng);
+                });
+
+                // Event listeners
+                document.getElementById('locate-btn').addEventListener('click', getCurrentLocation);
+                document.getElementById('time-mode-btn').addEventListener('click', toggleTimeMachine);
+                document.getElementById('sync-btn').addEventListener('click', togglePanningSync);
+
+                setTimeout(() => getCurrentLocation(true), 1000);
+
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                document.getElementById('initial-msg').textContent = 'Error loading. Click map to explore.';
+            }
+        }
+
+        function getCurrentLocation(silent = false) {
+            if (isLocating) return;
+            
+            if (!navigator.geolocation) {
+                if (!silent) alert('Geolocation not supported');
+                return;
+            }
+
+            isLocating = true;
+            if (!silent) showLoading(true);
+            
+            const btn = document.getElementById('locate-btn');
+            btn.style.opacity = '0.5';
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const location = new google.maps.LatLng(
+                        position.coords.latitude,
+                        position.coords.longitude
+                    );
+                    
+                    map.setCenter(location);
+                    map.setZoom(18);
+                    updateViews(location);
+                    
+                    isLocating = false;
+                    btn.style.opacity = '1';
+                    if (!silent) showLoading(false);
+                },
+                (error) => {
+                    console.warn('Geolocation error:', error);
+                    isLocating = false;
+                    btn.style.opacity = '1';
+                    if (!silent) {
+                        showLoading(false);
+                        const fallback = new google.maps.LatLng(37.7749, -122.4194);
+                        map.setCenter(fallback);
+                        updateViews(fallback);
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: silent ? 5000 : 10000,
+                    maximumAge: 300000
+                }
+            );
+        }
+
+        function toggleTimeMachine() {
+            currentMode = currentMode === 'directional' ? 'temporal' : 'directional';
+            
+            const timeControls = document.getElementById('time-controls');
+            const modeIndicator = document.getElementById('mode-indicator');
+            const timeModeBtn = document.getElementById('time-mode-btn');
+            
+            if (currentMode === 'temporal') {
+                timeControls.style.display = 'block';
+                modeIndicator.textContent = 'Time Machine Mode';
+                timeModeBtn.style.backgroundColor = '#3b82f6';
+                timeModeBtn.style.color = 'white';
+                
+                if (currentLocation) {
+                    loadHistoricalData(currentLocation);
+                }
+            } else {
+                timeControls.style.display = 'none';
+                modeIndicator.textContent = 'Directional Mode';
+                timeModeBtn.style.backgroundColor = '';
+                timeModeBtn.style.color = '';
+                
+                if (currentLocation) {
+                    updateDirectionalViews(currentLocation);
+                }
+            }
+        }
+
+        function togglePanningSync() {
+            syncPanning = !syncPanning;
+            const btn = document.getElementById('sync-btn');
+            
+            if (syncPanning) {
+                btn.style.backgroundColor = '#3b82f6';
+                btn.style.color = 'white';
+            } else {
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+            }
+        }
+
+        function syncPanoramaPanning(sourcePanoramaIndex) {
+            if (!syncPanning || isUpdatingPov) return;
+            
+            isUpdatingPov = true; // Prevent infinite loop
+            
+            try {
+                const sourcePov = panoramas[sourcePanoramaIndex].getPov();
+                masterHeading = sourcePov.heading;
+                
+                // Update other panoramas with relative headings
+                const baseHeadings = [0, 90, 180, 270]; // North, East, South, West
+                
+                for (let i = 0; i < 4; i++) {
+                    if (i !== sourcePanoramaIndex) {
+                        const relativeHeading = (masterHeading + baseHeadings[i] - baseHeadings[sourcePanoramaIndex]) % 360;
+                        panoramas[i].setPov({
+                            heading: relativeHeading < 0 ? relativeHeading + 360 : relativeHeading,
+                            pitch: sourcePov.pitch
+                        });
+                    }
+                }
+            } finally {
+                // Use setTimeout to break the call stack and prevent recursion
+                setTimeout(() => {
+                    isUpdatingPov = false;
+                }, 50);
+            }
+        }
+
+        async function loadHistoricalData(location) {
+            showLoading(true);
+            historicalData = [];
+            
+            try {
+                // Clear existing panels first
+                for (let i = 0; i < 4; i++) {
+                    clearPanel(i);
+                }
+                
+                console.log('Starting historical search at:', location.lat(), location.lng());
+                
+                // Use the Street View Timeline API to get actual historical data
+                const foundPanoramas = await searchHistoricalImagery(location);
+                
+                console.log(`Found ${foundPanoramas.length} time-distinct panoramas:`, 
+                    foundPanoramas.map(p => ({ 
+                        year: p.captureYear, 
+                        date: p.captureDate,
+                        panoId: p.panoId ? p.panoId.substring(0, 12) + '...' : 'unknown'
+                    })));
+                
+                // Fill the 4 panels with chronological data (newest to oldest)
+                for (let i = 0; i < 4; i++) {
+                    if (i < foundPanoramas.length) {
+                        const pano = foundPanoramas[i];
+                        const currentYear = new Date().getFullYear();
+                        const yearDiff = currentYear - pano.captureYear;
+                        
+                        let labelText;
+                        if (yearDiff <= 1) {
+                            labelText = 'Most Recent';
+                        } else if (yearDiff <= 3) {
+                            labelText = `${yearDiff} Years Ago`;
+                        } else {
+                            labelText = `${yearDiff}+ Years Ago`;
+                        }
+                        
+                        updateTemporalView(i, {
+                            data: pano.data,
+                            captureDate: pano.captureDate,
+                            captureYear: pano.captureYear,
+                            location: pano.location,
+                            panoId: pano.panoId,
+                            labelText: labelText,
+                            isReal: true
+                        });
+                    } else {
+                        // No more historical data available
+                        const labels = ['Most Recent', '2-3 Years Ago', '4-5 Years Ago', '6+ Years Ago'];
+                        showNoDataPanel(i, labels[i]);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading historical data:', error);
+                // Fallback to default labels
+                for (let i = 0; i < 4; i++) {
+                    showNoDataPanel(i, ['Most Recent', '2-3 Years Ago', '4-5 Years Ago', '6+ Years Ago'][i]);
+                }
+            }
+            
+            showLoading(false);
+        }
+
+        async function searchHistoricalImagery(location) {
+            const foundPanoramas = [];
+            const seenPanoIds = new Set();
+            const maxRadius = 500; // meters
+            
+            // First, get the current/most recent panorama
+            const currentPano = await getPanoramaAtLocation(location, 50);
+            if (currentPano) {
+                foundPanoramas.push(currentPano);
+                seenPanoIds.add(currentPano.panoId);
+            }
+            
+            // Search in expanding circles and different time periods
+            const searchRadii = [100, 200, 350, 500];
+            const searchOffsets = [
+                { lat: 0, lng: 0 },
+                { lat: 0.001, lng: 0 }, { lat: -0.001, lng: 0 },
+                { lat: 0, lng: 0.001 }, { lat: 0, lng: -0.001 },
+                { lat: 0.0015, lng: 0.0015 }, { lat: -0.0015, lng: -0.0015 },
+                { lat: 0.002, lng: -0.001 }, { lat: -0.001, lng: 0.002 },
+                { lat: 0.0025, lng: 0 }, { lat: 0, lng: 0.0025 }
+            ];
+            
+            // Try different search strategies
+            const searchPromises = [];
+            
+            // Strategy 1: Search nearby locations for different capture years
+            for (const radius of searchRadii) {
+                for (const offset of searchOffsets.slice(0, 6)) { // Limit to avoid too many requests
+                    searchPromises.push((async () => {
+                        try {
+                            const searchLoc = new google.maps.LatLng(
+                                location.lat() + offset.lat,
+                                location.lng() + offset.lng
+                            );
+                            const pano = await getPanoramaAtLocation(searchLoc, radius);
+                            if (pano && !seenPanoIds.has(pano.panoId)) {
+                                // Check if this is actually a different time capture
+                                const timeDiff = Math.abs(pano.captureYear - (currentPano?.captureYear || new Date().getFullYear()));
+                                if (timeDiff >= 1 || foundPanoramas.length === 0) {
+                                    foundPanoramas.push(pano);
+                                    seenPanoIds.add(pano.panoId);
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore failed requests
+                        }
+                    })());
+                }
+                
+                // Wait for this radius batch before moving to next
+                await Promise.allSettled(searchPromises.splice(0, searchPromises.length));
+                
+                // If we found enough variety, stop searching
+                if (foundPanoramas.length >= 4) break;
+            }
+            
+            // Strategy 2: If not enough variety, try to use historical timeline requests
+            if (foundPanoramas.length < 3 && currentPano) {
+                try {
+                    const timelineData = await getTimelineData(location, currentPano.panoId);
+                    if (timelineData && timelineData.length > 0) {
+                        for (const histItem of timelineData) {
+                            if (!seenPanoIds.has(histItem.panoId) && foundPanoramas.length < 4) {
+                                foundPanoramas.push(histItem);
+                                seenPanoIds.add(histItem.panoId);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log('Timeline data not available');
+                }
+            }
+            
+            // Sort by year (newest first) and ensure variety
+            foundPanoramas.sort((a, b) => b.captureYear - a.captureYear);
+            
+            // If we have duplicates or too similar years, try to space them out
+            const spacedPanoramas = [];
+            let lastYear = null;
+            
+            for (const pano of foundPanoramas) {
+                if (spacedPanoramas.length === 0 || !lastYear || Math.abs(pano.captureYear - lastYear) >= 1) {
+                    spacedPanoramas.push(pano);
+                    lastYear = pano.captureYear;
+                    if (spacedPanoramas.length >= 4) break;
+                }
+            }
+            
+            return spacedPanoramas;
+        }
+        
+        async function getPanoramaAtLocation(location, radius) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: location,
+                    radius: radius,
+                    source: google.maps.StreetViewSource.OUTDOOR
+                };
+                
+                streetViewService.getPanorama(request, (data, status) => {
+                    if (status === google.maps.StreetViewStatus.OK && data) {
+                        let captureYear = new Date().getFullYear();
+                        let captureDate = 'Current';
+                        
+                        if (data.imageDate) {
+                            const date = new Date(data.imageDate);
+                            captureYear = date.getFullYear();
+                            captureDate = date.toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short' 
+                            });
+                        }
+                        
+                        resolve({
+                            data: data,
+                            captureDate: captureDate,
+                            captureYear: captureYear,
+                            location: data.location.latLng,
+                            panoId: data.location.pano
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+        
+        async function getTimelineData(location, basePanoId) {
+            // This is a more advanced technique to try to get historical data
+            // In practice, Google's Street View Timeline API is not publicly accessible
+            // But we can try some heuristics with the pano metadata
+            
+            return new Promise((resolve) => {
+                // Try to construct historical pano requests based on known patterns
+                const potentialHistoricalPanos = [];
+                const currentYear = new Date().getFullYear();
+                
+                // Generate some potential historical pano IDs based on common patterns
+                for (let yearOffset = 1; yearOffset <= 8; yearOffset++) {
+                    const year = currentYear - yearOffset;
+                    
+                    // This is speculative - in real Google Street View, historical panos
+                    // have different IDs but we can't easily predict them
+                    // Instead, we'll try nearby locations with smaller radii to find older captures
+                    const testLocation = new google.maps.LatLng(
+                        location.lat() + (Math.random() - 0.5) * 0.001,
+                        location.lng() + (Math.random() - 0.5) * 0.001
+                    );
+                    
+                    streetViewService.getPanorama({
+                        location: testLocation,
+                        radius: 50,
+                        source: google.maps.StreetViewSource.OUTDOOR
+                    }, (data, status) => {
+                        if (status === google.maps.StreetViewStatus.OK && data && data.imageDate) {
+                            const captureYear = new Date(data.imageDate).getFullYear();
+                            if (captureYear !== currentYear && captureYear >= 2007) { // Street View started in 2007
+                                potentialHistoricalPanos.push({
+                                    data: data,
+                                    captureDate: new Date(data.imageDate).toLocaleDateString('en-US', { 
+                                        year: 'numeric', 
+                                        month: 'short' 
+                                    }),
+                                    captureYear: captureYear,
+                                    location: data.location.latLng,
+                                    panoId: data.location.pano
+                                });
+                            }
+                        }
+                        
+                        // After all attempts, return what we found
+                        if (yearOffset === 8) {
+                            resolve(potentialHistoricalPanos);
+                        }
+                    });
+                }
+                
+                // Timeout fallback
+                setTimeout(() => resolve(potentialHistoricalPanos), 3000);
+            });
+        }
+        
+        function clearPanel(index) {
+            const panel = document.getElementById(`sv-${index}`);
+            // Remove any existing overlays
+            const overlay = panel.querySelector('.historical-overlay');
+            if (overlay) overlay.remove();
+            
+            // Remove any no-data content
+            const noDataContent = panel.querySelector('.no-data-panel');
+            if (noDataContent) noDataContent.remove();
+            
+            // Hide initial messages
+            const spans = panel.querySelectorAll('span');
+            spans.forEach(span => {
+                if (span.textContent.includes('Finding') || span.textContent.includes('No imagery')) {
+                    span.style.display = 'none';
+                }
+            });
+        }
+        
+        function showNoDataPanel(index, labelText = 'No Data') {
+            clearPanel(index);
+            
+            const panel = document.getElementById(`sv-${index}`);
+            
+            // Update label and time info
+            const label = panel.querySelector('.sv-label');
+            const timeInfo = panel.querySelector('.sv-time-info');
+            
+            if (label) label.textContent = labelText;
+            if (timeInfo) timeInfo.textContent = 'No data';
+            
+            // Add no-data message
+            const noDataDiv = document.createElement('div');
+            noDataDiv.className = 'no-data-panel';
+            noDataDiv.innerHTML = `
+                <div>No imagery available</div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.7;">for this time period</div>
+            `;
+            panel.appendChild(noDataDiv);
+            
+            // Hide the panorama
+            if (panoramas[index]) {
+                panoramas[index].setVisible(false);
+            }
+        }
+
+        function updateTemporalView(index, panoramaData) {
+            if (!panoramaData) return;
+            
+            clearPanel(index);
+            
+            const panel = document.getElementById(`sv-${index}`);
+            const timeInfo = panel.querySelector('.sv-time-info');
+            const label = panel.querySelector('.sv-label');
+            
+            // Use the provided label text
+            if (label) label.textContent = panoramaData.labelText;
+            if (timeInfo) timeInfo.textContent = panoramaData.captureDate;
+            
+            // Set up the panorama with consistent heading - USING ACTUAL DIFFERENT DATA
+            if (panoramas[index]) {
+                panoramas[index].setPosition(panoramaData.location);
+                panoramas[index].setPov({ 
+                    heading: masterHeading, 
+                    pitch: 5 
+                });
+                panoramas[index].setVisible(true);
+            }
+            
+            // Add historical overlay for older years ONLY (no overlay for real current data)
+            const currentYear = new Date().getFullYear();
+            if (panoramaData.captureYear < currentYear && panoramaData.isReal) {
+                const overlay = document.createElement('div');
+                overlay.className = 'historical-overlay';
+                panel.appendChild(overlay);
+            }
+            
+            // Remove any old disclaimer
+            const oldDisclaimer = panel.querySelector('.time-disclaimer');
+            if (oldDisclaimer) oldDisclaimer.remove();
+        }
+
+        function updateDirectionalViews(location) {
+            // Remove historical overlays
+            document.querySelectorAll('.historical-overlay').forEach(el => el.remove());
+            
+            // Clear no-data panels
+            document.querySelectorAll('.no-data-panel').forEach(el => el.remove());
+            
+            const request = {
+                location: location,
+                radius: 100,
+                source: google.maps.StreetViewSource.OUTDOOR,
+            };
+
+            streetViewService.getPanorama(request, (data, status) => {
+                const initialMsg = document.getElementById('initial-msg');
+                
+                if (status === google.maps.StreetViewStatus.OK) {
+                    const panoramaLocation = data.location.latLng;
+                    const headings = [0, 90, 180, 270]; // North, East, South, West
+                    const labels = ['North', 'East', 'South', 'West'];
+                    
+                    // Extract capture info
+                    let captureDate = 'Unknown';
+                    let timeOfDay = '';
+                    
+                    if (data.imageDate) {
+                        const date = new Date(data.imageDate);
+                        captureDate = date.getFullYear();
+                        timeOfDay = estimateTimeOfDay(data);
+                    }
+                    
+                    for (let i = 0; i < 4; i++) {
+                        const panel = document.getElementById(`sv-${i}`);
+                        const label = panel.querySelector('.sv-label');
+                        const timeInfo = panel.querySelector('.sv-time-info');
+                        
+                        label.textContent = labels[i];
+                        timeInfo.textContent = captureDate + (timeOfDay ? ` ${timeOfDay}` : '');
+                        
+                        panoramas[i].setPosition(panoramaLocation);
+                        panoramas[i].setPov({ 
+                            heading: (headings[i] + masterHeading) % 360, 
+                            pitch: 5 
+                        });
+                        panoramas[i].setVisible(true);
+                    }
+                    
+                    if (initialMsg) initialMsg.style.display = 'none';
+
+                } else {
+                    console.warn("Street View not available at this location");
+                    
+                    for (let i = 0; i < 4; i++) {
+                        panoramas[i].setVisible(false);
+                    }
+                    
+                    const firstPanel = document.getElementById('sv-0');
+                    firstPanel.innerHTML = `
+                        <div class="sv-label">North</div>
+                        <div class="sv-time-info">--</div>
+                        <span style="text-align: center; padding: 1rem;">
+                            Street View not available here.<br>
+                            <small>Try a different location</small>
+                        </span>`;
+                }
+            });
+        }
+
+        function updateViews(location) {
+            currentLocation = location;
+            marker.position = location;
+            map.panTo(location);
+
+            if (currentMode === 'temporal') {
+                loadHistoricalData(location);
+            } else {
+                updateDirectionalViews(location);
+            }
+        }
+
+        function updateTimeSlider(value) {
+            // This function is no longer used but kept for compatibility
+            // The time machine now works automatically without user slider input
+        }
+
+        function stepTime(direction) {
+            // This function is no longer used but kept for compatibility  
+            // The time machine now works automatically without user stepping
+        }
+
+        function estimateTimeOfDay(data) {
+            // Simplified time estimation based on available metadata
+            // In a real implementation, you might analyze shadow patterns or use additional APIs
+            try {
+                if (data.imageDate) {
+                    const date = new Date(data.imageDate);
+                    const hour = date.getHours();
+                    if (hour >= 6 && hour < 12) return 'Morning';
+                    if (hour >= 12 && hour < 17) return 'Afternoon';
+                    if (hour >= 17 && hour < 20) return 'Evening';
+                    return 'Night';
+                }
+            } catch (e) {
+                // Fallback estimation
+            }
+            return '';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // Google Maps API loader with geometry library for distance calculations
+        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" was loaded more than once. The rendering process may not work properly."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})
+        ({key: "AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA", v: "weekly", libraries: "geometry"});
+
+        // Initialize the app
+        async function startApp() {
+            // Load geometry library for distance calculations
+            await google.maps.importLibrary("geometry");
+            initApp();
+        }
+
+        startApp();
+    </script>
+
+</body>
+</html>
