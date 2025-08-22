@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Renamer & Zipper (HTML & RTF)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-zone.dragover {
+            background-color: #f0f9ff;
+            border-color: #3b82f6;
+        }
+        .file-item {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900">File Renamer & Zipper</h1>
+            <p class="text-slate-500 mt-2">Select HTML or RTF files, rename them based on content, and download as a ZIP.</p>
+        </div>
+
+        <!-- File Input & Drop Zone -->
+        <div id="dropZone" class="drop-zone rounded-lg p-8 text-center cursor-pointer bg-slate-100/50 hover:bg-slate-100">
+            <input type="file" id="fileInput" multiple accept=".html,.htm,.rtf" class="hidden">
+            <svg class="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <p class="mt-4 text-sm text-slate-600">
+                <span class="font-semibold text-blue-600">Click to upload</span> or drag and drop
+            </p>
+            <p class="text-xs text-slate-500 mt-1">HTML and RTF files supported</p>
+        </div>
+        
+        <div id="fileList" class="mt-4 space-y-2"></div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 text-center">
+            <button id="processBtn" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 disabled:bg-slate-300 disabled:cursor-not-allowed" disabled>
+                Process Files
+            </button>
+        </div>
+
+        <!-- Status & Preview Panel -->
+        <div id="statusPanel" class="mt-6 hidden">
+            <h2 class="text-lg font-semibold border-b pb-2 mb-4 text-slate-700">Processing Results</h2>
+            <div id="statusContainer" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+                <!-- Status items will be injected here -->
+            </div>
+        </div>
+        
+        <!-- Download Button -->
+        <div id="downloadContainer" class="mt-6 text-center hidden">
+             <button id="downloadBtn" class="w-full bg-green-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 disabled:bg-slate-300 disabled:cursor-not-allowed">
+                <span id="downloadBtnText">Download ZIP</span>
+                <span id="spinner" class="hidden animate-spin inline-block w-5 h-5 border-4 border-t-transparent rounded-full ml-2" role="status" aria-hidden="true"></span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileListDisplay = document.getElementById('fileList');
+        const processBtn = document.getElementById('processBtn');
+        const statusPanel = document.getElementById('statusPanel');
+        const statusContainer = document.getElementById('statusContainer');
+        const downloadContainer = document.getElementById('downloadContainer');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadBtnText = document.getElementById('downloadBtnText');
+        const spinner = document.getElementById('spinner');
+
+        // --- State Management ---
+        let selectedFiles = [];
+        let processedFiles = [];
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                handleFileSelection();
+            }
+        });
+        fileInput.addEventListener('change', handleFileSelection);
+        processBtn.addEventListener('click', processAllFiles);
+        downloadBtn.addEventListener('click', createAndDownloadZip);
+
+        // --- Core Functions ---
+
+        /**
+         * Handles the selection of files from the input or drag-and-drop.
+         */
+        function handleFileSelection() {
+            selectedFiles = Array.from(fileInput.files);
+            fileListDisplay.innerHTML = '';
+            if (selectedFiles.length > 0) {
+                const list = document.createElement('ul');
+                list.className = 'list-disc list-inside text-slate-600 text-sm';
+                selectedFiles.forEach(file => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = file.name;
+                    list.appendChild(listItem);
+                });
+                fileListDisplay.appendChild(list);
+                processBtn.disabled = false;
+            } else {
+                processBtn.disabled = true;
+            }
+            statusPanel.classList.add('hidden');
+            downloadContainer.classList.add('hidden');
+        }
+
+        /**
+         * Main function to orchestrate the processing of all selected files.
+         */
+        async function processAllFiles() {
+            processedFiles = [];
+            statusContainer.innerHTML = '';
+            statusPanel.classList.remove('hidden');
+            downloadContainer.classList.add('hidden');
+            
+            const processingPromises = selectedFiles.map(file => processSingleFile(file));
+            await Promise.all(processingPromises);
+
+            if (processedFiles.length > 0) {
+                downloadContainer.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Processes a single file: checks extension, calls the correct parser, and updates UI.
+         * @param {File} file - The file object to process.
+         */
+        async function processSingleFile(file) {
+            try {
+                const content = await file.text();
+                let newNameRaw = null;
+                let finalName = file.name;
+                let status = 'unchanged';
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                if (['html', 'htm'].includes(fileExtension)) {
+                    newNameRaw = extractFilenameFromHTML(content);
+                } else if (fileExtension === 'rtf') {
+                    newNameRaw = extractFilenameFromRTF(content);
+                }
+
+                if (newNameRaw) {
+                    const extension = fileExtension === 'rtf' ? '.rtf' : '.html';
+                    finalName = sanitizeFilename(newNameRaw) + extension;
+                    status = 'renamed';
+                }
+
+                processedFiles.push({ originalFile: file, newName: finalName });
+                updateStatusUI(file.name, finalName, status);
+
+            } catch (error) {
+                console.error(`Error processing file ${file.name}:`, error);
+                updateStatusUI(file.name, 'Error processing file', 'error');
+            }
+        }
+
+        /**
+         * HTML PARSER: Extracts filename from specific HTML structure.
+         * @param {string} htmlContent - The string content of the HTML file.
+         * @returns {string|null} The extracted filename or null if not found.
+         */
+        function extractFilenameFromHTML(htmlContent) {
+            const regex = /<dt>\s*Medium Neutral Citation:\s*<\/dt>\s*<dd>\s*<strong>(.*?)<\/strong>/is;
+            const match = htmlContent.match(regex);
+            return match ? match[1].trim() : null;
+        }
+
+        /**
+         * RTF PARSER: Extracts filename from RTF content.
+         * @param {string} rtfContent - The string content of the RTF file.
+         * @returns {string|null} The extracted filename or null if not found.
+         */
+        function extractFilenameFromRTF(rtfContent) {
+            // This is a simplified RTF to text conversion. It's not perfect but works for this specific case.
+            // It removes RTF control words (like \b, \i0) and curly brace groups.
+            let plainText = rtfContent.replace(/\\([a-z0-9]+)\s?/g, '')
+                                      .replace(/[{}]/g, '')
+                                      .replace(/[\r\n]+/g, ' ');
+
+            // Find the anchor text "MEDIUM NEUTRAL CITATION"
+            const anchorIndex = plainText.indexOf('MEDIUM NEUTRAL CITATION');
+            if (anchorIndex === -1) {
+                return null;
+            }
+
+            // Search for the citation pattern *after* the anchor text.
+            const textAfterAnchor = plainText.substring(anchorIndex);
+            
+            // Regex to find a pattern like "[2021] VSC 791"
+            const citationRegex = /\[\s*\d{4}\s*\]\s*[A-Z]+\s*\d+/;
+            const match = textAfterAnchor.match(citationRegex);
+
+            return match ? match[0].trim() : null;
+        }
+
+        /**
+         * Removes characters that are invalid in filenames.
+         * @param {string} name - The raw filename to sanitize.
+         * @returns {string} The sanitized filename.
+         */
+        function sanitizeFilename(name) {
+            return name.replace(/[\\/:*?"<>|]/g, '_');
+        }
+
+        /**
+         * Updates the status panel with the result of a single file's processing.
+         */
+        function updateStatusUI(originalName, newName, status) {
+            const item = document.createElement('div');
+            item.className = 'file-item text-sm p-3 rounded-md';
+            
+            let arrowColor = 'text-slate-400';
+            let bgColor = 'bg-slate-50';
+            let newNameColor = 'text-slate-800';
+
+            if (status === 'renamed') {
+                arrowColor = 'text-green-500';
+                bgColor = 'bg-green-50';
+                newNameColor = 'text-green-700 font-semibold';
+            } else if (status === 'error') {
+                arrowColor = 'text-red-500';
+                bgColor = 'bg-red-50';
+                newNameColor = 'text-red-700 font-semibold';
+            }
+
+            item.classList.add(bgColor);
+
+            item.innerHTML = `
+                <span class="truncate text-slate-600" title="${originalName}">${originalName}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${arrowColor}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                <span class="truncate ${newNameColor}" title="${newName}">${newName}</span>
+            `;
+            statusContainer.appendChild(item);
+        }
+
+        /**
+         * Creates a ZIP archive from the processed files and triggers a download.
+         */
+        async function createAndDownloadZip() {
+            if (processedFiles.length === 0) return;
+
+            setDownloadButtonState(true);
+
+            const zip = new JSZip();
+            processedFiles.forEach(item => {
+                zip.file(item.newName, item.originalFile);
+            });
+
+            try {
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = 'renamed_files.zip';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            } catch (error) {
+                console.error("Error creating ZIP file:", error);
+                alert("There was an error creating the ZIP file.");
+            } finally {
+                setDownloadButtonState(false);
+            }
+        }
+        
+        /**
+         * Manages the visual state of the download button (loading/idle).
+         */
+        function setDownloadButtonState(isLoading) {
+            if (isLoading) {
+                downloadBtn.disabled = true;
+                downloadBtnText.textContent = 'Zipping...';
+                spinner.classList.remove('hidden');
+            } else {
+                downloadBtn.disabled = false;
+                downloadBtnText.textContent = 'Download ZIP';
+                spinner.classList.add('hidden');
+            }
+        }
+
+    </script>
+</body>
+</html>
