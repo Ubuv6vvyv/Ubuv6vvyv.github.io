@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Content Protection Suite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; overscroll-behavior-y: contain; background-color: #f3f4f6; }
+        .protection-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2.5rem;
+            padding: 1.5rem;
+            overflow: hidden;
+        }
+        @media (min-width: 640px) { .protection-card { padding: 2rem; } }
+
+        /* --- Method 1: Spotlight --- */
+        .spotlight-protector { position: relative; cursor: none; -webkit-user-select: none; user-select: none; }
+        .spotlight-text { color: transparent; text-shadow: 0 0 12px rgba(0, 0, 0, 0.4); }
+        .spotlight-protector.reveal-active .spotlight-text { -webkit-mask-image: var(--mask-gradient); mask-image: var(--mask-gradient); color: #1f2937; text-shadow: none; }
+        
+        /* --- Method 2: Tap-to-Decode --- */
+        .scramble-protector p { cursor: pointer; transition: filter 0.5s ease; }
+        .scramble-protector p.decoded { filter: blur(0); }
+        .scramble-protector p.scrambled { filter: blur(2px); }
+
+        /* --- Method 3: Dynamic Watermark --- */
+        .watermark-protector { position: relative; -webkit-user-select: none; user-select: none; }
+        .dynamic-watermark { position: absolute; pointer-events: none; opacity: 0; font-weight: bold; font-size: clamp(1rem, 4vw, 1.5rem); color: #dc2626; transform: rotate(-25deg); transition: opacity 0.5s ease, top 0.1s ease-out, left 0.1s ease-out; white-space: nowrap; }
+
+        /* --- Method 4: Copy Trap --- */
+        .copy-trap-protector { position: relative; }
+        .copy-trap-protector .visible-text { -webkit-user-select: none; user-select: none; }
+        .copy-trap-protector .hidden-trap { position: absolute; inset: 0; color: transparent; background: transparent; z-index: 5; }
+        .copy-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background-color: #2d3748; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 100; transition: bottom 0.5s ease-in-out; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .copy-notification.show { bottom: 20px; }
+
+        /* --- Method 5: Wind-Up Reader --- */
+        .wind-up-reader { display: flex; flex-direction: column; md:flex-row; gap: 1.5rem; align-items: center; }
+        .wind-up-text-container { flex-grow: 1; }
+        .wind-up-text { transition: opacity 1s linear; }
+        .winder-container { flex-shrink: 0; text-align: center; }
+        #winderKnob { width: 80px; height: 80px; background: #4a5568; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: grab; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: transform 0.1s; }
+        #winderKnob:active { cursor: grabbing; transform: scale(1.1); }
+        #winderKnob::after { content: ''; width: 60%; height: 6px; background: #a0aec0; border-radius: 3px; }
+
+        /* --- Method 6: Audio Deterrent --- */
+        .audio-deterrent-protector .selection-text::selection { background: #f87171; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Advanced Protection Suite</h1>
+            <p class="text-gray-600 mt-3 text-lg">Six unique methods, fully responsive for desktop and mobile.</p>
+        </header>
+
+        <!-- Methods 1-4 (Unchanged) -->
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">1. Spotlight Reveal</h2>
+            <p class="text-gray-600 mb-4">Drag your finger or mouse to reveal text. This works natively on touch and desktop, preventing full screenshots while allowing page scrolling.</p>
+            <div id="spotlightProtector" class="spotlight-protector p-6 bg-gray-50 rounded-lg"><p class="spotlight-text leading-relaxed">The spotlight method remains a highly effective, cross-platform solution. Its core logic adapts seamlessly to both mouse movements and touch-drag events. By revealing only a small portion of the content at any given moment, it effectively thwarts attempts to capture a complete screenshot.</p></div>
+        </div>
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">2. Tap-to-Decode Scrambler</h2>
+            <p class="text-gray-600 mb-4">Optimized for touch. Tap a paragraph to decode it for a few seconds before it automatically re-scrambles. This frustrates copy-paste attempts.</p>
+            <div id="scrambleProtector" class="scramble-protector p-6 bg-gray-50 rounded-lg"><p class="leading-relaxed">This paragraph is now touch-friendly. Tap on it to trigger the decoding animation. The text will remain readable for three seconds before scrambling itself again. This interaction model prevents the text from being easily selected while remaining fully accessible.</p></div>
+        </div>
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">3. Interactive Dynamic Watermark</h2>
+            <p class="text-gray-600 mb-4">A watermark appears as you interact with the text (mouse move or finger drag), ensuring any screenshot taken is stamped with traceable information.</p>
+            <div id="watermarkProtector" class="watermark-protector p-6 bg-gray-50 rounded-lg">
+                <div id="dynamicWatermark" class="dynamic-watermark"></div><p class="leading-relaxed">This watermark is triggered by direct interaction. On a desktop, move your mouse over this area. On mobile, drag your finger across the text. A semi-transparent watermark containing a unique session ID and timestamp will follow your pointer, deterring unauthorized sharing.</p>
+            </div>
+        </div>
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">4. Intelligent Copy Trap</h2>
+            <p class="text-gray-600 mb-4">Attempting to copy this text (e.g., via long-press on mobile) will copy a hidden copyright message instead and trigger a polite notification.</p>
+            <div id="copyTrapProtector" class="copy-trap-protector p-6 bg-gray-50 rounded-lg">
+                <div class="visible-text leading-relaxed">The copy trap is universally effective. When a user attempts to copy this text, they will instead copy a hidden copyright message to their clipboard. The system then displays a notification, politely informing them that the content is protected.</div>
+                <div class="hidden-trap">Copyright © 2025. Content is protected. Unauthorized copying is prohibited.</div>
+            </div>
+        </div>
+
+        <!-- Method 5: Wind-Up Reader -->
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">5. Wind-Up Reader</h2>
+            <p class="text-gray-600 mb-4">The text is only visible if you keep it "wound up." Drag the knob to power the text. As it winds down, the text fades, requiring constant interaction.</p>
+            <div class="wind-up-reader p-6 bg-gray-50 rounded-lg">
+                <div class="wind-up-text-container">
+                    <p id="windUpText" class="wind-up-text leading-relaxed">This content is powered by your interaction. To read it, you must use your mouse or finger to spin the winder knob. The more you wind it, the more "power" you give the text, making it fully visible. Over time, this power decays, and the text will begin to fade away. This forces the user to remain actively engaged, making it impossible to passively view or capture the entire document in a single, clear state. It's a kinetic barrier to content theft.</p>
+                </div>
+                <div class="winder-container">
+                     <div id="winderKnob" title="Drag to wind"></div>
+                     <p class="text-sm text-gray-500 mt-2">Power: <span id="powerLevel">0</span>%</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Method 6: Audio Deterrent -->
+        <div class="protection-card">
+            <h2 class="text-2xl font-bold mb-2 text-gray-700">6. Audio Selection Deterrent</h2>
+            <p class="text-gray-600 mb-4">Try to select the text below. A subtle audio tone will play. The more text you select, the higher-pitched and more grating the tone becomes as a deterrent.</p>
+            <div id="audioDeterrentProtector" class="audio-deterrent-protector p-6 bg-gray-50 rounded-lg">
+                <p id="selectionText" class="selection-text leading-relaxed">This is an auditory defense mechanism. When a user begins to select this text, a low-frequency square wave tone is generated using the Web Audio API. As the selection area increases, the frequency and volume of the tone ramp up significantly. A full selection results in a loud, high-pitched, and irritating sound, creating a strong psychological incentive to stop the selection. This method doesn't prevent copying but makes the process extremely unpleasant, discouraging the behavior in a novel way.</p>
+            </div>
+        </div>
+
+    </div>
+    
+    <div id="copyNotification" class="copy-notification"><p>This content is protected and cannot be copied.</p></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Methods 1-4 (No new changes) ---
+        const spotlightProtector = document.getElementById('spotlightProtector');
+        if (spotlightProtector) { /* Spotlight logic from previous version */ 
+            let isSpotlightActive = false;
+            const updateSpotlight = (x, y) => {
+                const rect = spotlightProtector.getBoundingClientRect();
+                spotlightProtector.style.setProperty('--mask-gradient', `radial-gradient(circle at ${x - rect.left}px ${y - rect.top}px, black 12%, transparent 25%)`);
+                if (!isSpotlightActive) { spotlightProtector.classList.add('reveal-active'); isSpotlightActive = true; }
+            };
+            spotlightProtector.addEventListener('mousemove', e => updateSpotlight(e.clientX, e.clientY));
+            spotlightProtector.addEventListener('touchmove', e => { if (e.touches.length > 0) updateSpotlight(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+        }
+        const scrambleProtector = document.getElementById('scrambleProtector');
+        if (scrambleProtector) { /* Scramble logic from previous version */ 
+             const paragraphs = scrambleProtector.querySelectorAll('p');
+            const chars = '!<>-_\\/[]{}—=+*^?#'; let activeTimeout = null;
+            paragraphs.forEach(p => {
+                const originalText = p.textContent; p.setAttribute('data-original', originalText);
+                p.textContent = originalText.split('').map(c => c === ' ' ? ' ' : chars[Math.floor(Math.random() * chars.length)]).join('');
+                p.classList.add('scrambled');
+                p.addEventListener('click', (e) => {
+                    const targetP = e.currentTarget; if (activeTimeout) clearTimeout(activeTimeout);
+                    paragraphs.forEach(otherP => { if (otherP !== targetP) { otherP.textContent = otherP.getAttribute('data-original').split('').map(c => c === ' ' ? ' ' : chars[Math.floor(Math.random() * chars.length)]).join(''); otherP.classList.remove('decoded'); otherP.classList.add('scrambled'); }});
+                    targetP.textContent = targetP.getAttribute('data-original'); targetP.classList.remove('scrambled'); targetP.classList.add('decoded');
+                    activeTimeout = setTimeout(() => { targetP.textContent = targetP.getAttribute('data-original').split('').map(c => c === ' ' ? ' ' : chars[Math.floor(Math.random() * chars.length)]).join(''); targetP.classList.remove('decoded'); targetP.classList.add('scrambled');}, 3000);
+                });
+            });
+        }
+        const watermarkProtector = document.getElementById('watermarkProtector');
+        if (watermarkProtector) { /* Watermark logic from previous version */ 
+            const dynamicWatermark = document.getElementById('dynamicWatermark'); const sessionId = `SID-${Math.random().toString(36).substr(2, 9).toUpperCase()}`; const date = new Date().toLocaleDateString();
+            const updateWatermark = (x, y) => {
+                const rect = watermarkProtector.getBoundingClientRect(); dynamicWatermark.style.left = `${x - rect.left}px`; dynamicWatermark.style.top = `${y - rect.top}px`; dynamicWatermark.textContent = `${sessionId} | ${date}`; dynamicWatermark.style.opacity = '0.1';
+            };
+            watermarkProtector.addEventListener('mousemove', e => updateWatermark(e.clientX, e.clientY));
+            watermarkProtector.addEventListener('touchmove', e => { if (e.touches.length > 0) updateWatermark(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+            watermarkProtector.addEventListener('mouseleave', () => dynamicWatermark.style.opacity = '0');
+            watermarkProtector.addEventListener('touchend', () => dynamicWatermark.style.opacity = '0');
+        }
+        const copyTrapProtector = document.getElementById('copyTrapProtector');
+        if (copyTrapProtector) { /* Copy trap logic from previous version */ 
+            const copyNotification = document.getElementById('copyNotification');
+            copyTrapProtector.addEventListener('copy', () => { copyNotification.classList.add('show'); setTimeout(() => copyNotification.classList.remove('show'), 3000); });
+        }
+
+        // --- Method 5: Wind-Up Reader Logic ---
+        const windUpText = document.getElementById('windUpText');
+        const winderKnob = document.getElementById('winderKnob');
+        const powerLevelSpan = document.getElementById('powerLevel');
+        if (windUpText && winderKnob && powerLevelSpan) {
+            let power = 0;
+            let currentRotation = 0;
+            let isWinding = false;
+            let lastAngle = 0;
+            
+            const updatePowerDisplay = () => {
+                windUpText.style.opacity = power / 100;
+                powerLevelSpan.textContent = Math.round(power);
+            };
+
+            setInterval(() => {
+                if (power > 0) {
+                    power -= 1; // Power decay rate
+                    updatePowerDisplay();
+                }
+            }, 100);
+
+            const startWinding = (e) => {
+                e.preventDefault();
+                isWinding = true;
+                const rect = winderKnob.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+                lastAngle = angle;
+            };
+            
+            const onWinding = (e) => {
+                if (!isWinding) return;
+                const rect = winderKnob.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+                let deltaAngle = angle - lastAngle;
+
+                if (deltaAngle > 180) deltaAngle -= 360;
+                if (deltaAngle < -180) deltaAngle += 360;
+
+                currentRotation += deltaAngle;
+                power = Math.min(100, power + Math.abs(deltaAngle) / 5);
+                winderKnob.style.transform = `rotate(${currentRotation}deg) scale(1.1)`;
+                updatePowerDisplay();
+                lastAngle = angle;
+            };
+
+            const stopWinding = () => {
+                isWinding = false;
+                winderKnob.style.transform = `rotate(${currentRotation}deg) scale(1)`;
+            };
+
+            winderKnob.addEventListener('mousedown', startWinding);
+            window.addEventListener('mousemove', onWinding);
+            window.addEventListener('mouseup', stopWinding);
+            winderKnob.addEventListener('touchstart', startWinding, { passive: false });
+            window.addEventListener('touchmove', onWinding, { passive: false });
+            window.addEventListener('touchend', stopWinding);
+
+            updatePowerDisplay(); // Initial state
+        }
+        
+        // --- Method 6: Audio Deterrent Logic ---
+        const audioDeterrentProtector = document.getElementById('audioDeterrentProtector');
+        if(audioDeterrentProtector) {
+            let audioCtx, oscillator, gainNode;
+            let isAudioInitialized = false;
+
+            const setupAudio = () => {
+                if (isAudioInitialized) return;
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    oscillator = audioCtx.createOscillator();
+                    gainNode = audioCtx.createGain();
+                    
+                    oscillator.type = 'square';
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    gainNode.gain.value = 0; // Start silent
+                    oscillator.start();
+                    isAudioInitialized = true;
+                } catch (e) {
+                    console.error("Web Audio API is not supported in this browser.", e);
+                }
+            };
+            
+            document.addEventListener('selectionchange', () => {
+                const selection = window.getSelection();
+                const textElement = document.getElementById('selectionText');
+                if (!selection.isCollapsed && textElement && selection.containsNode(textElement, true)) {
+                    if (!isAudioInitialized) setupAudio();
+                    if (!audioCtx) return;
+                    if(audioCtx.state === 'suspended') audioCtx.resume();
+                    
+                    const totalLength = textElement.textContent.length;
+                    const selectedLength = selection.toString().length;
+                    const selectionPercent = selectedLength / totalLength;
+                    
+                    // Map selection percentage to frequency (e.g., 200Hz to 2000Hz)
+                    const frequency = 200 + (selectionPercent * 1800);
+                    // Map selection percentage to volume (e.g., 5% to 50%)
+                    const volume = 0.05 + (selectionPercent * 0.45);
+                    
+                    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                    gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.01);
+                } else {
+                    if (gainNode) {
+                        gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+                    }
+                }
+            });
+        }
+    });
+    </script>
+</body>
+</html>
