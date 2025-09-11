@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zip Flattener</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip library to handle zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FileSaver.js to save files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full max-w-2xl mx-4">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Zip Flattener</h1>
+            <p class="text-gray-600 mt-2">Upload a .zip file to create a flattened version with unique filenames.</p>
+        </header>
+
+        <main>
+            <!-- File Input Section -->
+            <div class="mb-6">
+                <label for="zip-file" class="block w-full cursor-pointer bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-center transition-colors duration-300">
+                    <span>📂 Select Zip File</span>
+                    <input type="file" id="zip-file" class="hidden" accept=".zip">
+                </label>
+            </div>
+            
+            <!-- Message and Loading Section -->
+            <div id="status-container" class="text-center text-gray-500 py-4">
+                <p id="status-message">No file selected.</p>
+                <div id="loader" class="hidden animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mt-2"></div>
+            </div>
+
+            <!-- File Content Display Section -->
+            <div id="file-contents" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-semibold">Zip Contents</h2>
+                    <button id="download-flat-zip" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                        Download Flattened Zip
+                    </button>
+                </div>
+                <div id="file-list" class="max-h-80 overflow-y-auto bg-gray-50 p-4 rounded-lg border">
+                    <!-- File items will be dynamically inserted here -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const zipFileInput = document.getElementById('zip-file');
+        const statusMessage = document.getElementById('status-message');
+        const loader = document.getElementById('loader');
+        const fileContentsContainer = document.getElementById('file-contents');
+        const fileListContainer = document.getElementById('file-list');
+        const downloadFlatZipButton = document.getElementById('download-flat-zip');
+
+        // Store the loaded zip object globally within the script's scope
+        let loadedZip = null;
+        let originalFilename = 'flattened.zip';
+        
+        /**
+         * Creates a flattened, unique filename from a zip entry's full path.
+         * Replaces directory separators with spaces.
+         * @param {string} fullPath The full path of the file in the zip (e.g., "folder/file.txt").
+         * @returns {string} The flattened name (e.g., "folder file.txt").
+         */
+        function getFlattenedFileName(fullPath) {
+            // Replace all forward slashes with spaces and trim any whitespace.
+            return fullPath.replace(/\//g, ' ').trim();
+        }
+
+
+        zipFileInput.addEventListener('change', handleFileSelect);
+
+        /**
+         * Handles the file selection event.
+         * @param {Event} event The file input change event.
+         */
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                resetUI();
+                return;
+            }
+            
+            if (!file.name.toLowerCase().endsWith('.zip')) {
+                statusMessage.textContent = 'Error: Please select a .zip file.';
+                statusMessage.classList.add('text-red-500');
+                resetUI(true);
+                return;
+            }
+
+            // Reset UI state for new file
+            fileContentsContainer.classList.add('hidden');
+            fileListContainer.innerHTML = '';
+            statusMessage.textContent = 'Processing file...';
+            statusMessage.classList.remove('text-red-500');
+            loader.classList.remove('hidden');
+            downloadFlatZipButton.disabled = true;
+            loadedZip = null;
+            originalFilename = file.name.replace(/\.zip$/i, '-flattened.zip');
+
+
+            try {
+                // Read the file as an ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                // Load the zip file using JSZip
+                loadedZip = await JSZip.loadAsync(arrayBuffer);
+                
+                const files = [];
+                // Iterate over each file in the zip
+                loadedZip.forEach((relativePath, zipEntry) => {
+                    // Ignore directories
+                    if (!zipEntry.dir) {
+                        files.push(zipEntry);
+                    }
+                });
+
+                if (files.length === 0) {
+                     statusMessage.textContent = 'This zip file is empty or contains only folders.';
+                } else {
+                     statusMessage.textContent = `Found ${files.length} file(s).`;
+                     displayFiles(files);
+                     fileContentsContainer.classList.remove('hidden');
+                     downloadFlatZipButton.disabled = false;
+                }
+
+            } catch (error) {
+                console.error('Error processing zip file:', error);
+                statusMessage.textContent = 'Error: Could not read the zip file. It might be corrupt.';
+                statusMessage.classList.add('text-red-500');
+                loadedZip = null;
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Renders the list of files in the UI.
+         * @param {Array<JSZip.ZipObject>} files An array of zip entries.
+         */
+        function displayFiles(files) {
+            fileListContainer.innerHTML = ''; // Clear previous list
+            files.forEach(file => {
+                const listItem = document.createElement('div');
+                listItem.className = 'flex justify-between items-center p-2 border-b last:border-b-0 hover:bg-gray-100';
+                
+                const flattenedName = getFlattenedFileName(file.name);
+
+                const fileNameSpan = document.createElement('span');
+                fileNameSpan.textContent = flattenedName;
+                fileNameSpan.className = 'truncate pr-4';
+                fileNameSpan.title = `Original path: ${file.name}`; // Show original path on hover
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.textContent = 'Download';
+                downloadLink.href = '#';
+                downloadLink.className = 'text-blue-500 hover:underline text-sm font-semibold flex-shrink-0';
+                downloadLink.download = flattenedName;
+
+                downloadLink.onclick = async (e) => {
+                    e.preventDefault();
+                    e.target.textContent = '...';
+                    try {
+                        // Generate blob content for the specific file
+                        const blob = await file.async('blob');
+                        // Use FileSaver.js to save the file
+                        saveAs(blob, flattenedName);
+                    } catch (err) {
+                        console.error("Failed to download file:", err);
+                    } finally {
+                        e.target.textContent = 'Download';
+                    }
+                };
+
+                listItem.appendChild(fileNameSpan);
+                listItem.appendChild(downloadLink);
+                fileListContainer.appendChild(listItem);
+            });
+        }
+
+        /**
+         * Handles the click event for downloading the flattened zip.
+         */
+        downloadFlatZipButton.addEventListener('click', async () => {
+            if (!loadedZip) {
+                alert('No zip file loaded.');
+                return;
+            }
+
+            downloadFlatZipButton.textContent = 'Zipping...';
+            downloadFlatZipButton.disabled = true;
+
+            try {
+                const newZip = new JSZip();
+                const filePromises = [];
+
+                // Iterate through original zip files
+                loadedZip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir) {
+                        // Get the new flattened and unique filename
+                        const flattenedName = getFlattenedFileName(zipEntry.name);
+                        
+                        // Add file to the new zip with the flattened name
+                        const promise = zipEntry.async('blob').then(content => {
+                            newZip.file(flattenedName, content);
+                        });
+                        filePromises.push(promise);
+                    }
+                });
+
+                // Wait for all files to be added to the new zip instance
+                await Promise.all(filePromises);
+
+                // Generate the new zip file as a blob
+                const content = await newZip.generateAsync({ type: 'blob' });
+                // Save the new zip file
+                saveAs(content, originalFilename);
+
+            } catch (error) {
+                console.error('Error creating flattened zip:', error);
+                alert('An error occurred while creating the flattened zip.');
+            } finally {
+                downloadFlatZipButton.textContent = 'Download Flattened Zip';
+                downloadFlatZipButton.disabled = false;
+            }
+        });
+        
+        /**
+         * Resets the UI to its initial state.
+         * @param {boolean} isError - If the reset is due to an error.
+         */
+        function resetUI(isError = false) {
+            fileContentsContainer.classList.add('hidden');
+            fileListContainer.innerHTML = '';
+            loader.classList.add('hidden');
+            if (!isError) {
+                statusMessage.textContent = 'No file selected.';
+                statusMessage.classList.remove('text-red-500');
+            }
+            zipFileInput.value = ''; // Reset file input
+        }
+
+    </script>
+</body>
+</html>
+
