@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Enhanced Web Crawler</title>
+</head>
+<body>
+<script>
+const visited = new Set(), queue = [], results = {
+    pages: new Set(),
+    external: new Set(),
+    images: new Map(),
+    media: new Set(),
+    scripts: new Set(),
+    styles: new Set(),
+    secrets: []
+};
+
+let crawling = 0, paused = 0, processed = 0, queued = 0, active = 0, startTime = 0;
+const settings = { depth: 3, concurrent: 5, external: 0, robots: 0, timeout: 8000 };
+
+// Create UI container with enhanced visibility
+const ui = document.createElement('div');
+ui.id = 'web-crawler-ui';
+ui.style.cssText = 'position:fixed;top:0;left:0;width:100%;z-index:999999;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:12px;color:#fff;text-align:left;box-shadow:0 4px 20px rgba(0,0,0,0.8);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)';
+
+// Enhanced header with better contrast
+const header = document.createElement('div');
+header.style.cssText = 'background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 100%);border:2px solid #444;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;cursor:move;text-shadow:0 1px 2px rgba(0,0,0,0.8)';
+
+header.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px">
+<label style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:500">Depth: <input type="number" id="depth" min="1" max="10" value="3" style="width:32px;padding:2px;border:1px solid #666;border-radius:2px;background:#333;color:#fff"></label>
+<label style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:500">Threads: <input type="number" id="concurrent" min="1" max="15" value="5" style="width:32px;padding:2px;border:1px solid #666;border-radius:2px;background:#333;color:#fff"></label>
+<label style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:500"><input type="checkbox" id="external" style="margin:0"> External</label>
+<label style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:500"><input type="checkbox" id="robots" style="margin:0"> Robots.txt</label>
+</div>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+<button id="start" style="padding:4px 8px;background:#0a7c0a;border:1px solid #0f5c0f;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500">Start</button>
+<button id="pause" style="padding:4px 8px;background:#b8860b;border:1px solid #996f0a;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500" disabled>Pause</button>
+<button id="stop" style="padding:4px 8px;background:#8b0000;border:1px solid #650000;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500" disabled>Stop</button>
+<button id="export-html" style="padding:4px 8px;background:#1e5799;border:1px solid #1a4d82;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500" disabled>Export Report</button>
+<button id="export-json" style="padding:4px 8px;background:#7b1fa2;border:1px solid #6a1b85;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500" disabled>Export JSON</button>
+<button id="export-sitemap" style="padding:4px 8px;background:#455a64;border:1px solid #37474f;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500" disabled>Export Sitemap</button>
+<button id="close" style="padding:4px 8px;background:#444;border:1px solid #333;color:#fff;border-radius:3px;cursor:pointer;font-size:10px;font-weight:500">✕</button>
+</div>`;
+ui.appendChild(header);
+
+// Enhanced status bar with better visibility
+const statusBar = document.createElement('div');
+statusBar.style.cssText = 'background:rgba(0,0,0,0.9);border:1px solid #333;border-top:none;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:10px;text-shadow:0 1px 1px rgba(0,0,0,0.8)';
+const statusText = document.createElement('span');
+statusText.textContent = 'Ready';
+statusText.style.cssText = 'font-weight:500';
+const progressBar = document.createElement('div');
+progressBar.style.cssText = 'flex:1;margin:0 12px;height:4px;background:#333;border:1px solid #555;border-radius:2px;overflow:hidden';
+const progressFill = document.createElement('div');
+progressFill.style.cssText = 'width:0%;height:100%;background:linear-gradient(90deg,#0a7c0a,#4caf50);transition:width 0.3s ease';
+progressBar.appendChild(progressFill);
+const statsText = document.createElement('span');
+statsText.textContent = 'URLs: 0';
+statsText.style.cssText = 'font-weight:500';
+statusBar.appendChild(statusText);
+statusBar.appendChild(progressBar);
+statusBar.appendChild(statsText);
+ui.appendChild(statusBar);
+document.body.appendChild(ui);
+
+// Utility functions
+const log = (msg, type = 'info') => {
+    console.log(`[Crawler] ${msg}`);
+    if (type === 'error') console.error(msg);
+};
+
+const updateStatus = () => {
+    const progress = queued > 0 ? (processed / queued) * 100 : 0;
+    progressFill.style.width = `${Math.min(progress, 100)}%`;
+    statusText.textContent = paused ? 'Paused' : crawling ? `Crawling... (${active} active)` : 'Ready';
+    statsText.textContent = `Pages: ${results.pages.size} | Ext: ${results.external.size} | Imgs: ${results.images.size} | Media: ${results.media.size}`;
+};
+
+// Enhanced URL normalization with comprehensive detection
+const normalizeUrl = (url, base = location.href) => {
+    if (!url || typeof url !== 'string') return null;
+    try {
+        // Handle data URLs, mailto, tel, javascript, etc.
+        if (url.match(/^(data|mailto|tel|javascript|about|chrome|moz-):/i)) return null;
+        
+        // Clean common tracking parameters and fragments
+        const u = new URL(url.trim(), base);
+        u.hash = '';
+        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 
+         'fbclid', 'gclid', 'gclsrc', 'dclid', 'ref', 'referrer', '_ga', '_gl'].forEach(p => u.searchParams.delete(p));
+        
+        // Remove common session IDs
+        u.searchParams.delete('PHPSESSID');
+        u.searchParams.delete('jsessionid');
+        u.searchParams.delete('JSESSIONID');
+        
+        return u.href;
+    } catch {
+        return null;
+    }
+};
+
+const isValidUrl = url => {
+    try { return Boolean(new URL(url)); } catch { return false; }
+};
+
+const isSameOrigin = url => {
+    try { return new URL(url).origin === location.origin; } catch { return false; }
+};
+
+const getFileType = url => {
+    const ext = url.toLowerCase().split('.').pop().split('?')[0].split('#')[0];
+    const types = {
+        image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp', 'tiff', 'avif'],
+        video: ['mp4', 'webm', 'mov', 'avi', 'wmv', 'flv', 'mkv', 'm4v'],
+        audio: ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'],
+        script: ['js', 'mjs', 'jsx', 'ts', 'tsx'],
+        style: ['css', 'scss', 'sass', 'less'],
+        document: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf'],
+        archive: ['zip', 'rar', 'tar', 'gz', '7z', 'bz2', 'xz']
+    };
+    for (const [type, exts] of Object.entries(types)) {
+        if (exts.includes(ext)) return type;
+    }
+    return 'other';
+};
+
+const extractImageSize = url => {
+    const sizeMatch = url.match(/[\W_-](\d+)x(\d+)[\W_-]|[\W_-]w(\d+)[\W_-]|[\W_-](\d+)w[\W_-]/i);
+    return sizeMatch ? parseInt(sizeMatch[1] || sizeMatch[3] || sizeMatch[4]) || 0 : 0;
+};
+
+const deduplicateImages = () => {
+    const groups = new Map();
+    for (const [url, data] of results.images) {
+        const baseName = url.split('/').pop().split('.')[0].replace(/[-_]\d+x?\d*$/i, '').toLowerCase();
+        if (!groups.has(baseName)) groups.set(baseName, []);
+        groups.get(baseName).push([url, data]);
+    }
+    results.images.clear();
+    for (const group of groups.values()) {
+        if (group.length === 1) {
+            results.images.set(group[0][0], group[0][1]);
+        } else {
+            const largest = group.reduce((max, current) => 
+                current[1].size > max[1].size ? current : max
+            );
+            results.images.set(largest[0], largest[1]);
+        }
+    }
+};
+
+const scanForSecrets = (text, url) => {
+    const patterns = [
+        { name: 'API Key', regex: /\b(?:api[_-]?key|access[_-]?key|secret[_-]?key)\s*[:=]\s*['"']?([a-zA-Z0-9_\-\.]{20,})['"']?/gi },
+        { name: 'JWT Token', regex: /\b(eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*)/g },
+        { name: 'AWS Key', regex: /\b(AKIA[0-9A-Z]{16})\b/g },
+        { name: 'Google API', regex: /\b(AIza[0-9A-Za-z_\-]{35})\b/g },
+        { name: 'GitHub Token', regex: /\b(gh[pous]_[a-zA-Z0-9]{36,251})\b/g },
+        { name: 'Private Key', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g }
+    ];
+    
+    for (const pattern of patterns) {
+        let match;
+        while ((match = pattern.regex.exec(text)) !== null) {
+            const value = match[1] || match[0];
+            if (value.length >= 16 && !results.secrets.some(s => s.value.includes(value.substring(0, 20)))) {
+                results.secrets.push({
+                    type: pattern.name,
+                    url,
+                    value: value.substring(0, 50) + (value.length > 50 ? '...' : '')
+                });
+                if (results.secrets.length <= 5) {
+                    log(`Found ${pattern.name} in ${url}`, 'warning');
+                }
+            }
+        }
+    }
+};
+
+// Enhanced content extraction with comprehensive URL detection
+const extractContent = (html, baseUrl) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const foundUrls = new Set();
+    
+    // Extract all possible URL sources
+    const urlSources = [
+        ['a', 'href'], ['link', 'href'], ['area', 'href'],
+        ['img', 'src'], ['img', 'srcset'], ['source', 'srcset'], ['source', 'src'],
+        ['script', 'src'], ['iframe', 'src'], ['embed', 'src'], ['object', 'data'],
+        ['video', 'src'], ['audio', 'src'], ['track', 'src'],
+        ['form', 'action'], ['base', 'href'], ['meta[http-equiv="refresh"]', 'content']
+    ];
+    
+    urlSources.forEach(([selector, attr]) => {
+        doc.querySelectorAll(selector).forEach(el => {
+            let urls = [];
+            const val = el.getAttribute(attr);
+            if (!val) return;
+            
+            // Handle special cases
+            if (attr === 'content' && selector.includes('refresh')) {
+                const match = val.match(/url=(.+)/i);
+                if (match) urls = [match[1]];
+            } else if (attr === 'srcset') {
+                urls = val.split(',').map(s => s.trim().split(/\s+/)[0]);
+            } else {
+                urls = [val];
+            }
+            
+            urls.forEach(u => {
+                const fullUrl = normalizeUrl(u, baseUrl);
+                if (!fullUrl) return;
+                
+                const isExternal = !isSameOrigin(fullUrl);
+                
+                // ALWAYS log external URLs regardless of settings
+                if (isExternal) {
+                    results.external.add(fullUrl);
+                    log(`External URL found: ${fullUrl}`);
+                }
+                
+                // Only add to crawl queue if it's internal OR external crawling is enabled
+                if (!isExternal || settings.external) {
+                    const type = getFileType(fullUrl);
+                    
+                    // Categorize resource types
+                    if (type === 'image') {
+                        const size = extractImageSize(fullUrl);
+                        results.images.set(fullUrl, { url: fullUrl, size, type, element: selector });
+                    } else if (type === 'script') {
+                        results.scripts.add(fullUrl);
+                    } else if (type === 'style') {
+                        results.styles.add(fullUrl);
+                    } else if (['video', 'audio', 'document', 'archive'].includes(type)) {
+                        results.media.add(fullUrl);
+                    }
+                    
+                    // Add to crawl queue for HTML pages
+                    if (selector === 'a' || type === 'other') {
+                        foundUrls.add(fullUrl);
+                    }
+                }
+            });
+        });
+    });
+    
+    // Extract URLs from inline styles and JavaScript
+    const inlineScripts = doc.querySelectorAll('script:not([src])');
+    inlineScripts.forEach(script => {
+        const urlRegex = /(?:https?:)?\/\/[^\s"'<>]+/g;
+        let match;
+        while ((match = urlRegex.exec(script.textContent)) !== null) {
+            const url = normalizeUrl(match[0], baseUrl);
+            if (url) {
+                if (!isSameOrigin(url)) results.external.add(url);
+                else foundUrls.add(url);
+            }
+        }
+    });
+    
+    // Extract URLs from CSS
+    const styleElements = doc.querySelectorAll('style');
+    styleElements.forEach(style => {
+        const urlRegex = /url\(['"]?([^'"()]+)['"]?\)/g;
+        let match;
+        while ((match = urlRegex.exec(style.textContent)) !== null) {
+            const url = normalizeUrl(match[1], baseUrl);
+            if (url) {
+                if (!isSameOrigin(url)) results.external.add(url);
+                else if (getFileType(url) === 'image') {
+                    results.images.set(url, { url, size: 0, type: 'image', element: 'css' });
+                }
+            }
+        }
+    });
+    
+    scanForSecrets(html, baseUrl);
+    return Array.from(foundUrls);
+};
+
+// Check for sitemap.xml as URL discovery shortcut
+const checkSitemap = async () => {
+    const sitemapUrls = [
+        `${location.origin}/sitemap.xml`,
+        `${location.origin}/sitemap_index.xml`,
+        `${location.origin}/sitemaps.xml`,
+        `${location.origin}/wp-sitemap.xml`
+    ];
+    
+    for (const sitemapUrl of sitemapUrls) {
+        try {
+            const response = await fetch(sitemapUrl, { 
+                method: 'HEAD',
+                timeout: 3000 
+            });
+            if (response.ok) {
+                log(`Found sitemap: ${sitemapUrl}`);
+                const fullResponse = await fetch(sitemapUrl);
+                const xml = await fullResponse.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(xml, 'text/xml');
+                
+                // Extract URLs from sitemap
+                const urls = Array.from(doc.querySelectorAll('url > loc')).map(loc => loc.textContent.trim());
+                urls.forEach(url => {
+                    const normalized = normalizeUrl(url);
+                    if (normalized && isSameOrigin(normalized)) {
+                        enqueueUrl(normalized, 1); // Add with depth 1
+                    }
+                });
+                log(`Added ${urls.length} URLs from sitemap`);
+                break; // Use first found sitemap
+            }
+        } catch (e) {
+            // Silently continue to next sitemap
+        }
+    }
+};
+
+const enqueueUrl = (url, depth) => {
+    const normalized = normalizeUrl(url);
+    if (!normalized || visited.has(normalized) || depth > settings.depth) return;
+    
+    visited.add(normalized);
+    queue.push({ url: normalized, depth });
+    queued++;
+};
+
+const processNext = async () => {
+    if (!crawling || paused || queue.length === 0 || active >= settings.concurrent) return;
+    
+    const item = queue.shift();
+    active++;
+    
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), settings.timeout);
+        
+        const response = await fetch(item.url, {
+            signal: controller.signal,
+            credentials: 'omit',
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (compatible; WebCrawler/2.0)',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
+            const html = await response.text();
+            const urls = extractContent(html, item.url);
+            results.pages.add(item.url);
+            urls.forEach(u => enqueueUrl(u, item.depth + 1));
+            log(`Crawled: ${item.url.length > 60 ? item.url.substring(0, 60) + '...' : item.url}`);
+        } else {
+            const type = getFileType(item.url);
+            if (type === 'script') results.scripts.add(item.url);
+            else if (type === 'style') results.styles.add(item.url);
+            else results.media.add(item.url);
+        }
+        
+        processed++;
+    } catch (error) {
+        log(`Error crawling ${item.url}: ${error.message}`, 'error');
+    } finally {
+        active--;
+        updateStatus();
+        setTimeout(processQueue, 10);
+    }
+};
+
+const processQueue = () => {
+    if (!crawling || paused) return;
+    
+    const slots = settings.concurrent - active;
+    for (let i = 0; i < slots && queue.length > 0; i++) {
+        processNext();
+    }
+    
+    if (active === 0 && queue.length === 0 && crawling) {
+        stopCrawl(true);
+    } else if (crawling && queue.length > 0) {
+        setTimeout(processQueue, 50);
+    }
+};
+
+const startCrawl = async () => {
+    if (crawling) return;
+    
+    // Update settings from UI
+    settings.depth = parseInt(document.getElementById('depth').value) || 3;
+    settings.concurrent = parseInt(document.getElementById('concurrent').value) || 5;
+    settings.external = document.getElementById('external').checked;
+    settings.robots = document.getElementById('robots').checked;
+    
+    // Reset state
+    visited.clear();
+    queue.length = 0;
+    Object.values(results).forEach(r => r.clear ? r.clear() : r.length = 0);
+    results.secrets = [];
+    processed = queued = active = 0;
+    startTime = Date.now();
+    crawling = true;
+    paused = false;
+    
+    // Update UI
+    document.getElementById('start').disabled = true;
+    document.getElementById('pause').disabled = false;
+    document.getElementById('stop').disabled = false;
+    
+    log('Starting crawl...');
+    
+    // Check sitemap first as a shortcut
+    await checkSitemap();
+    
+    // Add starting URL
+    enqueueUrl(location.href, 0);
+    updateStatus();
+    processQueue();
+};
+
+const pauseCrawl = () => {
+    paused = !paused;
+    document.getElementById('pause').textContent = paused ? 'Resume' : 'Pause';
+    log(paused ? 'Paused' : 'Resumed');
+    updateStatus();
+    if (!paused) processQueue();
+};
+
+const stopCrawl = (completed = false) => {
+    crawling = false;
+    paused = false;
+    queue.length = 0;
+    
+    document.getElementById('start').disabled = false;
+    document.getElementById('pause').disabled = true;
+    document.getElementById('pause').textContent = 'Pause';
+    document.getElementById('stop').disabled = true;
+    document.getElementById('export-html').disabled = false;
+    document.getElementById('export-json').disabled = false;
+    document.getElementById('export-sitemap').disabled = false;
+    
+    deduplicateImages();
+    log(completed ? 'Crawl completed!' : 'Crawl stopped');
+    updateStatus();
+};
+
+// Simplified and clean export functions
+const exportHTML = () => {
+    const duration = startTime ? Date.now() - startTime : 0;
+    const imageArray = Array.from(results.images.values()).sort((a, b) => a.url.localeCompare(b.url));
+    
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Crawl Report - ${location.hostname}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:11px/1.3 system-ui,sans-serif;background:#f5f5f5;color:#222}
+.c{max-width:1200px;margin:0 auto;padding:12px}
+.h{background:#fff;border:1px solid #ddd;border-radius:4px;padding:16px;margin-bottom:16px}
+.h h1{font:16px/1.2 system-ui;margin-bottom:4px}
+.h p{font-size:10px;color:#666;margin-bottom:12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px}
+.stat{text-align:center;padding:8px;background:#f8f8f8;border:1px solid #e5e5e5;border-radius:3px}
+.stat-n{font:14px/1 system-ui;font-weight:600}
+.stat-l{font-size:9px;color:#777;margin-top:2px;text-transform:uppercase}
+.s{background:#fff;margin:12px 0;border:1px solid #ddd;border-radius:4px}
+.s-h{background:#666;color:#fff;padding:8px 12px;font:10px/1 system-ui;font-weight:600;text-transform:uppercase}
+.s-c{padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.item{border:1px solid #e5e5e5;border-radius:3px;overflow:hidden}
+.item img{width:100%;height:100px;object-fit:cover;background:#f0f0f0}
+.item-i{padding:6px;font-size:9px}
+.item-t{font-weight:500;margin-bottom:2px;word-break:break-all}
+.item-m{color:#777;font-size:8px}
+.list{list-style:none}
+.list li{padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:10px;word-break:break-all}
+.list li:last-child{border-bottom:none}
+.list a{color:#0066cc;text-decoration:none}
+.list a:hover{text-decoration:underline}
+.secret{background:#fffbf0;border:1px solid #f0e68c;border-radius:3px;padding:8px;margin:6px 0;font-size:10px}
+.secret-t{font-weight:600;color:#b8860b}
+.secret-v{font:9px/1.2 monospace;background:#f5f5f5;padding:3px;border-radius:2px;margin:3px 0;word-break:break-all}
+.filter{margin-bottom:8px}
+.filter input{width:100%;padding:6px;border:1px solid #ccc;border-radius:3px;font-size:10px}
+@media (max-width:640px){
+.c{padding:8px}
+.h{padding:12px}
+.stats{grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{padding:6px}
+.grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.item img{height:80px}
+}
+</style>
+</head>
+<body>
+<div class="c">
+<div class="h">
+<h1>Crawl Report</h1>
+<p>${location.hostname} • ${new Date().toLocaleString()} • ${(duration/1000).toFixed(1)}s</p>
+<div class="stats">
+<div class="stat"><div class="stat-n">${results.pages.size}</div><div class="stat-l">Pages</div></div>
+<div class="stat"><div class="stat-n">${results.external.size}</div><div class="stat-l">External</div></div>
+<div class="stat"><div class="stat-n">${results.images.size}</div><div class="stat-l">Images</div></div>
+<div class="stat"><div class="stat-n">${results.media.size}</div><div class="stat-l">Media</div></div>
+<div class="stat"><div class="stat-n">${results.scripts.size}</div><div class="stat-l">Scripts</div></div>
+<div class="stat"><div class="stat-n">${results.styles.size}</div><div class="stat-l">Styles</div></div>
+<div class="stat"><div class="stat-n">${results.secrets.length}</div><div class="stat-l">Secrets</div></div>
+</div>
+</div>
+
+<div class="s">
+<div class="s-h">Pages (${results.pages.size})</div>
+<div class="s-c">
+<div class="filter"><input type="text" placeholder="Filter pages..." onkeyup="f(this,'p')"></div>
+<ul class="list" id="p">${Array.from(results.pages).sort().map(u => `<li><a href="${u}" target="_blank">${u}</a></li>`).join('')}</ul>
+</div>
+</div>
+
+<div class="s">
+<div class="s-h">External URLs (${results.external.size})</div>
+<div class="s-c">
+<div class="filter"><input type="text" placeholder="Filter external URLs..." onkeyup="f(this,'e')"></div>
+<ul class="list" id="e">${Array.from(results.external).sort().map(u => `<li><a href="${u}" target="_blank">${u}</a></li>`).join('')}</ul>
+</div>
+</div>
+
+<div class="s">
+<div class="s-h">Images (${results.images.size})</div>
+<div class="s-c">
+<div class="filter"><input type="text" placeholder="Filter images..." onkeyup="g(this,'i')"></div>
+<div class="grid" id="i">${imageArray.map(img => `<div class="item" data-url="${img.url}">
+<img src="${img.url}" alt="" loading="lazy" onerror="this.style.display='none'">
+<div class="item-i">
+<div class="item-t">${img.url.split('/').pop()||'Image'}</div>
+<div class="item-m">${img

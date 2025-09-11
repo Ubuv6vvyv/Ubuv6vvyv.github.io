@@ -1,0 +1,147 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {packages:['wordtree']});
+      google.charts.setOnLoadCallback(drawSimpleNodeChart);
+
+      let zoomLevel = 1;
+      let collapsedNodes = new Set();
+      let originalData;
+
+      function drawSimpleNodeChart() {
+        originalData = [
+          ['id', 'childLabel', 'parent', 'size', 'weight'],
+          [0, 'Dog', -1, 1, 0],
+          [1, 'Do', 0, 5, 0],
+          [2, 'Features', 0, 5, 0],
+          [3, 'Happenings', 0, 5, 0],
+
+          [4, 'Woofing', 1, 3, 0],
+          [5, 'Looking', 1, 3, 0],
+          [6, 'Running', 1, 3, 0],
+          [7, 'Jumping', 1, 3, 0],
+          [8, 'Sniffing', 1, 3, 0],
+          [9, 'Digging', 1, 3, 0],
+          [10, 'Chasing', 1, 3, 0],
+          [11, 'Sleeping', 1, 3, 0],
+
+          [12, 'Loud', 4, 2, 0],
+          [13, 'Woof', 4, 2, 0],
+          [14, 'Yip', 4, 2, 0],
+
+          [15, 'Window', 5, 2, 0],
+          [16, 'You', 5, 2, 0],
+          [17, 'Outside', 5, 2, 0],
+
+          [18, 'Fast', 6, 2, 0],
+          [19, 'Zoom', 6, 2, 0],
+          [20, 'Quick', 6, 2, 0],
+
+          [21, 'High', 7, 2, 0],
+          [22, 'Bounce', 7, 2, 0],
+          [23, 'Leap', 7, 2, 0],
+
+          [24, 'Smell', 8, 2, 0],
+          [25, 'Explore', 8, 2, 0],
+          [26, 'Nose', 8, 2, 0],
+
+          [27, 'Dirt', 9, 2, 0],
+          [28, 'Hole', 9, 2, 0],
+          [29, 'Mud', 9, 2, 0],
+
+          [30, 'Cats', 10, 2, 0],
+          [31, 'Balls', 10, 2, 0],
+          [32, 'Squirrels', 10, 2, 0],
+
+          [33, 'Nap', 11, 2, 0],
+          [34, 'Snooze', 11, 2, 0],
+          [35, 'Dream', 11, 2, 0],
+
+          [36, 'Snout', 2, 3, 0],
+          [37, 'Tail', 2, 3, 0],
+          [38, 'Ears', 2, 3, 0],
+          [39, 'Paws', 2, 3, 0],
+          [40, 'Fur', 2, 3, 0],
+          [41, 'Eyes', 2, 3, 0],
+
+          [42, 'Wet', 36, 2, 0],
+          [43, 'Sniffy', 36, 2, 0],
+          [44, 'Long', 36, 2, 0],
+
+          [45, 'Waggy', 37, 2, 0],
+          [46, 'Fluffy', 37, 2, 0],
+          [47, 'Short', 37, 2, 0],
+
+          [48, 'Floppy', 38, 2, 0],
+          [49, 'Pointy', 38, 2, 0],
+          [50, 'Big', 38, 2, 0],
+
+          [51, 'Soft', 39, 2, 0],
+          [52, 'Big', 39, 2, 0],
+          [53, 'Cute', 39, 2, 0],
+
+          [54, 'Fluffy', 40, 2, 0],
+          [55, 'Shiny', 40, 2, 0],
+          [56, 'Soft', 40, 2, 0],
+
+          [57, 'Shiny', 41, 2, 0],
+          [58, 'Big', 41, 2, 0],
+          [59, 'Sparkly', 41, 2, 0],
+
+          [60, 'Lost', 3, 3, 0],
+          [61, 'Mess', 3, 3, 0],
+          [62, 'Scared', 3, 3, 0],
+          [63, 'Happy', 3, 3, 0],
+          [64, 'Sick', 3, 3, 0],
+
+          [65, 'Wanders', 60, 2, 0],
+          [66, 'Hides', 60, 2, 0],
+          [67, 'Runs', 60, 2, 0],
+
+          [68, 'Mud', 61, 2, 0],
+          [69, 'Trash', 61, 2, 0],
+          [70, 'Chew', 61, 2, 0],
+
+          [71, 'Thunder', 62, 2, 0],
+          [72, 'Vacuum', 62, 2, 0],
+          [73, 'Stranger', 62
