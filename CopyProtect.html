@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Insights Blog</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            color: #333;
+            background-color: #fff;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #222;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        article {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Exploring Modern Concepts</h1>
+    </header>
+    <article>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+        <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.</p>
+        <p>Consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam.</p>
+    </article>
+
+    <script>
+        // Web Audio API setup
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let baseOscillator = null;
+        let gainNode = null;
+        let panner = null;
+        let tremoloLFO = null;
+        let fmLFO = null;
+        let panLFO = null;
+        let distortionNode = null;
+        let noiseSource = null;
+        let noiseGain = null;
+        let additionalOscillators = [];
+        let isSelecting = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                panner = audioCtx.createStereoPanner();
+                panner.pan.value = 0;
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.5; // Moderate volume
+                gainNode.connect(panner);
+                panner.connect(audioCtx.destination);
+            }
+        }
+
+        function getCurrentInput() {
+            return distortionNode || gainNode;
+        }
+
+        function startBaseTone(freq) {
+            if (baseOscillator) {
+                baseOscillator.stop();
+                baseOscillator.disconnect();
+                baseOscillator = null;
+            }
+            baseOscillator = audioCtx.createOscillator();
+            baseOscillator.type = 'sine'; // Smooth but audible hum
+            baseOscillator.frequency.value = freq;
+            baseOscillator.connect(getCurrentInput());
+            baseOscillator.start();
+        }
+
+        function addTremolo(percentage) {
+            if (tremoloLFO) {
+                tremoloLFO.stop();
+                tremoloLFO.disconnect();
+                tremoloLFO = null;
+            }
+            const lfoFreq = 5 + 10 * (percentage - 0.1) / 0.9; // Start at 10%, ramp from 5Hz to 15Hz
+            tremoloLFO = audioCtx.createOscillator();
+            tremoloLFO.type = 'sine';
+            tremoloLFO.frequency.value = lfoFreq;
+
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 0.5 + 0.3 * (percentage - 0.1) / 0.9; // Increase depth
+
+            tremoloLFO.connect(lfoGain);
+            lfoGain.connect(gainNode.gain);
+            tremoloLFO.start();
+        }
+
+        function addFM(percentage) {
+            if (fmLFO) {
+                fmLFO.stop();
+                fmLFO.disconnect();
+                fmLFO = null;
+            }
+            const lfoFreq = 3 + 10 * (percentage - 0.2) / 0.8; // Start at 20%, ramp from 3Hz to 13Hz
+            fmLFO = audioCtx.createOscillator();
+            fmLFO.type = 'triangle'; // Slightly harsher modulation
+            fmLFO.frequency.value = lfoFreq;
+
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 150 + 450 * (percentage - 0.2) / 0.8; // Stronger modulation depth
+
+            fmLFO.connect(lfoGain);
+            lfoGain.connect(baseOscillator.frequency);
+            fmLFO.start();
+        }
+
+        function addPanModulation(percentage) {
+            if (panLFO) {
+                panLFO.stop();
+                panLFO.disconnect();
+                panLFO = null;
+            }
+            const lfoFreq = 3 + 7 * (percentage - 0.3) / 0.7; // Start at 30%, ramp from 3Hz to 10Hz
+            panLFO = audioCtx.createOscillator();
+            panLFO.type = 'sine';
+            panLFO.frequency.value = lfoFreq;
+
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 1; // Full pan depth
+
+            panLFO.connect(lfoGain);
+            lfoGain.connect(panner.pan);
+            panLFO.start();
+        }
+
+        function addDistortion(percentage) {
+            if (distortionNode) {
+                distortionNode.disconnect();
+                distortionNode = null;
+            }
+            distortionNode = audioCtx.createWaveShaper();
+            const curve = new Float32Array(1024);
+            const amount = 0.6 + 0.4 * (percentage - 0.4) / 0.6; // Start at 40%, ramp distortion
+            for (let i = 0; i < 1024; i++) {
+                const x = (i / 1024) * 2 - 1;
+                curve[i] = (Math.PI + amount) * x / (Math.PI + amount * Math.abs(x));
+            }
+            distortionNode.curve = curve;
+            distortionNode.oversample = '4x';
+
+            // Reconnect baseOscillator
+            baseOscillator.disconnect();
+            baseOscillator.connect(distortionNode);
+
+            // Reconnect additional oscillators
+            additionalOscillators.forEach(osc => {
+                osc.disconnect();
+                osc.connect(distortionNode);
+            });
+
+            // Reconnect noise if present
+            if (noiseSource && noiseGain) {
+                noiseGain.disconnect();
+                noiseGain.connect(distortionNode);
+            }
+
+            distortionNode.connect(gainNode);
+        }
+
+        function addNoise(percentage) {
+            if (noiseSource) {
+                noiseSource.stop();
+                noiseSource.disconnect();
+                noiseSource = null;
+            }
+            if (noiseGain) {
+                noiseGain.disconnect();
+                noiseGain = null;
+            }
+            noiseGain = audioCtx.createGain();
+            noiseGain.gain.value = 0.15 + 0.45 * (percentage - 0.5) / 0.5; // Start at 50%, ramp from 0.15 to 0.6
+
+            const bufferLength = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferLength, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferLength; i++) {
+                data[i] = Math.random() * 2 - 1; // White noise
+            }
+
+            noiseSource = audioCtx.createBufferSource();
+            noiseSource.buffer = buffer;
+            noiseSource.loop = true;
+            noiseSource.connect(noiseGain);
+            noiseGain.connect(getCurrentInput());
+            noiseSource.start();
+        }
+
+        function addNightmareOscillators(count) {
+            // Clear existing additional oscillators
+            additionalOscillators.forEach(osc => {
+                osc.stop();
+                osc.disconnect();
+            });
+            additionalOscillators = [];
+
+            for (let i = 0; i < count; i++) {
+                const osc = audioCtx.createOscillator();
+                osc.type = ['sawtooth', 'square', 'triangle'][i % 3]; // Diverse waveforms
+                osc.frequency.value = 800 + Math.random() * 2200; // Random high freqs
+                osc.connect(getCurrentInput());
+                osc.start();
+                additionalOscillators.push(osc);
+            }
+        }
+
+        function stopAll() {
+            if (baseOscillator) {
+                baseOscillator.stop();
+                baseOscillator.disconnect();
+                baseOscillator = null;
+            }
+            if (tremoloLFO) {
+                tremoloLFO.stop();
+                tremoloLFO.disconnect();
+                tremoloLFO = null;
+            }
+            if (fmLFO) {
+                fmLFO.stop();
+                fmLFO.disconnect();
+                fmLFO = null;
+            }
+            if (panLFO) {
+                panLFO.stop();
+                panLFO.disconnect();
+                panLFO = null;
+            }
+            if (distortionNode) {
+                distortionNode.disconnect();
+                distortionNode = null;
+            }
+            if (noiseSource) {
+                noiseSource.stop();
+                noiseSource.disconnect();
+                noiseSource = null;
+            }
+            if (noiseGain) {
+                noiseGain.disconnect();
+                noiseGain = null;
+            }
+            additionalOscillators.forEach(osc => {
+                osc.stop();
+                osc.disconnect();
+            });
+            additionalOscillators = [];
+        }
+
+        // Handle text selection
+        document.addEventListener('selectionchange', () => {
+            const selection = window.getSelection();
+            const selectedText = selection.toString();
+            const length = selectedText.length;
+
+            if (length > 0) {
+                initAudio();
+                isSelecting = true;
+                const maxLength = 2000;
+                const percentage = Math.min(length / maxLength, 1);
+
+                // Base frequency ramp: 400Hz to 3500Hz
+                const lowFreq = 400; // Higher initial tone for audibility
+                const highFreq = 3500;
+                const freq = lowFreq + (highFreq - lowFreq) * percentage;
+                startBaseTone(freq);
+
+                // Add nightmare oscillators ramping up to 12
+                const nightmareCount = Math.floor(12 * percentage);
+                addNightmareOscillators(nightmareCount);
+
+                // Add effects earlier based on percentage
+                if (percentage >= 0.1) {
+                    addTremolo(percentage);
+                }
+                if (percentage >= 0.2) {
+                    addFM(percentage);
+                }
+                if (percentage >= 0.3) {
+                    addPanModulation(percentage);
+                }
+                if (percentage >= 0.4) {
+                    addDistortion(percentage);
+                }
+                if (percentage >= 0.5) {
+                    addNoise(percentage);
+                }
+            } else if (isSelecting) {
+                stopAll();
+                isSelecting = false;
+            }
+        });
+
+        // Handle copy event
+        document.addEventListener('copy', (event) => {
+            // Play discomforting squeal
+            initAudio();
+            const squealOsc = audioCtx.createOscillator();
+            squealOsc.type = 'square'; // Harsh squeal
+            squealOsc.frequency.value = 6000; // Even higher for discomfort
+            squealOsc.connect(gainNode);
+            squealOsc.start();
+
+            // Add chaotic noise burst
+            const noiseBurstGain = audioCtx.createGain();
+            noiseBurstGain.gain.value = 0.6;
+            const bufferLength = audioCtx.sampleRate * 1;
+            const buffer = audioCtx.createBuffer(1, bufferLength, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferLength; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noiseBurst = audioCtx.createBufferSource();
+            noiseBurst.buffer = buffer;
+            noiseBurst.connect(noiseBurstGain);
+            noiseBurstGain.connect(gainNode);
+            noiseBurst.start();
+
+            // Vibrate if supported
+            if (navigator.vibrate) {
+                navigator.vibrate([300, 100, 300, 100, 600]); // More intense pattern
+            }
+
+            // Stop squeal and noise after 1.2 seconds
+            setTimeout(() => {
+                squealOsc.stop();
+                squealOsc.disconnect();
+                noiseBurst.stop();
+                noiseBurst.disconnect();
+                noiseBurstGain.disconnect();
+            }, 1200);
+
+            // Allow copy but annoy
+        });
+    </script>
+</body>
+</html>
