@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF Renamer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --surface-color: #242424;
+            --border-color: #3a3a3a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #9e9e9e;
+            --accent-color: #4a90e2;
+            --accent-hover: #5aa1f2;
+            --font-family: 'Roboto Mono', monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px; margin: 0 auto;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; overflow: hidden;
+            margin-top: 20px; margin-bottom: 20px;
+        }
+        .header {
+            background: #111;
+            padding: 20px; text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 { font-size: 1.8rem; margin-bottom: 5px; font-weight: 500; }
+        .header p { color: var(--text-secondary); font-size: 0.9rem; }
+        .main-content { padding: 15px; display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 992px) {
+            .main-content { grid-template-columns: 400px 1fr; }
+        }
+        .left-panel, .right-panel { display: flex; flex-direction: column; gap: 15px; }
+        .upload-area {
+            border: 2px dashed var(--border-color); border-radius: 6px; padding: 25px 15px;
+            text-align: center; background: var(--bg-color);
+            transition: border-color 0.3s, background-color 0.3s; cursor: pointer;
+        }
+        .upload-area:hover, .upload-area.dragover { border-color: var(--accent-color); background-color: #2a2a2a; }
+        .upload-icon { font-size: 2.5rem; color: var(--accent-color); margin-bottom: 10px; }
+        .upload-text { font-size: 1rem; font-weight: 500; }
+        #fileInput { display: none; }
+        .btn {
+            padding: 10px 15px; border: none; border-radius: 5px; font-size: 0.9rem;
+            cursor: pointer; transition: background-color 0.3s; font-weight: 500;
+            background-color: var(--accent-color); color: white; text-transform: uppercase;
+        }
+        .btn:hover { background-color: var(--accent-hover); }
+        .btn:disabled { background-color: var(--border-color); color: var(--text-secondary); cursor: not-allowed; }
+        .renaming-rules fieldset {
+            border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;
+            background: transparent; margin-bottom: 10px;
+        }
+        .renaming-rules legend { padding: 0 8px; font-weight: 500; color: var(--accent-color); font-size: 0.9rem; }
+        .rule-group { display: flex; flex-direction: column; gap: 10px; }
+        .rule-group label { color: var(--text-secondary); font-size: 0.85rem; }
+        .rule-group input[type="text"], .rule-group input[type="number"], .rule-group select {
+            width: 100%; padding: 8px; border-radius: 4px;
+            border: 1px solid var(--border-color); font-size: 0.9rem;
+            background-color: var(--bg-color); color: var(--text-primary);
+            font-family: var(--font-family);
+        }
+        .rule-group input:focus, .rule-group select:focus { border-color: var(--accent-color); outline: none; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; }
+        .checkbox-group input[type="checkbox"] { accent-color: var(--accent-color); }
+        .inline-group { display: flex; gap: 8px; align-items: center; }
+        .inline-group input, .inline-group select { flex: 1; }
+        .file-list-container {
+            background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border-color);
+            padding: 8px; min-height: 400px; overflow-y: auto;
+        }
+        .file-item {
+            padding: 10px; border-bottom: 1px solid var(--border-color); display: flex;
+            align-items: center; gap: 10px; transition: background-color 0.2s;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .file-item:hover { background: var(--surface-color); }
+        .file-icon {
+            font-size: 0.7rem; color: var(--text-primary); background: #c0392b;
+            width: 32px; height: 32px; border-radius: 4px; display: flex;
+            align-items: center; justify-content: center; flex-shrink: 0; font-weight: 500;
+        }
+        .file-info { flex: 1; overflow: hidden; }
+        .file-name, .file-preview {
+            font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+        .file-name span, .file-preview span { color: var(--text-secondary); }
+        .file-preview { color: var(--accent-hover); }
+        .empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .empty-state-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Advanced PDF Renamer</h1>
+            <p>Comprehensive bulk renaming for PDF files</p>
+        </header>
+        
+        <main class="main-content">
+            <div class="left-panel">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">Drop PDF Files Here</div>
+                    <input type="file" id="fileInput" multiple accept=".pdf">
+                </div>
+                
+                <div class="renaming-rules" id="renamingRules">
+                    <fieldset>
+                        <legend>1. Build Core Name</legend>
+                        <div class="rule-group">
+                            <div class="checkbox-group"><input type="checkbox" id="ruleKeepOriginalName" checked><label for="ruleKeepOriginalName">Original Filename</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="ruleAddTitle"><label for="ruleAddTitle">PDF Title</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="ruleAddAuthor"><label for="ruleAddAuthor">PDF Author</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="ruleAddCreator"><label for="ruleAddCreator">PDF Creator Tool</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="ruleAddProducer"><label for="ruleAddProducer">PDF Producer Tool</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="ruleAddCreationDate"><label for="ruleAddCreationDate">PDF Creation Date (DDMMYYYY)</label></div>
+                            <label for="rulePartSeparator">Separator for core parts:</label>
+                            <input type="text" id="rulePartSeparator" value=" - ">
+                        </div>
+                    </fieldset>
+                    
+                    <fieldset>
+                        <legend>2. Refine & Transform</legend>
+                        <div class="rule-group">
+                            <label>Find & Replace:</label>
+                            <input type="text" id="ruleFind" placeholder="Find this text">
+                            <input type="text" id="ruleReplace" placeholder="Replace with this text">
+                            <div class="checkbox-group"><input type="checkbox" id="ruleCaseSensitive"><label for="ruleCaseSensitive">Case Sensitive</label></div>
+                            <label>Change Case:</label>
+                            <select id="ruleCase">
+                                <option value="none">No Change</option><option value="upper">UPPERCASE</option><option value="lower">lowercase</option><option value="title">Title Case</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    
+                    <fieldset>
+                        <legend>3. Add Prefix / Suffix</legend>
+                        <div class="rule-group">
+                            <label>Add Custom Text:</label>
+                            <div class="inline-group">
+                                <input type="text" id="ruleAddText" placeholder="Custom text">
+                                <select id="ruleAddTextPos"><option value="none">Don't Add</option><option value="prepend">Prepend</option><option value="append">Append</option></select>
+                            </div>
+                            <label>Add Current Date:</label>
+                             <div class="inline-group">
+                                <select id="ruleAddDateFmt">
+                                    <option value="YYYY-MM-DD">YYYY-MM-DD</option><option value="DD-MM-YYYY">DD-MM-YYYY</option><option value="MM-DD-YYYY">MM-DD-YYYY</option>
+                                </select>
+                                <select id="ruleAddDatePos"><option value="none">Don't Add</option><option value="prepend">Prepend</option><option value="append">Append</option></select>
+                            </div>
+                            <label>Add Sequence:</label>
+                            <div class="inline-group">
+                                <input type="number" id="ruleSeqStart" value="1" title="Start">
+                                <input type="number" id="ruleSeqStep" value="1" title="Step">
+                                <input type="number" id="ruleSeqPad" value="2" title="Padding">
+                                <select id="ruleSeqPos"><option value="none">Don't Add</option><option value="prepend">Prepend</option><option value="append">Append</option></select>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>4. Clean Up</legend>
+                        <div class="rule-group">
+                            <label for="ruleSanitizeChars">Remove specific characters:</label>
+                            <input type="text" id="ruleSanitizeChars" placeholder="e.g., #$%_">
+                             <div class="checkbox-group"><input type="checkbox" id="ruleRemoveDigits"><label for="ruleRemoveDigits">Remove all digits (0-9)</label></div>
+                             <div class="checkbox-group"><input type="checkbox" id="ruleRemoveSymbols"><label for="ruleRemoveSymbols">Remove all symbols</label></div>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <button class="btn btn-secondary" id="downloadBtn" disabled>
+                    Download ZIP
+                </button>
+            </div>
+            
+            <div class="right-panel">
+                <div class="file-list-container" id="fileListContainer">
+                    <div id="fileList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📁</div>
+                            <div>Awaiting files...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        class PDFRenamer {
+            constructor() {
+                this.files = [];
+                this.bindDOM();
+                this.addEventListeners();
+            }
+
+            bindDOM() {
+                this.uploadArea = document.getElementById('uploadArea');
+                this.fileInput = document.getElementById('fileInput');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.fileList = document.getElementById('fileList');
+                this.rulesContainer = document.getElementById('renamingRules');
+            }
+
+            addEventListeners() {
+                this.uploadArea.addEventListener('click', () => this.fileInput.click());
+                ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    this.uploadArea.addEventListener(eventName, e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.type === 'dragover') this.uploadArea.classList.add('dragover');
+                        else this.uploadArea.classList.remove('dragover');
+                        if (e.type === 'drop') this.handleFileSelect(e.dataTransfer.files);
+                    });
+                });
+                this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
+                this.rulesContainer.addEventListener('input', this.updateAllPreviews.bind(this));
+                this.downloadBtn.addEventListener('click', this.downloadFilesAsZip.bind(this));
+            }
+
+            handleFileSelect(selectedFiles) {
+                const newFiles = Array.from(selectedFiles)
+                    .filter(file => file.type === 'application/pdf' && !this.files.some(f => f.originalName === file.name && f.file.size === file.size));
+
+                newFiles.forEach(file => {
+                    const fileData = { file, originalName: file.name, newName: file.name, metadata: null, id: `f-${Date.now()}-${Math.random()}` };
+                    this.files.push(fileData);
+                    this.fetchMetadata(fileData);
+                });
+                this.renderFileList();
+                this.updateAllPreviews();
+            }
+
+            async fetchMetadata(fileData) {
+                try {
+                    const arrayBuffer = await fileData.file.arrayBuffer();
+                    const typedarray = new Uint8Array(arrayBuffer);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    fileData.metadata = (await pdf.getMetadata()).info;
+                    this.updateAllPreviews();
+                } catch (error) { console.error(`Metadata error for ${fileData.originalName}:`, error); }
+            }
+
+            getRules() {
+                return {
+                    keepOriginalName: document.getElementById('ruleKeepOriginalName').checked,
+                    addTitle: document.getElementById('ruleAddTitle').checked,
+                    addAuthor: document.getElementById('ruleAddAuthor').checked,
+                    addCreator: document.getElementById('ruleAddCreator').checked,
+                    addProducer: document.getElementById('ruleAddProducer').checked,
+                    addCreationDate: document.getElementById('ruleAddCreationDate').checked,
+                    partSeparator: document.getElementById('rulePartSeparator').value,
+                    find: document.getElementById('ruleFind').value,
+                    replace: document.getElementById('ruleReplace').value,
+                    caseSensitive: document.getElementById('ruleCaseSensitive').checked,
+                    caseChange: document.getElementById('ruleCase').value,
+                    addText: document.getElementById('ruleAddText').value,
+                    addTextPos: document.getElementById('ruleAddTextPos').value,
+                    addDateFmt: document.getElementById('ruleAddDateFmt').value,
+                    addDatePos: document.getElementById('ruleAddDatePos').value,
+                    seqStart: parseInt(document.getElementById('ruleSeqStart').value) || 1,
+                    seqStep: parseInt(document.getElementById('ruleSeqStep').value) || 1,
+                    seqPad: parseInt(document.getElementById('ruleSeqPad').value) || 0,
+                    seqPos: document.getElementById('ruleSeqPos').value,
+                    sanitizeChars: document.getElementById('ruleSanitizeChars').value,
+                    removeDigits: document.getElementById('ruleRemoveDigits').checked,
+                    removeSymbols: document.getElementById('ruleRemoveSymbols').checked
+                };
+            }
+            
+            parsePdfDate(dateString) {
+                if (!dateString || !dateString.startsWith('D:')) return null;
+                const year = dateString.substring(2, 6);
+                const month = dateString.substring(6, 8);
+                const day = dateString.substring(8, 10);
+                return (year && month && day) ? `${day}${month}${year}` : null;
+            }
+
+            applyRules(fileData, rules, index) {
+                const extension = fileData.originalName.slice(fileData.originalName.lastIndexOf('.'));
+                const originalBaseName = fileData.originalName.slice(0, fileData.originalName.lastIndexOf('.'));
+                let baseName = '';
+
+                const parts = [];
+                if (rules.keepOriginalName) parts.push(originalBaseName);
+                if (rules.addTitle) parts.push(fileData.metadata?.Title || '');
+                if (rules.addAuthor) parts.push(fileData.metadata?.Author || '');
+                if (rules.addCreator) parts.push(fileData.metadata?.Creator || '');
+                if (rules.addProducer) parts.push(fileData.metadata?.Producer || '');
+                if (rules.addCreationDate) {
+                    const date = this.parsePdfDate(fileData.metadata?.CreationDate);
+                    if (date) parts.push(date);
+                }
+                baseName = parts.filter(p => p && p.trim()).join(rules.partSeparator);
+                if (!baseName) baseName = originalBaseName;
+
+                if (rules.find) {
+                    const flags = rules.caseSensitive ? 'g' : 'gi';
+                    baseName = baseName.replace(new RegExp(rules.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags), rules.replace);
+                }
+                if (rules.caseChange !== 'none') {
+                    baseName = (rules.caseChange === 'upper') ? baseName.toUpperCase() :
+                               (rules.caseChange === 'lower') ? baseName.toLowerCase() :
+                               baseName.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+                }
+
+                const prefixes = [], suffixes = [];
+                if (rules.addText && rules.addTextPos !== 'none') {
+                    (rules.addTextPos === 'prepend' ? prefixes : suffixes).push(rules.addText);
+                }
+                if (rules.addDatePos !== 'none') {
+                    const now = new Date();
+                    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
+                    const dateStr = rules.addDateFmt.replace('YYYY', y).replace('MM', m).replace('DD', d);
+                    (rules.addDatePos === 'prepend' ? prefixes : suffixes).push(dateStr);
+                }
+                if (rules.seqPos !== 'none') {
+                    const seqStr = String(rules.seqStart + (index * rules.seqStep)).padStart(rules.seqPad, '0');
+                    (rules.seqPos === 'prepend' ? prefixes : suffixes).push(seqStr);
+                }
+                if (prefixes.length > 0) baseName = `${prefixes.join(rules.partSeparator)}${rules.partSeparator}${baseName}`;
+                if (suffixes.length > 0) baseName = `${baseName}${rules.partSeparator}${suffixes.join(rules.partSeparator)}`;
+
+                baseName = baseName.replace(/[\\/:*?"<>|]/g, '');
+                if (rules.sanitizeChars) {
+                    baseName = baseName.replace(new RegExp(`[${rules.sanitizeChars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`, 'g'), '');
+                }
+                if (rules.removeDigits) baseName = baseName.replace(/\d/g, '');
+                if (rules.removeSymbols) baseName = baseName.replace(/[^a-zA-Z0-9\s._-]/g, '');
+                
+                return baseName.trim().replace(/\s+/g, ' ') + extension;
+            }
+            
+            updateAllPreviews() {
+                if (this.files.length === 0) { this.downloadBtn.disabled = true; return; }
+                const rules = this.getRules();
+                this.files.forEach((fileData, index) => {
+                    fileData.newName = this.applyRules(fileData, rules, index);
+                    const el = document.querySelector(`[data-id="${fileData.id}"] .file-preview-text`);
+                    if (el) el.textContent = fileData.newName;
+                });
+                this.downloadBtn.disabled = false;
+            }
+
+            renderFileList() {
+                if (this.files.length === 0) {
+                    this.fileList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📁</div><div>Awaiting files...</div></div>`;
+                    return;
+                }
+                this.fileList.innerHTML = this.files.map(fileData => `
+                    <div class="file-item" data-id="${fileData.id}">
+                        <div class="file-icon">PDF</div>
+                        <div class="file-info">
+                            <div class="file-name" title="${fileData.originalName}"><span>Orig:</span> ${fileData.originalName}</div>
+                            <div class="file-preview" title="${fileData.newName}"><span>New:</span> <span class="file-preview-text">${fileData.newName}</span></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            async downloadFilesAsZip() {
+                if (this.files.length === 0) return;
+                this.downloadBtn.textContent = 'Zipping...';
+                this.downloadBtn.disabled = true;
+                const zip = new JSZip();
+                const usedNames = new Set();
+                this.files.forEach(fileData => {
+                    let finalName = fileData.newName;
+                    let counter = 1;
+                    while(usedNames.has(finalName)) {
+                        const name = finalName.slice(0, finalName.lastIndexOf('.'));
+                        const ext = finalName.slice(finalName.lastIndexOf('.'));
+                        finalName = `${name} (${counter++})${ext}`;
+                    }
+                    usedNames.add(finalName);
+                    zip.file(finalName, fileData.file);
+                });
+                try {
+                    const zipBlob = await zip.generateAsync({ type: 'blob' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(zipBlob);
+                    link.download = `renamed_pdfs_${new Date().toISOString().slice(0, 10)}.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href);
+                } catch (error) {
+                    console.error("Error creating ZIP file:", error);
+                    alert("There was an error creating the ZIP file.");
+                } finally {
+                     this.downloadBtn.textContent = 'Download ZIP';
+                     this.downloadBtn.disabled = this.files.length === 0;
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { new PDFRenamer(); });
+    </script>
+</body>
+</html>
