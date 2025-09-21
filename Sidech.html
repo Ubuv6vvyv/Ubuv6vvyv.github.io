@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environmental & Motion Inference</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --fg-color: #cccccc;
+            --accent-color: #00ffff;
+            --border-color: #222222;
+            --pre-bg-color: #111111;
+        }
+        body {
+            font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            margin: 0 auto;
+            max-width: 1000px;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+        }
+        .container {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 5.0px;
+        }
+        h2 {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent-color);
+        }
+        p { 
+            font-size: 11px;
+            color: #888;
+            margin-top: 0;
+            margin-bottom: 5px;
+        }
+        button {
+            background-color: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: background-color 0.2s, color 0.2s;
+            width: 100%;
+        }
+        button:hover, button.active {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+        }
+        pre {
+            background-color: var(--pre-bg-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #b3b3b3;
+            font-size: 11px;
+            min-height: 30px;
+        }
+        #map {
+            width: 100%;
+            height: 300px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            margin-top: 15px;
+            filter: grayscale(100%);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAqVp90WuvdNXrtmT0gKY4TYS3D1A0iUPA&callback=initMap" async defer></script>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Engine</h2>
+        
+        <pre id="inference-output">Awaiting sensor data...</pre>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>Ultrasonic Analysis</h2>
+           
+            <button id="ultrasonic-btn">Activate Scan</button>
+            <pre id="ultrasonic-output">Status      : Inactive</pre>
+        </div>
+
+        <div class="container">
+            <h2>Device Motion</h2>
+            
+            <button id="motion-btn">Activate Motion Sensors</button>
+            <pre id="motion-output">Status      : Inactive</pre>
+        </div>
+
+        <div class="container">
+            <h2>Device Orientation</h2>
+            
+            <button id="orientation-btn">Activate Orientation Sensors</button>
+            <pre id="orientation-output">Status      : Inactive</pre>
+        </div>
+
+        <div class="container">
+            <h2>Geolocation</h2>
+            
+            <button id="geo-btn">Activate Geolocation</button>
+            <div id="map"></div>
+            <pre id="geo-output">Status      : Inactive</pre>
+        </div>
+    </div>
+
+<script>
+    // --- Global State & Sensor Data ---
+    const sensorState = {
+        ultrasonic: { active: false, status: 'Inactive', presence: 'Unknown', motion: 'Unknown', direction: 'N/A', presenceSignal: 0, motionSignal: 0 },
+        motion: { active: false, status: 'Inactive', magnitude: 0 },
+        orientation: { active: false, status: 'Inactive', alpha: 0, beta: 0, gamma: 0 },
+        geo: { active: false, status: 'Inactive', lat: 0, lng: 0, speed: 0, accuracy: 0, heading: null }
+    };
+
+    let map, marker, geoWatchId;
+
+    // --- Helper Functions for Formatting ---
+    const createProgressBar = (val, max, len = 10) => {
+        const p = Math.min(1, val / max);
+        const filled = Math.round(p * len);
+        const empty = len - filled;
+        return `[${'█'.repeat(filled)}${'-'.repeat(empty)}]`;
+    };
+
+    const degreesToCompass = (deg) => {
+        if (deg === null) return 'N/A';
+        const val = Math.floor((deg / 22.5) + 0.5);
+        const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+        return arr[(val % 16)];
+    };
+
+    // --- Google Maps Initialization ---
+    function initMap() {
+        const initialPos = { lat: -37.8136, lng: 144.9631 };
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 17, center: initialPos, mapTypeId: 'roadmap',
+            styles: [ { "featureType": "all", "elementType": "all", "stylers": [{ "saturation": -100 }, { "gamma": 0.5 }] } ]
+        });
+        marker = new google.maps.Marker({ position: initialPos, map: map });
+    }
+
+    // --- Sensor Activation Functions ---
+    document.getElementById('ultrasonic-btn').onclick = () => toggleSensor('ultrasonic');
+    document.getElementById('motion-btn').onclick = () => toggleSensor('motion');
+    document.getElementById('orientation-btn').onclick = () => toggleSensor('orientation');
+    document.getElementById('geo-btn').onclick = () => toggleSensor('geo');
+
+    async function toggleSensor(sensorName) {
+        const btn = document.getElementById(`${sensorName}-btn`);
+        if (sensorState[sensorName].active) return; // For simplicity, no deactivation
+        try {
+            switch(sensorName) {
+                case 'ultrasonic': await initUltrasonic(); break;
+                case 'motion': await initDeviceMotion(); break;
+                case 'orientation': await initDeviceOrientation(); break;
+                case 'geo': await initGeolocation(); break;
+            }
+            sensorState[sensorName].active = true;
+            btn.classList.add('active');
+            btn.textContent = `${sensorName.toUpperCase()} Sensor Active`;
+        } catch (e) {
+            sensorState[sensorName].status = `Error: ${e.message}`;
+        }
+    }
+
+    // --- Sensor Initializers (Core Logic) ---
+    async function initUltrasonic() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 2, echoCancellation: false } });
+        const context = new AudioContext();
+        const source = context.createMediaStreamSource(stream);
+        const splitter = context.createChannelSplitter(2);
+        source.connect(splitter);
+        const analyserL = context.createAnalyser(); const analyserR = context.createAnalyser();
+        splitter.connect(analyserL, 0); splitter.connect(analyserR, 1);
+        const oscillator = context.createOscillator();
+        oscillator.frequency.value = 20000;
+        oscillator.connect(context.destination);
+        oscillator.start();
+        
+        sensorState.ultrasonic.status = 'Calibrating...';
+        let baselineL, baselineR, lastSignalL, lastSignalR;
+        
+        setTimeout(() => {
+            const bufferLength = analyserL.frequencyBinCount;
+            const dataL = new Uint8Array(bufferLength); const dataR = new Uint8Array(bufferLength);
+            analyserL.getByteFrequencyData(dataL); analyserR.getByteFrequencyData(dataR);
+            baselineL = Array.from(dataL); lastSignalL = Array.from(dataL);
+            baselineR = Array.from(dataR); lastSignalR = Array.from(dataR);
+
+            setInterval(() => {
+                analyserL.getByteFrequencyData(dataL); analyserR.getByteFrequencyData(dataR);
+                let pDevL=0, pDevR=0, mVarL=0, mVarR=0;
+                for(let i=0; i<bufferLength; i++) {
+                    pDevL += Math.abs(dataL[i] - baselineL[i]); pDevR += Math.abs(dataR[i] - baselineR[i]);
+                    mVarL += Math.abs(dataL[i] - lastSignalL[i]); mVarR += Math.abs(dataR[i] - lastSignalR[i]);
+                }
+                const totalPresence = pDevL + pDevR; const totalMotion = mVarL + mVarR;
+
+                sensorState.ultrasonic.presence = totalPresence > 5000 ? 'Occupied' : 'Empty';
+                sensorState.ultrasonic.motion = totalMotion > 2500 ? 'Detected' : 'Still';
+                if (sensorState.ultrasonic.motion === 'Detected') {
+                    const diff = mVarL - mVarR;
+                    sensorState.ultrasonic.direction = Math.abs(diff) > 500 ? (diff > 0 ? 'Left Bias' : 'Right Bias') : 'Central';
+                } else { sensorState.ultrasonic.direction = 'N/A'; }
+                sensorState.ultrasonic.presenceSignal = totalPresence; sensorState.ultrasonic.motionSignal = totalMotion;
+                lastSignalL = Array.from(dataL); lastSignalR = Array.from(dataR);
+            }, 400);
+        }, 3000);
+    }
+
+    async function initDeviceMotion() {
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission !== 'granted') throw new Error('Permission denied.');
+        }
+        window.addEventListener('devicemotion', e => {
+            const { x, y, z } = e.accelerationIncludingGravity;
+            const magnitude = Math.sqrt(x*x + y*y + z*z);
+            sensorState.motion.magnitude = magnitude;
+            if (magnitude > 25) sensorState.motion.status = 'Shake Detected';
+            else if (magnitude < 10.5 && magnitude > 9) sensorState.motion.status = 'Still';
+            else sensorState.motion.status = 'In Motion';
+        });
+    }
+
+    async function initDeviceOrientation() {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') throw new Error('Permission denied.');
+        }
+        let lastBeta = null;
+        window.addEventListener('deviceorientation', e => {
+            sensorState.orientation = { ...sensorState.orientation, alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+            if (lastBeta !== null && Math.abs(e.beta - lastBeta) > 20 && e.beta < -45) sensorState.orientation.status = 'Picked Up';
+            else if (e.beta > -10 && e.beta < 10) sensorState.orientation.status = 'Laying Flat';
+            else sensorState.orientation.status = 'Tilted';
+            lastBeta = e.beta;
+        });
+    }
+
+    async function initGeolocation() {
+        geoWatchId = navigator.geolocation.watchPosition(pos => {
+            const { latitude, longitude, accuracy, speed, heading } = pos.coords;
+            sensorState.geo = { active: true, lat: latitude, lng: longitude, accuracy: accuracy, speed: speed || 0, heading: heading };
+            const currentPos = { lat: latitude, lng: longitude };
+            map.setCenter(currentPos);
+            marker.setPosition(currentPos);
+        }, err => { sensorState.geo.status = `Error: ${err.message}`; }, { enableHighAccuracy: true });
+    }
+    
+    // --- Main Display & Inference Loop ---
+    setInterval(() => {
+        // Update sensor displays with formatted text
+        if (sensorState.ultrasonic.active) {
+            const s = sensorState.ultrasonic;
+            document.getElementById('ultrasonic-output').textContent = 
+`Room Status : ${s.presence} ${createProgressBar(s.presenceSignal, 10000)}
+Movement    : ${s.motion} ${createProgressBar(s.motionSignal, 5000)}
+Direction   : ${s.direction}`;
+        }
+        if (sensorState.motion.active) {
+            const s = sensorState.motion;
+            document.getElementById('motion-output').textContent =
+`Device State: ${s.status}
+Force       : ${s.magnitude.toFixed(1)} G ${createProgressBar(s.magnitude, 30)}`;
+        }
+        if (sensorState.orientation.active) {
+            const s = sensorState.orientation;
+            document.getElementById('orientation-output').textContent =
+`Position    : ${s.status}
+Tilt (F/B)  : ${s.beta.toFixed(0)}°
+Tilt (L/R)  : ${s.gamma.toFixed(0)}°
+Compass     : ${s.alpha.toFixed(0)}° (${degreesToCompass(s.alpha)})`;
+        }
+        if (sensorState.geo.active) {
+            const s = sensorState.geo;
+            document.getElementById('geo-output').textContent =
+`Speed       : ${(s.speed * 3.6).toFixed(1)} km/h
+Heading     : ${s.heading ? s.heading.toFixed(0) + '° (' + degreesToCompass(s.heading) + ')' : 'N/A'}
+Accuracy    : ±${s.accuracy.toFixed(0)} meters`;
+        }
+        
+        // Run Master Inference
+        const { ultrasonic, motion, orientation, geo } = sensorState;
+        let inferences = ["Awaiting sufficient data..."];
+        if (ultrasonic.active && motion.active && orientation.active && geo.active) {
+            inferences = [];
+            if (geo.speed > 8 && motion.magnitude < 12) {
+                inferences.push('User is in a moving vehicle.');
+            } else if (geo.speed > 1 && motion.status === 'In Motion') {
+                inferences.push('User is walking or running with their device.');
+            } else if (ultrasonic.motion === 'Detected' && motion.status === 'Still' && orientation.status === 'Laying Flat') {
+                inferences.push('User is moving nearby; device is stationary on a flat surface.');
+            } else if (ultrasonic.presence === 'Empty' && geo.speed === 0) {
+                inferences.push('User has left the room, leaving their device behind.');
+            } else if (orientation.status === 'Picked Up') {
+                inferences.push('User just picked up their device.');
+            }
+             if (inferences.length === 0) {
+                inferences.push('Monitoring a stable or indeterminate state.');
+            }
+        }
+        document.getElementById('inference-output').textContent = `[ ${new Date().toLocaleTimeString('en-AU')} ]\n- ${inferences.join('\n- ')}`;
+
+    }, 500);
+
+</script>
+</body>
+</html>

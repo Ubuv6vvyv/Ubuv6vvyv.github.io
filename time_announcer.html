@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Announcer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .container { 
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 30px; width: 100%; max-width: 400px;
+            box-shadow: 0 8px 32px rgba(31,38,135,0.37); border: 1px solid rgba(255,255,255,0.18);
+        }
+        .time-display { 
+            font-size: 2.5rem; font-weight: bold; text-align: center; 
+            margin-bottom: 20px; text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite; font-variant-numeric: tabular-nums;
+        }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 0.9rem; font-weight: 500; opacity: 0.9; }
+        input[type="range"] { 
+            -webkit-appearance: none; height: 6px; border-radius: 3px;
+            background: rgba(255,255,255,0.3); outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+            background: white; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        select { 
+            background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+            color: white; padding: 10px; border-radius: 8px; outline: none;
+        }
+        input[type="checkbox"] {
+            transform: scale(1.2); margin-right: 8px;
+        }
+        button { 
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none; color: white; padding: 15px 30px; border-radius: 25px;
+            font-size: 1.1rem; font-weight: bold; cursor: pointer;
+            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+        button.active { background: linear-gradient(45deg, #ff3838, #c44569); }
+        .status { 
+            text-align: center; margin-top: 15px; font-size: 0.9rem;
+            opacity: 0.8; transition: all 0.3s ease;
+        }
+        .value-display { 
+            display: inline-block; background: rgba(255,255,255,0.2); 
+            padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 20px; margin: 10px; }
+            .time-display { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="time-display" id="timeDisplay">--:--:--</div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Voice <span class="value-display" id="voiceDisplay">Default</span></label>
+                <select id="voiceSelect"></select>
+            </div>
+            
+            <div class="control-group">
+                <label>Rate <span class="value-display" id="rateDisplay">1.0</span></label>
+                <input type="range" id="rateSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-group">
+                <label>Pitch <span class="value-display" id="pitchDisplay">1.0</span></label>
+                <input type="range" id="pitchSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-group">
+                <label>Volume <span class="value-display" id="volumeDisplay">1.0</span></label>
+                <input type="range" id="volumeSlider" min="0.1" max="1.0" step="0.1" value="1.0">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="fastMode" style="margin-right: 8px;">
+                    Fast Mode (15 seconds)
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>Voice Effect</label>
+                <select id="voiceEffect">
+                    <option value="normal">Normal</option>
+                    <option value="choir">Choir (Multi-voice)</option>
+                    <option value="badChoir">Bad Choir (Off-sync)</option>
+                    <option value="multiPitch">Multi-pitch</option>
+                    <option value="echo">Echo</option>
+                    <option value="robot">Robot</option>
+                </select>
+            </div>
+            
+            <button id="toggleBtn">Start Announcements</button>
+        </div>
+        
+        <div class="status" id="status">Ready to start</div>
+    </div>
+
+    <script>
+        class TimeAnnouncer {
+            constructor() {
+                this.isRunning = false; this.interval = null; this.voices = [];
+                this.synth = window.speechSynthesis;
+                this.elements = {
+                    timeDisplay: document.getElementById('timeDisplay'),
+                    voiceSelect: document.getElementById('voiceSelect'),
+                    rateSlider: document.getElementById('rateSlider'),
+                    pitchSlider: document.getElementById('pitchSlider'),
+                    volumeSlider: document.getElementById('volumeSlider'),
+                    toggleBtn: document.getElementById('toggleBtn'),
+                    status: document.getElementById('status'),
+                    voiceDisplay: document.getElementById('voiceDisplay'),
+                    rateDisplay: document.getElementById('rateDisplay'),
+                    pitchDisplay: document.getElementById('pitchDisplay'),
+                    volumeDisplay: document.getElementById('volumeDisplay'),
+                    fastMode: document.getElementById('fastMode'),
+                    voiceEffect: document.getElementById('voiceEffect')
+                };
+                this.init();
+            }
+
+            init() {
+                this.loadVoices(); this.updateTime(); this.bindEvents();
+                setInterval(() => this.updateTime(), 1000);
+                if (speechSynthesis.onvoiceschanged !== undefined) {
+                    speechSynthesis.onvoiceschanged = () => this.loadVoices();
+                }
+            }
+
+            loadVoices() {
+                this.voices = this.synth.getVoices().filter(voice => 
+                    voice.lang.startsWith('en-') || voice.lang === 'en'
+                );
+                const select = this.elements.voiceSelect;
+                select.innerHTML = '';
+                this.voices.forEach((voice, i) => {
+                    const option = document.createElement('option');
+                    option.value = i; 
+                    const region = voice.lang.split('-')[1] || 'US';
+                    option.textContent = `${voice.name} (${region})`;
+                    select.appendChild(option);
+                });
+                if (this.voices.length > 0) this.updateVoiceDisplay();
+            }
+
+            updateTime() {
+                const now = new Date();
+                this.elements.timeDisplay.textContent = now.toLocaleTimeString();
+            }
+
+            updateVoiceDisplay() {
+                const selectedIndex = this.elements.voiceSelect.value;
+                const voice = this.voices[selectedIndex] || { name: 'Default' };
+                this.elements.voiceDisplay.textContent = voice.name.split(' ')[0];
+            }
+
+            bindEvents() {
+                this.elements.toggleBtn.addEventListener('click', () => this.toggle());
+                this.elements.voiceSelect.addEventListener('change', () => this.updateVoiceDisplay());
+                
+                ['rate', 'pitch', 'volume'].forEach(param => {
+                    const slider = this.elements[param + 'Slider'];
+                    const display = this.elements[param + 'Display'];
+                    slider.addEventListener('input', (e) => {
+                        display.textContent = e.target.value;
+                    });
+                });
+            }
+
+            toggle() {
+                this.isRunning ? this.stop() : this.start();
+            }
+
+            start() {
+                this.isRunning = true;
+                this.elements.toggleBtn.textContent = 'Stop Announcements';
+                this.elements.toggleBtn.classList.add('active');
+                const mode = this.elements.fastMode.checked ? '15-second' : 'minute';
+                this.elements.status.textContent = `${mode} announcements active`;
+                this.announceTime(); // Announce immediately
+                this.scheduleNext();
+            }
+
+            stop() {
+                this.isRunning = false; clearTimeout(this.interval);
+                this.synth.cancel();
+                this.elements.toggleBtn.textContent = 'Start Announcements';
+                this.elements.toggleBtn.classList.remove('active');
+                this.elements.status.textContent = 'Announcements stopped';
+            }
+
+            scheduleNext() {
+                if (!this.isRunning) return;
+                const now = new Date();
+                let delay;
+                
+                if (this.elements.fastMode.checked) {
+                    // Every 15 seconds
+                    delay = 15000;
+                } else {
+                    // At the start of each minute
+                    const secondsUntilNextMinute = 60 - now.getSeconds();
+                    delay = secondsUntilNextMinute * 1000;
+                }
+                
+                this.interval = setTimeout(() => {
+                    if (this.isRunning) { this.announceTime(); this.scheduleNext(); }
+                }, delay);
+            }
+
+            announceTime() {
+                if (!this.isRunning) return;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const text = `The time is ${timeString}`;
+                
+                const effect = this.elements.voiceEffect.value;
+                this.speakWithEffect(text, effect);
+                this.elements.status.textContent = `Last announced: ${timeString}`;
+            }
+
+            speakWithEffect(text, effect) {
+                const baseProps = {
+                    rate: parseFloat(this.elements.rateSlider.value),
+                    pitch: parseFloat(this.elements.pitchSlider.value),
+                    volume: parseFloat(this.elements.volumeSlider.value)
+                };
+
+                switch(effect) {
+                    case 'choir':
+                        this.choirEffect(text, baseProps);
+                        break;
+                    case 'badChoir':
+                        this.badChoirEffect(text, baseProps);
+                        break;
+                    case 'multiPitch':
+                        this.multiPitchEffect(text, baseProps);
+                        break;
+                    case 'echo':
+                        this.echoEffect(text, baseProps);
+                        break;
+                    case 'robot':
+                        this.robotEffect(text, baseProps);
+                        break;
+                    default:
+                        this.normalSpeak(text, baseProps);
+                }
+            }
+
+            normalSpeak(text, props) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voiceIndex = this.elements.voiceSelect.value;
+                if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                Object.assign(utterance, props);
+                this.synth.speak(utterance);
+            }
+
+            choirEffect(text, props) {
+                // 3 voices in harmony
+                const pitches = [props.pitch * 0.8, props.pitch, props.pitch * 1.2];
+                pitches.forEach((pitch, i) => {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        const voiceIndex = (parseInt(this.elements.voiceSelect.value) + i) % this.voices.length;
+                        if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                        utterance.rate = props.rate;
+                        utterance.pitch = pitch;
+                        utterance.volume = props.volume * 0.7;
+                        this.synth.speak(utterance);
+                    }, i * 50);
+                });
+            }
+
+            badChoirEffect(text, props) {
+                // 4 voices deliberately out of sync
+                const delays = [0, 150, 300, 200];
+                const rates = [props.rate, props.rate * 0.9, props.rate * 1.1, props.rate * 0.95];
+                delays.forEach((delay, i) => {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        const voiceIndex = (parseInt(this.elements.voiceSelect.value) + i) % this.voices.length;
+                        if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                        utterance.rate = rates[i];
+                        utterance.pitch = props.pitch + (Math.random() - 0.5) * 0.3;
+                        utterance.volume = props.volume * 0.6;
+                        this.synth.speak(utterance);
+                    }, delay);
+                });
+            }
+
+            multiPitchEffect(text, props) {
+                const words = text.split(' ');
+                let delay = 0;
+                words.forEach((word, i) => {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(word);
+                        const voiceIndex = this.elements.voiceSelect.value;
+                        if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                        utterance.rate = props.rate * 1.2;
+                        utterance.pitch = props.pitch + Math.sin(i) * 0.5;
+                        utterance.volume = props.volume;
+                        this.synth.speak(utterance);
+                    }, delay);
+                    delay += 300;
+                });
+            }
+
+            echoEffect(text, props) {
+                // Original + 2 echoes
+                [0, 200, 400].forEach((delay, i) => {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        const voiceIndex = this.elements.voiceSelect.value;
+                        if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                        utterance.rate = props.rate;
+                        utterance.pitch = props.pitch;
+                        utterance.volume = props.volume * (1 - i * 0.3);
+                        this.synth.speak(utterance);
+                    }, delay);
+                });
+            }
+
+            robotEffect(text, props) {
+                const syllables = text.match(/\b\w+\b/g) || [text];
+                let delay = 0;
+                syllables.forEach((syllable) => {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(syllable);
+                        const voiceIndex = this.elements.voiceSelect.value;
+                        if (this.voices[voiceIndex]) utterance.voice = this.voices[voiceIndex];
+                        utterance.rate = props.rate * 0.7;
+                        utterance.pitch = 0.3;
+                        utterance.volume = props.volume;
+                        this.synth.speak(utterance);
+                    }, delay);
+                    delay += 200;
+                });
+            }
+        }
+
+        new TimeAnnouncer();
+    </script>
+</body>
+</html>
