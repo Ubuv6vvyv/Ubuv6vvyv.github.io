@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>360° Panoramic Straightener</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: hidden;
+        }
+        .container { 
+            max-width: 100vw; 
+            padding: 10px;
+            transition: background-color 0.2s; /* For drag-over feedback */
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 10px;
+            background: rgba(0,0,0,0.8);
+        }
+        .title { font-size: 18px; font-weight: 600; }
+        .upload-btn {
+            background: #007AFF;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            background: #111;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            touch-action: none;
+        }
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        .controls {
+            padding: 15px 10px;
+            background: rgba(20,20,20,0.9);
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .control-group { margin-bottom: 20px; }
+        .control-label {
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: block;
+            font-weight: 500;
+        }
+        .control-label-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .slider-container {
+            position: relative;
+            height: 28px;
+            background: #333;
+            border-radius: 14px;
+            margin: 10px 0;
+            transition: opacity 0.3s;
+        }
+        .slider-container.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 28px;
+            background: transparent;
+            outline: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-radius: 14px;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 26px;
+            height: 26px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 5px rgba(0,122,255,0.3);
+        }
+        .slider::-moz-range-thumb {
+            width: 26px;
+            height: 26px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 5px rgba(0,122,255,0.3);
+        }
+        .value-display {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #aaa;
+            pointer-events: none;
+        }
+        .reset-btn, .export-btn, .action-btn {
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .reset-btn { background: #666; }
+        .export-btn { background: #34C759; }
+        .action-btn { background: #5856D6; width: calc(100% - 10px); }
+        .file-input { display: none; }
+        .select-container {
+            position: relative;
+            background: #333;
+            border-radius: 8px;
+            padding: 0 10px;
+        }
+        select {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            background: transparent; border: none; color: white;
+            padding: 8px 10px; font-size: 13px; width: 100%; cursor: pointer;
+        }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider-knob { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .switch .slider-knob:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-knob { background-color: #34C759; }
+        input:checked + .slider-knob:before { transform: translateX(20px); }
+        #progress-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .progress-container { background: #2c2c2e; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
+        .progress-label { font-size: 16px; margin-bottom: 15px; }
+        .progress-bar-background { background: #444; height: 10px; border-radius: 5px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: #007AFF; border-radius: 5px; transition: width 0.1s linear; }
+        .progress-text { margin-top: 10px; font-size: 14px; color: #aaa; }
+        .tool-section { border-top: 1px solid #333; padding-top: 20px; margin-top: 20px; text-align: center; }
+        .tool-description { font-size: 13px; color: #888; margin-bottom: 15px; max-width: 300px; margin-left: auto; margin-right: auto; line-height: 1.5; }
+
+        @media (max-width: 480px) {
+            .canvas-container { height: 250px; }
+            .controls { padding: 15px 5px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Straighten</div>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Load Image</button>
+        </div>
+        <input type="file" id="fileInput" class="file-input" accept="image/*">
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="grid-overlay">
+                <svg width="100%" height="100%"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#fff" stroke-width="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /><line x1="50%" y1="0" x2="50%" y2="100%" stroke="#007AFF" stroke-width="1"/><line x1="0" y1="50%" x2="100%" y2="50%" stroke="#007AFF" stroke-width="1"/></svg>
+            </div>
+        </div>
+        <div class="controls">
+            <div class="control-group">
+                <label class="control-label">Horizontal</label>
+                <div class="slider-container"><input type="range" id="horizontalSlider" class="slider" min="-100" max="100" value="0"><div class="value-display" id="horizontalValue">0</div></div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">Vertical</label>
+                <div class="slider-container"><input type="range" id="verticalSlider" class="slider" min="-100" max="100" value="0"><div class="value-display" id="verticalValue">0</div></div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">Pan / Center</label>
+                <div class="slider-container"><input type="range" id="panSlider" class="slider" min="-100" max="100" value="0"><div class="value-display" id="panValue">0</div></div>
+            </div>
+            <div class="control-group">
+                <div class="control-label-flex">
+                    <span class="control-label">Perspective</span>
+                    <label class="switch"><input type="checkbox" id="perspectiveToggle"><span class="slider-knob"></span></label>
+                </div>
+                <div id="perspectiveSliderContainer" class="slider-container disabled"><input type="range" id="perspectiveSlider" class="slider" min="0" max="100" value="0"><div class="value-display" id="perspectiveValue">0</div></div>
+            </div>
+            <div class="control-group">
+                 <label class="control-label">Output Aspect Ratio</label>
+                 <div class="select-container">
+                     <select id="equirectangularMode">
+                         <option value="original" selected>Original</option>
+                         <option value="stretch">Stretch to 2:1</option>
+                         <option value="crop">Crop to 2:1</option>
+                     </select>
+                 </div>
+            </div>
+
+            <div class="tool-section">
+                <label class="control-label">Seamless Wrap Tool</label>
+                <p class="tool-description">Blends the left and right edges of the image to create a continuous panorama. This permanently modifies the loaded image.</p>
+                <button class="action-btn" onclick="createSeamlessWrap()">Create Seamless Wrap</button>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="reset-btn" onclick="resetValues()">Reset Controls</button>
+                <button class="export-btn" onclick="exportImage()">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="progress-overlay" style="display: none;">
+        <div class="progress-container">
+            <div class="progress-label" id="progress-label">Processing...</div>
+            <div class="progress-bar-background"><div id="progress-bar" class="progress-bar"></div></div>
+            <div id="progress-text" class="progress-text">0%</div>
+        </div>
+    </div>
+
+    <script>
+        let canvas, ctx, originalImage, originalImageData, fullQualityImage;
+        let horizontalCorrection = 0, verticalCorrection = 0, panOffset = 0;
+        let perspectiveEnabled = false, perspectiveStrength = 0;
+        let equirectangularMode = 'original';
+        let isProcessing = false;
+        let processingQueue = null;
+        
+        function init() {
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = 800; canvas.height = 400;
+            
+            ['horizontalSlider','verticalSlider','panSlider','perspectiveSlider'].forEach(id=>document.getElementById(id).addEventListener('input', updateSliders));
+            ['perspectiveToggle', 'equirectangularMode'].forEach(id => document.getElementById(id).addEventListener('change', updateSliders));
+            document.getElementById('fileInput').addEventListener('change', (e) => e.target.files[0] && loadImage(e.target.files[0]));
+            
+            setupDragAndDrop();
+            setupCanvasInteraction();
+            loadDemoImage();
+        }
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    fullQualityImage = img;
+                    const maxSize = 1600; 
+                    const ratio = Math.min(1, maxSize / Math.max(img.width, img.height));
+                    const previewWidth = Math.floor(img.width * ratio);
+                    const previewHeight = Math.floor(img.height * ratio);
+
+                    const previewCanvas = document.createElement('canvas');
+                    previewCanvas.width = previewWidth; previewCanvas.height = previewHeight;
+                    previewCanvas.getContext('2d').drawImage(img, 0, 0, previewWidth, previewHeight);
+
+                    previewCanvas.toBlob(blob => {
+                        originalImage = new Image();
+                        originalImage.onload = () => {
+                            URL.revokeObjectURL(originalImage.src);
+                            canvas.width = originalImage.width; canvas.height = originalImage.height;
+                            ctx.drawImage(originalImage, 0, 0);
+                            originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            resetValues();
+                        };
+                        originalImage.src = URL.createObjectURL(blob);
+                    });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // This function orchestrates the blending process for an image
+        async function runSeamlessWorkflow(sourceImage, progressLabel) {
+             const overlay = document.getElementById('progress-overlay');
+             const label = document.getElementById('progress-label');
+             label.textContent = progressLabel;
+             overlay.style.display = 'flex';
+
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    const width = sourceImage.width;
+                    const height = sourceImage.height;
+                    const blendWidth = Math.max(64, Math.floor(width * 0.08)); // 8% blend width
+
+                    // 1. Offset Filter: Center the seam
+                    const shiftedCanvas = new OffscreenCanvas(width, height);
+                    const sCtx = shiftedCanvas.getContext('2d');
+                    sCtx.drawImage(sourceImage, width / 2, 0, width / 2, height, 0, 0, width / 2, height);
+                    sCtx.drawImage(sourceImage, 0, 0, width / 2, height, width / 2, 0, width / 2, height);
+                    
+                    const centerX = width / 2;
+
+                    // 2. Heal the Seam: Create feathered patches to blend the center
+                    const leftPatch = new OffscreenCanvas(blendWidth, height);
+                    const lpCtx = leftPatch.getContext('2d');
+                    lpCtx.drawImage(shiftedCanvas, centerX - blendWidth, 0, blendWidth, height, 0, 0, blendWidth, height);
+                    const leftGrad = lpCtx.createLinearGradient(0, 0, blendWidth, 0);
+                    leftGrad.addColorStop(0, "rgba(0,0,0,0)"); leftGrad.addColorStop(1, "rgba(0,0,0,1)");
+                    lpCtx.fillStyle = leftGrad; lpCtx.globalCompositeOperation = "destination-in";
+                    lpCtx.fillRect(0, 0, blendWidth, height);
+
+                    const rightPatch = new OffscreenCanvas(blendWidth, height);
+                    const rpCtx = rightPatch.getContext('2d');
+                    rpCtx.drawImage(shiftedCanvas, centerX, 0, blendWidth, height, 0, 0, blendWidth, height);
+                    const rightGrad = rpCtx.createLinearGradient(0, 0, blendWidth, 0);
+                    rightGrad.addColorStop(0, "rgba(0,0,0,1)"); rightGrad.addColorStop(1, "rgba(0,0,0,0)");
+                    rpCtx.fillStyle = rightGrad; rpCtx.globalCompositeOperation = "destination-in";
+                    rpCtx.fillRect(0, 0, blendWidth, height);
+
+                    sCtx.drawImage(rightPatch, centerX - blendWidth, 0);
+                    sCtx.drawImage(leftPatch, centerX, 0);
+
+                    // 3. Offset Back: Return to original orientation
+                    const finalCanvas = new OffscreenCanvas(width, height);
+                    const fCtx = finalCanvas.getContext('2d');
+                    fCtx.drawImage(shiftedCanvas, width / 2, 0, width / 2, height, 0, 0, width / 2, height);
+                    fCtx.drawImage(shiftedCanvas, 0, 0, width / 2, height, width / 2, 0, width / 2, height);
+                    
+                    // Convert canvas to a new Image object
+                    finalCanvas.convertToBlob().then(blob => {
+                        const newImage = new Image();
+                        newImage.onload = () => {
+                            URL.revokeObjectURL(newImage.src);
+                            overlay.style.display = 'none';
+                            resolve(newImage);
+                        };
+                        newImage.src = URL.createObjectURL(blob);
+                    });
+                }, 100); // Timeout to allow UI to update
+            });
+        }
+
+        // ADDED: Main function to apply the seamless wrap to the loaded images
+        async function createSeamlessWrap() {
+            if (!fullQualityImage) { alert("Please load an image first."); return; }
+
+            // Process both the full quality and preview images
+            fullQualityImage = await runSeamlessWorkflow(fullQualityImage, "Processing Full-Quality Image...");
+            originalImage = await runSeamlessWorkflow(originalImage, "Processing Preview Image...");
+
+            // Update the canvas and image data with the new seamless preview
+            canvas.width = originalImage.width;
+            canvas.height = originalImage.height;
+            ctx.drawImage(originalImage, 0, 0);
+            originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            updateSliders(); // Redraw with current settings
+        }
+        
+        function processImageFast() {
+            if (!originalImage || isProcessing) return;
+            isProcessing = true;
+            
+            const width = canvas.width, height = canvas.height;
+            const scale = 0.5;
+            const fastWidth = Math.floor(width * scale), fastHeight = Math.floor(height * scale);
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = fastWidth; tempCanvas.height = fastHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.createImageData(fastWidth, fastHeight);
+            const data = imageData.data;
+            
+            const scaledCanvas = document.createElement('canvas');
+            scaledCanvas.width = fastWidth; scaledCanvas.height = fastHeight;
+            const scaledCtx = scaledCanvas.getContext('2d');
+            scaledCtx.drawImage(originalImage, 0, 0, fastWidth, fastHeight);
+            const scaledData = scaledCtx.getImageData(0, 0, fastWidth, fastHeight).data;
+            
+            const hStrength = horizontalCorrection*0.01, vStrength = verticalCorrection*0.01;
+            const pixelShift = panOffset * 0.005 * fastWidth;
+            
+            for (let y = 0; y < fastHeight; y++) {
+                for (let x = 0; x < fastWidth; x++) {
+                    const normalizedX = (x/fastWidth)*2-1, normalizedY = (y/fastHeight)*2-1;
+                    let sourceX = x, sourceY = y;
+                    
+                    if (hStrength !== 0) {
+                        const hFactor = 1 + hStrength * (normalizedX*normalizedX+normalizedY*normalizedY);
+                        sourceX = (normalizedX/hFactor+1)*fastWidth*0.5;
+                    }
+                    if (vStrength !== 0) {
+                        const vFactor = 1 + vStrength * normalizedY;
+                        sourceY = ((normalizedY/vFactor)+1)*fastHeight*0.5;
+                    }
+                    sourceX = ((sourceX+pixelShift)%fastWidth + fastWidth)%fastWidth;
+
+                    sourceX = Math.max(0, Math.min(fastWidth - 1.001, sourceX));
+                    sourceY = Math.max(0, Math.min(fastHeight - 1.001, sourceY));
+                    const x_floor = Math.floor(sourceX), y_floor = Math.floor(sourceY);
+                    const fx = sourceX - x_floor, fy = sourceY - y_floor;
+                    
+                    const idx_tl = (y_floor * fastWidth + x_floor) * 4;
+                    const idx_out = (y * fastWidth + x) * 4;
+
+                    for(let c = 0; c < 3; c++) {
+                        const p_tl = scaledData[idx_tl + c], p_tr = scaledData[idx_tl + 4 + c];
+                        const p_bl = scaledData[idx_tl + fastWidth * 4 + c], p_br = scaledData[idx_tl + fastWidth * 4 + 4 + c];
+                        const i1 = p_tl * (1 - fx) + p_tr * fx;
+                        const i2 = p_bl * (1 - fx) + p_br * fx;
+                        data[idx_out + c] = i1 * (1 - fy) + i2 * fy;
+                    }
+                    data[idx_out + 3] = 255;
+                }
+            }
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, width, height);
+
+            if (perspectiveEnabled && perspectiveStrength > 0) {
+                const totalHeightRatio = 1 + (perspectiveStrength / 100);
+                const imgHeightOnCanvas = height / totalHeightRatio;
+                const barHeightOnCanvas = (height - imgHeightOnCanvas) / 2;
+                ctx.drawImage(tempCanvas, 0, barHeightOnCanvas, width, imgHeightOnCanvas);
+            } else {
+                ctx.drawImage(tempCanvas, 0, 0, width, height);
+            }
+            
+            isProcessing = false;
+        }
+        
+        function processImage() {
+            if (!originalImage) return;
+            const width = canvas.width, height = canvas.height;
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            const originalData = originalImageData.data;
+            const hStrength = horizontalCorrection*0.01, vStrength = verticalCorrection*0.01;
+            const pixelShift = panOffset * 0.005 * width;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const normalizedX = (x/width)*2-1, normalizedY = (y/height)*2-1;
+                    let sourceX = x, sourceY = y;
+                    if (hStrength !== 0) {
+                        const hRadius = Math.sqrt(normalizedX*normalizedX+normalizedY*normalizedY);
+                        if (hRadius>0) {
+                            const hFactor = 1 + hStrength*hRadius*hRadius*0.8;
+                            sourceX = (normalizedX/hFactor+1)*width*0.5;
+                        }
+                    }
+                    if (vStrength !== 0) {
+                        const vFactor = 1 + vStrength*normalizedY*0.6;
+                        if (Math.abs(vFactor)>0.1) sourceY = ((normalizedY/vFactor)+1)*height*0.5;
+                    }
+                    sourceX = ((sourceX+pixelShift)%width+width)%width;
+                    sourceX = Math.max(1,Math.min(width-2,sourceX));
+                    sourceY = Math.max(1,Math.min(height-2,sourceY));
+                    const x1 = Math.floor(sourceX), y1 = Math.floor(sourceY);
+                    const fx = sourceX - x1, fy = sourceY - y1;
+                    const idx = (y*width+x)*4;
+                    for (let c=0; c<3; c++) {
+                        const p1=originalData[(y1*width+x1)*4+c], p2=originalData[(y1*width+(x1+1))*4+c];
+                        const p3=originalData[((y1+1)*width+x1)*4+c], p4=originalData[((y1+1)*width+(x1+1))*4+c];
+                        const i1 = p1*(1-fx)+p2*fx, i2 = p3*(1-fx)+p4*fx;
+                        data[idx+c] = i1*(1-fy)+i2*fy;
+                    }
+                    data[idx+3]=255;
+                }
+            }
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width; tempCanvas.height = height;
+            tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+            
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, width, height);
+
+            if (perspectiveEnabled && perspectiveStrength > 0) {
+                const totalHeightRatio = 1 + (perspectiveStrength / 100);
+                const imgHeightOnCanvas = height / totalHeightRatio;
+                const barHeightOnCanvas = (height - imgHeightOnCanvas) / 2;
+                ctx.drawImage(tempCanvas, 0, barHeightOnCanvas, width, imgHeightOnCanvas);
+            } else {
+                ctx.drawImage(tempCanvas, 0, 0, width, height);
+            }
+        }
+
+        function processImageForExport(onComplete) {
+            if (!fullQualityImage) return;
+            document.getElementById('progress-label').textContent = 'Applying Corrections...';
+            const width = fullQualityImage.width, height = fullQualityImage.height;
+            const exportCanvas = new OffscreenCanvas(width, height);
+            const exportCtx = exportCanvas.getContext('2d');
+            exportCtx.drawImage(fullQualityImage,0,0);
+            const originalData = exportCtx.getImageData(0,0,width,height).data;
+            const hStrength = horizontalCorrection*0.01, vStrength = verticalCorrection*0.01;
+            const pixelShift = panOffset * 0.005 * width;
+            let y = 0;
+            const progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text');
+
+            function processChunk() {
+                const chunkSize = 10, endY = Math.min(y+chunkSize,height);
+                const imageData = exportCtx.getImageData(0, y, width, chunkSize);
+                const data = imageData.data;
+                for (let currentY=0; currentY<chunkSize; currentY++) {
+                   const globalY = y + currentY;
+                   if (globalY >= height) break;
+                   for (let x=0; x<width; x++) {
+                        const normalizedX = (x/width)*2-1, normalizedY = (globalY/height)*2-1;
+                        let sourceX = x, sourceY = globalY;
+                        if (hStrength!==0) {
+                            const hRadius = Math.sqrt(normalizedX*normalizedX+normalizedY*normalizedY);
+                            if (hRadius>0) sourceX = (normalizedX/(1+hStrength*hRadius*hRadius*0.8)+1)*width*0.5;
+                        }
+                        if (vStrength!==0) {
+                            const vFactor = 1+vStrength*normalizedY*0.6;
+                            if (Math.abs(vFactor)>0.1) sourceY = ((normalizedY/vFactor)+1)*height*0.5;
+                        }
+                        sourceX = ((sourceX+pixelShift)%width+width)%width;
+                        sourceX = Math.max(1,Math.min(width-2,sourceX));
+                        sourceY = Math.max(1,Math.min(height-2,sourceY));
+                        const x1 = Math.floor(sourceX), y1 = Math.floor(sourceY);
+                        const fx = sourceX-x1, fy = sourceY-y1;
+                        const idx = (currentY*width+x)*4;
+                        for (let c=0; c<3; c++) {
+                            const p1=originalData[(y1*width+x1)*4+c],p2=originalData[(y1*width+(x1+1))*4+c];
+                            const p3=originalData[((y1+1)*width+x1)*4+c],p4=originalData[((y1+1)*width+(x1+1))*4+c];
+                            const i1=p1*(1-fx)+p2*fx,i2=p3*(1-fx)+p4*fx;
+                            data[idx+c]=i1*(1-fy)+i2*fy;
+                        }
+                        data[idx+3]=255;
+                    }
+                }
+                exportCtx.putImageData(imageData, 0, y);
+                y = endY;
+                const progress = Math.round((y/height)*100);
+                progressBar.style.width = progress+'%';
+                progressText.textContent = progress+'%';
+
+                if (y < height) { 
+                    requestAnimationFrame(processChunk);
+                } else {
+                    let finalCanvas = exportCanvas;
+                    if (perspectiveEnabled && perspectiveStrength > 0) {
+                        const barHeight = Math.round((height * (perspectiveStrength / 100) * 0.5));
+                        const newHeight = height + 2 * barHeight;
+                        const perspectiveCanvas = new OffscreenCanvas(width, newHeight);
+                        const pCtx = perspectiveCanvas.getContext('2d');
+                        pCtx.fillStyle = 'black';
+                        pCtx.fillRect(0, 0, width, newHeight);
+                        pCtx.drawImage(exportCanvas, 0, barHeight);
+                        finalCanvas = perspectiveCanvas;
+                    }
+                    onComplete(finalCanvas);
+                }
+            }
+            processChunk();
+        }
+        
+        function updateSliders() {
+            horizontalCorrection = parseInt(document.getElementById('horizontalSlider').value);
+            verticalCorrection = parseInt(document.getElementById('verticalSlider').value);
+            panOffset = parseInt(document.getElementById('panSlider').value);
+            perspectiveEnabled = document.getElementById('perspectiveToggle').checked;
+            perspectiveStrength = parseInt(document.getElementById('perspectiveSlider').value);
+            equirectangularMode = document.getElementById('equirectangularMode').value;
+            
+            document.getElementById('horizontalValue').textContent = horizontalCorrection;
+            document.getElementById('verticalValue').textContent = verticalCorrection;
+            document.getElementById('panValue').textContent = panOffset;
+            document.getElementById('perspectiveValue').textContent = perspectiveStrength;
+            document.getElementById('perspectiveSliderContainer').classList.toggle('disabled', !perspectiveEnabled);
+            
+            if (processingQueue) clearTimeout(processingQueue);
+            processingQueue = setTimeout(processImage, 150);
+            processImageFast();
+        }
+        
+        function resetValues() {
+            document.getElementById('horizontalSlider').value=0;
+            document.getElementById('verticalSlider').value=0;
+            document.getElementById('panSlider').value=0;
+            document.getElementById('perspectiveToggle').checked=false;
+            document.getElementById('perspectiveSlider').value=0;
+            document.getElementById('equirectangularMode').value='original';
+            updateSliders();
+        }
+        
+        function exportImage() {
+            if (!fullQualityImage) { alert("Please load an image first."); return; }
+            const overlay = document.getElementById('progress-overlay');
+            overlay.style.display = 'flex';
+            
+            processImageForExport((processedCanvas) => {
+                document.getElementById('progress-label').textContent = 'Finalizing Export...';
+                let finalCanvas = processedCanvas;
+                const w = finalCanvas.width, h = finalCanvas.height;
+                
+                if (equirectangularMode !== 'original') {
+                    let newW = w, newH = h, sx = 0, sy = 0, sw = w, sh = h;
+                    if (equirectangularMode === 'stretch') { newH = Math.round(w / 2); } 
+                    else if (equirectangularMode === 'crop') {
+                        if (w / h > 2) { sw = h * 2; sx = (w - sw) / 2; newW = sw; } 
+                        else { sh = w / 2; sy = (h - sh) / 2; newH = sh; }
+                    }
+                    const resizeCanvas = new OffscreenCanvas(newW, newH);
+                    resizeCanvas.getContext('2d').drawImage(finalCanvas, sx, sy, sw, sh, 0, 0, newW, newH);
+                    finalCanvas = resizeCanvas;
+                }
+
+                finalCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.95 }).then(blob => {
+                    const link = document.createElement('a');
+                    link.download = 'straightened-panorama.jpg';
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                    overlay.style.display = 'none';
+                });
+            });
+        }
+        
+        function setupDragAndDrop() {
+            const container = document.querySelector('.container');
+            container.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); container.style.backgroundColor = '#1a1a1a'; });
+            container.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); container.style.backgroundColor = ''; });
+            container.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                container.style.backgroundColor = '';
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) { loadImage(file); } 
+                else { alert('Please drop an image file.'); }
+            });
+        }
+        
+        function setupCanvasInteraction() {
+            let isDragging = false, startX = 0, startPan = 0;
+            const start = (e) => {
+                isDragging = true;
+                startX = e.clientX || e.touches[0].clientX;
+                startPan = panOffset;
+                canvas.style.cursor = 'grabbing';
+            };
+            const move = (e) => {
+                if (!isDragging) return;
+                const currentX = e.clientX || e.touches[0].clientX;
+                const deltaX = currentX - startX;
+                const panChange = (deltaX / canvas.clientWidth) * 200;
+                let newPan = startPan + panChange;
+                newPan = Math.max(-100, Math.min(100, newPan));
+                document.getElementById('panSlider').value = newPan;
+                updateSliders();
+            };
+            const end = () => {
+                if(!isDragging) return; isDragging = false;
+                canvas.style.cursor = 'grab';
+                if (processingQueue) clearTimeout(processingQueue);
+                processingQueue = setTimeout(processImage, 50);
+            };
+
+            canvas.addEventListener('mousedown', start);
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', end);
+            canvas.addEventListener('mouseleave', end);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); }, { passive: false });
+            canvas.addEventListener('touchend', end);
+            canvas.addEventListener('touchcancel', end);
+            canvas.style.cursor = 'grab';
+        }
+
+        function loadDemoImage() {
+            const demoSvg = `<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="100%"><stop offset="0%" stop-color="#87CEEB"/><stop offset="100%" stop-color="#98FB98"/></linearGradient></defs><rect width="800" height="400" fill="url(#g)"/><rect y="200" width="800" height="200" fill="#8B7355"/><path d="M-100,200 C200,150 600,150 900,200" stroke="#FFF" stroke-width="4" fill="none" stroke-dasharray="10,5"/><text x="400" y="350" text-anchor="middle" fill="white" font-size="20" font-family="-apple-system, sans-serif" font-weight="500">Demo Image - Load your own to begin</text></svg>`;
+            const img = new Image();
+            img.onload = () => {
+                fullQualityImage = img; originalImage = img;
+                canvas.width = 800; canvas.height = 400;
+                ctx.drawImage(img, 0, 0);
+                originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                updateSliders();
+            };
+            img.src = 'data:image/svg+xml;base64,' + btoa(demoSvg);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
