@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Enhancer</title>
+    <style>
+        :root {
+            --accent: #2563eb;
+            --bg: #ffffff;
+            --surface: #f8f8f8;
+            --text: #1a1a1a;
+            --border: #e0e0e0;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            height: auto;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        #viewer {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg);
+        }
+        #loader {
+            text-align: center;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 500;
+            padding: 40px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        canvas {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: #fff;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 8px 0;
+        }
+        canvas.processing {
+            opacity: 0.65;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.65; }
+            50% { opacity: 0.45; }
+        }
+        .controls {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+            overflow-y: auto;
+            max-height: 50%;
+        }
+        .section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .value-display {
+            font-size: 11px;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+            min-width: 35px;
+            text-align: right;
+            font-weight: 700;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 2px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 1px 3px rgba(37,99,235,0.3);
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            box-shadow: 0 1px 3px rgba(37,99,235,0.3);
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type="range"]::-moz-range-thumb:active {
+            transform: scale(1.3);
+        }
+        input[type="file"]::file-selector-button, button {
+            padding: 10px 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        input[type="file"]::file-selector-button:hover, button:hover {
+            background: #1e40af;
+            transform: translateY(-1px);
+        }
+        input[type="file"]::file-selector-button:active, button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+            opacity: 0.5;
+            transform: none;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 14px;
+            background: var(--accent);
+            color: white;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .file-input-label:hover {
+            background: #1e40af;
+            transform: translateY(-1px);
+        }
+        .file-input-label:active {
+            transform: translateY(0);
+        }
+        #sliders-section {
+            display: none;
+        }
+        #sliders-section.show {
+            display: flex !important;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .row .ctrl-group {
+            gap: 4px;
+        }
+        .row label {
+            font-size: 11px;
+        }
+        @media (max-width: 600px) {
+            .controls { max-height: 55%; gap: 10px; padding: 10px; }
+            .row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="viewer">
+        <div id="loader"><span class="spinner"></span>Select a PDF to enhance</div>
+    </div>
+
+    <div class="controls">
+        <div class="section">
+            <input type="file" id="pdf-input" accept="application/pdf">
+            <label for="pdf-input" class="file-input-label">📁 Select PDF</label>
+        </div>
+
+        <div class="section" id="sliders-section">
+            <div class="row">
+                <div class="ctrl-group">
+                    <label>
+                        Brightness
+                        <span class="value-display" id="brightness-val">0</span>
+                    </label>
+                    <input type="range" id="brightness-slider" min="-100" max="100" value="0" step="1">
+                </div>
+
+                <div class="ctrl-group">
+                    <label>
+                        Contrast
+                        <span class="value-display" id="contrast-val">0</span>
+                    </label>
+                    <input type="range" id="contrast-slider" min="-100" max="100" value="0" step="1">
+                </div>
+            </div>
+
+            <div class="ctrl-group">
+                <label>
+                    Sharpen
+                    <span class="value-display" id="sharpen-val">0</span>
+                </label>
+                <input type="range" id="sharpen-slider" min="0" max="100" value="0" step="1">
+            </div>
+
+            <div class="row">
+                <button id="reset-btn">↻ Reset</button>
+                <button id="save-pdf-btn">💾 Save PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const el = {
+            input: document.getElementById('pdf-input'),
+            viewer: document.getElementById('viewer'),
+            loader: document.getElementById('loader'),
+            save: document.getElementById('save-pdf-btn'),
+            reset: document.getElementById('reset-btn'),
+            sliders: document.getElementById('sliders-section'),
+            brightness: document.getElementById('brightness-slider'),
+            contrast: document.getElementById('contrast-slider'),
+            sharpen: document.getElementById('sharpen-slider'),
+        };
+
+        let pdfDoc = null, pageData = [], renderTimeout, optimalThresh = 128;
+
+        const updateVal = id => {
+            const val = document.getElementById(id).value;
+            document.getElementById(id.replace('-slider', '-val')).textContent = val;
+        };
+
+        const calcOtsu = data => {
+            const hist = new Uint32Array(256);
+            for (let i = 0; i < data.length; i += 4) {
+                const g = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                hist[Math.floor(g)]++;
+            }
+            let maxVar = 0, thresh = 128, total = data.length / 4;
+            for (let t = 1; t < 255; t++) {
+                let w0 = 0, m0 = 0;
+                for (let i = 0; i < t; i++) {
+                    w0 += hist[i];
+                    m0 += i * hist[i];
+                }
+                const w1 = total - w0;
+                if (w0 === 0 || w1 === 0) continue;
+                m0 /= w0;
+                let m1 = 0;
+                for (let i = t; i < 256; i++) m1 += i * hist[i];
+                m1 /= w1;
+                const v = w0 * w1 * (m0 - m1) * (m0 - m1);
+                if (v > maxVar) { maxVar = v; thresh = t; }
+            }
+            return thresh;
+        };
+
+        el.input.addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            el.viewer.innerHTML = '<div id="loader"><span class="spinner"></span>Loading PDF...</div>';
+            el.sliders.classList.remove('show');
+            el.save.disabled = true;
+            pageData = [];
+
+            const reader = new FileReader();
+            reader.onload = async e => {
+                try {
+                    pdfDoc = await pdfjsLib.getDocument({data: new Uint8Array(e.target.result)}).promise;
+                    el.viewer.innerHTML = '<div id="loader"><span class="spinner"></span>Rendering ' + pdfDoc.numPages + ' page(s)...</div>';
+                    
+                    for (let i = 1; i <= pdfDoc.numPages; i++) {
+                        await renderPage(i);
+                    }
+
+                    if (pageData.length > 0) {
+                        optimalThresh = calcOtsu(pageData[0].origData.data);
+                        el.viewer.innerHTML = '';
+                        pageData.forEach(d => el.viewer.appendChild(d.displayCanvas));
+                        el.sliders.classList.add('show');
+                        el.save.disabled = false;
+                        update(true);
+                    }
+                } catch (err) {
+                    el.viewer.innerHTML = '<div id="loader">Error loading PDF</div>';
+                    console.error(err);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        async function renderPage(n) {
+            const page = await pdfDoc.getPage(n);
+            const baseScale = 2.5;
+            const vp = page.getViewport({scale: baseScale});
+            
+            const fullCanvas = document.createElement('canvas');
+            fullCanvas.width = vp.width;
+            fullCanvas.height = vp.height;
+            const fullCtx = fullCanvas.getContext('2d', {willReadFrequently: true});
+            
+            await page.render({canvasContext: fullCtx, viewport: vp}).promise;
+            const origData = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
+            
+            const displayCanvas = document.createElement('canvas');
+            displayCanvas.width = fullCanvas.width;
+            displayCanvas.height = fullCanvas.height;
+            
+            pageData.push({fullCanvas, displayCanvas, origData, page: n});
+        }
+
+        el.brightness.addEventListener('input', () => {updateVal('brightness-slider'); update(false);});
+        el.contrast.addEventListener('input', () => {updateVal('contrast-slider'); update(false);});
+        el.sharpen.addEventListener('input', () => {updateVal('sharpen-slider'); update(false);});
+        
+        el.brightness.addEventListener('change', () => update(true));
+        el.contrast.addEventListener('change', () => update(true));
+        el.sharpen.addEventListener('change', () => update(true));
+
+        el.reset.addEventListener('click', () => {
+            el.brightness.value = 0;
+            el.contrast.value = 0;
+            el.sharpen.value = 0;
+            updateVal('brightness-slider');
+            updateVal('contrast-slider');
+            updateVal('sharpen-slider');
+            update(true);
+        });
+
+        function update(final) {
+            if (!pageData.length) return;
+            
+            if (renderTimeout) clearTimeout(renderTimeout);
+            
+            if (!final) {
+                pageData.forEach(d => d.displayCanvas.classList.add('processing'));
+                renderTimeout = setTimeout(() => {
+                    doRender(false);
+                }, 120);
+            } else {
+                doRender(true);
+            }
+        }
+
+        function doRender(final) {
+            const b = parseInt(el.brightness.value);
+            const c = parseInt(el.contrast.value);
+            const s = parseInt(el.sharpen.value);
+            
+            pageData.forEach(d => {
+                const cv = final ? d.fullCanvas : d.displayCanvas;
+                applyFilters(cv, d.origData, b, c, s, optimalThresh);
+                
+                if (final) {
+                    const dCtx = d.displayCanvas.getContext('2d');
+                    dCtx.drawImage(d.fullCanvas, 0, 0);
+                }
+            });
+            
+            pageData.forEach(d => d.displayCanvas.classList.remove('processing'));
+        }
+
+        function applyFilters(cv, od, b, c, s, t) {
+            const ctx = cv.getContext('2d');
+            const tc = document.createElement('canvas');
+            tc.width = od.width;
+            tc.height = od.height;
+            const tCtx = tc.getContext('2d');
+            tCtx.putImageData(od, 0, 0);
+            ctx.drawImage(tc, 0, 0, cv.width, cv.height);
+            
+            const id = ctx.getImageData(0, 0, cv.width, cv.height);
+            const d = id.data;
+            const cf = c === 0 ? 1 : (259 * (c + 255)) / (255 * (259 - c));
+            
+            for (let i = 0; i < d.length; i += 4) {
+                let r = d[i], g = d[i+1], bb = d[i+2];
+                
+                r += b; g += b; bb += b;
+                
+                if (c !== 0) {
+                    r = cf * (r - 128) + 128;
+                    g = cf * (g - 128) + 128;
+                    bb = cf * (bb - 128) + 128;
+                }
+                
+                if (s > 0) {
+                    const factor = 1 + (s / 100) * 0.8;
+                    r *= factor;
+                    g *= factor;
+                    bb *= factor;
+                }
+                
+                r = Math.max(0, Math.min(255, r));
+                g = Math.max(0, Math.min(255, g));
+                bb = Math.max(0, Math.min(255, bb));
+                
+                const gray = 0.299*r + 0.587*g + 0.114*bb;
+                const col = gray > t ? 255 : 0;
+                
+                d[i] = col;
+                d[i+1] = col;
+                d[i+2] = col;
+            }
+            ctx.putImageData(id, 0, 0);
+        }
+
+        el.save.addEventListener('click', async () => {
+            if (!pageData.length) return;
+            el.viewer.innerHTML = '<div id="loader"><span class="spinner"></span>Saving...</div>';
+            el.save.disabled = true;
+            
+            const {jsPDF} = window.jspdf;
+            const fc = pageData[0].fullCanvas;
+            const orient = fc.width > fc.height ? 'l' : 'p';
+            const pdf = new jsPDF(orient, 'pt', [fc.width, fc.height]);
+            
+            for (let i = 0; i < pageData.length; i++) {
+                const c = pageData[i].fullCanvas;
+                const img = c.toDataURL('image/jpeg', 0.93);
+                if (i > 0) pdf.addPage([c.width, c.height], c.width > c.height ? 'l' : 'p');
+                pdf.addImage(img, 'JPEG', 0, 0, c.width, c.height);
+            }
+            
+            pdf.save('enhanced-document.pdf');
+            
+            el.viewer.innerHTML = '';
+            pageData.forEach(d => el.viewer.appendChild(d.displayCanvas));
+            el.save.disabled = false;
+        });
+    </script>
+</body>
+</html>
