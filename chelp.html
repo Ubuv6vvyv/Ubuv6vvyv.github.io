@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl & Scrape Command Generator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #222;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #333;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        h1, h2 {
+            border-bottom: 2px solid #555;
+            padding-bottom: 10px;
+            color: #4CAF50;
+        }
+        .input-area {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+        }
+        #urlInput {
+            flex-grow: 1;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #444;
+            color: #fff;
+        }
+        #generateButton {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #generateButton:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #444;
+            color: #4CAF50;
+        }
+        code {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #2a2a2a;
+            color: #f0a0f0; /* Pinkish-purple for code */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .placeholder {
+            color: #00f0a0; /* Bright green for user URL */
+            font-weight: bold;
+        }
+        .note {
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Crawl & Scrape Command Generator</h1>
+        <p>Paste your target URL below. The commands will automatically update to target that domain.</p>
+
+        <div class="input-area">
+            <input type="text" id="urlInput" placeholder="Enter a URL (e.g., www.example.com)">
+            <button id="generateButton">Generate Commands</button>
+        </div>
+
+        <h2>Wayback Machine (CDX API) Queries</h2>
+        <p>These commands query the Wayback Machine's *index* of archived URLs. They do not crawl the live site.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Goal</th>
+                    <th>Command (Click to copy)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Get All Unique URLs</strong> (Main Domain)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder domain-placeholder">example.com</span>/*&output=text&fl=original&collapse=urlkey" | tee <span class="placeholder domain-placeholder">example.com</span>_urls.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Get All Unique URLs</strong> (incl. <strong>Subdomains</strong>)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey" | tee <span class="placeholder domain-placeholder">example.com</span>_all_urls.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filter: Only Successful URLs (200 OK)</strong> (incl. Subdomains)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey&filter=statuscode:200"</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filter: Only PDFs</strong> (incl. Subdomains)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey&filter=mimetype:application/pdf" | tee <span class="placeholder domain-placeholder">example.com</span>_pdfs.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filter: Only JavaScript Files</strong> (incl. Subdomains)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey&filter=mimetype:application/javascript"</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filter: Only XML Files (e.g., Sitemaps)</strong> (incl. Subdomains)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey&filter=mimetype:text/xml"</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filter: By Date (2023 Onwards)</strong> (incl. Subdomains)</td>
+                    <td><code>curl -s "http://web.archive.org/cdx/search/cdx?url=<span class="placeholder wildcard-placeholder">*.example.com</span>/*&output=text&fl=original&collapse=urlkey&from=2023"</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Live Crawling Tools</h2>
+        <p class="note">⚠️ <strong>Warning:</strong> Crawling a live site "as fast as possible" can get your IP banned or harm the server. Always check <code>/robots.txt</code> first and be respectful. These tools must be installed on your system.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Goal (Tool)</th>
+                    <th>Command (Click to copy)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Find Sitemap in `robots.txt`</strong> (curl)</td>
+                    <td><code>curl -s "<span class="placeholder full-url-robots">https://example.com/robots.txt</span>" | grep -i "Sitemap:" | awk '{print $2}'</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Find All Links on a Single Page</strong> (curl)</td>
+                    <td><code>curl -s "<span class="placeholder full-url-placeholder">https://example.com</span>" | grep -Eo 'href="([^"]+)"' | cut -d'"' -f2 | tee <span class="placeholder domain-placeholder">example.com</span>_page_links.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Faster "Spider" (Log All URLs)</strong> (wget)</td>
+                    <td><code>wget --spider -r -l 5 --wait=0.5 --random-wait -U "Mozilla/5.0" <span class="placeholder full-url-placeholder">https://example.com</span> -o <span class="placeholder domain-placeholder">example.com</span>_crawl.log; cat <span class="placeholder domain-placeholder">example.com</span>_crawl.log | grep -Eoi '(http|https)://[^ ]+' | sort -u | tee <span class="placeholder domain-placeholder">example.com</span>_wget_urls.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>List ONLY PDF Links (Recursive)</strong> (wget)</td>
+                    <td><code>wget --spider -r -l 5 --wait=0.5 --random-wait -A.pdf -U "Mozilla/5.0" <span class="placeholder full-url-placeholder">https://example.com</span> 2>&1 | grep '^--' | awk '{print $3}' | grep -i '\.pdf' | sort -u | tee <span class="placeholder domain-placeholder">example.com</span>_pdf_links.txt</code></td>
+                </tr>
+                 <tr>
+                    <td><strong>Download ONLY PDFs (Recursive)</strong> (wget)</td>
+                    <td><code>wget -r -l 5 --wait=0.5 --random-wait -A.pdf -U "Mozilla/5.0" <span class="placeholder full-url-placeholder">https://example.com</span></code></td>
+                </tr>
+                <tr>
+                    <td><strong>Mirror Site (Faster but Polite)</strong> (wget)</td>
+                    <td><code>wget -m -k -p --wait=0.5 --random-wait -U "Mozilla/5.0" <span class="placeholder full-url-placeholder">https://example.com</span></code></td>
+                </tr>
+                <tr>
+                    <td><strong>Fast/Deep Crawl (Log All URLs)</strong> (gospider)</td>
+                    <td><code>gospider -s "<span class="placeholder full-url-placeholder">https://example.com</span>" -c 25 -d 5 --include-subs --other-source --robots | tee <span class="placeholder domain-placeholder">example.com</span>_gospider.txt</code></td>
+                </tr>
+                 <tr>
+                    <td><strong>List ONLY PDF Links (Fast)</strong> (gospider)</td>
+                    <td><code>gospider -s "<span class="placeholder full-url-placeholder">https://example.com</span>" -c 25 -d 5 --include-subs --other-source --robots | grep -i '\.pdf' | sort -u | tee <span class="placeholder domain-placeholder">example.com</span>_gospider_pdfs.txt</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Find "Hidden" Links in JS</strong> (hakrawler)</td>
+                    <td><code>echo "<span class="placeholder full-url-placeholder">https://example.com</span>" | hakrawler -d 2 -scope subdomains | tee <span class="placeholder domain-placeholder">example.com</span>_hakrawler.txt</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const button = document.getElementById('generateButton');
+            const input = document.getElementById('urlInput');
+
+            const updateCommands = () => {
+                let urlInput = input.value.trim();
+                
+                if (!urlInput) {
+                    // Reset to placeholders if input is empty
+                    urlInput = 'example.com';
+                }
+
+                // 1. Normalize the URL
+                let fullUrl = urlInput;
+                if (!/^https?:\/\//i.test(fullUrl)) {
+                    fullUrl = 'https://' + fullUrl;
+                }
+
+                let baseDomain = 'example.com';
+                let wildcardDomain = '*.example.com';
+                let fullBaseUrl = 'https://example.com';
+                let fullUrlRobots = 'https://example.com/robots.txt';
+
+                try {
+                    const urlObj = new URL(fullUrl);
+                    const hostname = urlObj.hostname;
+                    
+                    // Create base domain (e.g., "example.com" from "www.example.com")
+                    baseDomain = hostname.replace(/^www\./, '');
+                    
+                    // Create wildcard domain
+                    wildcardDomain = `*.${baseDomain}`;
+                    
+                    // Create full base URL (e.g., "https://example.com")
+                    fullBaseUrl = urlObj.origin;
+
+                    // Create full robots.txt URL
+                    fullUrlRobots = `${urlObj.origin}/robots.txt`;
+
+                } catch (e) {
+                    // Handle invalid URL input gracefully by using the placeholder
+                    // This allows the user to type without errors until they're done
+                    if (input.value.trim()) { // Only log error if user actually typed something
+                        console.warn('Invalid URL, using placeholders.');
+                    }
+                    baseDomain = 'example.com';
+                    wildcardDomain = '*.example.com';
+                    fullBaseUrl = 'https://example.com';
+                    fullUrlRobots = 'https://example.com/robots.txt';
+                }
+
+                // 2. Populate all placeholders
+                document.querySelectorAll('.domain-placeholder').forEach(span => {
+                    span.textContent = baseDomain;
+                });
+                
+                document.querySelectorAll('.wildcard-placeholder').forEach(span => {
+                    span.textContent = wildcardDomain;
+                });
+
+                document.querySelectorAll('.full-url-placeholder').forEach(span => {
+                    span.textContent = fullBaseUrl;
+                });
+
+                document.querySelectorAll('.full-url-robots').forEach(span => {
+                    span.textContent = fullUrlRobots;
+                });
+            };
+
+            // 3. Add event listeners
+            button.addEventListener('click', updateCommands);
+            
+            // Optional: Update as the user types
+            input.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    updateCommands();
+                }
+            });
+            input.addEventListener('input', updateCommands);
+
+            // 4. Add click-to-copy functionality to code blocks
+            document.querySelectorAll('code').forEach(codeBlock => {
+                codeBlock.style.cursor = 'pointer';
+                codeBlock.title = 'Click to copy';
+                codeBlock.addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeBlock.innerText).then(() => {
+                        const originalText = codeBlock.innerText;
+                        codeBlock.innerText = 'Copied to clipboard!';
+                        setTimeout(() => {
+                            codeBlock.innerText = originalText;
+                        }, 1500);
+                    }).catch(err => {
+                        console.error('Failed to copy text: ', err);
+                    });
+                });
+            });
+
+            // Initial call to populate with placeholders
+            updateCommands();
+        });
+    </script>
+
+</body>
+</html>
