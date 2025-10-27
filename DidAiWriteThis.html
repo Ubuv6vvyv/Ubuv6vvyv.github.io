@@ -1,765 +1,363 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Content Detector v2.6 (Merged)</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>AI Content Detector v2.8 (Enhanced)</title><script src=https://cdn.tailwindcss.com></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sansation:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
-:root{--bg-color:#f9f9f9;--text-color:#2d2d2d;--border-color:#e0e0e0;--primary-color:#000;--secondary-color:#fff;--subtle-text-color:#888;--highlight-bg:#f0f0f0;--error-color:#c0392b}
-body{font-family:'JetBrains Mono',monospace;background-color:var(--bg-color);color:var(--text-color);font-size:13.5px;line-height:1.7;font-weight:400;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-h1,h2,h3{font-weight:600;letter-spacing:-.5px}
-.main-container{max-width:750px;margin:0 auto;padding:3rem 1.5rem}
-header{text-align:center;margin-bottom:3rem}
-header h1{font-size:1.8rem;font-weight:700;margin-bottom:.5rem}
-header p{font-size:.9rem;color:var(--subtle-text-color)}
-.card{background-color:var(--secondary-color);border:1px solid var(--border-color);padding:2rem;margin-bottom:2rem;transition:box-shadow .3s ease-in-out}
-.editor{min-height:250px;width:100%;font-size:.9rem;border:1px solid var(--border-color);padding:1.5rem;transition:all .3s ease}
-.editor:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
-.editor-controls{display:flex;justify-content:flex-end;align-items:center;gap:.75rem;margin-top:1rem}
-.btn{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:500;padding:.75rem 1.5rem;border:none;cursor:pointer;transition:all .3s ease}
-#analyze-btn{background-color:var(--primary-color);color:var(--secondary-color)}
-#analyze-btn:hover:not(:disabled){background-color:#333;transform:translateY(-2px)}
-#analyze-btn:disabled{background-color:#ccc;cursor:not-allowed}
-#clear-btn{background-color:transparent;color:var(--text-color);border:1px solid var(--border-color)}
-#clear-btn:hover{background-color:var(--highlight-bg);border-color:#ccc}
-#results-container{display:flex;flex-direction:column;gap:2rem}
-.results-summary{display:flex;flex-direction:column;align-items:center;text-align:center}
-h2.section-title{font-size:1.2rem;margin-bottom:1.5rem;text-align:center}
-.score-circle{width:140px;height:140px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .5s ease-in-out;--score-percent:0%;background:conic-gradient(var(--border-color) 0% var(--score-percent),var(--border-color) var(--score-percent) 100%)}
-#score-text{font-size:2.5rem;font-weight:700}
-#confidence-level{font-size:.8rem;color:var(--subtle-text-color);margin-top:1rem;text-transform:uppercase;letter-spacing:1px}
-#key-indicators{list-style-type:none;padding:0;margin:0;width:100%;text-align:center}
-#key-indicators li{padding:.75rem;border:1px solid var(--border-color);margin-top:.75rem;font-size:.8rem}
-#analysis-categories{border:1px solid var(--border-color)}
-.category-wrapper{border-bottom:1px solid var(--border-color)}
-.category-wrapper:last-child{border-bottom:none}
-.category-header{cursor:pointer;padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center;transition:background-color .3s ease}
-.category-header:hover{background-color:#fbfbfb}
-.category-header h3{font-size:1rem;font-weight:500;text-transform:capitalize}
-.category-header svg{width:16px;height:16px;transition:transform .4s cubic-bezier(.25,.46,.45,.94)}
-.category-header.expanded svg{transform:rotate(180deg)}
-.category-content{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.25,.46,.45,.94)}
-.category-content.expanded{max-height:2000px;transition:max-height .6s cubic-bezier(.25,.46,.45,.94)}
-.category-content-inner{padding:0 1.5rem 1.5rem;border-top:1px solid var(--border-color)}
-.category-item{padding:1rem;background-color:var(--bg-color);border:1px solid #e9e9e9;margin-top:1rem}
-.item-title{font-weight:500;display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
-.item-description{font-size:.85rem;color:var(--subtle-text-color)}
-.item-description.small{margin-top:.25rem;font-size:.8rem}
-.item-subcategory{font-weight:500;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color)}
-.badge{font-size:.7rem;font-weight:700;padding:.2rem .6rem;background-color:var(--highlight-bg);border:1px solid var(--border-color);color:var(--text-color)}
-.item-examples{margin-top:.75rem}
-.item-examples summary{cursor:pointer;font-weight:500;font-size:.85rem;padding:.5rem;background:#fafafa;border:1px solid var(--border-color);user-select:none}
-.item-examples summary:hover{background:#f0f0f0}
-.item-examples ul{list-style-type:disc;padding-left:1.25rem;margin-top:.5rem}
-.item-examples li{margin-bottom:.75rem;font-size:.8rem;line-height:1.6;color:#555}
-.hidden{display:none!important}
-.fade-in{animation:fadeIn .8s ease-in-out forwards}
-@keyframes fadeIn{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
-</style>
-</head>
-<body>
-<div class="main-container">
-<header>
-<h1>AI Content Detector v2.6</h1>
-<p>A comprehensive tool to analyze text for AI-generated patterns with visual examples.</p>
-</header>
-<main>
-<div class="card">
-<div id="editor" contenteditable="true" class="editor" placeholder="Paste or type your text here..."></div>
-<div class="editor-controls">
-<button id="clear-btn" class="btn">Clear</button>
-<button id="analyze-btn" class="btn" disabled>Analyze</button>
-</div>
-</div>
-<div id="results-container" class="hidden">
-<div class="card results-summary fade-in">
-<h2 class="section-title">Analysis Summary</h2>
-<div id="score-circle" class="score-circle"><span id="score-text">-%</span></div>
-<p id="confidence-level"></p>
-</div>
-<div class="card fade-in" style="animation-delay: 100ms;">
-<h2 class="section-title">Key Indicators</h2>
-<ul id="key-indicators"><li class="text-gray-500">Analysis results will appear here.</li></ul>
-</div>
-</div>
-<div id="detailed-analysis" class="hidden">
-<h2 class="section-title fade-in" style="animation-delay: 200ms; margin-top: 2rem;">Detailed Analysis</h2>
-<div id="analysis-categories" class="fade-in" style="animation-delay: 300ms;"></div>
-</div>
-</main>
-</div>
+  @import url(https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap);
 
-<script>
-// === UTILITY CLASS ===
-class Utils{
-static htmlToText(t){
-if(!t||"string"!=typeof t)return"";
-const e=document.createElement("div");
-return e.innerHTML=t,e.textContent||e.innerText||""
-}
-static countWords(t){
-if(!t)return 0;
-const e="string"==typeof t&&t.includes("<")?this.htmlToText(t):t;
-return e.trim().split(/\s+/).filter(Boolean).length
-}
-static debounce(t,e=300){
-let s;
-return(...r)=>{clearTimeout(s),s=setTimeout(()=>t.apply(this,r),e)}
-}
-}
+  :root {
+    --bg-color: #f9f9f9;
+    --text-color: #2d2d2d;
+    --border-color: #2d6765;
+    --primary-color: #000;
+    --secondary-color: #fff;
+    --subtle-text-color: #555;
+    --highlight-bg: #f0f0f0;
+    --error-color: #c0392b;
+    --warning-color: #f59e0b
+  }
 
-// === STRUCTURAL ANALYZER ===
-class StructuralAnalyzer {
-analyze(html) {
-const plainText = Utils.htmlToText(html);
-const paragraphs = plainText.split(/\n\s*\n/).filter(p => Utils.countWords(p) > 5);
-if (paragraphs.length <= 2) return { hasData: false };
+  body {
+    font-family: "Sansation", sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-size: 13.5px;
+    line-height: 1.7;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale
+  }
 
-const pLengths = paragraphs.map(p => p.split(/\s+/).filter(Boolean).length);
-const mean = pLengths.reduce((a, b) => a + b, 0) / pLengths.length;
-const stdDev = Math.sqrt(pLengths.map(len => Math.pow(len - mean, 2)).reduce((a, b) => a + b, 0) / pLengths.length);
-const isUniform = pLengths.length > 3 && stdDev < 6 && mean > 20;
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    letter-spacing: -.5px
+  }
 
-const boldPatternRegex = /(?:\*\*|__|\*|"|'|^|\n)([A-Z][^:]{1,50})(?:\*\*|__|\*|"|')?:\s+([^\n]{20,100})/gm;
-const boldMatches = [];
-let match;
-while ((match = boldPatternRegex.exec(plainText)) !== null && boldMatches.length < 5) {
-boldMatches.push({ term: match[1], context: match[0].substring(0, 100) });
-}
-const hasBoldPattern = boldMatches.length > 2;
+  .main-container {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem
+  }
 
-const listRegex = /^\s*[-*•]\s+(.+)|^\s*\d+[\.)]\s+(.+)/gm;
-const listItems = [];
-while ((match = listRegex.exec(plainText)) !== null && listItems.length < 10) {
-listItems.push(match[1] || match[2]);
-}
-let isListUniform = false;
-if (listItems.length > 3) {
-const itemLengths = listItems.map(item => Utils.countWords(item));
-const listMean = itemLengths.reduce((a, b) => a + b, 0) / itemLengths.length;
-const listStdDev = Math.sqrt(itemLengths.map(len => Math.pow(len - listMean, 2)).reduce((a, b) => a + b, 0) / itemLengths.length);
-isListUniform = listStdDev < 4 && listMean > 10;
-}
+  header {
+    text-align: center;
+    margin-bottom: 3rem
+  }
 
-const headerRegex = /^#+\s+(.+)|^([A-Z][^.!?]{10,60})\s*$/gm;
-const headers = [];
-while ((match = headerRegex.exec(plainText)) !== null && headers.length < 8) {
-headers.push(match[1] || match[2]);
-}
-const hasStructuredSections = headers.length > 3;
+  header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: .5rem
+  }
 
-return { stdDev, isUniform, boldMatches, hasBoldPattern, listItems: listItems.slice(0, 4), isListUniform, headers: headers.slice(0, 4), hasStructuredSections, hasData: true };
-}
+  header p {
+    font-size: .9rem;
+    color: var(--subtle-text-color)
+  }
 
-getScore(results) {
-let score = 0, explanation = null;
-if (results.hasBoldPattern) {
-score = 0.9;
-explanation = `Frequent use of "Term:" format (${results.boldMatches.length}x), a very strong AI indicator.`;
-} else if (results.isListUniform) {
-score = 0.8;
-explanation = `List items (${results.listItems.length}) are unnaturally uniform in length and structure.`;
-} else if (results.isUniform) {
-score = 0.7;
-explanation = "Paragraphs are suspiciously uniform in length.";
-}
-if (results.hasStructuredSections) score += 0.1;
-return { score, confidence: score > 0 ? 0.9 : 0.5, explanation };
-}
+  .card {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    transition: box-shadow .3s ease-in-out
+  }
 
-getHtml(results) {
-if (!results.hasData) return '<p class="text-gray-500">Not enough content to analyze structural patterns.</p>';
-let html = '';
-if (results.isUniform) html += `<div class="category-item"><div class="item-title">Paragraph Uniformity</div><div class="item-description">Paragraph lengths are very consistent (Std Dev: ${results.stdDev.toFixed(2)}).</div></div>`;
-if (results.hasBoldPattern) {
-html += `<div class="category-item"><div class="item-title">Explanatory Formatting</div><div class="item-description">Detected ${results.boldMatches.length} instances of a "<strong>Term:</strong>" pattern. This is a classic AI writing style.</div>`;
-if (results.boldMatches.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-results.boldMatches.forEach(m => html += `<li><strong>${this.escapeHtml(m.term)}:</strong> ${this.escapeHtml(m.context.substring(0, 80))}...</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-if (results.isListUniform) {
-html += `<div class="category-item"><div class="item-title">List Uniformity</div><div class="item-description">The ${results.listItems.length} list items are highly consistent in length, suggesting AI generation.</div>`;
-if (results.listItems.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-results.listItems.forEach(item => html += `<li>${this.escapeHtml(item.substring(0, 100))}</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-if (results.hasStructuredSections && results.headers.length > 0) {
-html += `<div class="category-item"><div class="item-title">Structured Sections</div><div class="item-description">Detected ${results.headers.length}+ section headers in an organizational pattern.</div></div>`;
-}
-return html || '<p class="text-gray-500">No significant structural patterns detected.</p>';
-}
+  .editor {
+    min-height: 250px;
+    width: 100%;
+    font-size: .6rem;
+    border: 2px solid var(--border-color);
+    padding: 1.5rem;
+    transition: all .3s ease
+  }
 
-escapeHtml(text) {
-const div = document.createElement('div');
-div.textContent = text;
-return div.innerHTML;
-}
-}
+  .editor:focus {
+    outline: 0;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, .05)
+  }
 
-// === STYLISTIC ANALYZER (MERGED) ===
-class StylisticAnalyzer {
-constructor() {
-this.commonAiPhrases = {
-introductory: ["certainly,", "absolutely,", "of course,", "here is", "here's", "here are", "let's dive into", "let's explore", "let's delve into", "let's take a closer look at", "let's unpack", "in this article, we will", "in this guide,", "in this blog post,", "in this response,", "it's important to note", "it is crucial to understand", "it's worth highlighting", "when it comes to", "in the realm of", "in the world of", "the landscape of", "in today's fast-paced world", "in the modern era,", "in today's digital age,", "without further ado", "to begin with,", "first and foremost,", "to kick things off,", "as we embark on", "diving right in", "let us examine", "it is essential to consider"],
-concluding: ["in conclusion,", "to sum up,", "in summary,", "to summarize,", "overall,", "in the final analysis,", "all in all,", "taking everything into consideration,", "looking ahead,", "moving forward,", "the path forward involves", "as we look to the future", "hope this helps!", "i hope this explanation was helpful", "i hope this provides clarity", "feel free to ask", "if you have any further questions,", "don't hesitate to reach out", "please let me know if you need anything else", "should you require further assistance,", "to wrap things up", "bringing it all together", "the key takeaway is", "ultimately, what matters most"],
-disclaimers: ["as an ai,", "as a language model,", "as a large language model,", "as an ai assistant,", "my knowledge cutoff is", "my training data only goes up to", "i do not have access to real-time information", "i don't have personal opinions", "i cannot provide financial advice", "i am not a medical professional", "it is important to remember", "it should be noted that", "it's worth noting", "a key consideration is", "one must bear in mind", "please keep in mind", "it is essential to", "it's crucial to understand that", "please be aware that", "it's vital to recognize"],
-hedging: ["in general,", "generally speaking,", "typically,", "usually,", "often,", "for the most part,", "it seems that", "it appears that", "it could be argued that", "one might say", "tends to be", "can be seen as", "in some respects,", "in many cases,", "arguably,", "potentially,", "likely,", "it is possible that", "in some instances,", "to some extent,", "more or less", "by and large", "on the whole", "as a rule", "in most scenarios"],
-rhetorical: ["so, what does this all mean?", "but what about", "the question then becomes", "what's the bottom line?", "how can we", "why is this important?", "so, how does it work?", "what's the key takeaway?", "what does the future hold?", "where do we go from here?", "what can we learn from this?", "how does this apply to", "why should you care?", "what makes this significant?"],
-transitions: ["that being said", "with that said", "having said that", "with that in mind", "on the other hand", "it's worth mentioning", "speaking of which", "in light of this", "building on this", "expanding on this idea"]
-};
-this.formalityWords = ["delve", "explore", "harness", "leverage", "utilize", "facilitate", "elucidate", "underscore", "demonstrate", "articulate", "expound", "ascertain", "postulate", "necessitate", "streamline", "optimize", "ameliorate", "augment", "constitutes", "profoundly", "expedite", "synergize", "navigate", "unleash", "unlock", "furthermore", "moreover", "additionally", "subsequently", "conversely", "correspondingly", "therefore", "hence", "consequently", "nonetheless", "nevertheless", "accordingly", "juxtapose", "paradigm shift", "cultivate", "endeavor", "synthesize", "extrapolate", "epitomize", "exemplify", "encapsulate"];
-this.genericWords = ["vast", "intricate", "complex", "dynamic", "remarkable", "unique", "various", "significant", "essential", "key", "crucial", "pivotal", "foundational", "game-changing", "cutting-edge", "state-of-the-art", "world-class", "transformative", "powerful", "seamless", "impactful", "innovative", "streamlined", "versatile", "elegant", "intuitive", "next-generation", "comprehensive", "extensive", "diverse", "abundant", "numerous", "multifaceted", "interconnected", "wide-ranging", "groundbreaking", "amazing", "incredible", "fantastic", "excellent", "outstanding", "impressive", "fascinating", "exceptional", "cornerstone", "revolutionary", "unparalleled", "unprecedented", "holistic", "robust", "scalable"];
-            
-// --- ADDED FROM TOOL 1 ---
-this.punctuationThresholds = {
-emDashesPercentage: 0.003,
-ellipsesPercentage: 0.006,
-exclamationPercentage: 0.007
-};
-// --- END ADDED ---
-}
-        
-analyze(text) {
-const plainText = Utils.htmlToText(text);
-if (Utils.countWords(plainText) < 30) return { hasData: false };
-            
-const aiPhrases = this.findPhrases(plainText, this.commonAiPhrases);
-const formalityWords = this.findPhrases(plainText, { formality: this.formalityWords });
-const genericWords = this.findPhrases(plainText, { generic: this.genericWords });
-            
-// --- ADDED FROM TOOL 1 ---
-const punctuation = this.analyzePunctuation(plainText);
-// --- END ADDED ---
+  .editor:empty:before {
+    content: attr(placeholder);
+    color: #999
+  }
 
-// --- MODIFIED ---
-const hasData = aiPhrases.count > 0 || formalityWords.count > 2 || genericWords.count > 3 || punctuation.hasIssues;
-return { hasData, aiPhrases, formalityWords, genericWords, punctuation, plainText };
-// --- END MODIFIED ---
-}
-        
-findPhrases(text, categories) {
-const results = { count: 0, matches: [], categories: {}, examples: [] };
-text = text.toLowerCase();
-for (const category in categories) {
-results.categories[category] = 0;
-for (const phrase of categories[category]) {
-const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-const matches = text.match(regex);
-if (matches && matches.length > 0) {
-const count = matches.length;
-results.count += count;
-results.categories[category] += count;
-results.matches.push({ phrase, category, count });
-                        
-const idx = text.indexOf(phrase.toLowerCase());
-if (idx !== -1 && results.examples.length < 8) {
-const start = Math.max(0, idx - 30);
-const end = Math.min(text.length, idx + phrase.length + 50);
-results.examples.push({
-phrase: matches[0],
-context: text.substring(start, end).trim()
-});
-}
-}
-}
-}
-return results;
-}
+  .editor-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: .75rem;
+    margin-top: 1rem
+  }
 
-// --- ADDED FROM TOOL 1 ---
-analyzePunctuation(text) {
-const results = {
-hasIssues: false,
-results: {
-emDashes: { count: 0, isExcessive: false },
-ellipses: { count: 0, isExcessive: false },
-exclamationMarks: { count: 0, isExcessive: false },
-oxfordCommaConsistency: { consistent: false }
-}
-};
-if (text.length === 0) return results;
-          
-const emDashCount = (text.match(/—|–|--/g) || []).length;
-results.results.emDashes = {
-count: emDashCount,
-isExcessive: ((emDashCount / text.length) > this.punctuationThresholds.emDashesPercentage && emDashCount >= 2) || emDashCount >= 3
-};
-          
-const ellipsesCount = (text.match(/\.\.\./g) || []).length;
-results.results.ellipses = {
-count: ellipsesCount,
-isExcessive: (ellipsesCount / text.length) > this.punctuationThresholds.ellipsesPercentage && ellipsesCount >= 3
-};
+  .btn {
+    font-family: "Sansation", sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    padding: .75rem 1.5rem;
+    border: none;
+    cursor: pointer;
+    transition: all .3s ease
+  }
 
-const exclamationCount = (text.match(/!/g) || []).length;
-results.results.exclamationMarks = {
-count: exclamationCount,
-isExcessive: (exclamationCount / text.length) > this.punctuationThresholds.exclamationPercentage && exclamationCount >= 3
-};
+  #analyze-btn {
+    background-color: var(--primary-color);
+    color: var(--secondary-color)
+  }
 
-const withOxfordComma = (text.match(/,\s+and\s+/g) || []).length;
-const withoutOxfordComma = (text.match(/\s+and\s+/g) || []).length - withOxfordComma;
-const oxfordConsistency = {
-consistent: false,
-commaCount: withOxfordComma,
-noCommaCount: withoutOxfordComma
-};
-if (withOxfordComma + withoutOxfordComma >= 5) {
-if ((withOxfordComma > 0 && withoutOxfordComma === 0) || (withoutOxfordComma > 0 && withOxfordComma === 0)) {
-oxfordConsistency.consistent = true;
-}
-}
-results.results.oxfordCommaConsistency = oxfordConsistency;
-          
-results.hasIssues = results.results.emDashes.isExcessive || results.results.ellipses.isExcessive || results.results.exclamationMarks.isExcessive || (oxfordConsistency.consistent && (withOxfordComma + withoutOxfordComma) >= 8);
-return results;
-}
-// --- END ADDED ---
+  #analyze-btn:hover:not(:disabled) {
+    background-color: #333;
+    transform: translateY(-2px)
+  }
 
-getScore(results) {
-if (!results.hasData) return { score: 0, confidence: 0, explanation: null };
-let score = 0, explanations = [];
-            
-if (results.aiPhrases.categories.rhetorical > 0) {
-score += 0.4;
-explanations.push("uses rhetorical questions to structure content");
-}
-if (results.aiPhrases.count > 1) {
-score += Math.min(0.5, results.aiPhrases.count * 0.1);
-explanations.push(`AI-typical phrases (${results.aiPhrases.count})`);
-}
-if (results.formalityWords.count > 2) {
-score += Math.min(0.25, (results.formalityWords.count - 2) * 0.05);
-explanations.push("overly formal/academic language");
-}
-if (results.genericWords.count > 3) {
-score += Math.min(0.2, (results.genericWords.count - 3) * 0.04);
-explanations.push("high use of generic 'booster' words");
-}
+  #analyze-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed
+  }
 
-// --- ADDED FROM TOOL 1 (MODIFIED) ---
-const punctuation = results.punctuation;
-if (punctuation?.hasIssues) {
-let punctScore = 0;
-if (punctuation.results.emDashes.isExcessive) {
-if (punctuation.results.emDashes.count >= 3) {
-punctScore += 0.25;
-explanations.push(`Multiple em dashes (${punctuation.results.emDashes.count})`);
-} else {
-punctScore += 0.15;
-explanations.push("High em-dash usage");
-}
-}
-if (punctuation.results.ellipses.isExcessive) punctScore += 0.05;
-if (punctuation.results.exclamationMarks.isExcessive) punctScore += 0.05;
-const oxford = punctuation.results.oxfordCommaConsistency;
-if (oxford.consistent && (oxford.commaCount + oxford.noCommaCount) >= 8) {
-punctScore += 0.15;
-explanations.push("Perfect consistency in optional punctuation");
-}
-score += punctScore;
-}
-// --- END ADDED ---
-            
-return { score: Math.min(0.95, score), confidence: explanations.length > 0 ? 0.85 : 0.5, explanation: explanations.length > 0 ? `Stylistic indicators: ${explanations.join(', ')}.` : null };
-}
+  #clear-btn {
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color)
+  }
 
-getHtml(results) {
-if (!results.hasData) return '<p class="text-gray-500">No significant stylistic patterns detected.</p>';
-let html = '';
-            
-if (results.aiPhrases.count > 0) {
-html += `<div class="category-item"><div class="item-title">AI-Typical Phrasing <span class="badge">${results.aiPhrases.count}</span></div>`;
-html += `<div class="item-description">Found common introductory, concluding, or disclaimer phrases. ${results.aiPhrases.categories.rhetorical > 0 ? `Detected ${results.aiPhrases.categories.rhetorical} rhetorical question(s).` : ''}</div>`;
-if (results.aiPhrases.examples.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-results.aiPhrases.examples.forEach(ex => html += `<li>"...${this.escapeHtml(ex.context)}..."</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-if (results.formalityWords.count > 2) {
-html += `<div class="category-item"><div class="item-title">Overly Formal Language <span class="badge">${results.formalityWords.count}</span></div>`;
-html += `<div class="item-description">Text uses words like "utilize", "elucidate", and "paradigm" which can be a sign of AI writing.</div>`;
-if (results.formalityWords.examples.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-results.formalityWords.examples.forEach(ex => html += `<li>"...${this.escapeHtml(ex.context)}..."</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-if (results.genericWords.count > 3) {
-html += `<div class="category-item"><div class="item-title">Generic "Booster" Words <span class="badge">${results.genericWords.count}</span></div>`;
-html += `<div class="item-description">Text uses vague, positive words like "transformative", "game-changing", and "nuanced" frequently.</div>`;
-if (results.genericWords.examples.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-results.genericWords.examples.forEach(ex => html += `<li>"...${this.escapeHtml(ex.context)}..."</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
+  #clear-btn:hover {
+    background-color: var(--highlight-bg);
+    border-color: #ccc
+  }
 
-// --- ADDED FROM TOOL 1 (MODIFIED) ---
-const punctuation = results.punctuation;
-if (punctuation?.hasIssues) {
-html += `<div class="category-item"><div class="item-title">Punctuation Patterns</div>`;
-if (punctuation.results.emDashes.isExcessive) {
-html += `<div class="item-description">High em-dash usage: ${punctuation.results.emDashes.count} em-dashes.</div>`;
-if (punctuation.results.emDashes.count >= 3) {
-html += `<div class="item-description small" style="color: var(--error-color);">⚠️Multiple em dashes are highly characteristic of AI-generated content.</div>`;
-}
-}
-if (punctuation.results.ellipses.isExcessive) {
-html += `<div class="item-description">High ellipsis usage: ${punctuation.results.ellipses.count} ellipses.</div>`;
-}
-if (punctuation.results.exclamationMarks.isExcessive) {
-html += `<div class="item-description">High exclamation mark usage: ${punctuation.results.exclamationMarks.count} exclamation marks.</div>`;
-}
-const oxford = punctuation.results.oxfordCommaConsistency;
-if (oxford.consistent && (oxford.commaCount + oxford.noCommaCount) >= 8) {
-html += `<div class="item-description">Perfect ${oxford.commaCount > 0 ? 'usage' : 'avoidance'} of Oxford commas across ${oxford.commaCount + oxford.noCommaCount} instances.</div>`;
-html += `<div class="item-description small">Extreme consistency in optional punctuation can be an AI indicator.</div>`;
-}
-html += `</div>`;
-}
-// --- END ADDED ---
+  #results-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem
+  }
 
-return html;
-}
+  .results-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center
+  }
 
-escapeHtml(text) {
-const div = document.createElement('div');
-div.textContent = text;
-return div.innerHTML;
-}
-}
-    
-// === LEXICAL ANALYZER ===
-class LexicalAnalyzer {
-constructor() {
-this.thresholds = { ttr: { low: 0.45 }, sentenceLengthStdDev: { low: 5 } };
-this.hedgingWords = new Set(["actually", "basically", "essentially", "generally", "literally", "overall", "really", "simply", "truly", "ultimately", "in fact", "of course", "so to speak", "needless to say", "arguably", "apparently", "seemingly", "particularly", "specifically", "notably", "evidently"]);
-this.redundantStarters = ["this is because", "in other words", "what this means is", "to put it simply", "to clarify", "that is to say", "in essence", "essentially", "basically", "fundamentally"];
-}
+  h2.section-title {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    text-align: center
+  }
 
-analyze(text) {
-const plainText = Utils.htmlToText(text);
-const wordCount = Utils.countWords(plainText);
-if (wordCount < 50) return { hasData: false, wordCount };
+  .score-circle {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .5s ease-in-out;
+    --score-percent: 0%;
+    background: conic-gradient(var(--border-color) 0 var(--score-percent), var(--border-color) var(--score-percent) 100%)
+  }
 
-const sentences = plainText.split(/[.!?]+(?:\s|$)/).filter(s => s.trim().length > 3);
-const ttr = this.calculateTTR(plainText);
-const sentenceLength = this.analyzeSentenceLengths(sentences);
-const redundancy = this.analyzeRedundancy(sentences);
-const passiveVoice = this.detectPassiveVoice(sentences);
-            
-return { hasData: true, ttr, sentenceLength, redundancy, passiveVoice, sentences };
-}
-        
-calculateTTR(t){
-const e=t.toLowerCase().replace(/[^\w\s]/g," ").split(/\s+/).filter(Boolean);
-if(e.length<50)return{ttr:1,interpretation:"Text too short",isSuspicious:!1};
-const s=new Set(e),r=s.size/e.length;
-let n=r<this.thresholds.ttr.low;
-return{ttr:r,uniqueCount:s.size,totalCount:e.length,interpretation:n?"Low lexical diversity":"Good lexical diversity",isSuspicious:n}
-}
+  #score-text {
+    font-size: 2.5rem;
+    font-weight: 700
+  }
 
-analyzeSentenceLengths(t){
-if(t.length<3)return{interpretation:"Too few sentences",isSuspicious:!1};
-const e=t.map(t=>Utils.countWords(t)),s=e.reduce((t,e)=>t+e,0)/e.length,r=Math.sqrt(e.map(t=>Math.pow(t-s,2)).reduce((t,e)=>t+e,0)/e.length);
-return{avg:s,stdDev:r,interpretation:r<this.thresholds.sentenceLengthStdDev.low&&t.length>=10?"Uniform sentences with low variation":"Sentences with natural variation",isSuspicious:r<this.thresholds.sentenceLengthStdDev.low&&t.length>=10}
-}
+  #confidence-level {
+    font-size: .8rem;
+    color: var(--subtle-text-color);
+    margin-top: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px
+  }
 
-analyzeRedundancy(sentences) {
-let redundantPairs = 0;
-const examples = [];
-const stopWords = new Set(['the', 'a', 'an', 'is', 'it', 'this', 'that', 'was', 'were', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'as', 'by']);
-if (sentences.length < 3) return { count: 0, isSuspicious: false, examples };
-            
-for (let i = 0; i < sentences.length - 1; i++) {
-const s1 = sentences[i];
-const s2 = sentences[i+1];
-                
-for (const starter of this.redundantStarters) {
-if (s2.toLowerCase().trim().startsWith(starter)) {
-redundantPairs++;
-if (examples.length < 4) {
-examples.push({ s1: s1.substring(0, 100), s2: s2.substring(0, 100), type: 'explicit' });
-}
-break;
-}
-}
-                
-const words1 = new Set(s1.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => !stopWords.has(w) && w.length > 2));
-const words2 = new Set(s2.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => !stopWords.has(w) && w.length > 2));
-if (words1.size === 0 || words2.size === 0) continue;
-                
-const intersection = new Set([...words1].filter(w => words2.has(w)));
-const similarity = intersection.size / Math.min(words1.size, words2.size);
-                
-if (similarity > 0.6) {
-redundantPairs++;
-if (examples.length < 4) {
-examples.push({ s1: s1.substring(0, 100), s2: s2.substring(0, 100), type: 'semantic' });
-}
-}
-}
-return { count: redundantPairs, isSuspicious: redundantPairs > 1 && (redundantPairs / sentences.length) > 0.2, examples };
-}
+  #key-indicators {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    text-align: center
+  }
 
-detectPassiveVoice(sentences) {
-const passivePatterns = [
-/\b(is|are|was|were|been|being)\s+(being\s+)?\w+ed\b/gi,
-/\b(is|are|was|were|been|being)\s+\w+en\b/gi
-];
-let passiveCount = 0;
-const examples = [];
-            
-sentences.forEach(sent => {
-passivePatterns.forEach(pattern => {
-const matches = sent.match(pattern);
-if (matches) {
-passiveCount += matches.length;
-if (examples.length < 4 && matches.length > 0) {
-examples.push(sent.substring(0, 120));
-}
-}
-});
-});
-            
-const passiveRate = passiveCount / sentences.length;
-return { count: passiveCount, rate: passiveRate, isExcessive: passiveRate > 0.3, examples: [...new Set(examples)] };
-}
+  #key-indicators li {
+    padding: .75rem;
+    border: 1px solid var(--border-color);
+    margin-top: .75rem;
+    font-size: .8rem
+  }
 
-getScore(results) {
-if (!results.hasData) return { score: 0, confidence: 0, explanation: null };
-let score = 0, explanations = [];
-if (results.ttr?.isSuspicious) { score += 0.25; explanations.push("low lexical diversity"); }
-if (results.sentenceLength?.isSuspicious) { score += 0.35; explanations.push("unusually uniform sentence lengths"); }
-if (results.redundancy?.isSuspicious) { score += 0.4; explanations.push(`high semantic redundancy (${results.redundancy.count} pairs)`); }
-if (results.passiveVoice?.isExcessive) { score += 0.2; explanations.push(`excessive passive voice (${(results.passiveVoice.rate * 100).toFixed(0)}%)`); }
-return { score: Math.min(score, 1), confidence: explanations.length > 0 ? 0.8 : 0.5, explanation: explanations.length > 0 ? `Lexical patterns: ${explanations.join(', ')}.` : null };
-}
+  .warning-notice {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-size: .85rem;
+    color: #856404;
+    border-radius: 4px
+  }
 
-getHtml(results) {
-if (!results.hasData) return `<p class="text-gray-500">Not enough text (${results.wordCount || 0} words) for analysis.</p>`;
-let html = '';
-const { ttr, sentenceLength, redundancy, passiveVoice } = results;
-if (ttr) html += `<div class="category-item"><div class="item-title">Word Variety (TTR)</div><div class="item-description">${ttr.interpretation}. (${ttr.uniqueCount} unique of ${ttr.totalCount} total words)</div></div>`;
-if (sentenceLength) html += `<div class="category-item"><div class="item-title">Sentence Structure</div><div class="item-description">${sentenceLength.interpretation}. (Avg: ${sentenceLength.avg?.toFixed(1)}, Std Dev: ${sentenceLength.stdDev?.toFixed(2)})</div></div>`;
-if (redundancy?.isSuspicious) {
-html += `<div class="category-item"><div class="item-title">Sentence Redundancy</div><div class="item-description">Detected ${redundancy.count} pairs of sentences that repeat the same information. This is a strong AI indicator.</div>`;
-if (redundancy.examples.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-redundancy.examples.forEach(ex => html += `<li><strong>Sentence 1:</strong> "${this.escapeHtml(ex.s1)}"<br><strong>Sentence 2:</strong> "${this.escapeHtml(ex.s2)}"</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-if (passiveVoice?.isExcessive) {
-html += `<div class="category-item"><div class="item-title">Passive Voice Overuse</div><div class="item-description">Found ${passiveVoice.count} instances of passive voice (${(passiveVoice.rate * 100).toFixed(0)}% of sentences). AI often defaults to passive constructions.</div>`;
-if (passiveVoice.examples.length > 0) {
-html += '<details class="item-examples"><summary>👁️ View Examples</summary><ul>';
-passiveVoice.examples.forEach(ex => html += `<li>"${this.escapeHtml(ex)}..."</li>`);
-html += '</ul></details>';
-}
-html += '</div>';
-}
-return html;
-}
+  #analysis-categories {
+    border: 1px solid var(--border-color)
+  }
 
-escapeHtml(text) {
-const div = document.createElement('div');
-div.textContent = text;
-return div.innerHTML;
-}
-}
-    
-// === EMOJI ANALYZER ===
-class EmojiAnalyzer{
-analyze(t){
-const e=(new DOMParser).parseFromString(t,"text/html"),s=Array.from(e.querySelectorAll("p, div, li")),r={consecutiveStartsWithAny:0,percentStartsWithEmoji:0,hasData:!1,examples:[]};
-if(s.length<3)return r;
-let n=0,o=0,i=0;
-const a=/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u;
-return s.forEach(t=>{
-const e=t.textContent.trim();
-if(e&&e.match(a)){
-i++,o++;
-const s=e.substring(0,80);
-r.examples.length<5&&r.examples.push(s)
-}else o=0;
-n=Math.max(n,o)
-}),r.consecutiveStartsWithAny=n,r.percentStartsWithEmoji=i/s.length*100,r.hasData=r.consecutiveStartsWithAny>2||r.percentStartsWithEmoji>30,r
-}
-getScore(t){
-let e=0,s=.5,r=null;
-return t.percentStartsWithEmoji>80?(e=.95,s=.95,r="Extremely high percentage of paragraphs start with emojis."):t.consecutiveStartsWithAny>3?(e=.85,s=.9,r="Multiple consecutive paragraphs start with emojis."):t.percentStartsWithEmoji>50&&(e=.75,s=.8,r="A significant portion of paragraphs start with an emoji."),{score:e,confidence:s,explanation:r}
-}
-getHtml(t){
-if(!t.hasData)return'<p class="text-gray-500">No significant emoji patterns detected.</p>';
-let e='<div class="category-item"><div class="item-title">Emoji Pattern</div><div class="item-description">';
-return t.percentStartsWithEmoji>10&&(e+=`<strong>${t.percentStartsWithEmoji.toFixed(0)}%</strong> of paragraphs start with an emoji. `),t.consecutiveStartsWithAny>2&&(e+=`Found up to <strong>${t.consecutiveStartsWithAny}</strong> consecutive paragraphs starting with an emoji.`),e+="</div>",t.examples.length>0&&(e+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',t.examples.forEach(t=>e+=`<li>"${this.escapeHtml(t)}..."</li>`),e+="</ul></details>"),e+="</div>",e
-}
-escapeHtml(t){
-const e=document.createElement("div");
-return e.textContent=t,e.innerHTML
-}
-}
+  .category-wrapper {
+    border-bottom: 1px solid var(--border-color)
+  }
 
-// === UNICODE ANALYZER ===
-class UnicodeAnalyzer{
-constructor(){
-this.invisibleChars={"​":"Zero Width Space","‌":"Zero Width Non-Joiner","‍":"Zero Width Joiner","":"Byte Order Mark"}
-}
-analyze(t){
-const e=Utils.htmlToText(t),s=[];
-let r=!1;
-for(let n=0;n<e.length;n++){
-const o=e[n];
-this.invisibleChars[o]&&(s.push({char:o,name:this.invisibleChars[o],position:n}),"﻿"===o&&n>0&&(r=!0))
-}
-return{found:s,hasBomNotAtStart:r,count:s.length,hasData:s.length>0}
-}
-getScore(t){
-let e=0,s=.5,r=null;
-return t.hasBomNotAtStart?(e=.9,s=.9,r="Byte Order Mark found mid-text, which is highly unusual."):t.count>5?(e=.7,s=.8,r=`High number of invisible characters (${t.count}) detected.`):t.count>0&&(e=.3,s=.6,r=`A few invisible characters (${t.count}) were found.`),{score:e,confidence:s,explanation:r}
-}
-getHtml(t){
-if(!t.hasData)return'<p class="text-gray-500">No unusual Unicode characters found.</p>';
-let e=`<div class="category-item"><div class="item-title">Invisible Characters</div><div class="item-description">Found ${t.count} invisible character(s): `;
-const s=[...new Set(t.found.map(t=>t.char))];
-return s.forEach((s,r)=>{
-const n=t.found.filter(t=>t.char===s).length;
-e+=`<strong>${this.invisibleChars[s]}</strong> (${n}x)${r<s.length-1?", ":"."}`
-}),t.hasBomNotAtStart&&(e+=' <span style="color:#c0392b;font-weight:600;">BOM was found mid-text!</span>'),e+="</div></div>",e
-}
-}
+  .category-wrapper:last-child {
+    border-bottom: none
+  }
 
-// === ANALYSIS MANAGER ===
-class AnalysisManager {
-constructor() {
-this.analyzers = {
-structural: new StructuralAnalyzer(),
-stylistic: new StylisticAnalyzer(),
-lexical: new LexicalAnalyzer(),
-emoji: new EmojiAnalyzer(),
-unicode: new UnicodeAnalyzer()
-};
-}
+  .category-header {
+    cursor: pointer;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color .3s ease
+  }
 
-analyze(html) {
-const results = {};
-for (const key in this.analyzers) results[key] = this.analyzers[key].analyze(html);
-results.score = this.calculateScore(results);
-this.displayResults(results);
-}
+  .category-header:hover {
+    background-color: #fbfbfb
+  }
 
-calculateScore(results) {
-const contributions = {};
-for (const key in this.analyzers) contributions[key] = this.analyzers[key].getScore(results[key]);
-            
-let totalScore = 0, totalWeight = 0, maxConfidence = 0;
-const keyIndicators = [];
-const weights = { structural: 1.8, stylistic: 1.5, lexical: 1.6, emoji: 1.0, unicode: 1.5 };
+  .category-header h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    text-transform: capitalize
+  }
 
-for (const category in contributions) {
-const c = contributions[category];
-if (!c || c.score === 0) continue;
-let weight = weights[category] * (0.5 + 0.5 * c.confidence);
-totalScore += c.score * weight;
-totalWeight += weight;
-maxConfidence = Math.max(maxConfidence, c.confidence);
-if (c.explanation) keyIndicators.push({ explanation: c.explanation, score: c.score * c.confidence });
-}
+  .category-header svg {
+    width: 16px;
+    height: 16px;
+    transition: transform .4s cubic-bezier(.25, .46, .45, .94)
+  }
 
-let finalScore = totalWeight > 0 ? (totalScore / totalWeight) * 100 : 0;
-            
-if (results.structural?.hasBoldPattern) finalScore = Math.max(finalScore + 15, 85);
-if (results.structural?.isListUniform) finalScore = Math.max(finalScore + 10, 80);
-if (results.lexical?.redundancy?.isSuspicious) finalScore = Math.max(finalScore + 20, 90);
-if (results.stylistic?.aiPhrases.categories.rhetorical > 1) finalScore = Math.max(finalScore + 10, 75);
-// --- ADDED SCORING BOOST FROM TOOL 1 ---
-if (results.stylistic?.punctuation?.results.emDashes.count >= 5) finalScore = Math.max(finalScore, 85);
-// --- END ADDED ---
+  .category-header.expanded svg {
+    transform: rotate(180deg)
+  }
 
-finalScore = Math.min(99, Math.round(finalScore));
+  .category-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .4s cubic-bezier(.25, .46, .45, .94)
+  }
 
-keyIndicators.sort((a, b) => b.score - a.score);
-let confidenceLevel = 'Low';
-if (finalScore > 70 && maxConfidence > 0.8) confidenceLevel = 'High';
-else if (finalScore > 40 && maxConfidence > 0.6) confidenceLevel = 'Medium';
-            
-return { value: finalScore, confidenceLevel, keyIndicators: keyIndicators.slice(0, 3) };
-}
+  .category-content.expanded {
+    max-height: 2000px;
+    transition: max-height .6s cubic-bezier(.25, .46, .45, .94)
+  }
 
-displayResults(results) {
-document.getElementById('results-container').classList.remove('hidden');
-document.getElementById('detailed-analysis').classList.remove('hidden');
-const scoreValue = results.score.value;
-const scoreCircle = document.getElementById('score-circle');
-const scoreText = document.getElementById('score-text');
-let color = scoreValue > 75 ? '#ef4444' : scoreValue > 50 ? '#f59e0b' : scoreValue > 25 ? '#facc15' : '#22c55e';
-scoreCircle.style.setProperty('--score-percent', `${scoreValue}%`);
-scoreCircle.style.background = `conic-gradient(${color} 0% var(--score-percent), #e5e7eb var(--score-percent) 100%)`;
-scoreText.textContent = `${scoreValue}%`;
-scoreText.style.color = color;
-document.getElementById('confidence-level').textContent = `Confidence: ${results.score.confidenceLevel}`;
-const indicatorsList = document.getElementById('key-indicators');
-indicatorsList.innerHTML = results.score.keyIndicators.length > 0 ? results.score.keyIndicators.map(ind => `<li>${ind.explanation}</li>`).join('') : '<li class="text-gray-500">No strong AI indicators found. Looks human!</li>';
-const categoriesContainer = document.getElementById('analysis-categories');
-categoriesContainer.innerHTML = '';
-const categoryOrder = ['structural', 'stylistic', 'lexical', 'emoji', 'unicode'];
-categoryOrder.forEach(key => {
-const wrapper = document.createElement('div');
-wrapper.className = 'category-wrapper';
-const header = document.createElement('div');
-header.className = 'category-header';
-header.innerHTML = `<h3>${key} Analysis</h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
-const content = document.createElement('div');
-content.className = 'category-content';
-const contentInner = document.createElement('div');
-contentInner.className = 'category-content-inner';
-contentInner.innerHTML = this.analyzers[key].getHtml(results[key]);
-content.appendChild(contentInner);
-wrapper.append(header, content);
-categoriesContainer.appendChild(wrapper);
-header.addEventListener('click', () => {
-header.classList.toggle('expanded');
-content.classList.toggle('expanded');
-});
-});
-}
-}
+  .category-content-inner {
+    padding: 0 1.5rem 1.5rem;
+    border-top: 1px solid var(--border-color)
+  }
 
-// === APP LOGIC ===
-document.addEventListener("DOMContentLoaded",()=>{
-const t=document.getElementById("editor"),e=document.getElementById("analyze-btn"),s=document.getElementById("clear-btn"),r=document.getElementById("results-container"),n=document.getElementById("detailed-analysis"),o=new AnalysisManager,a=()=>{
-const e=t.innerHTML;
-if(Utils.countWords(e)<20){
-const t=document.createElement("div");
-return t.textContent="Please enter at least 20 words.",t.style.cssText="position:fixed; top:20px; left:50%; transform:translateX(-50%); background: #c0392b; color: white; padding: 10px 20px; border-radius: 5px; z-index: 1000;",document.body.appendChild(t),void setTimeout(()=>t.remove(),2500)
-}
-o.analyze(e)
-},l=()=>{
-t.innerHTML="",r.classList.add("hidden"),n.classList.add("hidden"),e.disabled=!0
-};
-e.addEventListener("click",a),s.addEventListener("click",l),t.addEventListener("input",Utils.debounce(()=>{
-e.disabled=Utils.countWords(t.innerHTML)<20
-},300)),t.addEventListener("paste",t=>{
-t.preventDefault();
-const e=(t.clipboardData||window.clipboardData).getData("text/plain");
-document.execCommand("insertText",!1,e)
-})
-});
-</script>
-</body>
-</html>
+  .category-item {
+    padding: 1rem;
+    background-color: var(--bg-color);
+    border: 1px solid #e9e9e9;
+    margin-top: 1rem
+  }
+
+  .item-title {
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .5rem
+  }
+
+  .item-description {
+    font-size: .85rem;
+    color: var(--subtle-text-color)
+  }
+
+  .item-description.small {
+    margin-top: .25rem;
+    font-size: .8rem
+  }
+
+  .item-subcategory {
+    font-weight: 500;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color)
+  }
+
+  .badge {
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .2rem .6rem;
+    background-color: var(--highlight-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color)
+  }
+
+  .item-examples {
+    margin-top: .75rem
+  }
+
+  .item-examples summary {
+    cursor: pointer;
+    font-weight: 500;
+    font-size: .85rem;
+    padding: .5rem;
+    background: #fafafa;
+    border: 1px solid var(--border-color);
+    user-select: none
+  }
+
+  .item-examples summary:hover {
+    background: #f0f0f0
+  }
+
+  .item-examples ul {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+    margin-top: .5rem
+  }
+
+  .item-examples li {
+    margin-bottom: .75rem;
+    font-size: .8rem;
+    line-height: 1.6;
+    color: #555
+  }
+
+  .hidden {
+    display: none !important
+  }
+
+  .fade-in {
+    animation: fadeIn .8s ease-in-out forwards
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(15px)
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0)
+    }
+  }
+
+  .trigger-highlight {
+    color: var(--error-color);
+    background-color: #fef2f2;
+    font-weight: 600;
+    padding: 0 2px;
+    border-radius: 3px
+  }
+
+  </style>
+
+
+<div class=main-container><header><h1>AI Content Detector v2.8</h1><p>Enhanced detection with flexible text parsing and improved accuracy</header><main><div class=card><div class=editor id=editor contenteditable=true placeholder="Paste or type your text here..."></div><div class=editor-controls><button class=btn id=clear-btn>Clear</button> <button class=btn id=analyze-btn disabled>Analyze</button></div></div><div class=hidden id=results-container><div class="fade-in card results-summary"><h2 class=section-title>Analysis Summary</h2><div class=score-circle id=score-circle><span id=score-text>-%</span></div><p id=confidence-level></div><div class="fade-in card"style=animation-delay:.1s><h2 class=section-title>Key Indicators</h2><ul id=key-indicators><li class=text-gray-500>Analysis results will appear here.</ul></div></div><div class=hidden id=detailed-analysis><h2 class="fade-in section-title"style=animation-delay:.2s;margin-top:2rem>Detailed Analysis</h2><div class=fade-in id=analysis-categories style=animation-delay:.3s></div></div></main></div><script>class Utils{static htmlToText(e){if(!e||"string"!=typeof e)return"";const t=document.createElement("div");return t.innerHTML=e,t.textContent||t.innerText||""}static countWords(e){if(!e)return 0;return("string"==typeof e&&e.includes("<")?this.htmlToText(e):e).trim().split(/\s+/).filter(Boolean).length}static debounce(e,t=300){let s;return(...n)=>{clearTimeout(s),s=setTimeout((()=>e.apply(this,n)),t)}}static splitIntoParagraphs(e){const t=e.trim().split(/\n\s*\n+/);return t.length<2?e.split(/(?<=[.!?])\s+(?=[A-Z])/):t}static splitIntoSentences(e){return e.split(/[.!?]+(?:\s|$)/).filter((e=>e.trim().length>3))}}class StructuralAnalyzer{analyze(e){const t=Utils.htmlToText(e),s=Utils.countWords(t);if(s<10)return{hasData:!1,wordCount:s,tooShort:!0};const n=Utils.splitIntoParagraphs(t).filter((e=>Utils.countWords(e)>3)),a=Utils.splitIntoSentences(t);if(n.length<2&&a.length<3)return{hasData:!0,wordCount:s,insufficientStructure:!0};const r=n.map((e=>Utils.countWords(e))),i=r.reduce(((e,t)=>e+t),0)/r.length,o=Math.sqrt(r.map((e=>Math.pow(e-i,2))).reduce(((e,t)=>e+t),0)/r.length),l=n.length>=3&&o<8&&i>15,c=/(?:\*\*|__|["'])?([A-Z][^:]{1,50})(?:\*\*|__|["'])?:\s+([^\n]{15,150})/gm,h=[];let d;for(;null!==(d=c.exec(t))&&h.length<6;)h.push({term:d[1],context:d[0].substring(0,100)});const u=h.length>2,g=/^\s*[-*•·]\s+(.+)|^\s*\d+[\.)]\s+(.+)/gm,m=[];for(;null!==(d=g.exec(t))&&m.length<12;)m.push(d[1]||d[2]);let p=!1;if(m.length>3){const e=m.map((e=>Utils.countWords(e))),t=e.reduce(((e,t)=>e+t),0)/e.length;p=Math.sqrt(e.map((e=>Math.pow(e-t,2))).reduce(((e,t)=>e+t),0)/e.length)<5&&t>8}const f=/^#+\s+(.+)|^([A-Z][^.!?]{8,70})\s*$/gm,y=[];for(;null!==(d=f.exec(t))&&y.length<10;)y.push(d[1]||d[2]);const x=y.length>2;return{hasData:!0,wordCount:s,stdDev:o,avgParaLength:i,isUniform:l,boldMatches:h,hasBoldPattern:u,listItems:m.slice(0,5),isListUniform:p,headers:y.slice(0,5),hasStructuredSections:x,paragraphCount:n.length}}getScore(e){if(!e.hasData)return{score:0,confidence:0,explanation:null};if(e.tooShort)return{score:0,confidence:.3,explanation:"Text too short for reliable structural analysis."};if(e.insufficientStructure)return{score:0,confidence:.4,explanation:"Limited structure detected (very short paragraphs/sentences)."};let t=0,s=null;return e.hasBoldPattern?(t=.9,s=`Strong "Term: definition" pattern detected (${e.boldMatches.length}x) - highly characteristic of AI.`):e.isListUniform?(t=.8,s=`List items (${e.listItems.length}) show unnatural uniformity in length.`):e.isUniform&&e.paragraphCount>=3&&(t=.65,s=`${e.paragraphCount} paragraphs are suspiciously uniform in length.`),e.hasStructuredSections&&e.paragraphCount>=5&&(t+=.12),{score:Math.min(.95,t),confidence:t>0?.88:.5,explanation:s}}getHtml(e){if(!e.hasData)return'<p class="text-gray-500">Not enough content to analyze structural patterns.</p>';if(e.tooShort)return'<div class="warning-notice">⚠️ Very short text ('+e.wordCount+' words). Structural analysis requires more content for accuracy.</div>';if(e.insufficientStructure)return'<div class="warning-notice">⚠️ Limited structure detected. Text appears to be a single block or very short fragments.</div>';let t="";return e.isUniform&&e.paragraphCount>=3&&(t+=`<div class="category-item"><div class="item-title">Paragraph Uniformity</div><div class="item-description">${e.paragraphCount} paragraphs with consistent lengths (Std Dev: ${e.stdDev.toFixed(2)}, Avg: ${e.avgParaLength.toFixed(1)} words). Natural writing shows more variation.</div></div>`),e.hasBoldPattern&&(t+=`<div class="category-item"><div class="item-title">Explanatory Formatting Pattern</div><div class="item-description">Detected ${e.boldMatches.length} instances of "<strong>Term:</strong> explanation" format. This is a signature AI writing pattern.</div>`,e.boldMatches.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.boldMatches.forEach((e=>t+=`<li><strong class="trigger-highlight">${this.escapeHtml(e.term)}:</strong> ${this.escapeHtml(e.context.substring(0,80))}...</li>`)),t+="</ul></details>"),t+="</div>"),e.isListUniform&&e.listItems.length>=3&&(t+=`<div class="category-item"><div class="item-title">List Item Uniformity</div><div class="item-description">${e.listItems.length} list items with highly consistent lengths. AI tends to create balanced lists.</div>`,e.listItems.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.listItems.forEach((e=>t+=`<li>${this.escapeHtml(e.substring(0,100))}${e.length>100?"...":""}</li>`)),t+="</ul></details>"),t+="</div>"),e.hasStructuredSections&&e.headers.length>0&&(t+=`<div class="category-item"><div class="item-title">Structured Sections</div><div class="item-description">Detected ${e.headers.length}+ section headers, suggesting organized AI-style formatting.</div></div>`),t||'<p class="text-gray-500">No significant structural patterns detected.</p>'}escapeHtml(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML}}class StylisticAnalyzer{constructor(){this.commonAiPhrases={introductory:["certainly,","absolutely,","of course,","here is","here's","here are","let's dive into","let's explore","let's delve into","let's take a closer look at","let's unpack","in this article, we will","in this guide,","in this blog post,","in this response,","it's important to note","it is crucial to understand","it's worth highlighting","when it comes to","in the realm of","in the world of","the landscape of","in today's fast-paced world","in the modern era,","in today's digital age,","without further ado","to begin with,","first and foremost,","to kick things off,","as we embark on","diving right in","let us examine","it is essential to consider"],concluding:["in conclusion,","to sum up,","in summary,","to summarize,","overall,","in the final analysis,","all in all,","taking everything into consideration,","looking ahead,","moving forward,","the path forward involves","as we look to the future","hope this helps!","i hope this explanation was helpful","i hope this provides clarity","feel free to ask","if you have any further questions,","don't hesitate to reach out","please let me know if you need anything else","should you require further assistance,","to wrap things up","bringing it all together","the key takeaway is","ultimately, what matters most"],disclaimers:["as an ai,","as a language model,","as a large language model,","as an ai assistant,","my knowledge cutoff is","my training data only goes up to","i do not have access to real-time information","i don't have personal opinions","i cannot provide financial advice","i am not a medical professional","it is important to remember","it should be noted that","it's worth noting","a key consideration is","one must bear in mind","please keep in mind","it is essential to","it's crucial to understand that","please be aware that","it's vital to recognize"],hedging:["in general,","generally speaking,","typically,","usually,","often,","for the most part,","it seems that","it appears that","it could be argued that","one might say","tends to be","can be seen as","in some respects,","in many cases,","arguably,","potentially,","likely,","it is possible that","in some instances,","to some extent,","more or less","by and large","on the whole","as a rule","in most scenarios"],rhetorical:["so, what does this all mean?","but what about","the question then becomes","what's the bottom line?","how can we","why is this important?","so, how does it work?","what's the key takeaway?","what does the future hold?","where do we go from here?","what can we learn from this?","how does this apply to","why should you care?","what makes this significant?"],transitions:["that being said","with that said","having said that","with that in mind","on the other hand","it's worth mentioning","speaking of which","in light of this","building on this","expanding on this idea"]},this.formalityWords=["delve","explore","harness","leverage","utilize","facilitate","elucidate","underscore","demonstrate","articulate","expound","ascertain","postulate","necessitate","streamline","optimize","ameliorate","augment","constitutes","profoundly","expedite","synergize","navigate","unleash","unlock","furthermore","moreover","additionally","subsequently","conversely","correspondingly","therefore","hence","consequently","nonetheless","nevertheless","accordingly","juxtapose","paradigm shift","cultivate","endeavor","synthesize","extrapolate","epitomize","exemplify","encapsulate"],this.genericWords=["vast","intricate","complex","dynamic","remarkable","unique","various","significant","essential","key","crucial","pivotal","foundational","game-changing","cutting-edge","state-of-the-art","world-class","transformative","powerful","seamless","impactful","innovative","streamlined","versatile","elegant","intuitive","next-generation","comprehensive","extensive","diverse","abundant","numerous","multifaceted","interconnected","wide-ranging","groundbreaking","amazing","incredible","fantastic","excellent","outstanding","impressive","fascinating","exceptional","cornerstone","revolutionary","unparalleled","unprecedented","holistic","robust","scalable"],this.punctuationThresholds={emDashesPercentage:.003,ellipsesPercentage:.006,exclamationPercentage:.007}}analyze(e){const t=Utils.htmlToText(e),s=Utils.countWords(t);if(s<20)return{hasData:!1,wordCount:s,tooShort:!0};const n=this.findPhrases(t,this.commonAiPhrases),a=this.findPhrases(t,{formality:this.formalityWords}),r=this.findPhrases(t,{generic:this.genericWords}),i=this.analyzePunctuation(t);return{hasData:n.count>0||a.count>1||r.count>2||i.hasIssues,wordCount:s,aiPhrases:n,formalityWords:a,genericWords:r,punctuation:i,plainText:t}}findPhrases(e,t){const s={count:0,matches:[],categories:{},examples:[]};for(const n in t){s.categories[n]=0;const a=[];for(const r of t[n]){const t=new RegExp(this.escapeRegExp(r),"gi");let i;for(;null!==(i=t.exec(e));)if(s.count++,s.categories[n]++,s.matches.push({phrase:i[0],category:n,count:1}),a.length<8){const t=i.index,s=Math.max(0,t-30),n=Math.min(e.length,t+i[0].length+50);a.push({phrase:i[0],context:e.substring(s,n).trim()})}}s.examples=[...s.examples,...a.filter(((e,t,s)=>s.findIndex((t=>t.phrase===e.phrase&&t.context===e.context))===t))]}return s.examples=s.examples.slice(0,8),s}analyzePunctuation(e){const t={hasIssues:!1,results:{emDashes:{count:0,isExcessive:!1},ellipses:{count:0,isExcessive:!1},exclamationMarks:{count:0,isExcessive:!1},oxfordCommaConsistency:{consistent:!1}}};if(0===e.length)return t;const s=(e.match(/—|–|--/g)||[]).length;t.results.emDashes={count:s,isExcessive:s/e.length>this.punctuationThresholds.emDashesPercentage&&s>=2||s>=3};const n=(e.match(/\.\.\./g)||[]).length;t.results.ellipses={count:n,isExcessive:n/e.length>this.punctuationThresholds.ellipsesPercentage&&n>=3};const a=(e.match(/!/g)||[]).length;t.results.exclamationMarks={count:a,isExcessive:a/e.length>this.punctuationThresholds.exclamationPercentage&&a>=3};const r=(e.match(/,\s+and\s+/g)||[]).length,i=(e.match(/\s+and\s+/g)||[]).length-r,o={consistent:!1,commaCount:r,noCommaCount:i};return r+i>=5&&(r>0&&0===i||i>0&&0===r)&&(o.consistent=!0),t.results.oxfordCommaConsistency=o,t.hasIssues=t.results.emDashes.isExcessive||t.results.ellipses.isExcessive||t.results.exclamationMarks.isExcessive||o.consistent&&r+i>=8,t}getScore(e){if(!e.hasData)return{score:0,confidence:0,explanation:null};if(e.tooShort)return{score:0,confidence:.3,explanation:"Text too short for stylistic analysis."};let t=0,s=[];e.aiPhrases.categories.rhetorical>0&&(t+=.4,s.push("rhetorical questions for structure")),e.aiPhrases.categories.introductory>0&&(t+=.2,s.push("AI-typical introductory phrases")),e.aiPhrases.categories.concluding>0&&(t+=.15,s.push("AI-typical concluding phrases")),e.aiPhrases.count>1&&(t+=Math.min(.5,.08*e.aiPhrases.count)),e.formalityWords.count>1&&(t+=Math.min(.3,.06*(e.formalityWords.count-1)),e.formalityWords.count>2&&s.push("excessive formality")),e.genericWords.count>2&&(t+=Math.min(.25,.05*(e.genericWords.count-2)),e.genericWords.count>3&&s.push("generic booster words"));const n=e.punctuation;if(n?.hasIssues){let e=0;n.results.emDashes.isExcessive&&(n.results.emDashes.count>=5?(e+=.3,s.push(`many em-dashes (${n.results.emDashes.count})`)):n.results.emDashes.count>=3?(e+=.25,s.push("multiple em-dashes")):(e+=.15,s.push("high em-dash usage"))),n.results.ellipses.isExcessive&&(e+=.05),n.results.exclamationMarks.isExcessive&&(e+=.05);const a=n.results.oxfordCommaConsistency;a.consistent&&a.commaCount+a.noCommaCount>=8&&(e+=.15,s.push("perfect comma consistency")),t+=e}return{score:Math.min(.95,t),confidence:s.length>0?.85:.5,explanation:s.length>0?`Stylistic indicators: ${s.join(", ")}.`:null}}getHtml(e){if(!e.hasData)return'<p class="text-gray-500">No significant stylistic patterns detected.</p>';if(e.tooShort)return'<div class="warning-notice">⚠️ Short text ('+e.wordCount+' words). Stylistic analysis is more accurate with longer content.</div>';let t="";e.aiPhrases.count>0&&(t+=`<div class="category-item"><div class="item-title">AI-Typical Phrasing <span class="badge">${e.aiPhrases.count}</span></div>`,t+='<div class="item-description">',Object.keys(e.aiPhrases.categories).forEach((s=>{e.aiPhrases.categories[s]>0&&(t+=`${s}: ${e.aiPhrases.categories[s]} • `)})),t=t.slice(0,-3),t+="</div>",e.aiPhrases.examples.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.aiPhrases.examples.forEach((e=>{const s=this.escapeHtml(e.context).replace(new RegExp(this.escapeRegExp(e.phrase),"gi"),'<strong class="trigger-highlight">$&</strong>');t+=`<li>"...${s}..."</li>`})),t+="</ul></details>"),t+="</div>"),e.formalityWords.count>1&&(t+=`<div class="category-item"><div class="item-title">Formal/Academic Language <span class="badge">${e.formalityWords.count}</span></div>`,t+='<div class="item-description">Elevated vocabulary like "leverage", "paradigm", and "utilize" - common in AI text.</div>',e.formalityWords.examples.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.formalityWords.examples.forEach((e=>{const s=this.escapeHtml(e.context).replace(new RegExp(this.escapeRegExp(e.phrase),"gi"),'<strong class="trigger-highlight">$&</strong>');t+=`<li>"...${s}..."</li>`})),t+="</ul></details>"),t+="</div>"),e.genericWords.count>2&&(t+=`<div class="category-item"><div class="item-title">Generic Enhancement Words <span class="badge">${e.genericWords.count}</span></div>`,t+='<div class="item-description">Vague descriptors: "transformative", "innovative", "cutting-edge" - AI favorites.</div>',e.genericWords.examples.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.genericWords.examples.forEach((e=>{const s=this.escapeHtml(e.context).replace(new RegExp(this.escapeRegExp(e.phrase),"gi"),'<strong class="trigger-highlight">$&</strong>');t+=`<li>"...${s}..."</li>`})),t+="</ul></details>"),t+="</div>");const s=e.punctuation;if(s?.hasIssues){t+='<div class="category-item"><div class="item-title">Punctuation Patterns</div>',s.results.emDashes.isExcessive&&(t+=`<div class="item-description">Em-dash usage: <strong class="trigger-highlight">${s.results.emDashes.count} occurrences</strong>`,s.results.emDashes.count>=5?t+=' <span style="color:var(--error-color)">⚠️ Very high - strong AI indicator</span>':s.results.emDashes.count>=3&&(t+=" - multiple instances detected"),t+="</div>"),s.results.ellipses.isExcessive&&(t+=`<div class="item-description small">Ellipses: ${s.results.ellipses.count}x</div>`),s.results.exclamationMarks.isExcessive&&(t+=`<div class="item-description small">Exclamation marks: ${s.results.exclamationMarks.count}x</div>`);const e=s.results.oxfordCommaConsistency;e.consistent&&e.commaCount+e.noCommaCount>=8&&(t+=`<div class="item-description">Perfect ${e.commaCount>0?"Oxford comma usage":"avoidance"} (${e.commaCount+e.noCommaCount} instances) - unnatural consistency.</div>`),t+="</div>"}return t}escapeHtml(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML}escapeRegExp(e){return e.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}}class LexicalAnalyzer{constructor(){this.thresholds={ttr:{low:.42},sentenceLengthStdDev:{low:6}},this.hedgingWords=new Set(["actually","basically","essentially","generally","literally","overall","really","simply","truly","ultimately","in fact","of course","so to speak","needless to say","arguably","apparently","seemingly","particularly","specifically","notably","evidently"]),this.redundantStarters=["this is because","in other words","what this means is","to put it simply","to clarify","that is to say","in essence","essentially","basically","fundamentally"],this.passivePatterns=[/\b(is|are|was|were|been|being)\s+(being\s+)?\w+ed\b/gi,/\b(is|are|was|were|been|being)\s+\w+en\b/gi]}analyze(e){const t=Utils.htmlToText(e),s=Utils.countWords(t);if(s<30)return{hasData:!1,wordCount:s,tooShort:!0};const n=Utils.splitIntoSentences(t);return{hasData:!0,wordCount:s,ttr:this.calculateTTR(t),sentenceLength:this.analyzeSentenceLengths(n),redundancy:this.analyzeRedundancy(n),passiveVoice:this.detectPassiveVoice(n),sentences:n}}calculateTTR(e){const t=e.toLowerCase().replace(/[^\w\s]/g," ").split(/\s+/).filter(Boolean);if(t.length<30)return{ttr:1,interpretation:"Insufficient data",isSuspicious:!1};const s=new Set(t),n=s.size/t.length;let a=n<this.thresholds.ttr.low;return{ttr:n,uniqueCount:s.size,totalCount:t.length,interpretation:a?"Low word variety (repetitive)":"Good word variety",isSuspicious:a}}analyzeSentenceLengths(e){if(e.length<3)return{interpretation:"Too few sentences",isSuspicious:!1};const t=e.map((e=>Utils.countWords(e))),s=t.reduce(((e,t)=>e+t),0)/t.length,n=Math.sqrt(t.map((e=>Math.pow(e-s,2))).reduce(((e,t)=>e+t),0)/t.length);return{avg:s,stdDev:n,interpretation:n<this.thresholds.sentenceLengthStdDev.low&&e.length>=8?"Sentences are very uniform in length":"Sentences show natural variation",isSuspicious:n<this.thresholds.sentenceLengthStdDev.low&&e.length>=8}}analyzeRedundancy(e){let t=0;const s=[],n=new Set(["the","a","an","is","it","this","that","was","were","be","to","of","in","for","on","with","as","by","at","from"]);if(e.length<3)return{count:0,isSuspicious:!1,examples:s};for(let a=0;a<e.length-1;a++){const r=e[a],i=e[a+1];for(const e of this.redundantStarters)if(i.toLowerCase().trim().startsWith(e)){t++,s.length<4&&s.push({s1:r.substring(0,100),s2:i.substring(0,100),type:"explicit"});break}const o=new Set(r.toLowerCase().replace(/[^\w\s]/g,"").split(/\s+/).filter((e=>!n.has(e)&&e.length>2))),l=new Set(i.toLowerCase().replace(/[^\w\s]/g,"").split(/\s+/).filter((e=>!n.has(e)&&e.length>2)));if(0===o.size||0===l.size)continue;new Set([...o].filter((e=>l.has(e)))).size/Math.min(o.size,l.size)>.65&&(t++,s.length<4&&s.push({s1:r.substring(0,100),s2:i.substring(0,100),type:"semantic"}))}return{count:t,isSuspicious:t>1&&t/e.length>.18,examples:s}}detectPassiveVoice(e){let t=0;const s=[];e.forEach((e=>{this.passivePatterns.forEach((n=>{const a=e.match(n);a&&(t+=a.length,s.length<4&&a.length>0&&s.push(e.substring(0,120)))}))}));const n=t/e.length;return{count:t,rate:n,isExcessive:n>.28,examples:[...new Set(s)]}}getScore(e){if(!e.hasData)return{score:0,confidence:0,explanation:null};if(e.tooShort)return{score:0,confidence:.35,explanation:"Text too short for lexical analysis."};let t=0,s=[];return e.ttr?.isSuspicious&&e.wordCount>50&&(t+=.3,s.push("low word variety")),e.sentenceLength?.isSuspicious&&(t+=.4,s.push("uniform sentence lengths")),e.redundancy?.isSuspicious&&(t+=.45,s.push(`sentence redundancy (${e.redundancy.count} pairs)`)),e.passiveVoice?.isExcessive&&(t+=.2,s.push(`high passive voice (${(100*e.passiveVoice.rate).toFixed(0)}%)`)),{score:Math.min(t,1),confidence:s.length>0?.82:.5,explanation:s.length>0?`Lexical patterns: ${s.join(", ")}.`:null}}getHtml(e){if(!e.hasData)return`<p class="text-gray-500">Not enough text for lexical analysis (${e.wordCount||0} words minimum).</p>`;if(e.tooShort)return'<div class="warning-notice">⚠️ Short text ('+e.wordCount+' words). Lexical analysis requires 30+ words for accuracy.</div>';let t="";const{ttr:s,sentenceLength:n,redundancy:a,passiveVoice:r}=e;if(s&&e.wordCount>=50&&(t+=`<div class="category-item"><div class="item-title">Lexical Diversity (TTR)</div><div class="item-description">${s.interpretation} - ${s.uniqueCount} unique words out of ${s.totalCount} total (ratio: ${s.ttr.toFixed(3)})</div></div>`),n&&(t+=`<div class="category-item"><div class="item-title">Sentence Length Variation</div><div class="item-description">${n.interpretation} (Average: ${n.avg?.toFixed(1)} words, Variation: ${n.stdDev?.toFixed(2)})</div></div>`),a?.isSuspicious&&(t+=`<div class="category-item"><div class="item-title">Semantic Redundancy</div><div class="item-description">Found ${a.count} adjacent sentence pairs that repeat similar information - strong AI indicator.</div>`,a.examples.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',a.examples.forEach((e=>t+=`<li><strong>First:</strong> "${this.escapeHtml(e.s1)}"<br><strong>Next:</strong> "${this.escapeHtml(e.s2)}"</li>`)),t+="</ul></details>"),t+="</div>"),r?.isExcessive){if(t+=`<div class="category-item"><div class="item-title">Passive Voice Frequency</div><div class="item-description">${r.count} passive constructions found (${(100*r.rate).toFixed(0)}% of sentences). AI frequently defaults to passive voice.</div>`,r.examples.length>0){t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>';const e=this.passivePatterns;r.examples.forEach((s=>{let n=this.escapeHtml(s);e.forEach((e=>{e.lastIndex=0,n=n.replace(e,'<strong class="trigger-highlight">this.redundantStarters=["this is because","in other words","what this means is","to</strong>')})),t+=`<li>"${n}..."</li>`})),t+="</ul></details>"}t+="</div>"}return t||'<p class="text-gray-500">No significant lexical patterns detected.</p>'}escapeHtml(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML}}class EmojiAnalyzer{analyze(e){const t=Utils.htmlToText(e),s=Utils.splitIntoParagraphs(t);if(s.length<2)return{hasData:!1,paragraphCount:s.length};let n=0,a=0,r=0;const i=/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u,o=[];return s.forEach((e=>{const t=e.trim();if(t&&t.match(i)){r++,a++;const e=t.substring(0,80);o.length<5&&o.push(e)}else a=0;n=Math.max(n,a)})),{consecutiveStartsWithAny:n,percentStartsWithEmoji:r/s.length*100,totalParagraphs:s.length,emojiStarts:r,hasData:n>2||r/s.length*100>25,examples:o,paragraphCount:s.length}}getScore(e){if(!e.hasData)return{score:0,confidence:0,explanation:null};let t=0,s=.5,n=null;return e.percentStartsWithEmoji>75?(t=.95,s=.95,n=`${e.emojiStarts}/${e.totalParagraphs} paragraphs start with emojis (${e.percentStartsWithEmoji.toFixed(0)}%) - extremely high.`):e.consecutiveStartsWithAny>3?(t=.85,s=.9,n=`${e.consecutiveStartsWithAny} consecutive paragraphs start with emojis.`):e.percentStartsWithEmoji>40?(t=.75,s=.8,n=`${e.percentStartsWithEmoji.toFixed(0)}% of paragraphs start with emojis.`):e.consecutiveStartsWithAny>2&&(t=.65,s=.75,n="Multiple consecutive emoji-started paragraphs."),{score:t,confidence:s,explanation:n}}getHtml(e){if(!e.hasData)return'<p class="text-gray-500">No emoji patterns detected.</p>';let t='<div class="category-item"><div class="item-title">Emoji Usage Pattern</div><div class="item-description">';return e.emojiStarts>0&&(t+=`<strong>${e.emojiStarts} out of ${e.totalParagraphs}</strong> paragraphs (${e.percentStartsWithEmoji.toFixed(0)}%) start with an emoji. `),e.consecutiveStartsWithAny>2&&(t+=`Detected <strong>${e.consecutiveStartsWithAny}</strong> consecutive emoji-started paragraphs.`),t+="</div>",e.examples.length>0&&(t+='<details class="item-examples"><summary>👁️ View Examples</summary><ul>',e.examples.forEach((e=>t+=`<li>"<strong class="trigger-highlight">${this.escapeHtml(e.charAt(0))}</strong>${this.escapeHtml(e.substring(1))}..."</li>`)),t+="</ul></details>"),t+="</div>",t}escapeHtml(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML}}class UnicodeAnalyzer{constructor(){this.invisibleChars={"​":"Zero Width Space","‌":"Zero Width Non-Joiner","‍":"Zero Width Joiner","":"Byte Order Mark"}}analyze(e){const t=Utils.htmlToText(e),s=[];let n=!1;for(let e=0;e<t.length;e++){const a=t[e];this.invisibleChars[a]&&(s.push({char:a,name:this.invisibleChars[a],position:e}),"\ufeff"===a&&e>0&&(n=!0))}return{found:s,hasBomNotAtStart:n,count:s.length,hasData:s.length>0}}getScore(e){let t=0,s=.5,n=null;return e.hasBomNotAtStart?(t=.9,s=.95,n="Byte Order Mark (BOM) found mid-text - highly unusual and suspicious."):e.count>5?(t=.7,s=.85,n=`${e.count} invisible Unicode characters detected.`):e.count>0&&(t=.35,s=.65,n=`${e.count} invisible character(s) found.`),{score:t,confidence:s,explanation:n}}getHtml(e){if(!e.hasData)return'<p class="text-gray-500">No unusual Unicode characters detected.</p>';let t=`<div class="category-item"><div class="item-title">Invisible Unicode Characters</div><div class="item-description">Detected ${e.count} invisible character(s): `;const s=[...new Set(e.found.map((e=>e.char)))];return s.forEach(((n,a)=>{const r=e.found.filter((e=>e.char===n)).length;t+=`<strong class="trigger-highlight">${this.invisibleChars[n]}</strong> (${r}x)${a<s.length-1?", ":"."}`})),e.hasBomNotAtStart&&(t+='<br><span style="color:var(--error-color);font-weight:600;">⚠️ BOM detected mid-text - strong manipulation indicator!</span>'),t+="</div></div>",t}}class AnalysisManager{constructor(){this.analyzers={structural:new StructuralAnalyzer,stylistic:new StylisticAnalyzer,lexical:new LexicalAnalyzer,emoji:new EmojiAnalyzer,unicode:new UnicodeAnalyzer}}analyze(e){const t={};for(const s in this.analyzers)t[s]=this.analyzers[s].analyze(e);t.score=this.calculateScore(t),this.displayResults(t)}calculateScore(e){const t={};for(const s in this.analyzers)t[s]=this.analyzers[s].getScore(e[s]);let s=0,n=0,a=0;const r=[],i={structural:1.9,stylistic:1.6,lexical:1.7,emoji:1.1,unicode:1.6};for(const e in t){const o=t[e];if(!o||0===o.score)continue;let l=i[e]*(.45+.55*o.confidence);s+=o.score*l,n+=l,a=Math.max(a,o.confidence),o.explanation&&r.push({explanation:o.explanation,score:o.score*o.confidence})}let o=n>0?s/n*100:0;e.structural?.hasBoldPattern&&(o=Math.max(o+18,88)),e.structural?.isListUniform&&e.structural.listItems.length>=4&&(o=Math.max(o+12,82)),e.lexical?.redundancy?.isSuspicious&&e.lexical.redundancy.count>=3&&(o=Math.max(o+22,92)),e.stylistic?.aiPhrases?.categories.rhetorical>1&&(o=Math.max(o+12,78)),e.stylistic?.punctuation?.results.emDashes.count>=5&&(o=Math.max(o,87)),e.stylistic?.aiPhrases?.categories.introductory>0&&e.stylistic?.aiPhrases?.categories.concluding>0&&(o=Math.max(o+8,75)),o=Math.min(99,Math.round(o)),r.sort(((e,t)=>t.score-e.score));let l="Low";return o>72&&a>.78?l="High":o>45&&a>.58&&(l="Medium"),{value:o,confidenceLevel:l,keyIndicators:r.slice(0,3)}}displayResults(e){document.getElementById("results-container").classList.remove("hidden"),document.getElementById("detailed-analysis").classList.remove("hidden");const t=e.score.value,s=document.getElementById("score-circle"),n=document.getElementById("score-text");let a=t>75?"#ef4444":t>50?"#f59e0b":t>25?"#facc15":"#22c55e";s.style.setProperty("--score-percent",`${t}%`),s.style.background=`conic-gradient(${a} 0% var(--score-percent), #e5e7eb var(--score-percent) 100%)`,n.textContent=`${t}%`,n.style.color=a,document.getElementById("confidence-level").textContent=`Confidence: ${e.score.confidenceLevel}`;document.getElementById("key-indicators").innerHTML=e.score.keyIndicators.length>0?e.score.keyIndicators.map((e=>`<li>${e.explanation}</li>`)).join(""):'<li class="text-gray-500">No strong AI indicators found. Text appears human-written!</li>';const r=document.getElementById("analysis-categories");r.innerHTML="";["structural","stylistic","lexical","emoji","unicode"].forEach((t=>{const s=document.createElement("div");s.className="category-wrapper";const n=document.createElement("div");n.className="category-header",n.innerHTML=`<h3>${t} Analysis</h3><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;const a=document.createElement("div");a.className="category-content";const i=document.createElement("div");i.className="category-content-inner",i.innerHTML=this.analyzers[t].getHtml(e[t]),a.appendChild(i),s.append(n,a),r.appendChild(s),n.addEventListener("click",(()=>{n.classList.toggle("expanded"),a.classList.toggle("expanded")}))}))}}document.addEventListener("DOMContentLoaded",(()=>{const e=document.getElementById("editor"),t=document.getElementById("analyze-btn"),s=document.getElementById("clear-btn"),n=document.getElementById("results-container"),a=document.getElementById("detailed-analysis"),r=new AnalysisManager;t.addEventListener("click",(()=>{const t=e.innerHTML;if(Utils.countWords(t)<15){const e=document.createElement("div");return e.textContent="Please enter at least 15 words for analysis.",e.style.cssText="position:fixed; top:20px; left:50%; transform:translateX(-50%); background: #f59e0b; color: white; padding: 12px 24px; border-radius: 5px; z-index: 1000; font-size: 14px;",document.body.appendChild(e),void setTimeout((()=>e.remove()),3e3)}r.analyze(t)})),s.addEventListener("click",(()=>{e.innerHTML="",n.classList.add("hidden"),a.classList.add("hidden"),t.disabled=!0})),e.addEventListener("input",Utils.debounce((()=>{t.disabled=Utils.countWords(e.innerHTML)<15}),300)),e.addEventListener("paste",(e=>{e.preventDefault();const t=(e.clipboardData||window.clipboardData).getData("text/plain");document.execCommand("insertText",!1,t)}))}))</script>
