@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced File Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background-color: #20232a;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #282c34;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #61dafb;
+        }
+        .dropzone {
+            border: 2px dashed #61dafb;
+            border-radius: 6px;
+            padding: 30px;
+            text-align: center;
+            background: #2d313c;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dropzone.active {
+            background: rgba(97, 218, 251, 0.2);
+            border-color: #61dafb;
+        }
+        button, input[type="text"] {
+            margin: 10px 5px 0;
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            transition: all 0.2s;
+        }
+        button {
+            background: #61dafb;
+            color: #000;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #21a1f1;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            width: calc(100% - 24px);
+            background: #333;
+            color: #fff;
+            border: 1px solid #444;
+        }
+        pre, #output {
+            background: #2d313c;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 70vh;
+        }
+        #output {
+            width: calc(100% - 32px); /* 100% - padding */
+            height: 400px;
+            color: #fff;
+            border: 1px solid #444;
+            font-family: monospace;
+            resize: vertical;
+            white-space: pre; /* Keep whitespace for TSV */
+        }
+        .file-list {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .file-item {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-item button {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin: 0;
+        }
+        .progress {
+            width: 100%;
+            height: 4px;
+            background: #2d313c;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #61dafb;
+            transition: width 0.3s;
+        }
+        @media(max-width:600px) {
+            button {
+                width: 100%;
+                margin: 5px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced File Analyzer</h1>
+        <div id="dropzone" class="dropzone">
+            Drag and drop files here or click to upload<br>
+            <small>Multiple files supported</small>
+        </div>
+        <input type="file" id="fileInput" multiple style="display: none;">
+        
+        <div id="fileListContainer" style="display:none">
+            <h3>Loaded Files:</h3>
+            <div class="file-list" id="fileList"></div>
+        </div>
+
+        <input type="text" id="customPattern" placeholder="Add custom regex pattern (e.g., [0-9]{3}-[0-9]{3}-[0-9]{4})">
+        
+        <div>
+            <button id="addPattern">Add Pattern</button>
+            <button id="analyzeBtn" disabled>Re-Analyze All</button>
+            <button id="removeMetaBtn" disabled>Remove Metadata</button>
+            <button id="downloadBtn" disabled>Download Clean Files</button>
+            <button id="clearResults">Clear Results</button>
+        </div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <textarea id="output" readonly>Results will appear here...</textarea>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        class AdvancedFileAnalyzer {
+            constructor() {
+                this.files = [];
+                this.results = [];
+                this.cleanedFiles = [];
+                this.patterns = {
+                    urls: /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g,
+                    emails: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+                    ipv4: /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/g,
+                    ipv6: /\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b/g,
+                    phones: /\b(?:\+?1[-.]?)?\(?([0-9]{3})\)?[-.]?([0-9]{3})[-.]?([0-9]{4})\b/g,
+                    crypto: /\b(?:bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}\b|0x[a-fA-F0-9]{40}\b/g,
+                    awsKeys: /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g,
+                    githubTokens: /gh[ps]_[A-Za-z0-9]{36}\b/g,
+                    openaiKeys: /sk-[A-Za-z0-9]{48}\b/g,
+                    creditCards: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/g,
+                    ssn: /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g,
+                    jwt: /\beyJ[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+?\.[A-Za-z0-9._-]+?\b/g,
+                    base64: /\b[A-Za-z0-9+/]{40,}={0,2}\b/g,
+                    hex: /\b(?:[0-9A-Fa-f]{2}){16,}\b/g,
+                    macAddresses: /\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b/g,
+                    uuid: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+                    coordinates: /\b[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)\b/g,
+                    privateKeys: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
+                    
+                    // --- NEW PATTERNS ADDED ---
+                    genericApiKeys: /\b(api_key|token|secret)[_s-]?([A-Za-z0-9-_\.+]{20,})\b/gi,
+                    dbConnectionStrings: /(?:User Id|User ID|Username|User Name|user|uid|login|u)=[^;]+;(?:Password|pass|pwd|p)=[^;]+/gi,
+                    domainNames: /\b((?=[a-z0-9-]{1,63}\.)(xn--)?[a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,63}\b/gi
+                };
+            }
+
+            async analyzeFile(file) {
+                const result = {
+                    filename: file.name,
+                    basicMetadata: this.extractBasicMetadata(file),
+                    fileHashes: await this.calculateHashes(file),
+                    patterns: {},
+                    exifData: null,
+                    imageInfo: null,
+                    audioMetadata: null,
+                    videoMetadata: null,
+                    pdfMetadata: null,
+                    officeMetadata: null,
+                    archiveStructure: null,
+                    decodedData: {},
+                    textContent: null
+                };
+                
+                try {
+                    const ext = file.name.split('.').pop()?.toLowerCase();
+                    
+                    if (file.type.startsWith('image/')) {
+                        result.exifData = await this.extractExif(file);
+                        result.imageInfo = await this.getImageDimensions(file);
+                        result.imageColorInfo = await this.analyzeImageColors(file);
+                    } else if (file.type.startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext)) {
+                        result.audioMetadata = await this.extractAudioMetadata(file);
+                    } else if (file.type.startsWith('video/') || ['mp4','avi','mov','mkv','webm'].includes(ext)) {
+                        result.videoMetadata = await this.extractVideoMetadata(file);
+                    } else if (file.type === 'application/pdf' || ext === 'pdf') {
+                        result.pdfMetadata = await this.extractPdfMetadata(file);
+                    } else if (file.type.includes('word') || ext === 'docx') {
+                        result.officeMetadata = await this.extractOfficeMetadata(file, 'word');
+                    } else if (file.type.includes('sheet') || ext === 'xlsx') {
+                        result.officeMetadata = await this.extractOfficeMetadata(file, 'excel');
+                    } else if (file.type.includes('presentation') || ext === 'pptx') {
+                        result.officeMetadata = await this.extractOfficeMetadata(file, 'powerpoint');
+                    } else if (file.type === 'application/zip' || ext === 'zip') {
+                        result.archiveStructure = await this.analyzeArchive(file);
+                    }
+
+                    // This text extraction and pattern analysis will run for *any* file
+                    // for which text can be extracted, or for *all* files if we force
+                    // a binary-to-text read (which is done by readAsText for text-like files)
+                    const text = await this.extractText(file);
+                    if (text) {
+                        result.textContent = text.length > 5000 ? text.substring(0, 5000) + '... [truncated]' : text;
+                        this.analyzePatterns(text, result);
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+
+            extractBasicMetadata(file) {
+                return {
+                    filename: file.name,
+                    extension: file.name.split('.').pop()?.toUpperCase() || 'None',
+                    mimeType: file.type || 'Unknown',
+                    sizeBytes: file.size,
+                    sizeKB: (file.size / 1024).toFixed(2),
+                    sizeMB: (file.size / 1048576).toFixed(2),
+                    lastModified: new Date(file.lastModified).toISOString(),
+                    lastModifiedReadable: new Date(file.lastModified).toLocaleString()
+                };
+            }
+
+            async calculateHashes(file) {
+                const buffer = await file.arrayBuffer();
+                const wordArray = CryptoJS.lib.WordArray.create(buffer);
+                return {
+                    md5: CryptoJS.MD5(wordArray).toString(),
+                    sha1: CryptoJS.SHA1(wordArray).toString(),
+                    sha256: CryptoJS.SHA256(wordArray).toString()
+                };
+            }
+
+            async extractText(file) {
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                // We attempt to read text from any text-like file or file with no type
+                if (file.type.startsWith('text/') || !file.type || file.type === 'application/octet-stream') {
+                     return await this.readAsText(file);
+                }
+                if (file.type === 'application/pdf' || ext === 'pdf') {
+                    return await this.extractPdfText(file);
+                }
+                if (file.type.includes('word') || ext === 'docx') {
+                    return await this.extractWordText(file);
+                }
+                // Return null if it's a known binary type we don't handle (like image/video)
+                return null;
+            }
+
+            readAsText(file) {
+                return new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => resolve(null);
+                    // Read as text, which will work for text files and show garbage
+                    // for binary files, but that garbage can still be searched by regex.
+                    reader.readAsText(file); 
+                });
+            }
+
+            async extractPdfText(file) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                    let text = '';
+                    for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        text += content.items.map(item => item.str).join(' ') + '\n';
+                    }
+                    return text;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            async extractPdfMetadata(file) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                    const meta = await pdf.getMetadata();
+                    return {
+                        pageCount: pdf.numPages,
+                        info: meta.info,
+                        metadata: meta.metadata ? meta.metadata.getAll() : null,
+                        pdfVersion: meta.info.PDFFormatVersion,
+                        isEncrypted: meta.info.IsEncrypted || false
+                    };
+                } catch (e) {
+                    return { error: e.message };
+                }
+            }
+
+            async extractWordText(file) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    const xml = await zip.file('word/document.xml')?.async('text');
+                    if (!xml) return null;
+                    return xml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            async extractOfficeMetadata(file, type) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    const meta = {
+                        type: type,
+                        files: Object.keys(zip.files),
+                        coreProperties: null,
+                        appProperties: null
+                    };
+                    
+                    const core = await zip.file('docProps/core.xml')?.async('text');
+                    const app = await zip.file('docProps/app.xml')?.async('text');
+                    
+                    meta.coreProperties = this.parseXmlMetadata(core);
+                    meta.appProperties = this.parseXmlMetadata(app);
+                    
+                    if (type === 'excel') {
+                        meta.worksheets = Object.keys(zip.files).filter(f => f.startsWith('xl/worksheets/'));
+                    } else if (type === 'powerpoint') {
+                        meta.slides = Object.keys(zip.files).filter(f => f.startsWith('ppt/slides/slide'));
+                        meta.slideCount = meta.slides.length;
+                    } else if (type === 'word') {
+                        meta.hasComments = Object.keys(zip.files).includes('word/comments.xml');
+                    }
+                    
+                    return meta;
+                } catch (e) {
+                    return { error: e.message };
+                }
+            }
+
+            parseXmlMetadata(xml) {
+                if (!xml) return null;
+                const meta = {};
+                const tags = ['creator', 'lastModifiedBy', 'created', 'modified', 'title', 'subject', 
+                             'description', 'keywords', 'category', 'revision', 'company', 'pages', 'words'];
+                tags.forEach(tag => {
+                    const regex = new RegExp(`<[^:]*:?${tag}[^>]*>([^<]+)<`, 'i');
+                    const match = xml.match(regex);
+                    if (match) meta[tag] = match[1];
+                });
+                return Object.keys(meta).length ? meta : null;
+            }
+
+            async analyzeArchive(file) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    const structure = {
+                        totalFiles: 0,
+                        totalSize: 0,
+                        files: [],
+                        directories: new Set(),
+                        fileTypes: {}
+                    };
+                    
+                    Object.keys(zip.files).forEach(path => {
+                        const f = zip.files[path];
+                        if (!f.dir) {
+                            structure.totalFiles++;
+                            const size = f._data?.uncompressedSize || 0;
+                            structure.totalSize += size;
+                            const ext = path.split('.').pop()?.toLowerCase() || 'none';
+                            structure.fileTypes[ext] = (structure.fileTypes[ext] || 0) + 1;
+                            structure.files.push({
+                                path: path,
+                                uncompressedSize: size,
+                                compressedSize: f._data?.compressedSize || 0
+                            });
+                        }
+                        const dir = path.substring(0, path.lastIndexOf('/'));
+                        if (dir) structure.directories.add(dir);
+                    });
+                    
+                    structure.directories = Array.from(structure.directories);
+                    structure.totalSizeKB = (structure.totalSize / 1024).toFixed(2);
+                    return structure;
+                } catch (e) {
+                    return { error: 'Not a valid archive' };
+                }
+            }
+
+            // --- *** UPDATED/FIXED EXIF FUNCTION *** ---
+            async extractExif(file) {
+                return new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            const tags = EXIF.readFromBinaryFile(reader.result);
+                            if (tags && Object.keys(tags).length > 0) {
+                                // Don't filter out objects (like IPTC), resolve the whole thing
+                                // But delete binary-heavy tags that just add noise
+                                delete tags.MakerNote; 
+                                delete tags.UserComment;
+                                delete tags.ComponentsConfiguration;
+                                delete tags.FileSource;
+                                resolve(tags); // Resolve with the full tag object
+                            } else {
+                                resolve(null);
+                            }
+                        } catch {
+                            resolve(null); // Failed to read
+                        }
+                    };
+                    reader.onerror = () => resolve(null);
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            async getImageDimensions(file) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        resolve({
+                            width: img.width,
+                            height: img.height,
+                            aspectRatio: (img.width / img.height).toFixed(2),
+                            megapixels: ((img.width * img.height) / 1000000).toFixed(2)
+                        });
+                        URL.revokeObjectURL(img.src);
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+
+            async analyzeImageColors(file) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx.drawImage(img, 0, 0);
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imageData.data;
+                            let r = 0, g = 0, b = 0;
+                            for (let i = 0; i < data.length; i += 4) {
+                                r += data[i];
+                                g += data[i + 1];
+                                b += data[i + 2];
+                            }
+                            const pixelCount = data.length / 4;
+                            resolve({
+                                averageColor: {
+                                    r: Math.round(r / pixelCount),
+                                    g: Math.round(g / pixelCount),
+                                    b: Math.round(b / pixelCount)
+                                }
+                            });
+                            URL.revokeObjectURL(img.src);
+                        } catch {
+                            resolve(null);
+                        }
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+
+            async extractAudioMetadata(file) {
+                return new Promise(resolve => {
+                    const audio = new Audio();
+                    audio.onloadedmetadata = () => {
+                        resolve({
+                            duration: audio.duration ? audio.duration.toFixed(2) + 's' : 'Unknown',
+                            durationMinutes: audio.duration ? (audio.duration / 60).toFixed(2) + ' min' : 'Unknown'
+                        });
+                        URL.revokeObjectURL(audio.src);
+                    };
+                    audio.onerror = () => resolve({ error: 'Could not load audio' });
+                    audio.src = URL.createObjectURL(file);
+                });
+            }
+
+            async extractVideoMetadata(file) {
+                return new Promise(resolve => {
+                    const video = document.createElement('video');
+                    video.onloadedmetadata = () => {
+                        resolve({
+                            duration: video.duration ? video.duration.toFixed(2) + 's' : 'Unknown',
+                            durationMinutes: video.duration ? (video.duration / 60).toFixed(2) + ' min' : 'Unknown',
+                            width: video.videoWidth,
+                            height: video.videoHeight,
+                            aspectRatio: video.videoWidth && video.videoHeight ? (video.videoWidth / video.videoHeight).toFixed(2) : 'Unknown'
+                        });
+                        URL.revokeObjectURL(video.src);
+                    };
+                    video.onerror = () => resolve({ error: 'Could not load video' });
+                    video.src = URL.createObjectURL(file);
+                });
+            }
+
+            analyzePatterns(text, result) {
+                for (const [key, regex] of Object.entries(this.patterns)) {
+                    const matches = [...new Set(text.match(regex) || [])];
+                    if (matches.length) result.patterns[key] = matches.slice(0, 100);
+                }
+                
+                const b64 = text.match(this.patterns.base64)?.[0];
+                if (b64) result.decodedData.base64Sample = this.tryDecode(b64, atob);
+                
+                const hexStr = text.match(this.patterns.hex)?.[0];
+                if (hexStr) result.decodedData.hexSample = this.tryDecode(hexStr, h => decodeURIComponent(h.replace(/(..)/g, '%$1')));
+                
+                const jwtToken = text.match(this.patterns.jwt)?.[0];
+                if (jwtToken) result.decodedData.jwtDecoded = this.decodeJWT(jwtToken);
+            }
+
+            tryDecode(str, decoder) {
+                if (!str) return null;
+                try {
+                    return decoder(str);
+                } catch {
+                    return null;
+                }
+            }
+
+            decodeJWT(token) {
+                if (!token) return null;
+                try {
+                    const parts = token.split('.');
+                    return {
+                        header: JSON.parse(atob(parts[0])),
+                        payload: JSON.parse(atob(parts[1]))
+                    };
+                } catch {
+                    return null;
+                }
+            }
+
+            // --- *** UPDATED removeMetadata FUNCTION *** ---
+            async removeMetadata(file) {
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                
+                if (file.type.startsWith('image/')) {
+                    return await this.stripImageMetadata(file);
+                } else if (file.type === 'application/pdf' || ext === 'pdf') {
+                    // Per user request, do not attempt to strip PDF metadata, just return original
+                    return new Blob([await file.arrayBuffer()], { type: file.type });
+                } else if (file.type.includes('word') || file.type.includes('sheet') || file.type.includes('presentation') || ['docx', 'xlsx', 'pptx'].includes(ext)) {
+                    return await this.stripOfficeMetadata(file);
+                }
+                
+                // Default: return the original file
+                return new Blob([await file.arrayBuffer()], { type: file.type });
+            }
+
+            async stripImageMetadata(file) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob(blob => resolve(blob), file.type, 0.95);
+                    };
+                    img.onerror = () => resolve(new Blob([], { type: file.type }));
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+
+            // --- *** stripPdfMetadata FUNCTION IS NOW DELETED *** ---
+
+            async stripOfficeMetadata(file) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    zip.remove('docProps/core.xml');
+                    zip.remove('docProps/app.xml');
+                    zip.remove('docProps/custom.xml');
+                    return await zip.generateAsync({ type: 'blob' });
+                } catch {
+                    return new Blob([await file.arrayBuffer()], { type: file.type });
+                }
+            }
+        }
+
+        const analyzer = new AdvancedFileAnalyzer();
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const output = document.getElementById('output');
+        const fileList = document.getElementById('fileList');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+
+        function updateUI() {
+            document.getElementById('analyzeBtn').disabled = !analyzer.files.length;
+            document.getElementById('removeMetaBtn').disabled = !analyzer.results.length;
+            document.getElementById('downloadBtn').disabled = !analyzer.cleanedFiles.length;
+            
+            if (analyzer.files.length) {
+                fileListContainer.style.display = 'block';
+                fileList.innerHTML = analyzer.files.map((f, i) => `
+                    <div class="file-item">
+                        <span>${f.name} <small>(${(f.size / 1024).toFixed(1)} KB)</small></span>
+                        <button onclick="window.removeFile(${i})">Remove</button>
+                    </div>
+                `).join('');
+            } else {
+                fileListContainer.style.display = 'none';
+            }
+        }
+
+        function displayResults() {
+            if (!analyzer.results.length) {
+                output.textContent = 'Results will appear here...';
+                return;
+            }
+
+            // This dynamically reads all keys, so new regex patterns are added automatically
+            const patternKeys = Object.keys(analyzer.patterns);
+            const headers = [
+                'Filename', 'MIME Type', 'Size (KB)', 'Last Modified', 'MD5', 'SHA1', 'SHA256',
+                'EXIF Data', 'Image Info', 'Audio Metadata', 'Video Metadata', 'PDF Metadata',
+                'Office Metadata', 'Archive Structure', 'Decoded Data', 'Text Content (Truncated)',
+                ...patternKeys, 'Error'
+            ];
+
+            const sanitize = (val) => {
+                if (val === null || val === undefined) return '';
+                let str;
+                if (typeof val === 'object') {
+                    str = JSON.stringify(val); // This will now show the full EXIF/IPTC objects
+                } else if (Array.isArray(val)) {
+                    str = val.join(', '); // Use comma for lists within a cell
+                } else {
+                    str = String(val);
+                }
+                return str.replace(/[\t\n\r]/g, ' '); // Remove tabs and newlines
+            };
+
+            let tsv = headers.join('\t') + '\n'; // Header row
+
+            analyzer.results.forEach(res => {
+                const row = [
+                    sanitize(res.filename),
+                    sanitize(res.basicMetadata?.mimeType),
+                    sanitize(res.basicMetadata?.sizeKB),
+                    sanitize(res.basicMetadata?.lastModified),
+                    sanitize(res.fileHashes?.md5),
+                    sanitize(res.fileHashes?.sha1),
+                    sanitize(res.fileHashes?.sha256),
+                    sanitize(res.exifData),
+                    sanitize(res.imageInfo),
+                    sanitize(res.audioMetadata),
+                    sanitize(res.videoMetadata),
+                    sanitize(res.pdfMetadata),
+                    sanitize(res.officeMetadata),
+                    sanitize(res.archiveStructure),
+                    sanitize(res.decodedData),
+                    sanitize(res.textContent),
+                    ...patternKeys.map(key => sanitize(res.patterns[key])),
+                    sanitize(res.error)
+                ];
+                tsv += row.join('\t') + '\n';
+            });
+
+            output.textContent = tsv;
+        }
+
+        window.removeFile = function(idx) {
+            analyzer.files.splice(idx, 1);
+            
+            if (analyzer.results.length > idx) {
+                analyzer.results.splice(idx, 1);
+            }
+            
+            analyzer.cleanedFiles = [];
+            
+            updateUI();
+            displayResults(); 
+        };
+
+        async function handleNewFiles(newFiles) {
+            const startIndex = analyzer.files.length;
+            analyzer.files.push(...newFiles);
+            updateUI(); 
+
+            progress.style.display = 'block';
+            for (let i = 0; i < newFiles.length; i++) {
+                const totalProgress = ((startIndex + i + 1) / analyzer.files.length) * 100;
+                progressBar.style.width = `${totalProgress}%`;
+                
+                const result = await analyzer.analyzeFile(newFiles[i]);
+                analyzer.results.push(result);
+            }
+            progress.style.display = 'none';
+            progressBar.style.width = `0%`; 
+            
+            displayResults();
+            updateUI(); 
+        }
+
+        dropzone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropzone.classList.add('active');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('active');
+        });
+
+        dropzone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropzone.classList.remove('active');
+            handleNewFiles(Array.from(e.dataTransfer.files));
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', e => {
+            handleNewFiles(Array.from(e.target.files));
+        });
+
+        document.getElementById('addPattern').addEventListener('click', () => {
+            const pattern = document.getElementById('customPattern').value.trim();
+            if (!pattern) return alert('Please enter a regex pattern');
+            try {
+                const regex = new RegExp(pattern, 'g');
+                const key = `custom_${Date.now()}`;
+                analyzer.patterns[key] = regex;
+                alert('Pattern added successfully!');
+                document.getElementById('customPattern').value = '';
+            } catch {
+                alert('Invalid regex pattern');
+            }
+        });
+
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            progress.style.display = 'block';
+            analyzer.results = []; 
+            
+            for (let i = 0; i < analyzer.files.length; i++) {
+                progressBar.style.width = `${((i + 1) / analyzer.files.length) * 100}%`;
+                const result = await analyzer.analyzeFile(analyzer.files[i]);
+                analyzer.results.push(result);
+            }
+            
+            progress.style.display = 'none';
+            progressBar.style.width = `0%`; 
+            displayResults(); 
+            updateUI();
+        });
+
+        document.getElementById('removeMetaBtn').addEventListener('click', async () => {
+            if (!analyzer.results.length) {
+                alert('Please analyze files first');
+                return;
+            }
+            
+            progress.style.display = 'block';
+            analyzer.cleanedFiles = [];
+            
+            for (let i = 0; i < analyzer.files.length; i++) {
+                progressBar.style.width = `${((i + 1) / analyzer.files.length) * 100}%`;
+                const cleaned = await analyzer.removeMetadata(analyzer.files[i]);
+                analyzer.cleanedFiles.push({
+                    blob: cleaned,
+                    name: 'cleaned_' + analyzer.files[i].name
+                });
+            }
+            
+            progress.style.display = 'none';
+            progressBar.style.width = `0%`; 
+            alert(`Metadata removed from ${analyzer.cleanedFiles.length} file(s). Click "Download Clean Files" to save.`);
+            updateUI();
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            if (!analyzer.cleanedFiles.length) {
+                alert('No cleaned files available');
+                return;
+            }
+            
+            if (analyzer.cleanedFiles.length === 1) {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(analyzer.cleanedFiles[0].blob);
+                link.download = analyzer.cleanedFiles[0].name;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            } else {
+                const zip = new JSZip();
+                analyzer.cleanedFiles.forEach(f => zip.file(f.name, f.blob));
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `cleaned_files_${Date.now()}.zip`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+        });
+
+        document.getElementById('clearResults').addEventListener('click', () => {
+            analyzer.files = [];
+            analyzer.results = [];
+            analyzer.cleanedFiles = [];
+            fileInput.value = '';
+            updateUI();
+            displayResults(); 
+        });
+
+        updateUI();
+    </script>
+</body>
+</html>
