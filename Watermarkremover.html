@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Watermark Shrinker</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <h1>PDF Watermark Shrinker</h1>
+    <p>Upload multiple PDFs, and this will shrink the watermark text size to 0, making it invisible.</p>
+    <input type="file" id="pdfInput" multiple accept=".pdf">
+    <button onclick="processPDFs()">Process and Download ZIP</button>
+
+    <script>
+        async function processPDFs() {
+            const input = document.getElementById('pdfInput');
+            if (input.files.length === 0) {
+                alert('Please select at least one PDF file.');
+                return;
+            }
+
+            const processPromises = [];
+            for (const file of input.files) {
+                processPromises.push(processSinglePDF(file));
+            }
+
+            try {
+                const results = await Promise.all(processPromises);
+                const zip = new JSZip();
+                results.forEach(result => {
+                    zip.file(result.name, result.bytes);
+                });
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                download(zipBlob, 'processed_pdfs.zip', 'application/zip');
+            } catch (error) {
+                console.error('Error processing PDFs:', error);
+                alert('An error occurred while processing the PDFs.');
+            }
+        }
+
+        async function processSinglePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+
+            const pages = pdfDoc.getPages();
+            for (const page of pages) {
+                const decodedContent = await getDecodedContent(page, pdfDoc);
+                // Shrink the text size: replace '/Xi1 80 Tf' with '/Xi1 0 Tf'
+                // Adjust regex if the size or spacing varies slightly
+                const modifiedContent = decodedContent.replace(/\/Xi1\s+\d+\s+Tf/g, '/Xi1 0 Tf');
+                await setEncodedContent(page, pdfDoc, modifiedContent);
+            }
+
+            const pdfBytes = await pdfDoc.save();
+            return { name: `clean_${file.name}`, bytes: pdfBytes };
+        }
+
+        async function getDecodedContent(page, pdfDoc) {
+            const contents = page.node.get(PDFLib.PDFName.of('Contents'));
+            const buffers = [];
+
+            if (contents instanceof PDFLib.PDFArray) {
+                for (let i = 0; i < contents.size(); i++) {
+                    const streamRef = contents.get(i);
+                    const stream = pdfDoc.context.lookup(streamRef, PDFLib.PDFStream);
+                    buffers.push(stream.getContents());
+                }
+            } else {
+                const stream = pdfDoc.context.lookup(contents, PDFLib.PDFStream);
+                buffers.push(stream.getContents());
+            }
+
+            // Concatenate all content streams
+            let totalLength = 0;
+            buffers.forEach(buffer => totalLength += buffer.length);
+            const fullEncoded = new Uint8Array(totalLength);
+            let offset = 0;
+            buffers.forEach(buffer => {
+                fullEncoded.set(buffer, offset);
+                offset += buffer.length;
+            });
+
+            // Attempt to inflate (assuming FlateDecode); fallback to raw if not compressed
+            try {
+                return pako.inflate(fullEncoded, { to: 'string' });
+            } catch (e) {
+                return new TextDecoder().decode(fullEncoded);
+            }
+        }
+
+        async function setEncodedContent(page, pdfDoc, modifiedContent) {
+            const newEncoded = pako.deflate(modifiedContent);
+            const newDict = PDFLib.PDFDict.withContext(pdfDoc.context);
+            newDict.set(PDFLib.PDFName.of('Filter'), PDFLib.PDFName.of('FlateDecode'));
+            newDict.set(PDFLib.PDFName.of('Length'), PDFLib.PDFNumber.of(newEncoded.length));
+            const newStream = PDFLib.PDFRawStream.of(newDict, newEncoded);
+            const newRef = pdfDoc.context.register(newStream);
+            page.node.set(PDFLib.PDFName.of('Contents'), newRef);
+        }
+
+        function download(bytes, fileName, mimeType) {
+            const blob = new Blob([bytes], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
