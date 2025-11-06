@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Metadata Extractor</title>
+    <script src="https://unpkg.com/exifreader@4.21.0/dist/exif-reader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1877f2; --primary-hover: #166fe5;
+            --secondary-color: #42b72a; --secondary-hover: #36a420;
+            --tertiary-color: #e4e6eb; --tertiary-hover: #d8dbdf;
+            --background-color: #f0f2f5; --container-bg: #ffffff;
+            --text-primary: #1c1e21; --text-secondary: #606770;
+            --border-color: #ccd0d5; --danger-color: #e02c2c;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color); color: var(--text-primary);
+            margin: 0; padding: 8px; font-size: 14px;
+        }
+        .main-container {
+            width: 100%; max-width: 500px; background-color: var(--container-bg);
+            border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 12px; box-sizing: border-box; margin: 0 auto;
+        }
+        .text-center { text-align: center; }
+        .hidden { display: none !important; }
+        .header h1 { font-size: 20px; margin: 0 0 4px 0; font-weight: 600; }
+        .header p { font-size: 12px; color: var(--text-secondary); margin: 0 0 12px 0; }
+        .file-upload-label {
+            display: flex; align-items: center; justify-content: center;
+            height: 100px; border: 2px dashed var(--border-color);
+            border-radius: 6px; cursor: pointer; transition: border-color 0.2s; padding: 10px;
+        }
+        .file-upload-label:hover { border-color: var(--primary-color); }
+        .file-upload-label span { font-size: 13px; color: var(--text-secondary); }
+        #file-info { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .btn {
+            padding: 10px; font-size: 13px; font-weight: 600;
+            border-radius: 6px; border: none; cursor: pointer;
+            transition: background-color 0.2s, opacity 0.2s;
+        }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+        .btn-tertiary { background-color: var(--tertiary-color); color: var(--text-primary); }
+        .btn:disabled { background-color: #dce1e6; color: #a0a6ad; cursor: not-allowed; }
+        .results-controls { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .results-controls .btn { padding: 6px 10px; font-size: 12px; }
+        .accordion-item { border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+        .accordion-header {
+            display: flex; align-items: center; gap: 10px; padding: 8px;
+            cursor: pointer; background-color: #f7f8fa; transition: background-color 0.2s;
+        }
+        .accordion-header:hover { background-color: #f0f2f5; }
+        .thumbnail { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+        .file-details { flex-grow: 1; min-width: 0; } /* Allow shrinking */
+        .file-details .filename { font-size: 13px; font-weight: 600; margin: 0; word-break: break-all; }
+        .file-details .file-date { font-size: 11px; color: var(--text-secondary); margin: 2px 0 0 0; }
+        .file-details .file-date.guessed { color: var(--danger-color); font-weight: 600; }
+        .accordion-content {
+            padding: 0; max-height: 0; overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            background-color: var(--container-bg);
+        }
+        .accordion-item.active .accordion-content { max-height: 500px; padding: 8px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 5px 6px; text-align: left; font-size: 11px; border-bottom: 1px solid #e4e6eb; }
+        thead th { background-color: #e9ebee; font-weight: 600; }
+        td:first-child { font-weight: 500; word-break: break-word; }
+        td:last-child { color: var(--text-secondary); word-break: break-all; }
+        #message-box { padding: 8px; font-size: 12px; border-radius: 4px; margin-top: 12px; }
+        .msg-success { background-color: #e9f6ea; color: #36a420; }
+        .msg-error { background-color: #fbe9e8; color: #c72b30; }
+        .msg-info { background-color: #e7f3ff; color: #166fe5; }
+        
+        /* Modal Styles */
+        #rename-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 10;
+            display: flex; justify-content: center; align-items: center; padding: 16px;
+        }
+        .modal-content {
+            background: var(--container-bg); border-radius: 8px;
+            padding: 16px; width: 100%; max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 90vh;
+            display: flex; flex-direction: column;
+        }
+        .modal-content h3 { font-size: 18px; margin: 0 0 12px 0; }
+        .modal-content h4 { font-size: 14px; margin: 12px 0 8px 0; }
+        .modal-content p.help-text { font-size: 11px; color: var(--text-secondary); margin: 4px 0; }
+        #available-fields-container {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            max-height: 150px; overflow-y: auto;
+            background: #f0f2f5; padding: 8px; border-radius: 6px;
+        }
+        .field-btn {
+            padding: 4px 8px; font-size: 12px; background: var(--tertiary-color);
+            border: none; border-radius: 4px; cursor: pointer;
+        }
+        .field-btn:hover { background: var(--tertiary-hover); }
+        #filename-pattern-input {
+            width: 100%; font-size: 14px; padding: 8px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            box-sizing: border-box; margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header text-center">
+            <h1>Metadata Extractor</h1>
+            <p>Build custom filenames from EXIF data.</p>
+        </div>
+        <div>
+            <label for="file-upload" class="file-upload-label">
+                <span>Drop files or <b>browse</b></span>
+                <input type="file" id="file-upload" multiple class="hidden" accept="image/*,.heic,.heif,.zip">
+            </label>
+            <p id="file-info" class="text-center">No files selected</p>
+        </div>
+        <div class="button-grid">
+            <button id="extract-btn" class="btn btn-primary" disabled>Extract Metadata</button>
+            <button id="rename-zip-btn" class="btn btn-tertiary" disabled>Rename & Download Zip</button>
+        </div>
+        <div id="results-controls" class="results-controls hidden">
+            <button id="toggle-all-btn" class="btn btn-tertiary">Expand All</button>
+            <button id="download-csv-btn" class="btn btn-secondary" disabled>Download CSV</button>
+        </div>
+        <div id="results-container"></div>
+        <div id="message-box" class="hidden"></div>
+    </div>
+    
+    <!-- Rename Modal -->
+    <div id="rename-modal" class="hidden">
+        <div class="modal-content">
+            <h3>Build Your Filename Pattern</h3>
+            <h4>Available Fields</h4>
+            <div id="available-fields-container">
+                <!-- Fields will be injected here -->
+            </div>
+            <p class="help-text">Click fields to add them. Type to add separators (e.g., "_").</p>
+            
+            <h4>Filename Pattern</h4>
+            <input id="filename-pattern-input" type="text" value="[Date(STC)]_[OriginalFilename]">
+            <p class="help-text">
+                <b>[Date]</b> = DDMMYYYY (from EXIF) <br>
+                <b>[Date(STC)]</b> = DDMMYYYY (appends _STC if guessed) <br>
+                <b>[OriginalFilename]</b> = Filename without extension
+            </p>
+            
+            <div class="button-grid" style="margin-top: 16px; margin-bottom: 0;">
+                <button id="cancel-rename" class="btn btn-tertiary">Cancel</button>
+                <button id="confirm-rename-zip" class="btn btn-primary">Confirm & Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DOM = {
+            fileUpload: document.getElementById('file-upload'),
+            fileInfo: document.getElementById('file-info'),
+            extractBtn: document.getElementById('extract-btn'),
+            renameZipBtn: document.getElementById('rename-zip-btn'),
+            downloadCsvBtn: document.getElementById('download-csv-btn'),
+            resultsContainer: document.getElementById('results-container'),
+            messageBox: document.getElementById('message-box'),
+            resultsControls: document.getElementById('results-controls'),
+            toggleAllBtn: document.getElementById('toggle-all-btn'),
+            renameModal: document.getElementById('rename-modal'),
+            cancelRename: document.getElementById('cancel-rename'),
+            confirmRenameZip: document.getElementById('confirm-rename-zip'),
+            availableFieldsContainer: document.getElementById('available-fields-container'),
+            filenamePatternInput: document.getElementById('filename-pattern-input'),
+        };
+        let imageData = [];
+
+        // Main Listeners
+        DOM.fileUpload.addEventListener('change', handleFileSelection);
+        DOM.extractBtn.addEventListener('click', processFiles);
+        DOM.downloadCsvBtn.addEventListener('click', downloadWideCSV);
+        DOM.toggleAllBtn.addEventListener('click', toggleAllAccordions);
+        
+        // Modal Listeners
+        DOM.renameZipBtn.addEventListener('click', showRenameModal);
+        DOM.cancelRename.addEventListener('click', () => DOM.renameModal.classList.add('hidden'));
+        DOM.confirmRenameZip.addEventListener('click', createCustomRenamedZip);
+
+        function handleFileSelection() {
+            imageData.forEach(img => URL.revokeObjectURL(img.thumbnailUrl));
+            DOM.fileInfo.textContent = DOM.fileUpload.files.length > 0 ? `${DOM.fileUpload.files.length} file(s) selected.` : 'No files selected';
+            DOM.extractBtn.disabled = DOM.fileUpload.files.length === 0;
+            resetUI();
+        }
+
+        function resetUI() {
+            DOM.resultsContainer.innerHTML = '';
+            DOM.renameZipBtn.disabled = true;
+            DOM.downloadCsvBtn.disabled = true;
+            DOM.resultsControls.classList.add('hidden');
+            imageData = [];
+            hideMessage();
+        }
+
+        async function processFiles() {
+            DOM.resultsContainer.innerHTML = '<div class="text-center" style="padding: 10px;">Processing...</div>';
+            imageData = [];
+            const files = Array.from(DOM.fileUpload.files);
+            const processingPromises = files.map(file => {
+                if (file.name.toLowerCase().endsWith('.zip')) {
+                    return JSZip.loadAsync(file).then(zip => {
+                        const imagePromises = [];
+                        zip.forEach((_, zipEntry) => {
+                            const isImage = /\.(jpe?g|png|gif|tiff?|heic|heif)$/i.test(zipEntry.name);
+                            if (!zipEntry.dir && isImage) {
+                                imagePromises.push(zipEntry.async('blob').then(blob => processSingleFile(blob, zipEntry.name)));
+                            }
+                        });
+                        return Promise.all(imagePromises);
+                    });
+                } else {
+                    return processSingleFile(file, file.name);
+                }
+            });
+
+            try {
+                const results = await Promise.all(processingPromises);
+                imageData = results.flat().filter(Boolean);
+                displayResults();
+                populateAvailableFields();
+            } catch (error) {
+                showMessage('An error occurred during processing.', 'error');
+                DOM.resultsContainer.innerHTML = '';
+            }
+        }
+
+        async function processSingleFile(fileBlob, filename) {
+            try {
+                const metadata = await ExifReader.load(fileBlob);
+                let thumbnailUrl = 'https://placehold.co/40x40/e2e8f0/4a5568?text=Img';
+                if (fileBlob.type?.startsWith('image/')) {
+                    thumbnailUrl = URL.createObjectURL(fileBlob);
+                }
+                if (metadata.Thumbnail?.base64) {
+                    thumbnailUrl = `data:image/jpeg;base64,${metadata.Thumbnail.base64}`;
+                }
+                const { date, source } = getDateTime(metadata, filename);
+                return { filename, metadata, thumbnailUrl, fileBlob, date, dateSource: source };
+            } catch (error) {
+                return {
+                    filename, metadata: { Error: { description: "Could not read file." } },
+                    thumbnailUrl: 'https://placehold.co/40x40/fecaca/991b1b?text=Err',
+                    fileBlob, date: null, dateSource: 'none'
+                };
+            }
+        }
+        
+        function displayResults() {
+            DOM.resultsContainer.innerHTML = '';
+            if (imageData.length === 0) {
+                showMessage('No processable images found.', 'info');
+                return;
+            }
+            imageData.forEach(img => {
+                const item = document.createElement('div');
+                item.className = 'accordion-item';
+                const displayDate = img.date ? `${img.date.day}/${img.date.month}/${img.date.year}` : 'No date found';
+                const dateClass = img.dateSource === 'filename' ? 'file-date guessed' : 'file-date';
+                
+                item.innerHTML = `
+                    <div class="accordion-header">
+                        <img src="${img.thumbnailUrl}" alt="${img.filename}" class="thumbnail" onerror="this.src='https://placehold.co/40x40/e2e8f0/4a5568?text=Img';">
+                        <div class="file-details">
+                            <p class="filename">${img.filename}</p>
+                            <p class="${dateClass}">${displayDate}</p>
+                        </div>
+                    </div>
+                    <div class="accordion-content">
+                        <table>
+                            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+                            <tbody>${generateTableRows(img.metadata)}</tbody>
+                        </table>
+                    </div>`;
+                DOM.resultsContainer.appendChild(item);
+            });
+            
+            document.querySelectorAll('.accordion-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    header.parentElement.classList.toggle('active');
+                    updateToggleAllButtonState();
+                });
+            });
+
+            DOM.renameZipBtn.disabled = false;
+            DOM.downloadCsvBtn.disabled = false;
+            DOM.resultsControls.classList.remove('hidden');
+            showMessage(`Extracted data from ${imageData.length} image(s).`, 'success');
+            updateToggleAllButtonState();
+        }
+
+        function generateTableRows(metadata) {
+            return Object.entries(metadata)
+                .filter(([key]) => key !== 'Thumbnail')
+                .map(([key, valueObj]) => {
+                    let value = valueObj.description ?? valueObj.value ?? JSON.stringify(valueObj);
+                    value = String(value).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    return `<tr><td>${key}</td><td>${value}</td></tr>`;
+                }).join('');
+        }
+
+        function isValidDate(y, m, d) {
+            const year = parseInt(y, 10), month = parseInt(m, 10), day = parseInt(d, 10);
+            const currentYear = new Date().getFullYear();
+            if (year < 1970 || year > currentYear + 2 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+            const testDate = new Date(year, month - 1, day);
+            return testDate.getFullYear() === year && testDate.getMonth() + 1 === month && testDate.getDate() === day;
+        }
+
+        function getDateTimeFromFilename(filename) {
+            const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+            const patterns = [
+                { regex: /(\d{4})-(\d{2})-(\d{2})/, map: { year: 1, month: 2, day: 3 } },
+                { regex: /IMG-(\d{4})(\d{2})(\d{2})-WA/, map: { year: 1, month: 2, day: 3 } },
+                { regex: /IMG_(\d{4})(\d{2})(\d{2})/, map: { year: 1, month: 2, day: 3 } },
+                { regex: /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{1,2}),\s(\d{4})/, map: { monthName: 1, day: 2, year: 3 } },
+                { regex: /^(\d{4})(\d{2})(\d{2})/, map: { year: 1, month: 2, day: 3 } }
+            ];
+            for (const p of patterns) {
+                const match = filename.match(p.regex);
+                if (match) {
+                    const day = p.map.day ? match[p.map.day].padStart(2, '0') : null;
+                    const month = p.map.monthName ? monthMap[match[p.map.monthName]] : (p.map.month ? match[p.map.month] : null);
+                    const year = p.map.year ? match[p.map.year] : null;
+                    if (day && month && year && isValidDate(year, month, day)) {
+                        return { year, month, day };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function getDateTime(metadata, filename) {
+            const exifDateStr = metadata.DateTimeOriginal?.description ?? metadata.DateTime?.description;
+            if (exifDateStr) {
+                const parts = exifDateStr.split(' ')[0].split(':');
+                if (parts.length === 3 && isValidDate(parts[0], parts[1], parts[2])) {
+                    return { date: { year: parts[0], month: parts[1], day: parts[2] }, source: 'exif' };
+                }
+            }
+            const guessedDate = getDateTimeFromFilename(filename);
+            return { date: guessedDate, source: guessedDate ? 'filename' : 'none' };
+        }
+
+        function populateAvailableFields() {
+            const allKeys = new Set(['Date', 'Date(STC)', 'OriginalFilename']);
+            imageData.forEach(img => {
+                Object.keys(img.metadata).forEach(key => key !== 'Thumbnail' && allKeys.add(key));
+            });
+            DOM.availableFieldsContainer.innerHTML = '';
+            Array.from(allKeys).sort().forEach(key => {
+                const btn = document.createElement('button');
+                btn.className = 'field-btn';
+                btn.textContent = key;
+                btn.onclick = () => {
+                    DOM.filenamePatternInput.value += `[${key}]`;
+                };
+                DOM.availableFieldsContainer.appendChild(btn);
+            });
+        }
+        
+        function showRenameModal() {
+            DOM.renameModal.classList.remove('hidden');
+            // Set a default pattern
+            if (!DOM.filenamePatternInput.value) {
+                DOM.filenamePatternInput.value = '[Date(STC)]_[OriginalFilename]';
+            }
+        }
+
+        function buildFilenameFromPattern(img, pattern) {
+            const baseName = img.filename.substring(0, img.filename.lastIndexOf('.'));
+            const extension = img.filename.split('.').pop();
+            let finalName = pattern;
+            
+            const tags = pattern.match(/\[(.*?)\]/g) || [];
+            
+            for (const tagWithBrackets of tags) {
+                const key = tagWithBrackets.substring(1, tagWithBrackets.length - 1);
+                let replacement = '';
+                
+                switch(key) {
+                    case 'Date':
+                        if (img.date) replacement = `${img.date.day}${img.date.month}${img.date.year}`;
+                        break;
+                    case 'Date(STC)':
+                        if (img.date) {
+                            replacement = `${img.date.day}${img.date.month}${img.date.year}`;
+                            if (img.dateSource === 'filename') replacement += '_STC';
+                        }
+                        break;
+                    case 'OriginalFilename':
+                        replacement = baseName;
+                        break;
+                    default:
+                        const valueObj = img.metadata[key];
+                        if (valueObj) {
+                            replacement = String(valueObj.description ?? valueObj.value ?? '').trim();
+                        }
+                }
+                // Sanitize replacement and replace the tag
+                const sanitized = replacement.replace(/[\/\\:*?"<>|]/g, '-');
+                finalName = finalName.replace(tagWithBrackets, sanitized);
+            }
+            
+            // Clean up any empty fields or multiple underscores
+            finalName = finalName.replace(/__+/g, '_').replace(/--+/g, '-');
+            if (finalName.startsWith('_')) finalName = finalName.substring(1);
+            if (finalName.endsWith('_')) finalName = finalName.substring(0, finalName.length - 1);
+            
+            return finalName ? `${finalName}.${extension}` : img.filename; // Fallback to original
+        }
+
+        function createCustomRenamedZip() {
+            if (imageData.length === 0) return;
+            const pattern = DOM.filenamePatternInput.value;
+            if (!pattern.trim()) {
+                showMessage('Please enter a filename pattern.', 'error');
+                return;
+            }
+            
+            showMessage('Zipping files with custom names...', 'info');
+            const zip = new JSZip();
+            
+            imageData.forEach(img => {
+                const newFilename = buildFilenameFromPattern(img, pattern);
+                zip.file(newFilename, img.fileBlob);
+            });
+            
+            zip.generateAsync({ type: "blob" }).then(content => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = "custom_renamed_images.zip";
+                link.click();
+                URL.revokeObjectURL(link.href);
+                showMessage('Zip file created.', 'success');
+                DOM.renameModal.classList.add('hidden');
+            });
+        }
+
+        function downloadWideCSV() {
+            if (imageData.length === 0) return;
+            const allKeys = new Set(['Filename', 'Date', 'DateSource']);
+            imageData.forEach(img => Object.keys(img.metadata).forEach(key => key !== 'Thumbnail' && allKeys.add(key)));
+            const sortedKeys = Array.from(allKeys).sort();
+            
+            const header = sortedKeys.map(k => `"${k.replace(/"/g, '""')}"`).join(',');
+            const rows = imageData.map(img => {
+                const row = sortedKeys.map(key => {
+                    if (key === 'Filename') return img.filename;
+                    if (key === 'Date') return img.date ? `${img.date.day}/${img.date.month}/${img.date.year}` : '';
+                    if (key === 'DateSource') return img.dateSource;
+                    const valueObj = img.metadata[key];
+                    if (!valueObj) return '';
+                    return valueObj.description ?? valueObj.value ?? JSON.stringify(valueObj);
+                });
+                return row.map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(',');
+            });
+
+            const csvContent = [header, ...rows].join('\r\n');
+            const link = document.createElement("a");
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+            link.download = "image_metadata_wide.csv";
+            link.click();
+        }
+        
+        function toggleAllAccordions() {
+            const isExpanding = DOM.toggleAllBtn.textContent === 'Expand All';
+            document.querySelectorAll('.accordion-item').forEach(item => item.classList.toggle('active', isExpanding));
+            DOM.toggleAllBtn.textContent = isExpanding ? 'Collapse All' : 'Expand All';
+        }
+
+        function updateToggleAllButtonState() {
+            const total = document.querySelectorAll('.accordion-item').length;
+            const active = document.querySelectorAll('.accordion-item.active').length;
+            DOM.toggleAllBtn.textContent = (active === total && total > 0) ? 'Collapse All' : 'Expand All';
+        }
+
+        function showMessage(message, type = 'info') {
+            DOM.messageBox.textContent = message;
+            DOM.messageBox.className = `msg-${type}`;
+        }
+
+        function hideMessage() { DOM.messageBox.className = 'hidden'; }
+    </script>
+</body>
+</html>
+
+
