@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+<meta charset=UTF-8>
+<meta content="width=device-width,initial-scale=1"name=viewport>
+<title>WhatsApp Chat Analyzer</title>
+<script src=https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js></script>
+<script src=https://d3js.org/d3.v7.min.js></script>
+<style>
+    :root {
+        --c-bg: #ffffff;
+        --c-text: #111111;
+        --c-border: #eeeeee;
+        --c-border-active: #bbbbbb;
+        --c-bg-hover: #f5f5f5;
+        --c-bg-card: #fafafa;
+        --c-brand: #333333;
+        --c-brand-text: #ffffff;
+        --c-positive: #22a75d;
+        --c-negative: #d94040;
+        --c-neutral: #d9a040
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        background: var(--c-bg);
+        min-height: 100vh;
+        padding: 10px;
+        color: var(--c-text);
+        font-size: 14px;
+        line-height: 1.5
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px
+    }
+
+    h1 {
+        text-align: center;
+        color: var(--c-text);
+        margin-bottom: 25px;
+        font-size: 1.8rem;
+        font-weight: 600
+    }
+
+    .upload-area {
+        border: 2px dashed var(--c-border-active);
+        border-radius: 8px;
+        padding: 40px 20px;
+        text-align: center;
+        margin-bottom: 30px;
+        transition: all .2s ease-out;
+        cursor: pointer;
+        background: var(--c-bg-hover)
+    }
+
+    .upload-area.dragover,
+    .upload-area:hover {
+        border-color: var(--c-brand);
+        background: var(--c-bg)
+    }
+
+    input[type=file] {
+        display: none
+    }
+
+    .upload-text {
+        font-size: 1.1rem;
+        color: var(--c-text);
+        margin-bottom: 10px;
+        font-weight: 500
+    }
+
+    .upload-subtitle {
+        color: #777;
+        font-size: .9rem
+    }
+
+    .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        color: var(--c-brand);
+        font-size: 1.1rem
+    }
+
+    .spinner {
+        border: 3px solid var(--c-border);
+        border-top: 3px solid var(--c-brand);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin .8s linear infinite;
+        margin: 0 auto 10px
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0)
+        }
+
+        100% {
+            transform: rotate(360deg)
+        }
+    }
+
+    .results {
+        display: none
+    }
+
+    .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--c-border)
+    }
+
+    .tab {
+        padding: 10px 15px;
+        background: 0 0;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        font-size: .9rem;
+        font-weight: 500;
+        color: #777;
+        transition: all .2s ease-out;
+        flex: 1;
+        min-width: 90px;
+        text-align: center
+    }
+
+    .tab.active {
+        color: var(--c-text);
+        border-bottom-color: var(--c-brand)
+    }
+
+    .tab:hover {
+        color: var(--c-text);
+        background: var(--c-bg-hover)
+    }
+
+    .tab-content {
+        display: none;
+        animation: fadeIn .2s ease-out
+    }
+
+    .tab-content.active {
+        display: block
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px
+    }
+
+    .stat-card {
+        background: var(--c-bg-card);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        transition: all .2s ease-out
+    }
+
+    .stat-card:hover {
+        border-color: var(--c-border-active);
+        transform: translateY(-2px)
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 600;
+        color: var(--c-brand);
+        display: block;
+        line-height: 1.1
+    }
+
+    .stat-label {
+        color: #555;
+        font-size: .85rem;
+        margin-top: 8px
+    }
+
+    .highlight-card {
+        background: var(--c-brand);
+        color: var(--c-brand-text);
+        border-color: var(--c-brand)
+    }
+
+    .highlight-card .stat-number {
+        color: var(--c-brand-text)
+    }
+
+    .highlight-card .stat-label {
+        color: rgba(255, 255, 255, .8)
+    }
+
+    .chart-container {
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        height: 400px;
+        /* --- 👇 THE FIX --- */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-container.auto-height {
+        height: auto;
+        /* Revert auto-height containers to block */
+        display: block;
+    }
+
+    /* This new rule targets the canvas */
+    .chart-container canvas {
+        flex: 1;
+        /* Tells the canvas to fill remaining space */
+        min-height: 0;
+        /* Critical for flex to shrink properly */
+    }
+
+    .chart-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--c-text);
+        margin-bottom: 15px;
+        text-align: center;
+        /* --- 👇 ADDITION --- */
+        flex-shrink: 0; /* Prevents title from shrinking */
+    }
+
+    .user-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px
+    }
+
+    .user-card {
+        background: var(--c-bg-card);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 15px;
+        border-left: 3px solid var(--c-brand)
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--c-text);
+        margin-bottom: 10px
+    }
+
+    .user-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-size: .9rem;
+        color: #555
+    }
+
+    .engagement-score {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--c-brand);
+        margin-top: 12px;
+        text-align: center
+    }
+
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+        gap: 10px;
+        margin-top: 20px
+    }
+
+    .emoji-item {
+        text-align: center;
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 10px 5px
+    }
+
+    .emoji {
+        font-size: 1.8rem;
+        display: block;
+        margin-bottom: 5px
+    }
+
+    .emoji-count {
+        font-size: .85rem;
+        color: var(--c-brand);
+        font-weight: 700
+    }
+
+    .word-cloud {
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        text-align: center;
+        min-height: 200px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 8px
+    }
+
+    .word-item {
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: var(--c-bg-hover);
+        border: 1px solid var(--c-border);
+        color: var(--c-text);
+        font-weight: 500;
+        display: inline-block;
+        margin: 2px
+    }
+
+    .fun-facts-section,
+    .phrases-section,
+    .profanity-section {
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0
+    }
+
+    .phrase-category {
+        margin-bottom: 20px
+    }
+
+    .phrase-title {
+        font-weight: 700;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px
+    }
+
+    .phrase-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 10px
+    }
+
+    .phrase-item {
+        background: var(--c-bg-card);
+        padding: 10px;
+        border-radius: 4px;
+        font-style: italic;
+        border-left: 3px solid;
+        font-size: .9rem
+    }
+
+    .positive-phrase {
+        border-left-color: var(--c-positive)
+    }
+
+    .negative-phrase {
+        border-left-color: var(--c-negative)
+    }
+
+    .neutral-phrase {
+        border-left-color: var(--c-neutral)
+    }
+
+    .profanity-section {
+        background: var(--c-bg);
+        border-color: var(--c-negative)
+    }
+
+    .profanity-title {
+        color: var(--c-negative);
+        font-weight: 700;
+        margin-bottom: 15px;
+        font-size: 1.2rem
+    }
+
+    .profanity-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px
+    }
+
+    .profanity-table td,
+    .profanity-table th {
+        border: 1px solid var(--c-border);
+        padding: 8px;
+        text-align: left;
+        font-size: .9rem
+    }
+
+    .profanity-table th {
+        background: var(--c-bg-hover);
+        font-weight: 600
+    }
+
+    .response-matrix {
+        overflow-x: auto;
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px
+    }
+
+    .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 400px
+    }
+
+    .matrix-table td,
+    .matrix-table th {
+        padding: 10px; /* Reduced from 20px */
+        text-align: center;
+        border: 1px solid var(--c-border);
+        font-size: .9rem
+    }
+
+    .matrix-table th {
+        background: var(--c-brand);
+        color: var(--c-brand-text);
+        font-weight: 600
+    }
+
+    .heatmap-cell {
+        position: relative;
+        font-weight: 700;
+        color: var(--c-text);
+        transition: background-color .2s
+    }
+
+    .time-analysis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px
+    }
+
+    .time-card {
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        height: 350px;
+        /* --- 👇 THE FIX --- */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* This new rule targets the canvas */
+    .time-card canvas {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .sentiment-indicator {
+        display: inline-block;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        margin-right: 8px
+    }
+
+    .positive {
+        background: var(--c-positive)
+    }
+
+    .negative {
+        background: var(--c-negative)
+    }
+
+    .neutral {
+        background: var(--c-neutral)
+    }
+
+    .topic-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 20px
+    }
+
+    .topic-card {
+        background: var(--c-bg-card);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+        padding: 20px;
+        border-top: 3px solid var(--c-brand)
+    }
+
+    .topic-title {
+        font-weight: 700;
+        color: var(--c-text);
+        margin-bottom: 10px
+    }
+
+    .topic-words {
+        color: #555;
+        font-size: .9rem;
+        line-height: 1.4
+    }
+
+    .fun-fact-item {
+        padding: 12px;
+        background: var(--c-bg-card);
+        border: 1px solid var(--c-border);
+        border-radius: 4px;
+        margin-bottom: 10px
+    }
+
+    .fun-fact-title {
+        font-weight: 600;
+        color: var(--c-brand);
+        font-size: 1rem
+    }
+
+    .fun-fact-body {
+        font-size: .9rem;
+        color: #333;
+        margin-top: 4px
+    }
+
+    .fun-fact-quote {
+        font-style: italic;
+        padding-left: 10px;
+        border-left: 2px solid var(--c-border-active);
+        margin-top: 5px;
+        color: #555
+    }
+
+    @media (max-width:768px) {
+        .container {
+            padding: 10px;
+            margin: 5px;
+            border: none
+        }
+
+        body {
+            padding: 0;
+            font-size: 13px
+        }
+
+        .tabs {
+            flex-direction: column
+        }
+
+        .tab {
+            flex: none;
+            min-width: auto
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px
+        }
+
+        .stat-card {
+            padding: 15px
+        }
+
+        .stat-number {
+            font-size: 1.6rem
+        }
+
+        .chart-container {
+            height: 300px; /* Restored from 400px */
+            padding: 10px; /* Restored from 5px */
+        }
+
+        .time-card {
+            height: 300px
+        }
+
+        .user-list {
+            grid-template-columns: 1fr
+        }
+
+        .emoji-grid {
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 8px
+        }
+
+        .time-analysis {
+            grid-template-columns: 1fr
+        }
+    }
+</style>
+</head>
+<body>
+<div class=container>
+<h1>WhatsApp Chat Analyzer</h1>
+<div class=upload-area onclick='document.getElementById("fileInput").click()'>
+<input accept=.txt id=fileInput type=file>
+<div class=upload-text>📄 Click or drag to upload chat export</div>
+<div class=upload-subtitle>Supports .txt format (with or without media)</div>
+</div>
+<div class=loading>
+<div class=spinner></div>
+<div>Analyzing your chat... This may take a moment.</div>
+</div>
+<div class=results>
+<div class=tabs>
+<button class="tab active"onclick='showTab("overview")'>📊 Overview</button>
+<button class=tab onclick='showTab("engagement")'>💥 Engagement</button>
+<button class=tab onclick='showTab("response")'>⏱️ Response</button>
+<button class=tab onclick='showTab("content")'>💬 Content</button>
+<button class=tab onclick='showTab("activity")'>📈 Activity</button>
+<button class=tab onclick='showTab("sentiment")'>😊 Sentiment</button>
+<button class=tab onclick='showTab("profanity")'>🤬 Profanity</button>
+<button class=tab onclick='showTab("funfacts")'>✨ Fun Facts</button>
+</div>
+<div class="tab-content active"id=overview>
+<div class=stats-grid>
+<div class=stat-card><span class=stat-number id=totalMessages>0</span>
+<div class=stat-label>Total Messages</div>
+</div>
+<div class=stat-card><span class=stat-number id=totalUsers>0</span>
+<div class=stat-label>Participants</div>
+</div>
+<div class=stat-card><span class=stat-number id=avgPerDay>0</span>
+<div class=stat-label>Messages/Day</div>
+</div>
+<div class=stat-card><span class=stat-number id=mediaMessages>0</span>
+<div class=stat-label>Media Messages</div>
+</div>
+<div class=stat-card><span class=stat-number id=deletedMessages>0</span>
+<div class=stat-label>Deleted Messages</div>
+</div>
+<div class=stat-card><span class=stat-number id=totalLinks>0</span>
+<div class=stat-label>Links Shared</div>
+</div>
+<div class=stat-card><span class=stat-number id=totalWords>0</span>
+<div class=stat-label>Total Words</div>
+</div>
+<div class=stat-card><span class=stat-number id=avgMsgLength>0</span>
+<div class=stat-label>Avg Msg Length (chars)</div>
+</div>
+<div class=stat-card><span class=stat-number id=longestSilence>0</span>
+<div class=stat-label>Longest Silence (hrs)</div>
+</div>
+<div class=stat-card><span class=stat-number id=hypeMeter>0</span>
+<div class=stat-label>Busiest Minute (Msgs)</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=chatVibe>-</span>
+<div class=stat-label>Chat Vibe</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=mostActiveDay>-</span>
+<div class=stat-label>Most Active Day</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=mostActiveHour>-</span>
+<div class=stat-label>Most Active Hour</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=chatDateRange>-</span>
+<div class=stat-label>Chat Duration (Days)</div>
+</div>
+</div>
+<div class=chart-container>
+<div class=chart-title>Message Timeline</div><canvas id=timelineChart></canvas>
+</div>
+<div class=fun-facts-section>
+<div class=fun-fact-item>
+<div class=fun-fact-title>First Message</div>
+<div class=fun-fact-body id=firstMessage>-</div>
+</div>
+<div class=fun-fact-item>
+<div class=fun-fact-title>Last Message</div>
+<div class=fun-fact-body id=lastMessage>-</div>
+</div>
+</div>
+</div>
+<div class=tab-content id=engagement>
+<div class=stats-grid>
+<div class=stat-card><span class=stat-number id=mostActiveUser>-</span>
+<div class=stat-label>Most Active User</div>
+</div>
+<div class=stat-card><span class=stat-number id=mostMediaUser>-</span>
+<div class=stat-label>Most Media Sent</div>
+</div>
+<div class=stat-card><span class=stat-number id=mostWordsUser>-</span>
+<div class=stat-label>Most Words Written</div>
+</div>
+<div class=stat-card><span class=stat-number id=questionAsker>-</span>
+<div class=stat-label>Top Question Asker</div>
+</div>
+</div>
+<div class=chart-container>
+<div class=chart-title>User Message Distribution</div><canvas id=userChart></canvas>
+</div>
+<div class=user-list id=userList></div>
+</div>
+<div class=tab-content id=response>
+<div class=stats-grid>
+<div class=stat-card><span class=stat-number id=avgResponseTime>0</span>
+<div class=stat-label>Avg Response (min)</div>
+</div>
+<div class=stat-card><span class=stat-number id=fastestUser>-</span>
+<div class=stat-label>Fastest Responder</div>
+</div>
+<div class=stat-card><span class=stat-number id=slowestUser>-</span>
+<div class=stat-label>Slowest Responder</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=firstResponder>-</span>
+<div class=stat-label>Top Conversation Starter</div>
+</div>
+</div>
+<div class=time-analysis>
+<div class=time-card>
+<div class=chart-title>Response Time by Hour</div><canvas id=hourlyResponseChart></canvas>
+</div>
+<div class=time-card>
+<div class=chart-title>Response Time by Day</div><canvas id=dailyResponseChart></canvas>
+</div>
+</div>
+<div class=chart-container>
+<div class=chart-title>Avg. Response Time by User (minutes)</div><canvas id=responseChart></canvas>
+</div>
+<div class="chart-container auto-height response-matrix"style=overflow-x:auto>
+<div class=chart-title>Who Replies to Whom? (Dyad Matrix)</div>
+<div class=upload-subtitle style=text-align:center;margin-top:-10px;margin-bottom:20px>Read as: [Row] sent a message, and [Column] replied.</div>
+<div id=dyadMatrixContainer></div>
+</div>
+</div>
+<div class=tab-content id=content>
+<div class=stats-grid>
+<div class=stat-card><span class=stat-number id=totalQuestions>0</span>
+<div class=stat-label>Total Questions</div>
+</div>
+<div class=stat-card><span class=stat-number id=uniqueWords>0</span>
+<div class=stat-label>Unique Words</div>
+</div>
+<div class=stat-card><span class=stat-number id=mostEmojisUser>-</span>
+<div class=stat-label>Top Emoji User</div>
+</div>
+<div class=stat-card><span class=stat-number id=mostUsedEmoji>-</span>
+<div class=stat-label>Most Used Emoji</div>
+</div>
+</div>
+<div class="chart-container auto-height">
+<div class=chart-title>Most Used Emojis</div>
+<div class=emoji-grid id=emojiGrid></div>
+</div>
+<div class="chart-container auto-height">
+<div class=chart-title>Word Cloud</div>
+<div class=word-cloud id=wordCloud></div>
+</div>
+</div>
+<div class=tab-content id=activity>
+<div class=chart-container>
+<div class=chart-title>Activity Heatmap (Day vs. Hour)</div><canvas id=heatmapChart></canvas>
+</div>
+<div class=chart-container>
+<div class=chart-title>Activity by Hour of Day</div><canvas id=hourlyChart></canvas>
+</div>
+<div class=chart-container>
+<div class=chart-title>Activity by Day of Week</div><canvas id=dailyChart></canvas>
+</div>
+</div>
+<div class=tab-content id=sentiment>
+<div class=stats-grid>
+<div class=stat-card><span class=stat-number id=overallSentiment>Neutral</span>
+<div class=stat-label>Overall Sentiment</div>
+</div>
+<div class=stat-card><span class=stat-number id=positivePercent>0%</span>
+<div class=stat-label>Positive Messages</div>
+</div>
+<div class=stat-card><span class=stat-number id=negativePercent>0%</span>
+<div class=stat-label>Negative Messages</div>
+</div>
+<div class="stat-card highlight-card"><span class=stat-number id=mostPositiveUser>-</span>
+<div class=stat-label>Most Positive User</div>
+</div>
+</div>
+<div class=chart-container>
+<div class=chart-title>Sentiment Over Time (Last 60 Days)</div><canvas id=sentimentChart></canvas>
+</div>
+<div class=chart-container>
+<div class=chart-title>Sentiment by User</div><canvas id=userSentimentChart></canvas>
+</div>
+<div class=phrases-section>
+<div class=phrase-category>
+<div class=phrase-title><span class="sentiment-indicator positive"></span> Positive Phrases</div>
+<div class=phrase-list id=positivePhrases></div>
+</div>
+<div class=phrase-category>
+<div class=phrase-title><span class="sentiment-indicator negative"></span> Negative Phrases</div>
+<div class=phrase-list id=negativePhrases></div>
+</div>
+</div>
+</div>
+<div class=tab-content id=profanity>
+<div class=profanity-section>
+<div class=profanity-title>⚠️ Profanity Analysis</div>
+<div id=profanityInfo>Loading profanity list...</div>
+<div class=chart-container id=profanityChartContainer style=display:none>
+<div class=chart-title>Profanity by User</div><canvas id=profanityChart></canvas>
+</div>
+<div id=profanityList style=margin-top:20px></div>
+</div>
+</div>
+<div class=tab-content id=funfacts>
+<div class=fun-facts-section>
+<div class=chart-title>✨ Fun Facts</div>
+<div id=funFactsList></div>
+</div>
+</div>
+</div>
+</div>
+<script>let chatData={},charts={},profanitySet=new Set;window.chatAnalyzerUtils={stopWords:new Set(["the","a","an","and","or","but","in","on","at","to","for","of","with","by","i","you","he","she","it","we","they","me","him","her","us","them","my","your","his","her","its","our","their","this","that","these","those","am","is","are","was","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","must","can","cant","cannot","wont","wouldnt","couldnt","shouldnt","dont","doesnt","didnt","isnt","arent","wasnt","werent","hasnt","havent","hadnt","im","ive","id","youre","youve","youd","hes","hes","shes","shed","itll","its","weve","weve","wed","theyre","theyve","theyd","what","which","who","whom","whose","where","when","why","how","so","just","not","no","yes","yeah","ok","okay","like","get","got","go","gonna","wanna","lol","omg","tho","though","also","then","now","all","one","very","up","out","if","about","some","from","as"]),laughter_list:["lol","lmao","haha","rofl","lmfao","😂","🤣","😆"],agree_list:["yes","yep","ya","i agree","exactly","true","correct","definitely","absolutely","👍"],disagree_list:["no","nope","nah","but","actually","i disagree","not really","wrong","👎"],positiveWords:["happy","good","great","awesome","love","like","best","amazing","wonderful","excellent","perfect","thanks","thank","haha","nice","cool","fun","yes","beautiful","congratulations","yay","hooray","excited"],negativeWords:["sad","bad","terrible","hate","worst","awful","horrible","angry","mad","no","never","stupid","dumb","sick","tired","annoying","boring","sucks","damn","shit","cry","upset","problem","fail","sorry"],positiveEmojis:{"😊":2,"😀":2,"😃":2,"😄":3,"😆":3,"😂":4,"🤣":4,"😍":4,"🥰":4,"😘":3,"🤗":3,"🤩":4,"😎":3,"👍":2,"👌":2,"🙌":3,"👏":3,"❤️":4,"💕":4,"💖":4,"💘":4,"💝":3,"🎉":3,"🔥":3,"✨":2,"🥳":3},negativeEmojis:{"😢":-3,"😭":-4,"😞":-2,"😔":-2,"😟":-2,"😕":-2,"🙁":-2,"😩":-3,"😫":-3,"😤":-2,"😠":-3,"😡":-4,"🤬":-4,"😰":-3,"😨":-3,"😱":-3,"😖":-2,"😣":-2,"💔":-4,"👎":-2,"😒":-2,"🙄":-2,"😬":-2,"🤢":-3},emojiRegex:/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,getSentimentScore:function(e){const t=e.toLowerCase();let n=0;return this.positiveWords.forEach((e=>{t.includes(e)&&(n+=1)})),this.negativeWords.forEach((e=>{t.includes(e)&&(n-=1.5)})),(e.match(this.emojiRegex)||[]).forEach((e=>{this.positiveEmojis[e]&&(n+=this.positiveEmojis[e]),this.negativeEmojis[e]&&(n+=this.negativeEmojis[e])})),n>5&&(n=5),n<-5&&(n=-5),0===n?0:n/5},getSentimentCategory:function(e){return e>.2?"positive":e<-.2?"negative":"neutral"}};const fileInput=document.getElementById("fileInput"),uploadArea=document.querySelector(".upload-area"),loading=document.querySelector(".loading"),results=document.querySelector(".results");function handleFile(e){if(!e.name.endsWith(".txt"))return void alert("Please select a .txt file");loading.style.display="block",results.style.display="none",Object.values(charts).forEach((e=>e.destroy())),charts={};const t=new FileReader;t.onload=async e=>{const t=e.target.result;setTimeout((async()=>{try{await analyzeChat(t),window.dispatchEvent(new CustomEvent("analysisComplete")),loading.style.display="none",results.style.display="block",showTab("overview")}catch(e){console.error("Analysis failed:",e),alert("Error analyzing chat: "+e.message),loading.style.display="none"}}),100)},t.readAsText(e)}function parseWhatsAppChat(e){const t=e.split("\n").filter((e=>e.trim())),n=[],s=[/^(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2})\s*([ap]m)?\s*-\s*([^:]+):\s*(.*)$/i,/^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}:\d{2})\s*([ap]m)?\]\s*([^:]+):\s*(.*)$/i,/^(\d{1,2}\.\d{1,2}\.\d{2,4}),?\s+(\d{1,2}:\d{2}:\d{2})\s*([ap]m)?\s*-\s*([^:]+):\s*(.*)$/i];let a=null,o=null;for(let e of t){let t=!1;for(let r of s){const s=e.match(r);if(s){a&&n.push(a);let[,e,r,i,d,l]=s;const c=e.split(/[\/\.]/);let g,h,u;2===c[2].length&&(c[2]="20"+c[2]),u=parseInt(c[2]),o||(o=parseInt(c[0])>12?"DMY":parseInt(c[1])>12?"MDY":"DMY"),"MDY"===o?(h=parseInt(c[0])-1,g=parseInt(c[1])):(g=parseInt(c[0]),h=parseInt(c[1])-1);let[m,p,y]=r.split(":").map(Number);isNaN(y)&&(y=0),i&&(i=i.toLowerCase(),"pm"===i&&12!==m?m+=12:"am"===i&&12===m&&(m=0));const v=new Date(u,h,g,m,p,y);if(d.includes("created group")||d.includes("added")||d.includes("changed")||d.includes("left")||d.includes("removed")||d.includes("Messages and calls are end-to-end encrypted"))a={date:v,sender:"System",text:`${d}: ${l}`.trim(),isMedia:!1,isSystem:!0};else{const e=l.trim();a={date:v,sender:d.trim(),text:e,isMedia:"<Media omitted>"===e||e.includes("image omitted")||e.includes("video omitted")||e.includes("audio omitted")||e.includes("sticker omitted")||e.includes("GIF omitted"),isSystem:!1,isDeleted:"You deleted this message"===e||"This message was deleted"===e}}t=!0;break}}t||!a||a.isSystem||(a.text+="\n"+e.trim())}if(a&&n.push(a),n.length>0){const e=n[0].date;"DMY"===o&&e.getMonth()+1>12&&console.warn("Date parsing ambiguity detected. Re-check logic.")}return n.filter((e=>!e.isSystem))}async function analyzeChat(e){const t=parseWhatsAppChat(e);if(0===t.length)throw new Error("No messages found. Please check the file format. Make sure it's a valid WhatsApp .txt export.");chatData={messages:t,users:[...new Set(t.map((e=>e.sender)))].sort(),startDate:new Date(Math.min(...t.map((e=>e.date)))),endDate:new Date(Math.max(...t.map((e=>e.date))))};const n=updateEngagement();updateOverview(),updateResponseTime(n),updateContent(),updateActivity(),updateSentiment(),updateFunFacts(n),runAdvancedVisuals(),
+    runUserDeepDive(),await updateProfanity(),document.getElementById("userList").innerHTML=chatData.users.sort(((e,t)=>n[t].messages-n[e].messages)).map((e=>`\n                    <div class="user-card">\n                        <div class="user-name">${e}</div>\n                        <div class="user-stats">\n                            <div><strong>Messages:</strong> ${n[e].messages.toLocaleString()}</div>\n                            <div><strong>Media:</strong> ${n[e].mediaMessages.toLocaleString()}</div>\n                            <div><strong>Words:</strong> ${n[e].words.toLocaleString()}</div>\n                            <div><strong>Avg Words:</strong> ${n[e].avgWordsPerMessage}</div>\n                            <div><strong>Links:</strong> ${n[e].links.toLocaleString()}</div>\n                            <div><strong>Questions:</strong> ${n[e].questions.toLocaleString()}</div>\n                            <div><strong>ALL CAPS:</strong> ${n[e].capsPercent}%</div>\n                            <div><strong>One-Word:</strong> ${n[e].oneWordPercent}%</div>\n                            <div><strong>Laughter Msgs:</strong> ${n[e].laughterScore.toLocaleString()}</div>\n                            <div><strong>Answers Given:</strong> ${n[e].answererScore?.toLocaleString()||0}</div>\n                            <div><strong>Comedian Score:</strong> ${n[e].comedianScore?.toLocaleString()||0}</div>\n                            <div><strong>Convo. Enders:</strong> ${n[e].enderScore?.toLocaleString()||0}</div>\n                        </div>\n                    </div>\n                `)).join(""),document.getElementById("longestSilence").textContent=chatData.longestSilence?chatData.longestSilence.toFixed(1):"0",document.getElementById("hypeMeter").textContent=chatData.hypeMeter?chatData.hypeMeter.toLocaleString():"0"}function updateOverview(){const{messages:e,users:t,startDate:n,endDate:s}=chatData,a=Math.max(1,Math.ceil((s-n)/864e5)),o=e.filter((e=>e.isMedia)).length,r=e.filter((e=>e.isDeleted)).length,i=e.filter((e=>!e.isMedia&&!e.isDeleted));let d=0,l=0,c=0;const g=/(?:https?|ftp):\/\/[\n\S]+/gi;i.forEach((e=>{d+=e.text.split(/\s+/).filter(Boolean).length,l+=e.text.length;const t=e.text.match(g);t&&(c+=t.length)}));const h=i.length>0?(l/i.length).toFixed(0):0,u=new Array(24).fill(0),m=new Array(7).fill(0);e.forEach((e=>{u[e.date.getHours()]++,m[e.date.getDay()]++}));const p=u.indexOf(Math.max(...u)),y=`${p}:00 - ${p+1}:00`,v=`${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][m.indexOf(Math.max(...m))]}`;let f="Balanced";const b=u.slice(0,6).reduce(((e,t)=>e+t),0),w=u.slice(8,18).reduce(((e,t)=>e+t),0);b/e.length>.25?f="🦉 Night Owls":w/e.length>.6?f="☀️ Early Birds":(p>=20||p<=2)&&(f="🌙 Evening Chatters");const x=e[0],S=e[e.length-1];document.getElementById("totalMessages").textContent=e.length.toLocaleString(),document.getElementById("totalUsers").textContent=t.length,document.getElementById("avgPerDay").textContent=(e.length/a).toFixed(1),document.getElementById("mediaMessages").textContent=o.toLocaleString(),document.getElementById("deletedMessages").textContent=r.toLocaleString(),document.getElementById("totalLinks").textContent=c.toLocaleString(),document.getElementById("totalWords").textContent=d.toLocaleString(),document.getElementById("avgMsgLength").textContent=h,document.getElementById("chatVibe").textContent=f,document.getElementById("mostActiveHour").textContent=y,document.getElementById("mostActiveDay").textContent=v,document.getElementById("chatDateRange").textContent=a.toLocaleString();const C=e=>`${e.toLocaleDateString()} ${e.toLocaleTimeString()}`;document.getElementById("firstMessage").innerHTML=`<strong>${x.sender}</strong> (${C(x.date)}): <em>"${x.text.substring(0,100)}..."</em>`,document.getElementById("lastMessage").innerHTML=`<strong>${S.sender}</strong> (${C(S.date)}): <em>"${S.text.substring(0,100)}..."</em>`;const E={};e.forEach((e=>{const t=e.date.toISOString().split("T")[0];E[t]=(E[t]||0)+1}));const $=Object.keys(E).sort(((e,t)=>new Date(e)-new Date(t)));charts.timeline&&charts.timeline.destroy();const M=document.getElementById("timelineChart").getContext("2d");charts.timeline=new Chart(M,{type:"line",data:{labels:$.map((e=>new Date(e).toLocaleDateString())),datasets:[{label:"Messages per Day",data:$.map((e=>E[e])),borderColor:"var(--c-brand)",backgroundColor:"rgba(51, 51, 51, 0.1)",tension:.1,fill:!0,pointRadius:0}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}})}function updateEngagement(){const{messages:e,users:t}=chatData,n={},s=/(?:https?|ftp):\/\/[\n\S]+/gi,a=/\?+/g,o=window.chatAnalyzerUtils.emojiRegex;t.forEach((t=>{const r=e.filter((e=>e.sender===t)),i={messages:r.length,textMessages:0,mediaMessages:0,words:0,links:0,questions:0,emojis:0,capsShoutCount:0,oneWordCount:0,laughterScore:0,workMsgs:0,socialMsgs:0,agreeScore:0,disagreeScore:0,wakeTimes:[],sleepTimes:[],answererScore:0,comedianScore:0,enderScore:0,initiatorScore:0,ignoredScore:0,replyTimes:[]},d={};r.forEach((e=>{const t=e.date.getDay(),n=e.date.getHours();t>=1&&t<=5&&n>=9&&n<17?i.workMsgs++:i.socialMsgs++;const r=e.date.toISOString().split("T")[0],l=60*n+e.date.getMinutes();if(d[r]?d[r].last=l:d[r]={first:l,last:l},e.isMedia)i.mediaMessages++;else if(!e.isDeleted){i.textMessages++;const t=e.text,n=t.toLowerCase(),r=t.split(/\s+/).filter(Boolean);i.words+=r.length,i.links+=(t.match(s)||[]).length,i.questions+=(t.match(a)||[]).length,i.emojis+=(t.match(o)||[]).length,t.length>5&&t===t.toUpperCase()&&!/^\d+$/.test(t)&&i.capsShoutCount++,1===r.length&&i.oneWordCount++,window.chatAnalyzerUtils.laughter_list.some((e=>n.includes(e)))&&i.laughterScore++,window.chatAnalyzerUtils.agree_list.some((e=>n.startsWith(e)))?i.agreeScore++:window.chatAnalyzerUtils.disagree_list.some((e=>n.startsWith(e)))&&i.disagreeScore++}})),i.wakeTimes=Object.values(d).map((e=>e.first)),i.sleepTimes=Object.values(d).map((e=>e.last));const l=i.wakeTimes.length>0?i.wakeTimes.reduce(((e,t)=>e+t),0)/i.wakeTimes.length:0,c=i.sleepTimes.length>0?i.sleepTimes.reduce(((e,t)=>e+t),0)/i.sleepTimes.length:0,g=e=>{const t=Math.floor(e/60),n=Math.floor(e%60);return`${t.toString().padStart(2,"0")}:${n.toString().padStart(2,"0")}`};i.avgWakeTimeStr=g(l),i.avgSleepTimeStr=g(c),i.avgWordsPerMessage=i.textMessages>0?(i.words/i.textMessages).toFixed(1):0,i.capsPercent=i.textMessages>0?(i.capsShoutCount/i.textMessages*100).toFixed(1):0,i.oneWordPercent=i.textMessages>0?(i.oneWordCount/i.textMessages*100).toFixed(1):0,i.workSocialRatio=i.socialMsgs>0?(i.workMsgs/i.socialMsgs).toFixed(2):"N/A",n[t]=i}));const r=t.reduce(((e,t)=>n[e].messages>n[t].messages?e:t)),i=t.reduce(((e,t)=>n[e].mediaMessages>n[t].mediaMessages?e:t)),d=t.reduce(((e,t)=>n[e].words>n[t].words?e:t)),l=t.reduce(((e,t)=>n[e].questions>n[t].questions?e:t));document.getElementById("mostActiveUser").textContent=r,document.getElementById("mostMediaUser").textContent=i,document.getElementById("mostWordsUser").textContent=d,document.getElementById("questionAsker").textContent=l,charts.user&&charts.user.destroy();const c=document.getElementById("userChart").getContext("2d");return charts.user=new Chart(c,{type:"doughnut",data:{labels:t,datasets:[{data:t.map((e=>n[e].messages)),backgroundColor:t.map(((e,n)=>`hsl(${180*n/t.length}, 20%, ${60+n%2*10}%)`)),borderWidth:2,borderColor:"var(--c-bg)"}]},options:{responsive:!0,maintainAspectRatio:!1,plugins:{legend:{position:"bottom",labels:{padding:15,usePointStyle:!0}}}}}),document.getElementById("userList").innerHTML="<div>Calculating advanced stats...</div>",chatData.userStats=n,n}function updateResponseTime(e){const{messages:t,users:n}=chatData,s=[],a={},o={},r=new Array(24).fill(0).map((()=>[])),i=new Array(7).fill(0).map((()=>[]));n.forEach((e=>{a[e]=[],o[e]=0}));let d=0;const l={};n.forEach((e=>{l[e]={},n.forEach((t=>l[e][t]=0))}));for(let n=0;n<t.length;n++)(0===n||t[n].date-t[n-1].date>36e5)&&(o[t[n].sender]++,n>0&&e[t[n].sender].initiatorScore++);for(let n=1;n<t.length;n++){const o=t[n],c=t[n-1],g=o.date-c.date,h=g/6e4;if(g>d&&(d=g),g>216e5&&e[c.sender].enderScore++,o.sender!==c.sender){l[c.sender][o.sender]++,e[c.sender].replyTimes.push(h);const d=o.text.toLowerCase();if(window.chatAnalyzerUtils.laughter_list.some((e=>d.includes(e)))&&e[c.sender].comedianScore++,c.text.includes("?")&&e[o.sender].answererScore++,n<t.length-2){const s=t[n+1],a=t[n+2];o.sender!==s.sender&&s.sender!==a.sender&&s.sender!==o.sender&&(s.date-o.date)/6e4>10&&e[o.sender].ignoredScore++}h<1440&&(s.push(h),a[o.sender].push(h),r[o.date.getHours()].push(h),i[o.date.getDay()].push(h))}}chatData.longestSilence=d/36e5,chatData.dyadMatrix=l;const c=s.length>0?(s.reduce(((e,t)=>e+t),0)/s.length).toFixed(1):0,g={};n.forEach((e=>{const t=a[e];g[e]=t.length>0?t.reduce(((e,t)=>e+t),0)/t.length:0}));const h=n.filter((e=>g[e]>0)).sort(((e,t)=>g[e]-g[t])),u=Object.entries(o).sort(((e,t)=>t[1]-e[1]))[0];document.getElementById("avgResponseTime").textContent=c,document.getElementById("fastestUser").textContent=h.length>0?`${h[0]} (${g[h[0]].toFixed(1)}m)`:"-",document.getElementById("slowestUser").textContent=h.length>0?`${h[h.length-1]} (${g[h[h.length-1]].toFixed(1)}m)`:"-",document.getElementById("firstResponder").textContent=u?`${u[0]} (${u[1]} times)`:"-";const m=r.map((e=>e.length>0?e.reduce(((e,t)=>e+t),0)/e.length:0));charts.hourlyResponse&&charts.hourlyResponse.destroy();const p=document.getElementById("hourlyResponseChart").getContext("2d");charts.hourlyResponse=new Chart(p,{type:"line",data:{labels:Array.from({length:24},((e,t)=>`${t}:00`)),datasets:[{label:"Avg Response Time (min)",data:m,borderColor:"var(--c-brand)",backgroundColor:"rgba(51, 51, 51, 0.1)",tension:.1,fill:!0}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}});const y=i.map((e=>e.length>0?e.reduce(((e,t)=>e+t),0)/e.length:0));charts.dailyResponse&&charts.dailyResponse.destroy();const v=document.getElementById("dailyResponseChart").getContext("2d");charts.dailyResponse=new Chart(v,{type:"bar",data:{labels:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],datasets:[{label:"Avg Response Time (min)",data:y,backgroundColor:"rgba(51, 51, 51, 0.7)",borderColor:"var(--c-brand)",borderWidth:1}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}}),charts.response&&charts.response.destroy();const f=document.getElementById("responseChart").getContext("2d");charts.response=new Chart(f,{type:"bar",data:{labels:h,datasets:[{label:"Avg Response Time (minutes)",data:h.map((e=>g[e].toFixed(1))),backgroundColor:"rgba(51, 51, 51, 0.7)",borderColor:"var(--c-brand)",borderWidth:1}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}});let b=' <table class="matrix-table"> <thead> <tr> <th> Replied To &rarr; <br /> Replied By &darr; </th>';n.forEach((e=>b+=` <th> ${e.substring(0,10)} </th>`)),b+=" <th> Total Replies </th> </tr> </thead> <tbody> ",n.forEach((e=>{b+=` <tr> <th> ${e.substring(0,10)} </th>`;let t=0;n.forEach((n=>{const s=l[n][e];if(t+=s,e===n)b+=' <td style="background: var(--c-border);"> - </td>';else{const t=l[n][e]+l[e][n];let a=.5;t>0&&(a=l[n][e]/t);const o=a>.6?"var(--c-negative)":a<.4?"var(--c-positive)":"var(--c-neutral)",r=`${n} initiated ${l[n][e]} times.\n${e} initiated ${l[e][n]} times.\nRatio (${n} / total): ${a.toFixed(2)}`;b+=`\n\t\t\t<td class="heatmap-cell" style="background-color: ${o}55;" title="${r}">\n                            ${s}\n                        </td>`}})),b+=`\n\t\t\t<td>\n\t\t\t\t<strong>${t}</strong>\n\t\t\t</td>`,b+=" </tr>"})),b+=" </tbody> </table>";const w=document.getElementById("dyadMatrixContainer");w&&(w.innerHTML=b)}function updateContent(){const{messages:e}=chatData,t=e.filter((e=>!e.isMedia&&!e.isDeleted)),n=window.chatAnalyzerUtils.emojiRegex,s={},a={};chatData.users.forEach((e=>a[e]=0)),t.forEach((e=>{const t=e.text.match(n);t&&t.forEach((t=>{s[t]=(s[t]||0)+1,a[e.sender]=(a[e.sender]||0)+1}))}));const o=Object.entries(s).sort(((e,t)=>t[1]-e[1])).slice(0,30),r=Object.entries(a).sort(((e,t)=>t[1]-e[1]))[0];document.getElementById("mostEmojisUser").textContent=r?r[0]:"-",document.getElementById("mostUsedEmoji").textContent=o.length>0?`${o[0][0]} (${o[0][1]})`:"-",document.getElementById("emojiGrid").innerHTML=o.map((([e,t])=>`\n<div class="emoji-item">\n\t<span class="emoji">${e}</span>\n\t<div class="emoji-count">${t}</div>\n</div>\n            `)).join("");const i={},d=new Set;let l=0;const c=/\?+/g;t.forEach((e=>{e.text.includes("?")&&(l+=(e.text.match(c)||[]).length),e.text.toLowerCase().replace(/[^\w\s]|_|\d/g," ").split(/\s+/).filter((e=>e.length>2&&!window.chatAnalyzerUtils.stopWords.has(e)&&!n.test(e))).forEach((e=>{i[e]=(i[e]||0)+1,d.add(e)}))})),document.getElementById("totalQuestions").textContent=l.toLocaleString(),document.getElementById("uniqueWords").textContent=d.size.toLocaleString();const g=Object.entries(i).sort(((e,t)=>t[1]-e[1])).slice(0,50),h=g.length>0?g[0][1]:1;document.getElementById("wordCloud").innerHTML=g.map((([e,t])=>`<span class="word-item" style="font-size: ${Math.max(.8,Math.min(2.5,t/h*2.5))}rem; opacity: ${Math.max(.4,t/h)}">${e}</span>`)).join("")}function updateActivity(){const{messages:e}=chatData;let t=0;const n=e.map((e=>e.date.getTime()));for(let e=0;e<n.length;e++){let s=e;for(;s<n.length&&n[s]-n[e]<=6e4;)s++;const a=s-e;a>t&&(t=a)}chatData.hypeMeter=t;const s=[],a=Array(7).fill(0).map((()=>Array(24).fill(0)));let o=0;e.forEach((e=>{const t=e.date.getDay(),n=e.date.getHours(),s=++a[t][n];s>o&&(o=s)})),a.forEach(((e,t)=>{e.forEach(((e,n)=>{e>0&&s.push({x:n,y:t,v:e})}))}));const r=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],i=Array.from({length:24},((e,t)=>`${t}:00`));charts.heatmap&&charts.heatmap.destroy();const d=document.getElementById("heatmapChart").getContext("2d");charts.heatmap=new Chart(d,{type:"bubble",data:{datasets:[{label:"Messages",data:s.map((e=>({x:e.x,y:e.y,r:e.v/o*10}))),backgroundColor:"rgba(51, 51, 51, 0.6)"}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{ticks:{callback:e=>r[e]},min:-.5,max:6.5,grid:{color:"var(--c-border)"}},x:{ticks:{callback:e=>e%2==0?i[e]:""},min:-.5,max:23.5,grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1},tooltip:{callbacks:{label:e=>{const t=s[e.dataIndex];return` ${r[t.y]}, ${i[t.x]}: ${t.v} msgs`}}}}}});const l=a.reduce(((e,t)=>(t.forEach(((t,n)=>e[n]+=t)),e)),new Array(24).fill(0));charts.hourly&&charts.hourly.destroy();const c=document.getElementById("hourlyChart").getContext("2d");charts.hourly=new Chart(c,{type:"bar",data:{labels:i,datasets:[{label:"Messages",data:l,backgroundColor:"rgba(51, 51, 51, 0.7)"}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}});const g=a.map((e=>e.reduce(((e,t)=>e+t),0)));charts.daily&&charts.daily.destroy();const h=document.getElementById("dailyChart").getContext("2d");charts.daily=new Chart(h,{type:"bar",data:{labels:r,datasets:[{label:"Messages",data:g,backgroundColor:"rgba(51, 51, 51, 0.7)"}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}})}function updateSentiment(){const{messages:e,users:t}=chatData,n=e.filter((e=>!e.isMedia&&!e.isDeleted)),s={positive:[],negative:[]},a={};t.forEach((e=>{a[e]={positive:0,negative:0,neutral:0}}));const o=n.map((e=>{const t=window.chatAnalyzerUtils.getSentimentScore(e.text),n=window.chatAnalyzerUtils.getSentimentCategory(t);return e.text.length>15&&e.text.length<150&&("positive"===n&&s.positive.length<6?s.positive.push({text:e.text,user:e.sender}):"negative"===n&&s.negative.length<6&&s.negative.push({text:e.text,user:e.sender})),a[e.sender][n]++,{...e,sentiment:n,score:t}})),r=o.filter((e=>"positive"===e.sentiment)).length,i=o.filter((e=>"negative"===e.sentiment)).length,d=o.length,l=r>1.1*i?"Positive":i>1.1*r?"Negative":"Neutral";document.getElementById("overallSentiment").textContent=l,document.getElementById("positivePercent").textContent=(r/d*100).toFixed(1)+"%",document.getElementById("negativePercent").textContent=(i/d*100).toFixed(1)+"%";const c=t.reduce(((e,t)=>a[e].positive>a[t].positive?e:t));document.getElementById("mostPositiveUser").textContent=c,document.getElementById("positivePhrases").innerHTML=s.positive.map((e=>`\n\t\t\t\t\t<div class="phrase-item positive-phrase">"${e.text}" \n\t\t\t\t\t\t<small>- ${e.user}</small>\n\t\t\t\t\t</div>`)).join(""),document.getElementById("negativePhrases").innerHTML=s.negative.map((e=>`\n\t\t\t\t\t<div class="phrase-item negative-phrase">"${e.text}" \n\t\t\t\t\t\t<small>- ${e.user}</small>\n\t\t\t\t\t</div>`)).join("");const g={},h=new Date((new Date).setDate((new Date).getDate()-60));o.filter((e=>e.date>h)).forEach((e=>{const t=e.date.toISOString().split("T")[0];g[t]||(g[t]={positive:0,negative:0,neutral:0,total:0}),g[t][e.sentiment]++,g[t].total++}));const u=Object.keys(g).sort(((e,t)=>new Date(e)-new Date(t)));charts.sentiment&&charts.sentiment.destroy();const m=document.getElementById("sentimentChart").getContext("2d");charts.sentiment=new Chart(m,{type:"line",data:{labels:u.map((e=>new Date(e).toLocaleDateString())),datasets:[{label:"Positive %",data:u.map((e=>g[e].positive/g[e].total*100)),borderColor:"var(--c-positive)",tension:.2},{label:"Negative %",data:u.map((e=>g[e].negative/g[e].total*100)),borderColor:"var(--c-negative)",tension:.2}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"},max:100},x:{grid:{color:"var(--c-border)"}}}}}),charts.userSentiment&&charts.userSentiment.destroy();const p=document.getElementById("userSentimentChart").getContext("2d");charts.userSentiment=new Chart(p,{type:"bar",data:{labels:t,datasets:[{label:"Positive",data:t.map((e=>a[e].positive)),backgroundColor:"var(--c-positive)"},{label:"Negative",data:t.map((e=>a[e].negative)),backgroundColor:"var(--c-negative)"},{label:"Neutral",data:t.map((e=>a[e].neutral)),backgroundColor:"var(--c-neutral)"}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{x:{stacked:!0,grid:{color:"var(--c-border)"}},y:{stacked:!0,beginAtZero:!0,grid:{color:"var(--c-border)"}}}}})}async function updateProfanity(){const{messages:e,users:t}=chatData,n=document.getElementById("profanityInfo"),s=document.getElementById("profanityList"),a=document.getElementById("profanityChartContainer");n.textContent="Fetching profanity list from GitHub...",s.innerHTML="",a.style.display="none";try{const e=await fetch("https://raw.githubusercontent.com/surge-ai/profanity-filter/main/profanity_en.json");if(!e.ok)throw new Error(`HTTP error! status: ${e.status}`);const t=await e.json();profanitySet=new Set(t),n.textContent=`Analyzed chat against a list of ${profanitySet.size} words.`}catch(e){console.error("Failed to fetch profanity list:",e),n.textContent="Error: Could not fetch profanity list. Analysis may be incomplete.",profanitySet=new Set([
+  
+  "cuntlicking",
+"why",
+    "fuck",
+    "shit",
+    "damn",
+    "hell",
+    "ass",
+    "bitch",
+    "bastard",
+    "crap",
+    "piss",
+    "cock",
+    "cunt",
+    "tits",
+    "fuck off",
+    "bullshit",
+    "asshole",
+    "motherfucker",
+    "son of a bitch",
+    "goddamn",
+    "pissed off",
+    "dickhead",
+    "wanker",
+    "bollocks",
+    "twat",
+    "bugger",
+    "prick",
+    "arse",
+    "shite",
+    "fucker",
+    "douchebag",
+    "cocksucker",
+    "jackass",
+    "dick",
+    "pussy",
+    "balls",
+    "knob",
+    "tosser",
+    "sod off",
+    "what the fuck",
+    "holy shit",
+    "fuck you",
+    "piece of shit",
+    "go to hell",
+    "asswipe",
+    "shithead",
+    "fuckwit",
+    "dumbass",
+    "bellend",
+    "cuntface",
+    "shitbag",
+    "wankstain"
+  
+
+
+  
+]
+)}const o=e.filter((e=>!e.isMedia&&!e.isDeleted)),r={},i={},d=[];if(t.forEach((e=>r[e]=0)),o.forEach((e=>{e.text.toLowerCase().replace(/[^\w\s]/g,"").split(/\s+/).forEach((t=>{profanitySet.has(t)&&(r[e.sender]++,i[t]=(i[t]||0)+1,d.push({user:e.sender,word:t,text:e.text}))}))})),0===d.length)return void(n.textContent+=" No profanity found. What a polite chat!");const l={};d.forEach((e=>{const t=`${e.user} - ${e.word}`;l[t]||(l[t]={count:0,user:e.user,word:e.word}),l[t].count++}));const c=Object.values(l).sort(((e,t)=>t.count-e.count));let g='\n                 <div class="chart-title">Profanity Breakdown</div>\n                 <table class="profanity-table"> \n <thead> \n  <tr> \n  <th>User</th>\n                             <th>Word</th>\n                             <th>Count</th>\n                         </tr>\n                     </thead>\n                     <tbody> \n ';c.forEach((e=>{g+=`\n                     <tr> \n <td>${e.user}</td>\n                         <td>${e.word}</td>\n                         <td>${e.count}</td>\n                     </tr>\n                `})),g+=" </tbody> </table>",s.innerHTML=g,a.style.display="block",charts.profanity&&charts.profanity.destroy();const h=document.getElementById("profanityChart").getContext("2d");charts.profanity=new Chart(h,{type:"bar",data:{labels:t,datasets:[{label:"Profanity Count",data:t.map((e=>r[e])),backgroundColor:"var(--c-negative)"}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:!0,grid:{color:"var(--c-border)"},ticks:{stepSize:1}},x:{grid:{color:"var(--c-border)"}}},plugins:{legend:{display:!1}}}})}function updateFunFacts(e){const{users:t,messages:n}=chatData;if(!e)return;let s="";const a=t.sort(((t,n)=>e[n].capsPercent-e[t].capsPercent))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">📢The "ALL CAPS" Shouter</div>\n                     <div class="fun-fact-body"> \n <strong>${a}</strong> was the biggest shouter, with ${e[a].capsPercent}% of their messages in all caps.\n                     </div>\n                 </div>`;const o=t.sort(((t,n)=>e[n].oneWordPercent-e[t].oneWordPercent))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">💬The "One-Word Wonder"</div>\n                     <div class="fun-fact-body"> \n <strong>${o}</strong> was the most concise, with ${e[o].oneWordPercent}% of their messages being a single word.\n                     </div>\n                 </div>`;const r=t.sort(((t,n)=>e[n].laughterScore-e[t].laughterScore))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">😂Easiest to Amuse</div>\n                     <div class="fun-fact-body"> \n <strong>${r}</strong> laughed the most, sending ${e[r].laughterScore.toLocaleString()} messages with 'lol', 'haha', or 😂.\n                     </div>\n                 </div>`;const i=t.sort(((t,n)=>e[n].comedianScore-e[t].comedianScore))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">🎤The Comedian</div>\n                     <div class="fun-fact-body"> \n <strong>${i}</strong> was the group comedian, making other users laugh ${e[i].comedianScore.toLocaleString()} times.\n                     </div>\n                 </div>`;const d=t.sort(((t,n)=>e[n].answererScore-e[t].answererScore))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">💡The Question Authority</div>\n                     <div class="fun-fact-body"> \n <strong>${d}</strong> answered the most questions, with ${e[d].answererScore.toLocaleString()} replies to a '?' message.\n                     </div>\n                 </div>`;const l=t.sort(((t,n)=>e[n].enderScore-e[t].enderScore))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">⛔The Conversation Ender</div>\n                     <div class="fun-fact-body"> \n <strong>${l}</strong> ended the conversation (was the last to speak before a 6+ hour gap) ${e[l].enderScore.toLocaleString()} times.\n                     </div>\n                 </div>`;const c=t.sort(((t,n)=>e[n].ignoredScore-e[t].ignoredScore))[0];s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">👻Most Ignored</div>\n                     <div class="fun-fact-body"> \n <strong>${c}</strong> was the most ignored, with ${e[c].ignoredScore.toLocaleString()} messages that were followed by a new conversation topic.\n                     </div>\n                 </div>`;let g={length:0,text:"",user:"",date:null};n.filter((e=>!e.isMedia)).forEach((e=>{e.text.length>g.length&&(g={length:e.text.length,text:e.text,user:e.sender,date:e.date})})),s+=`\n                 <div class="fun-fact-item"> \n <div class="fun-fact-title">📜The Longest Monologue</div>\n                     <div class="fun-fact-body"> \n <strong>${g.user}</strong> sent the longest single message on ${g.date.toLocaleDateString()}, with ${g.length.toLocaleString()} characters.\n                         <div class="fun-fact-quote">"${g.text.substring(0,150)}..."</div>\n                     </div>\n                 </div>`,document.getElementById("funFactsList").innerHTML=s}function showTab(e){document.querySelectorAll(".tab-content").forEach((e=>{e.classList.remove("active")})),document.querySelectorAll(".tab").forEach((e=>{e.classList.remove("active")})),document.getElementById(e).classList.add("active");const t=document.querySelector(`.tab[onclick="showTab('${e}')"], .tab[onclick='showTab("${e}")']`);t&&t.classList.add("active"),setTimeout((()=>{document.getElementById(e).querySelectorAll("canvas").forEach((e=>{const t=Chart.getChart(e);t&&t.resize()}))}),50)}uploadArea.addEventListener("dragover",(e=>{e.preventDefault(),uploadArea.classList.add("dragover")})),uploadArea.addEventListener("dragleave",(()=>{uploadArea.classList.remove("dragover")})),uploadArea.addEventListener("drop",(e=>{e.preventDefault(),uploadArea.classList.remove("dragover");const t=e.dataTransfer.files;t.length>0&&handleFile(t[0])})),fileInput.addEventListener("change",(e=>{e.target.files.length>0&&handleFile(e.target.files[0])}))
+
+/* --- ADVANCED VISUALS LOGIC (from former script 2) --- */
+function runAdvancedVisuals() {
+    if (!chatData || !chatData.messages) return void console.error("Advanced Visuals: chatData is not ready.");
+    const {
+        messages: t,
+        users: e,
+        dyadMatrix: a
+    } = chatData, n = window.chatAnalyzerUtils, o = function(t, e) {
+        const a = t.map((t => ({
+            id: t
+        }))), n = [];
+        for (let a = 0; a < t.length; a++)
+            for (let o = a + 1; o < t.length; o++) {
+                const r = t[a],
+                    i = t[o],
+                    s = (e[r] && e[r][i] || 0) + (e[i] && e[i][r] || 0);
+                s > 2 && n.push({
+                    source: r,
+                    target: i,
+                    value: s
+                })
+            }
+        return {
+            nodes: a,
+            links: n
+        }
+    }(e, a), r = function(t, e, a) {
+        const n = {};
+        e.forEach((t => {
+            n[t] = Array(24).fill(0).map((() => []))
+        })), t.forEach((t => {
+            if (t.isMedia || t.isDeleted) return;
+            const e = t.date.getHours(),
+                o = a.getSentimentScore(t.text);
+            n[t.sender] && n[t.sender][e].push(o)
+        }));
+        const o = {};
+        return e.forEach((t => {
+            o[t] = n[t].map((t => 0 === t.length ? 0 : t.reduce(((t, e) => t + e), 0) / t.length))
+        })), o
+    }(t, e, n), i = function(t, e) {
+        const a = {
+            "Work/School": ["project", "work", "meeting", "deadline", "study", "class", "homework", "exam"],
+            Food: ["eat", "food", "restaurant", "hungry", "lunch", "dinner", "cooking", "recipe"],
+            "Social/Plans": ["tonight", "tomorrow", "weekend", "party", "hang out", "bar", "movie", "game"],
+            Feelings: ["sad", "happy", "tired", "bored", "excited", "annoyed", "love", "hate"],
+            Questions: ["?", "what", "where", "when", "why", "how", "who"]
+        }, n = Object.keys(a), o = {};
+        return n.forEach((t => o[t] = {})), t.forEach((t => {
+            if (t.isMedia || t.isDeleted) return;
+            const e = t.text.toLowerCase();
+            for (const r of n)
+                if (a[r].some((t => e.includes(t)))) {
+                    const e = t.sender;
+                    o[r][e] = (o[r][e] || 0) + 1;
+                    break
+                }
+        })), {
+            contributions: o,
+            topics: n
+        }
+    }(t), s = function(t, e) {
+        const a = {};
+        t.forEach((t => {
+            if (t.isMedia || t.isDeleted) return;
+            const n = e.getSentimentScore(t.text);
+            (t.text.match(e.emojiRegex) || []).forEach((t => {
+                a[t] || (a[t] = {
+                    sentiments: [],
+                    count: 0
+                }), a[t].sentiments.push(n), a[t].count++
+            }))
+        }));
+        const n = [];
+        for (const [t, e] of Object.entries(a)) e.count > 5 && n.push({
+            emoji: t,
+            x: e.count,
+            y: e.sentiments.reduce(((t, e) => t + e), 0) / e.sentiments.length
+        });
+        return n
+    }(t, n), c = function(t, e) {
+        const a = {};
+        e.forEach((t => {
+            a[t] = {}, e.forEach((e => a[t][e] = 0))
+        }));
+        for (let e = 2; e < t.length; e++) {
+            const n = t[e - 2].sender,
+                o = t[e - 1].sender,
+                r = t[e].sender;
+            n !== o && r !== n && r !== o && t[e].date - t[e - 1].date < 1e4 && a[r][o]++
+        }
+        return a
+    }(t, e);
+    ! function(t, e) {
+        if ("undefined" == typeof d3) return void(document.getElementById("socialNetworkGraph").innerHTML = "Error: D3.js library not loaded.");
+        d3.select("#socialNetworkGraph svg").remove();
+        const a = document.getElementById("socialNetworkGraph"),
+            n = a.clientWidth,
+            o = a.clientHeight,
+            r = d3.forceSimulation(t).force("link", d3.forceLink(e).id((t => t.id)).distance(100)).force("charge", d3.forceManyBody().strength(-150)).force("center", d3.forceCenter(n / 2, o / 2)),
+            i = d3.select("#socialNetworkGraph").append("svg").attr("width", n).attr("height", o).attr("viewBox", [0, 0, n, o]),
+            s = i.append("g").selectAll("line").data(e).join("line").attr("class", "link").attr("stroke-width", (t => .5 * Math.sqrt(t.value) + 1)),
+            c = i.append("g").selectAll("circle").data(t).join("circle").attr("r", 8).attr("class", "node").call(function(t) {
+                return d3.drag().on("start", (function(e) {
+                    e.active || t.alphaTarget(.3).restart(), e.subject.fx = e.subject.x, e.subject.fy = e.subject.y
+                })).on("drag", (function(t) {
+                    t.subject.fx = t.x, t.subject.fy = t.y
+                })).on("end", (function(e) {
+                    e.active || t.alphaTarget(0), e.subject.fx = null, e.subject.fy = null
+                }))
+            }(r)),
+            d = i.append("g").selectAll("text").data(t).join("text").text((t => t.id)).attr("x", 12).attr("y", 3).attr("class", "node-label");
+        r.on("tick", (() => {
+            s.attr("x1", (t => t.source.x)).attr("y1", (t => t.source.y)).attr("x2", (t => t.target.x)).attr("y2", (t => t.target.y)), c.attr("cx", (t => t.x)).attr("cy", (t => t.y)), d.attr("transform", (t => `translate(${t.x},${t.y})`))
+        }))
+    }(o.nodes, o.links),
+    function(t, e) {
+        // 👇 **FIXED HERE**
+        charts.moodArc && charts.moodArc.destroy();
+        const a = document.getElementById("moodArcChart").getContext("2d"),
+            n = e.map(((t, a) => `hsl(${180*a/e.length}, 70%, 50%)`));
+        // 👇 **AND FIXED HERE**
+        charts.moodArc = new Chart(a, {
+            type: "radar",
+            data: {
+                labels: Array.from({
+                    length: 24
+                }, ((t, e) => `${e.toString().padStart(2,"0")}:00`)),
+                datasets: e.map(((e, a) => ({
+                    label: e,
+                    data: t[e],
+                    borderColor: n[a],
+                    backgroundColor: `${n[a]}33`,
+                    pointBackgroundColor: n[a],
+                    fill: !0
+                })))
+            },
+            options: {
+                responsive: !0,
+                maintainAspectRatio: !1,
+                scales: {
+                    r: {
+                        min: -1,
+                        max: 1,
+                        ticks: {
+                            stepSize: .5
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: "bottom"
+                    }
+                }
+            }
+        })
+    }(r, e),
+    function(t, e) {
+        // 👇 **FIXED HERE**
+        charts.topicDominance && charts.topicDominance.destroy();
+        const a = document.getElementById("topicDominanceChart").getContext("2d"),
+            {
+                contributions: n,
+                topics: o
+            } = t, r = e.map(((t, a) => `hsl(${180*a/e.length}, 70%, 50%)`));
+        // 👇 **AND FIXED HERE**
+        charts.topicDominance = new Chart(a, {
+            type: "bar",
+            data: {
+                labels: o,
+                datasets: e.map(((t, e) => ({
+                    label: t,
+                    data: o.map((e => n[e][t] || 0)),
+                    backgroundColor: r[e]
+                })))
+            },
+            options: {
+                responsive: !0,
+                maintainAspectRatio: !1,
+                scales: {
+                    x: {
+                        stacked: !0
+                    },
+                    y: {
+                        stacked: !0
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: "bottom"
+                    }
+                }
+            }
+        })
+    }(i, e),
+    function(t) {
+        // 👇 **FIXED HERE**
+        charts.emojiCharge && charts.emojiCharge.destroy();
+        const e = document.getElementById("emojiChargeChart").getContext("2d");
+        // 👇 **AND FIXED HERE**
+        charts.emojiCharge = new Chart(e, {
+            type: "scatter",
+            data: {
+                datasets: [{
+                    label: "Emojis",
+                    data: t.map((t => ({
+                        x: t.x,
+                        y: t.y,
+                        label: t.emoji
+                    }))),
+                    backgroundColor: "rgba(51, 51, 51, 0.7)"
+                }]
+            },
+            options: {
+                responsive: !0,
+                maintainAspectRatio: !1,
+                scales: {
+                    x: {
+                        title: {
+                            display: !0,
+                            text: "Frequency (Total Uses)"
+                        },
+                        type: "logarithmic"
+                    },
+                    y: {
+                        title: {
+                            display: !0,
+                            text: "Average Sentiment (-1 to +1)"
+                        },
+                        min: -1,
+                        max: 1
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: !1
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: t => `${t.raw.label} | Freq: ${t.raw.x} | Sent: ${t.raw.y.toFixed(2)}`
+                        }
+                    }
+                }
+            }
+        })
+    }(s),
+    function(t, e) {
+        let a = '<table class="matrix-table"><thead><tr><th>Interrupted &rarr;<br/>Interrupter &darr;</th>';
+        e.forEach((t => a += `<th>${t.substring(0,10)}</th>`)), a += "</tr></thead><tbody>";
+        let n = 0;
+        e.forEach((a => e.forEach((e => {
+            t[a][e] > n && (n = t[a][e])
+        })))), e.forEach((o => {
+            a += `<tr><th>${o.substring(0,10)}</th>`, e.forEach((e => {
+                const r = t[o][e];
+                a += o === e ? '<td style="background: var(--c-border);">-</td>' : `<td class="heatmap-cell" style="background-color: rgba(217, 64, 64, ${n>0?r/n:0});" title="${o} interrupted ${e} ${r} times">${r}</td>`
+            })), a += "</tr>"
+        })), a += "</tbody></table>", document.getElementById("interruptionMatrixContainer").innerHTML = a
+    }(c, e)
+}
+
+
+/* --- USER DEEP DIVE LOGIC (from former script 3) --- */
+function runUserDeepDive(){if(!chatData||!chatData.messages)return void console.error("Deep Dive: chatData is not ready.");const{messages:e,users:t}=chatData,s=window.chatAnalyzerUtils,{userStats:a,chatWideStats:n}=function(e,t,s){const a={},n={allEmojiCounts:{},longestStreak:{user:null,count:0}},o=["sorry","my bad","oops","mb"],r=new Set(["teh","youre","ther","thier","dont","wont","cant"]),i=new Set(["i","me","my","mine","i'm","i've","i'll","i'd"]),l=t.map((e=>e.toLowerCase().split(" ")[0]));t.forEach((e=>{a[e]={gif_score:0,apology_score:0,total_emojis:0,text_msgs:0,typo_count:0,total_words:0,word_set:new Set,revival_score:0,self_correct_score:0,void_question_score:0,link_score:0,me_count:0,gossip_score:0,antagonist_score:0,mirror_score:0,last_word_score:0,msg_lengths:[],sentiment_by_day:[[],[],[],[],[],[],[]],daily_activity:{}}}));let c={user:e.length>0?e[0].sender:null,count:1};for(let t=0;t<e.length;t++){const d=e[t],u=d.sender,v=a[u];if(!v)continue;if(d.isMedia||d.isDeleted)d.isMedia&&("GIF omitted"!==d.text&&"sticker omitted"!==d.text||v.gif_score++);else{const a=d.text,c=a.toLowerCase(),p=c.replace(/[^\w\s]/g,"").split(/\s+/).filter(Boolean);v.text_msgs++,v.total_words+=p.length,v.msg_lengths.push(a.length);const g=a.match(s.emojiRegex)||[];v.total_emojis+=g.length,g.forEach((e=>n.allEmojiCounts[e]=(n.allEmojiCounts[e]||0)+1)),o.some((e=>c.includes(e)))&&v.apology_score++,p.forEach((e=>{r.has(e)&&v.typo_count++})),p.forEach((e=>{e.length>2&&!window.chatAnalyzerUtils.stopWords.has(e)&&v.word_set.add(e)})),(a.includes("http://")||a.includes("https://"))&&v.link_score++,p.forEach((e=>{i.has(e)&&v.me_count++}));const h=u.toLowerCase().split(" ")[0];l.forEach((e=>{e!==h&&c.includes(e)&&v.gossip_score++}));const _=d.date.getDay();if(v.sentiment_by_day[_].push(s.getSentimentScore(a)),a.includes("?")){let s=!0;for(let a=t+1;a<Math.min(t+10,e.length)&&!(e[a].date-d.date>36e5);a++)if(e[a].sender!==u){s=!1;break}s&&v.void_question_score++}}const p=d.date.toISOString().split("T")[0],g=60*d.date.getHours()+d.date.getMinutes();if(v.daily_activity[p]?v.daily_activity[p].last=g:v.daily_activity[p]={first:g,last:g},t>0){const a=e[t-1],o=d.date-a.date;if(u===a.sender?c.count++:(c.count>n.longestStreak.count&&(n.longestStreak={...c}),c={user:u,count:1}),o>864e5&&v.revival_score++,u===a.sender&&o<12e4&&v.self_correct_score++,u!==a.sender&&!a.isMedia&&!d.isMedia){const e=s.getSentimentScore(a.text),t=s.getSentimentScore(d.text);e>.5&&t<-.5&&v.antagonist_score++;const n=s.getSentimentCategory(e),o=s.getSentimentCategory(t);"neutral"!==n&&n===o&&v.mirror_score++}}if(t>0&&t<e.length-1){const s=e[t-1],a=e[t+1];s.sender!==u&&a.sender!==u&&a.sender!==s.sender&&v.last_word_score++}}return c.count>n.longestStreak.count&&(n.longestStreak={...c}),n.rarestEmoji=Object.entries(n.allEmojiCounts).sort(((e,t)=>e[1]-t[1]))[0]||["N/A",0],t.forEach((e=>{const t=a[e];t.emoji_avg=t.text_msgs>0?(t.total_emojis/t.text_msgs).toFixed(2):0,t.typo_rate=t.total_words>0?(t.typo_count/t.total_words*100).toFixed(1):0,t.vocab_size=t.word_set.size,t.length_variance=function(e){if(0===e.length)return 0;const t=e.length,s=e.reduce(((e,t)=>e+t))/t,a=e.reduce(((e,t)=>e+Math.pow(t-s,2)),0)/t;return Math.sqrt(a)}(t.msg_lengths).toFixed(0),t.me_score_percent=t.total_words>0?(t.me_count/t.total_words*100).toFixed(1):0,t.avg_sentiment_by_day=t.sentiment_by_day.map((e=>e.length>0?(e.reduce(((e,t)=>e+t),0)/e.length).toFixed(2):"N/A"));const s=Object.keys(t.daily_activity).sort(),n=[];for(let e=0;e<s.length-1;e++){const a=s[e],o=s[e+1],r=new Date(a);if(new Date(o)-r==864e5){const e=1440-t.daily_activity[a].last+t.daily_activity[o].first;n.push(e)}}t.avg_sleep_gap=n.length>0?(n.reduce(((e,t)=>e+t),0)/(60*n.length)).toFixed(1):"N/A",delete t.word_set,delete t.msg_lengths,delete t.sentiment_by_day,delete t.daily_activity})),{userStats:a,chatWideStats:n}}(e,t,s);!function(e,t,s){const a=document.getElementById("deepDiveWinners"),n=(t,a)=>0===s.length?{user:"N/A",value:0}:s.map((s=>({user:s,value:e[s][t]}))).sort(a)[0],o=n("gif_score",((e,t)=>t.value-e.value)),r=n("apology_score",((e,t)=>t.value-e.value)),i=n("vocab_size",((e,t)=>t.value-e.value)),l=t.longestStreak,c=n("revival_score",((e,t)=>t.value-e.value)),d=n("me_score_percent",((e,t)=>t.value-e.value)),u=n("gossip_score",((e,t)=>t.value-e.value)),v=n("avg_sleep_gap",((e,t)=>"N/A"===e.value?1:"N/A"===t.value?-1:e.value-t.value));a.innerHTML=`\n            <div class="stat-card">\n                <span class="stat-number">${o.user}</span>\n                <div class="stat-label">The GIF Lord (${o.value} GIFs/Stickers)</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${r.user}</span>\n                <div class="stat-label">The Apologist (${r.value} "sorrys")</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${i.user}</span>\n                <div class="stat-label">The Lexicographer (${i.value} unique words)</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${l.user||"N/A"}</span>\n                <div class="stat-label">The Monologist (${l.count} msgs in a row)</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${c.user}</span>\n                <div class="stat-label">The Defibrillator (${c.value} chat revivals)</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${d.user}</span>\n                <div class="stat-label">Most Self-Referential (${d.value}% "I/me")</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${u.user}</span>\n                <div class="stat-label">The Gossip (${u.value} name-drops)</div>\n            </div>\n            <div class="stat-card">\n                <span class="stat-number">${v.user}</span>\n                <div class="stat-label">The "Sleepless" (${v.value}hr avg gap)</div>\n            </div>\n        `;const p=document.getElementById("deepDiveTable"),g=[{key:"gif_score",label:"GIF Lord"},{key:"apology_score",label:"Apologist"},{key:"emoji_avg",label:"Emoji/Msg"},{key:"typo_rate",label:"Typo Rate (%)"},{key:"vocab_size",label:"Vocabulary"},{key:"revival_score",label:"Defibrillator"},{key:"self_correct_score",label:"Self-Corrector"},{key:"void_question_score",label:"Void Questions"},{key:"length_variance",label:"Length Variance (StdDev)"},{key:"link_score",label:"Curator (Links)"},{key:"me_score_percent",label:'"Me" Score (%)'},{key:"gossip_score",label:"Gossip Score"},{key:"antagonist_score",label:"Antagonist"},{key:"mirror_score",label:"Emotional Mirror"},{key:"last_word_score",label:"Last Word"},{key:"avg_sleep_gap",label:"Avg Sleep (hr)"}];let h='<table class="deep-dive-table"><thead><tr><th>User</th>';g.forEach((e=>h+=`<th>${e.label}</th>`)),h+="</tr></thead><tbody>",s.forEach((t=>{h+=`<tr><td>${t}</td>`;const s=e[t];g.forEach((e=>{h+=`<td>${s[e.key]}</td>`})),h+="</tr>"})),h+="</tbody></table>",p.innerHTML=h}(a,n,t)}
+
+/* --- COMBINED INITIALIZATION LOGIC --- */
+document.addEventListener("DOMContentLoaded",(()=>{
+    // Inject Advanced Visuals (from former script 2)
+    !function(){const t=document.createElement("style");t.type="text/css",t.innerText=".node { fill: var(--c-brand); stroke: var(--c-bg); stroke-width: 2px; } .node-label { fill: #333; font-size: 10px; font-weight: 500; pointer-events: none; } .link { stroke: var(--c-border-active); stroke-opacity: 0.6; }",document.head.appendChild(t);const e=document.querySelector(".tabs");if(e){const t=document.createElement("button");t.className="tab",t.setAttribute("onclick","showTab('advancedVisuals')"),t.innerHTML="✨ Advanced Visuals",e.appendChild(t)}const a=document.querySelector(".results");if(a){const t=document.createElement("div");t.className="tab-content",t.id="advancedVisuals",t.innerHTML='<div class="chart-container" style="height: 500px;"> <div class="chart-title">Social Network Graph</div> <div class="upload-subtitle" style="text-align: center; margin-top: -10px; margin-bottom: 20px;"> Each user is a node. Line thickness shows total back-and-forth replies. </div> <div id="socialNetworkGraph" style="width: 100%; height: 400px; position: relative;"></div> </div> <div class="chart-container"> <div class="chart-title">User "Mood Arc" (Sentiment by Hour)</div> <canvas id="moodArcChart"></canvas> </div> <div class="chart-container"> <div class="chart-title">Topic Dominance</div> <canvas id="topicDominanceChart"></canvas> </div> <div class="chart-container"> <div class="chart-title">Emoji "Emotional Charge" Plot</div> <canvas id="emojiChargeChart"></canvas> </div> <div class="response-matrix chart-container auto-height" style="overflow-x: auto;"> <div class="chart-title">Interruption Heatmap</div> <div class="upload-subtitle" style="text-align: center; margin-top: -10px; margin-bottom: 20px;"> Read as: [Row] interrupted [Column]. </div> <div id="interruptionMatrixContainer"></div> </div>',a.appendChild(t)}}();
+
+    // Inject User Deep Dive (from former script 3)
+(function() {
+    // 1. Create and inject the CSS styles for the table
+    const cssStyles = `
+        .deep-dive-table-container {
+            overflow-x: auto;
+            background: var(--c-bg);
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .deep-dive-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px; /* Force horizontal scroll if needed */
+        }
+        .deep-dive-table th,
+        .deep-dive-table td {
+            border: 1px solid var(--c-border);
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .deep-dive-table th {
+            background: var(--c-bg-hover);
+            font-weight: 600;
+            position: sticky;
+            top: 0; /* Sticky header */
+        }
+        .deep-dive-table tbody tr:hover {
+            background: var(--c-bg-hover);
+        }
+        .deep-dive-table td:first-child,
+        .deep-dive-table th:first-child {
+            position: sticky;
+            left: 0; /* Sticky first column */
+            background: var(--c-bg-card);
+            font-weight: 700;
+            border-right: 2px solid var(--c-border-active);
+        }
+    `;
+
+    // Create a <style> element and add it to the page's <head>
+    const styleElement = document.createElement("style");
+    styleElement.type = "text/css";
+    styleElement.innerText = cssStyles;
+    document.head.appendChild(styleElement);
+
+    // ---
+
+    // 2. Find the ".tabs" container and add a new tab button
+    const tabsContainer = document.querySelector(".tabs");
+    if (tabsContainer) {
+        const tabButton = document.createElement("button");
+        tabButton.className = "tab";
+        tabButton.setAttribute("onclick", "showTab('userDeepDive')");
+        tabButton.innerHTML = "👤 User Deep Dive";
+        tabsContainer.appendChild(tabButton);
+    }
+
+    // ---
+
+    // 3. Find the ".results" container and add the new content area
+    const resultsContainer = document.querySelector(".results");
+    if (resultsContainer) {
+        // **FIXED:** Changed 'class.chart-title"' to 'class="chart-title"'
+        const tabContentHTML = `
+            <div class="chart-title" style="font-size: 1.1rem; font-weight: 600; color: var(--c-text); margin-bottom: 15px; text-align: center;">
+                Chat-Wide Superlatives
+            </div>
+            <div class="stats-grid" id="deepDiveWinners">
+            </div>
+
+            <div class="chart-title" style="font-size: 1.1rem; font-weight: 600; color: var(--c-text); margin-top: 30px; margin-bottom: 15px; text-align: center;">
+                Detailed User Stats
+            </div>
+            <div class="deep-dive-table-container" id="deepDiveTableContainer">
+                <div id="deepDiveTable">Loading stats...</div>
+            </div>
+        `;
+
+        // Create the <div> for the tab content and add it to the results area
+        const contentElement = document.createElement("div");
+        contentElement.className = "tab-content";
+        contentElement.id = "userDeepDive";
+        contentElement.innerHTML = tabContentHTML;
+
+        resultsContainer.appendChild(contentElement);
+    }
+
+})(); // <-- This closes the User Deep Dive function
+
+})); // <-- ADD THIS LINE to close the "DOMContentLoaded" listener
+
+</script>
