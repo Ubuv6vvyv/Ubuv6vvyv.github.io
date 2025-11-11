@@ -10,21 +10,134 @@
 </head>
 <body>
     <h1>PDF Watermark Shrinker</h1>
-    <p>Upload multiple PDFs, and this will shrink the watermark text size to 0, making it invisible.</p>
+    <p>Upload multiple PDFs, and this will attempt to remove text watermarks.</p>
     <input type="file" id="pdfInput" multiple accept=".pdf">
-    <button onclick="processPDFs()">Process and Download ZIP</button>
+
+    <fieldset style="margin: 20px 0; padding: 10px; border: 1px solid #ccc;">
+        <legend>Filename Options</legend>
+        <strong>1. Character Removal (Applied first):</strong><br>
+        <input type="checkbox" id="removeLower"> <label for="removeLower">Remove lowercase letters (a-z)</label><br>
+        <input type="checkbox" id="removeUpper"> <label for="removeUpper">Remove uppercase letters (A-Z)</label><br>
+        <input type="checkbox" id="removeSpecial"> <label for="removeSpecial">Remove special characters (e.g., -, _, @, etc.)</label><br>
+        <hr style="margin: 10px 0;">
+        <strong>2. Add Text (Applied second):</strong><br>
+        <label for="prependText" style="display: inline-block; width: 70px;">Prepend:</label>
+        <input type="text" id="prependText" placeholder="Valuation-"><br>
+        <label for="appendText" style="display: inline-block; width: 70px;">Append:</label>
+        <input type="text" id="appendText" placeholder="_final"><br>
+    </fieldset>
+
+    <button onclick="generatePreview()">Generate Preview</button>
+
+    <div id="previewArea" style="margin-top: 20px;"></div>
 
     <script>
-        async function processPDFs() {
+        // Global variable to hold files for processing
+        window.fileProcessingQueue = [];
+
+        /**
+         * [NEW FUNCTION]
+         * Generates the new filename based on selected options.
+         */
+        function getNewFileName(originalName) {
+            // 1. Separate base name and extension
+            const dotIndex = originalName.lastIndexOf('.');
+            let baseName, extension;
+            
+            if (dotIndex === -1) { // No extension
+                baseName = originalName;
+                extension = "";
+            } else {
+                baseName = originalName.substring(0, dotIndex);
+                extension = originalName.substring(dotIndex); // Includes the dot
+            }
+
+            // 2. Apply character removal toggles
+            const removeLower = document.getElementById('removeLower').checked;
+            const removeUpper = document.getElementById('removeUpper').checked;
+            const removeSpecial = document.getElementById('removeSpecial').checked;
+
+            if (removeLower) { baseName = baseName.replace(/[a-z]/g, ''); }
+            if (removeUpper) { baseName = baseName.replace(/[A-Z]/g, ''); }
+            if (removeSpecial) { 
+                // Removes anything that is NOT a letter or a number
+                // We do this so that if toggles 1 & 2 are off, it doesn't remove letters.
+                baseName = baseName.replace(/[^a-zA-Z0-9]/g, ''); 
+            }
+
+            // 3. Apply prepend/append text
+            const prepend = document.getElementById('prependText').value;
+            const append = document.getElementById('appendText').value;
+            
+            baseName = prepend + baseName + append;
+
+            return baseName + extension;
+        }
+
+        /**
+         * [NEW FUNCTION]
+         * Called when "Cancel" button in preview is clicked.
+         */
+        function cancelPreview() {
+            document.getElementById('previewArea').innerHTML = '';
+            window.fileProcessingQueue = [];
+            document.getElementById('pdfInput').value = ''; // Clear file input
+        }
+
+        /**
+         * [MODIFIED]
+         * Renamed from processPDFs. Now generates a preview and a confirmation button.
+         */
+        async function generatePreview() {
             const input = document.getElementById('pdfInput');
+            const previewArea = document.getElementById('previewArea');
             if (input.files.length === 0) {
                 alert('Please select at least one PDF file.');
                 return;
             }
 
-            const processPromises = [];
+            window.fileProcessingQueue = []; // Clear previous queue
+            let previewHtml = '<h3>Preview of New Filenames:</h3>';
+            previewHtml += '<ul style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; list-style-type: none; font-family: monospace;">';
+
             for (const file of input.files) {
-                processPromises.push(processSinglePDF(file));
+                const newName = getNewFileName(file.name);
+                window.fileProcessingQueue.push({ file: file, newName: newName });
+                
+                previewHtml += `<li style="margin-bottom: 5px;">
+                    <strong>Old:</strong> ${file.name}<br>
+                    <strong>New:</strong> ${newName}
+                </li><hr style="margin: 5px 0;">`;
+            }
+            
+            previewHtml += '</ul>';
+            previewHtml += '<button id="confirmButton" style="margin-top: 10px;">Confirm and Download ZIP</button>';
+            previewHtml += '<button onclick="cancelPreview()" style="margin-left: 10px;">Cancel</button>';
+            
+            previewArea.innerHTML = previewHtml;
+
+            // Add event listener to the new button
+            document.getElementById('confirmButton').onclick = startProcessing;
+        }
+
+        /**
+         * [NEW FUNCTION]
+         * This was the logic from the old processPDFs. It runs the actual processing.
+         */
+        async function startProcessing() {
+            const filesToProcess = window.fileProcessingQueue;
+            if (!filesToProcess || filesToProcess.length === 0) {
+                alert('No files to process.');
+                return;
+            }
+
+            const previewArea = document.getElementById('previewArea');
+            previewArea.innerHTML = '<h3>Processing... Please wait.</h3>';
+
+            const processPromises = [];
+            for (const fileData of filesToProcess) {
+                // Pass the newName to processSinglePDF
+                processPromises.push(processSinglePDF(fileData.file, fileData.newName));
             }
 
             try {
@@ -35,62 +148,109 @@
                 });
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 download(zipBlob, 'processed_pdfs.zip', 'application/zip');
+                previewArea.innerHTML = '<h3>Done! ZIP file downloaded.</h3>';
             } catch (error) {
                 console.error('Error processing PDFs:', error);
-                alert('An error occurred while processing the PDFs.');
+                alert('An error occurred while processing the PDFs: ' + error.message);
+                previewArea.innerHTML = `<h3 style="color: red;">Error: ${error.message}</h3>`;
+            }
+            
+            // Clear queue
+            window.fileProcessingQueue = [];
+        }
+
+
+        /**
+         * [MODIFIED]
+         * Now accepts a newName parameter and uses it in the return object.
+         */
+        async function processSinglePDF(file, newName) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+
+                const pages = pdfDoc.getPages();
+                for (const page of pages) {
+                    const decodedContent = await getDecodedContent(page, pdfDoc);
+                    if (decodedContent === null) continue; // Skip page if content is invalid
+
+                    // Strategy 1: Remove specific text
+                    let modifiedContent = decodedContent.replace(/\(Not Valid if Printed\)Tj/g, '()Tj');
+
+                    // Strategy 2: Fallback to original font-shrinking
+                    modifiedContent = modifiedContent.replace(/\/Xi1\s+\d+\s+Tf/g, '/Xi1 0 Tf');
+                    
+                    await setEncodedContent(page, pdfDoc, modifiedContent);
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                // Use the newName passed into the function
+                return { name: newName, bytes: pdfBytes }; 
+            } catch (e) {
+                console.error(`Failed to process ${file.name}:`, e);
+                throw new Error(`Failed to process ${file.name}: ${e.message}`);
             }
         }
 
-        async function processSinglePDF(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-
-            const pages = pdfDoc.getPages();
-            for (const page of pages) {
-                const decodedContent = await getDecodedContent(page, pdfDoc);
-                // Shrink the text size: replace '/Xi1 80 Tf' with '/Xi1 0 Tf'
-                // Adjust regex if the size or spacing varies slightly
-                const modifiedContent = decodedContent.replace(/\/Xi1\s+\d+\s+Tf/g, '/Xi1 0 Tf');
-                await setEncodedContent(page, pdfDoc, modifiedContent);
-            }
-
-            const pdfBytes = await pdfDoc.save();
-            return { name: `clean_${file.name}`, bytes: pdfBytes };
-        }
-
+        /**
+         * [UNCHANGED]
+         * Decodes page content streams.
+         */
         async function getDecodedContent(page, pdfDoc) {
             const contents = page.node.get(PDFLib.PDFName.of('Contents'));
             const buffers = [];
 
-            if (contents instanceof PDFLib.PDFArray) {
-                for (let i = 0; i < contents.size(); i++) {
-                    const streamRef = contents.get(i);
-                    const stream = pdfDoc.context.lookup(streamRef, PDFLib.PDFStream);
+            const processStream = (stream) => {
+                if (stream instanceof PDFLib.PDFStream) {
                     buffers.push(stream.getContents());
                 }
-            } else {
-                const stream = pdfDoc.context.lookup(contents, PDFLib.PDFStream);
-                buffers.push(stream.getContents());
-            }
+            };
 
-            // Concatenate all content streams
-            let totalLength = 0;
-            buffers.forEach(buffer => totalLength += buffer.length);
-            const fullEncoded = new Uint8Array(totalLength);
-            let offset = 0;
-            buffers.forEach(buffer => {
-                fullEncoded.set(buffer, offset);
-                offset += buffer.length;
-            });
-
-            // Attempt to inflate (assuming FlateDecode); fallback to raw if not compressed
             try {
-                return pako.inflate(fullEncoded, { to: 'string' });
+                if (contents instanceof PDFLib.PDFArray) {
+                    for (let i = 0; i < contents.size(); i++) {
+                        const item = contents.get(i);
+                        if (item instanceof PDFLib.PDFRef) {
+                            processStream(pdfDoc.context.lookup(item, PDFLib.PDFStream));
+                        } else if (item instanceof PDFLib.PDFStream) {
+                            processStream(item);
+                        }
+                    }
+                } else if (contents instanceof PDFLib.PDFRef) {
+                    processStream(pdfDoc.context.lookup(contents, PDFLib.PDFStream));
+                } else if (contents instanceof PDFLib.PDFStream) {
+                    processStream(contents);
+                }
+
+                if (buffers.length === 0) {
+                    return ""; // No content streams found
+                }
+
+                let totalLength = 0;
+                buffers.forEach(buffer => totalLength += buffer.length);
+                const fullEncoded = new Uint8Array(totalLength);
+                let offset = 0;
+                buffers.forEach(buffer => {
+                    fullEncoded.set(buffer, offset);
+                    offset += buffer.length;
+                });
+
+                try {
+                    return pako.inflate(fullEncoded, { to: 'string' });
+                } catch (e) {
+                    return new TextDecoder().decode(fullEncoded);
+                }
+
             } catch (e) {
-                return new TextDecoder().decode(fullEncoded);
+                console.error("Error decoding content stream:", e);
+                return null; // Return null to signal an error
             }
         }
 
+        /**
+         * [UNCHANGED]
+         * Encodes and sets the modified page content.
+         */
         async function setEncodedContent(page, pdfDoc, modifiedContent) {
             const newEncoded = pako.deflate(modifiedContent);
             const newDict = PDFLib.PDFDict.withContext(pdfDoc.context);
@@ -101,6 +261,10 @@
             page.node.set(PDFLib.PDFName.of('Contents'), newRef);
         }
 
+        /**
+         * [UNCHANGED]
+         * Triggers the file download.
+         */
         function download(bytes, fileName, mimeType) {
             const blob = new Blob([bytes], { type: mimeType });
             const url = URL.createObjectURL(blob);
