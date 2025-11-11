@@ -753,6 +753,7 @@ var expandedSecrets = [
     /glc_[A-Za-z0-9\-_+/]{32,200}={0,2}/g,
     /glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}/g,
 ];
+
 // Categories for classifying resource URLs by extension
 const categories = {
   images: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.ico', '.webp', '.bmp', '.tiff'],
@@ -773,13 +774,14 @@ const categories = {
 function classifyResource(url) {
   if (!url) return 'other';
   url = url.trim();
-  const extension = url.split('.').pop().toLowerCase();
+  // Basic check to avoid matching on query parameters
+  const path = url.split('?')[0];
   for (const [category, extensions] of Object.entries(categories)) {
-    if (extensions.some(ext => url.toLowerCase().endsWith(ext))) {
+    if (extensions.some(ext => path.toLowerCase().endsWith(ext))) {
       return category;
     }
   }
-  return 'media';
+  return 'media'; // Default fallback
 }
 
 // Safely add an item to a Set after validation
@@ -789,7 +791,7 @@ function safelyAddToSet(set, item) {
   }
 }
 
-// Main resource fetching function including additional security & scraping checks
+// Main resource fetching function
 function fetchResources() {
   const resources = {
     images: new Set(),
@@ -822,7 +824,9 @@ function fetchResources() {
     responsiveness: {},
     colors: {},
     securityHeaders: {},
-    scrapingIndicators: new Set()
+    scrapingIndicators: new Set(),
+    data_attributes: new Set(),
+    api_endpoints: new Set()
   };
 
   try {
@@ -892,6 +896,13 @@ function fetchResources() {
     console.log("Scanning scraping indicators...");
     scanScrapingIndicators(resources);
 
+    console.log("Scanning data attributes...");
+    scanDataAttributes(resources);
+    
+    // Run endpoint scan last, as it uses data from other scans
+    console.log("Scanning for API endpoints...");
+    findApiEndpoints(resources);
+
     console.log("Resource scan completed.");
   } catch (err) {
     console.error("Error during resource scan:", err);
@@ -901,23 +912,42 @@ function fetchResources() {
   return resources;
 }
 
-// Scan assets including lazy-loaded resources (data-src)
+// Scan assets including lazy-loaded (data-src) and srcset resources
 function scanAssets(resources) {
-  document.querySelectorAll('img, video, audio, link[rel="stylesheet"], script, source').forEach(tag => {
-    let url = tag.src || tag.href || tag.getAttribute('data-src');
-    const category = classifyResource(url);
-    if (resources[category]) safelyAddToSet(resources[category], url);
+  document.querySelectorAll('img, source, video, audio, link[rel="stylesheet"], script, object, embed').forEach(tag => {
+    const addUrl = (url) => {
+      if (url) {
+        const category = classifyResource(url);
+        if (resources[category]) safelyAddToSet(resources[category], url);
+      }
+    };
+
+    // Standard attributes
+    addUrl(tag.src);
+    addUrl(tag.href);
+    addUrl(tag.data);
+
+    // Lazy-load attribute
+    addUrl(tag.getAttribute('data-src'));
+
+    // Handle srcset (multiple URLs)
+    if (tag.srcset) {
+      tag.srcset.split(',').forEach(entry => {
+        const url = entry.trim().split(' ')[0];
+        addUrl(url);
+      });
+    }
   });
 }
 
-// Scan all links on the page
+// Scan all links on the page, including image maps
 function scanLinks(resources) {
-  document.querySelectorAll('a').forEach(a => {
+  document.querySelectorAll('a[href], area[href]').forEach(a => {
     if (a.href) safelyAddToSet(resources.links, a.href);
   });
 }
 
-// Extract text content broadly from main content and various headings
+// Extract text content broadly from main content, headings, and attributes
 function extractTextBroadly(resources) {
   const mainContent = document.querySelector('main') || document.querySelector('article');
   if (mainContent) {
@@ -940,15 +970,30 @@ function extractTextBroadly(resources) {
   if (metaDescription) {
     safelyAddToSet(resources.text_data, 'META_DESCRIPTION: ' + metaDescription.getAttribute('content'));
   }
+  
+  // Extract from common attributes
+  document.querySelectorAll('[title], [aria-label], [placeholder]').forEach(el => {
+     if (el.title) {
+        safelyAddToSet(resources.text_data, `TITLE_ATTR: ${el.title}`);
+     }
+     if (el.getAttribute('aria-label')) {
+        safelyAddToSet(resources.text_data, `ARIA-LABEL: ${el.getAttribute('aria-label')}`);
+     }
+     if (el.placeholder) {
+        safelyAddToSet(resources.text_data, `PLACEHOLDER: ${el.placeholder}`);
+     }
+  });
 }
 
-// Extract secrets using both predefined regex patterns and an expanded list of custom patterns
+// Extract secrets using regex on the *entire* page source
 function extractSecrets(resources) {
-  const bodyText = document.body ? document.body.innerText : "";
+  const pageContent = document.documentElement.innerHTML; // Scan full HTML source
+  
   // Check against built-in regexPatterns
   Object.entries(regexPatterns).forEach(([key, pattern]) => {
     try {
-      const matches = bodyText.match(pattern);
+      pattern.lastIndex = 0; // Reset regex state
+      const matches = pageContent.match(pattern);
       if (matches) {
         matches.forEach(match => {
           safelyAddToSet(resources.secrets, `${key.toUpperCase()}: ${match}`);
@@ -962,7 +1007,8 @@ function extractSecrets(resources) {
   // Check against expanded custom secret patterns
   expandedSecrets.forEach((pattern, index) => {
     try {
-      const matches = bodyText.match(pattern);
+      pattern.lastIndex = 0; // Reset regex state
+      const matches = pageContent.match(pattern);
       if (matches) {
         matches.forEach(match => {
           safelyAddToSet(resources.secrets, `EXPANDED_SECRET_${index}: ${match}`);
@@ -979,7 +1025,7 @@ function extractHiddenForms(resources) {
   document.querySelectorAll('form[style*="display:none"], input[type="hidden"]').forEach(el => {
     const formContent = el.outerHTML.trim();
     if (formContent) {
-      safelyAddToSet(resources.hidden_forms, `HIDDEN FORM: ${formContent}`);
+      safelyAddToSet(resources.hidden_forms, `HIDDEN: ${formContent}`);
     }
   });
 }
@@ -990,6 +1036,7 @@ function extractMediaURLs(resources) {
   
   Object.entries(regexPatterns).forEach(([key, pattern]) => {
     if (key.endsWith('_urls')) {
+      pattern.lastIndex = 0; // Reset regex state
       const matches = bodyText.match(pattern);
       if (matches) {
         matches.forEach(url => {
@@ -1044,30 +1091,43 @@ function extractIframes(resources) {
   });
 }
 
-// Analyze page performance metrics
+// Analyze page performance metrics using modern API
 function analyzePerformance(resources) {
-  if (window.performance && window.performance.timing) {
-    const timing = window.performance.timing;
-    resources.performance = {
-      loadTime: timing.loadEventEnd - timing.navigationStart,
-      domContentLoaded: timing.domContentLoadedEventEnd - timing.navigationStart,
-      firstPaint: performance.getEntriesByType('paint').find(entry => entry.name === 'first-paint')?.startTime,
-      firstContentfulPaint: performance.getEntriesByType('paint').find(entry => entry.name === 'first-contentful-paint')?.startTime
-    };
+  if (window.performance && window.performance.getEntriesByType) {
+    const navEntry = window.performance.getEntriesByType('navigation')[0];
+    if (navEntry) {
+      resources.performance = {
+        loadTime_ms: navEntry.loadEventEnd,
+        domContentLoaded_ms: navEntry.domContentLoadedEventEnd,
+        serverTiming: navEntry.serverTiming.map(entry => `${entry.name}: ${entry.description || entry.duration}`).join(', ') || 'N/A',
+        type: navEntry.type,
+        protocol: navEntry.nextHopProtocol,
+      };
+    }
+    
+    // Get paint timings
+    const firstPaint = performance.getEntriesByType('paint').find(entry => entry.name === 'first-paint');
+    const firstContentfulPaint = performance.getEntriesByType('paint').find(entry => entry.name === 'first-contentful-paint');
+    if (firstPaint) {
+         resources.performance.firstPaint_ms = firstPaint.startTime;
+    }
+    if (firstContentfulPaint) {
+        resources.performance.firstContentfulPaint_ms = firstContentfulPaint.startTime;
+    }
   }
 }
 
-// Check for accessibility issues like missing alt text or link texts
+// Check for accessibility issues
 function checkAccessibility(resources) {
   resources.accessibility = {
     imagesWithoutAlt: document.querySelectorAll('img:not([alt])').length,
     linksWithoutText: document.querySelectorAll('a:not([href]), a[href="#"], a[href=""]').length,
-    formInputsWithoutLabels: document.querySelectorAll('input:not([id])').length,
+    formInputsWithoutLabels: document.querySelectorAll('input:not([id])').length, // Basic check
     headingsHierarchy: Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(h => h.tagName).join(',')
   };
 }
 
-// Analyze SEO-related data such as title, meta description, and canonical links
+// Analyze SEO-related data
 function analyzeSEO(resources) {
   resources.seo = {
     title: document.title,
@@ -1083,13 +1143,20 @@ function detectThirdPartyResources(resources) {
   const currentDomain = window.location.hostname;
   document.querySelectorAll('script, link, img, iframe').forEach(el => {
     const src = el.src || el.href;
-    if (src && !src.includes(currentDomain)) {
-      safelyAddToSet(resources.third_party, src);
+    if (src) {
+        try {
+            const url = new URL(src, window.location.origin);
+            if (url.hostname !== currentDomain) {
+                safelyAddToSet(resources.third_party, src);
+            }
+        } catch (e) {
+            // Ignore invalid URLs
+        }
     }
   });
 }
 
-// Extract cookies and parse them into an object
+// Extract cookies
 function extractCookies(resources) {
   document.cookie.split(';').forEach(cookie => {
     const [name, value] = cookie.split('=').map(c => c.trim());
@@ -1101,8 +1168,16 @@ function extractCookies(resources) {
 
 // Extract data from localStorage and sessionStorage
 function extractStorage(resources) {
-  resources.localStorage = { ...localStorage };
-  resources.sessionStorage = { ...sessionStorage };
+  try {
+    resources.localStorage = { ...localStorage };
+  } catch (e) {
+    resources.localStorage = { error: 'Could not access localStorage' };
+  }
+  try {
+    resources.sessionStorage = { ...sessionStorage };
+  } catch (e) {
+    resources.sessionStorage = { error: 'Could not access sessionStorage' };
+  }
 }
 
 // Override WebSocket constructor to log connections
@@ -1111,19 +1186,22 @@ function detectWebSockets(resources) {
     const originalWebSocket = window.WebSocket;
     window.WebSocket = function(url, protocols) {
       safelyAddToSet(resources.websockets, url);
-      return new originalWebSocket(url, protocols);
+      if (protocols) {
+        return new originalWebSocket(url, protocols);
+      }
+      return new originalWebSocket(url);
     };
   }
 }
 
-// Analyze the structure of the page (doctype, language, main content, etc.)
+// Analyze the structure of the page
 function analyzePageStructure(resources) {
   resources.pageStructure = {
     doctype: document.doctype ? document.doctype.name : 'No DOCTYPE declared',
-    htmlLang: document.documentElement.lang,
+    htmlLang: document.documentElement.lang || 'Not specified',
     headTags: Array.from(document.head.children).map(el => el.tagName),
     bodyClasses: document.body.className,
-    mainContentTag: document.querySelector('main') ? 'main' : (document.querySelector('article') ? 'article' : 'No main content wrapper found'),
+    mainContentTag: document.querySelector('main') ? 'main' : (document.querySelector('article') ? 'article' : 'No main/article tag found'),
     footerPresent: !!document.querySelector('footer'),
     navigationPresent: !!document.querySelector('nav'),
     divCount: document.querySelectorAll('div').length,
@@ -1147,17 +1225,16 @@ function getMaxNestedDepth(tagName) {
     }
     maxDepth = Math.max(maxDepth, depth);
   }
-
   return maxDepth;
 }
 
-// Analyze responsiveness by checking viewport meta, media queries, and layout styles
+// Analyze responsiveness
 function analyzeResponsiveness(resources) {
   resources.responsiveness = {
     viewportMeta: document.querySelector('meta[name="viewport"]')?.content,
     mediaQueries: getMediaQueries(),
-    flexboxUsage: document.querySelectorAll('*').length - document.querySelectorAll('*:not([style*="display: flex"], [style*="display:flex"])').length,
-    gridUsage: document.querySelectorAll('*').length - document.querySelectorAll('*:not([style*="display: grid"], [style*="display:grid"])').length,
+    flexboxUsage: document.querySelectorAll('[style*="display: flex"]').length + document.querySelectorAll('[style*="display:inline-flex"]').length,
+    gridUsage: document.querySelectorAll('[style*="display: grid"]').length + document.querySelectorAll('[style*="display:inline-grid"]').length,
   };
 }
 
@@ -1166,9 +1243,11 @@ function getMediaQueries() {
   const mediaQueries = new Set();
   for (const sheet of document.styleSheets) {
     try {
-      for (const rule of sheet.cssRules) {
-        if (rule instanceof CSSMediaRule) {
-          mediaQueries.add(rule.conditionText);
+      if (sheet.cssRules) {
+        for (const rule of sheet.cssRules) {
+          if (rule instanceof CSSMediaRule) {
+            mediaQueries.add(rule.conditionText);
+          }
         }
       }
     } catch (e) {
@@ -1181,16 +1260,18 @@ function getMediaQueries() {
 // Analyze declared and used fonts
 function analyzeFonts(resources) {
   resources.fonts = {
-    declared: [],
+    declared: new Set(),
     used: new Set()
   };
 
   // Get declared fonts
   for (const sheet of document.styleSheets) {
     try {
-      for (const rule of sheet.cssRules) {
-        if (rule instanceof CSSFontFaceRule) {
-          resources.fonts.declared.push(rule.style.getPropertyValue('font-family').replace(/['"]/g, ''));
+      if (sheet.cssRules) {
+        for (const rule of sheet.cssRules) {
+          if (rule instanceof CSSFontFaceRule) {
+            resources.fonts.declared.add(rule.style.getPropertyValue('font-family').replace(/['"]/g, ''));
+          }
         }
       }
     } catch (e) {
@@ -1206,6 +1287,7 @@ function analyzeFonts(resources) {
     });
   });
 
+  resources.fonts.declared = Array.from(resources.fonts.declared);
   resources.fonts.used = Array.from(resources.fonts.used);
 }
 
@@ -1226,7 +1308,7 @@ function analyzeColors(resources) {
   resources.colors.text = Array.from(resources.colors.text);
 }
 
-// Scan for security headers from meta tags (e.g., CSP, X-Frame-Options)
+// Scan for security headers from meta tags
 function scanSecurityHeaders(resources) {
   resources.securityHeaders = {};
   const metaTags = document.getElementsByTagName('meta');
@@ -1234,25 +1316,25 @@ function scanSecurityHeaders(resources) {
     const httpEquiv = meta.getAttribute('http-equiv');
     if (httpEquiv) {
       const lowerHttpEquiv = httpEquiv.toLowerCase();
-      if (['content-security-policy', 'x-frame-options', 'x-content-type-options', 'strict-transport-security', 'x-xss-protection'].includes(lowerHttpEquiv)) {
+      if (['content-security-policy', 'x-frame-options', 'x-content-type-options', 'strict-transport-security', 'x-xss-protection', 'referrer-policy', 'permissions-policy'].includes(lowerHttpEquiv)) {
         resources.securityHeaders[lowerHttpEquiv] = meta.getAttribute('content');
       }
     }
   }
 }
 
-// Scan for scraping indicators such as CAPTCHA elements or anti-scraping messages
+// Scan for scraping indicators
 function scanScrapingIndicators(resources) {
   resources.scrapingIndicators = new Set();
   // Check for CAPTCHA elements or reCAPTCHA iframes
   const captchaSelectors = ['.g-recaptcha', 'iframe[src*="recaptcha"]', '[class*="captcha"]', '[id*="captcha"]'];
   captchaSelectors.forEach(selector => {
     document.querySelectorAll(selector).forEach(el => {
-      safelyAddToSet(resources.scrapingIndicators, `Detected CAPTCHA element: ${el.outerHTML}`);
+      safelyAddToSet(resources.scrapingIndicators, `Detected CAPTCHA element: ${el.outerHTML.substring(0, 150)}...`);
     });
   });
   
-  // Look for common text patterns that indicate anti-scraping measures
+  // Look for common text patterns
   const bodyText = document.body ? document.body.innerText : "";
   const antiScrapingPatterns = [
     /please verify you are a human/i,
@@ -1261,11 +1343,36 @@ function scanScrapingIndicators(resources) {
     /access denied/i
   ];
   antiScrapingPatterns.forEach(pattern => {
+    pattern.lastIndex = 0; // Reset regex state
     const matches = bodyText.match(pattern);
     if (matches) {
       matches.forEach(match => {
         safelyAddToSet(resources.scrapingIndicators, `Anti-scraping message: ${match}`);
       });
+    }
+  });
+}
+
+// Scan for all data attributes
+function scanDataAttributes(resources) {
+  document.querySelectorAll('*').forEach(el => {
+    const attributes = el.attributes;
+    for (let attr of attributes) {
+      if (attr.name.startsWith('data-')) {
+        safelyAddToSet(resources.data_attributes, `${attr.name}: ${attr.value}`);
+      }
+    }
+  });
+}
+
+// Find potential API endpoints from all collected URLs
+function findApiEndpoints(resources) {
+  const apiPattern = /\b(api|v1|v2|v3|graphql|endpoint|jsonrpc|swagger)\b/i;
+  const allUrls = new Set([...resources.links, ...resources.scripts, ...resources.data, ...resources.iframes, ...resources.media]);
+  
+  allUrls.forEach(url => {
+    if (url && apiPattern.test(url)) {
+      safelyAddToSet(resources.api_endpoints, url);
     }
   });
 }
@@ -1278,29 +1385,57 @@ function generateHTML(resources) {
     data: 'brown', form_data: 'brown', text_data: 'darkgrey', 
     secrets: 'darkred', hidden_forms: 'darkorange', media: 'blueviolet',
     comments: 'grey', iframes: 'coral', websockets: 'darkgreen',
-    third_party: 'indianred'
+    third_party: 'indianred', api_endpoints: 'darkblue', data_attributes: 'darkcyan'
   };
 
   let html = `
     <style>
-      body { font-family: Arial, sans-serif; font-size: 12px; }
-      h3 { cursor: pointer; }
-      ul { list-style-type: none; padding-left: 10px; }
-      li { margin: 5px 0; }
-      .hidden { display: none; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; line-height: 1.5; padding: 20px; }
+      h1 { font-size: 24px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+      h2 { font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+      h3 { cursor: pointer; font-size: 18px; margin-top: 20px; margin-bottom: 5px; }
+      h3::before { content: '► '; font-size: 12px; }
+      h3.active::before { content: '▼ '; }
+      ul { list-style-type: none; padding-left: 20px; margin: 0; }
+      li { margin: 5px 0; word-break: break-all; }
+      .content { display: none; padding-left: 10px; border-left: 3px solid #eee; }
+      .content.hidden { display: none; }
+      .content:not(.hidden) { display: block; }
       .collapsible { font-weight: bold; color: black; }
-      a { font-size: 10px; text-decoration: none; }
-      pre { white-space: pre-wrap; word-wrap: break-word; }
-      .media-preview { max-width: 100px; max-height: 100px; margin-right: 10px; }
+      a { font-size: 12px; text-decoration: none; color: #0066cc; }
+      a:hover { text-decoration: underline; }
+      pre { white-space: pre-wrap; word-wrap: break-word; background: #f4f4f4; padding: 10px; border-radius: 4px; }
+      .media-preview { max-width: 100px; max-height: 100px; margin-right: 10px; vertical-align: middle; }
+      .copy-btn { margin-left: 10px; font-size: 10px; padding: 2px 5px; cursor: pointer; border: 1px solid #ccc; background: #f9f9f9; border-radius: 3px; }
+      #scan-summary ul { padding-left: 0; }
+      #scan-summary li { display: inline-block; background: #eee; padding: 5px 10px; margin: 3px; border-radius: 4px; }
     </style>
-    <h1>Resource Scan Results</h1>
+    <h1>Ripsnort 2.0 Scan: ${document.title}</h1>
   `;
-
+  
+  // Add Scan Summary
+  html += `<div id="scan-summary"><h2>Scan Summary</h2><ul>`;
   Object.entries(resources).forEach(([category, items]) => {
-    if (items && (items.size > 0 || Object.keys(items).length > 0)) {
+      let count = 0;
+      if (items instanceof Set) {
+          count = items.size;
+      } else if (typeof items === 'object' && items !== null) {
+          count = Object.keys(items).length;
+      }
+      if (count > 0) {
+          html += `<li><b>${category.toUpperCase()}:</b> ${count}</li>`;
+      }
+  });
+  html += `</ul></div><hr>`;
+
+  // Add Collapsible Sections
+  Object.entries(resources).forEach(([category, items]) => {
+    const count = (items instanceof Set) ? items.size : (typeof items === 'object' ? Object.keys(items).length : 0);
+    if (count > 0) {
       html += `
-        <h3 class="collapsible" style="color: ${colors[category] || 'black'}">${category.toUpperCase()} (${items.size || Object.keys(items).length})</h3>
-        <div class="content hidden">
+        <h3 class="collapsible" style="color: ${colors[category] || 'black'}">${category.toUpperCase()} (${count})</h3>
+        <button class="copy-btn" data-category="${category}">Copy All</button>
+        <div class="content hidden" id="content-${category}">
       `;
 
       if (items instanceof Set) {
@@ -1317,21 +1452,54 @@ function generateHTML(resources) {
 
   html += `
     <script>
-      document.querySelectorAll('.collapsible').forEach(el => {
-        el.addEventListener('click', () => {
-          el.classList.toggle('active');
-          const content = el.nextElementSibling;
-          content.style.display = content.style.display === 'block' ? 'none' : 'block';
+      document.addEventListener('DOMContentLoaded', function() {
+        // Collapsible sections
+        document.querySelectorAll('.collapsible').forEach(el => {
+          el.addEventListener('click', () => {
+            el.classList.toggle('active');
+            // The content div is the second sibling after the <button>
+            const content = el.nextElementSibling.nextElementSibling;
+            content.classList.toggle('hidden');
+          });
+        });
+
+        // Copy buttons
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Don't trigger the collapse
+            const category = e.target.getAttribute('data-category');
+            const contentEl = document.getElementById('content-' + category);
+            let textToCopy = contentEl.innerText;
+
+            // For JSON, get the raw stringified data
+            if (contentEl.querySelector('pre')) {
+                textToCopy = contentEl.querySelector('pre').innerText;
+            } else if (contentEl.querySelector('ul')) {
+                // For lists, format as a clean list
+                textToCopy = Array.from(contentEl.querySelectorAll('li'))
+                                  .map(li => li.innerText.replace(/\[view\]/g, '').trim())
+                                  .join('\\n');
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+              e.target.textContent = 'Copied!';
+              setTimeout(() => { e.target.textContent = 'Copy All'; }, 2000);
+            }, (err) => {
+              console.error('Could not copy text: ', err);
+              e.target.textContent = 'Error';
+            });
+          });
+        });
+
+        // Auto-open high-value sections
+        const sectionsToOpen = ['SECRETS', 'API_ENDPOINTS', 'SCRAPINGINDICATORS'];
+        document.querySelectorAll('.collapsible').forEach(el => {
+          const sectionName = el.textContent.split(' ')[0];
+          if (sectionsToOpen.includes(sectionName)) {
+            el.click(); // Programmatically click to open
+          }
         });
       });
-
-      function playMedia(url) {
-        const player = document.createElement(url.includes('video') ? 'video' : 'audio');
-        player.src = url;
-        player.controls = true;
-        player.style.maxWidth = '100%';
-        document.body.appendChild(player);
-      }
     </script>
   `;
 
@@ -1342,35 +1510,42 @@ function generateHTML(resources) {
 
 // Format resource items for HTML display based on category
 function formatItem(category, item) {
+  // Escape HTML to prevent self-XSS in the report
+  const escapeHTML = (str) => str.replace(/[&<>"']/g, (m) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m]));
+  const safeItem = escapeHTML(item);
+
   switch (category) {
     case 'images':
-      return `<img src="${item}" alt="img" class="media-preview"><a href="${item}" target="_blank">[view]</a>`;
+      return `<img src="${safeItem}" alt="img" class="media-preview"> ${safeItem} <a href="${safeItem}" target="_blank">[view]</a>`;
     case 'videos':
-      return `<video src="${item}" class="media-preview"></video><a href="${item}" target="_blank">[view]</a>`;
+      return `<video src="${safeItem}" class="media-preview"></video> ${safeItem} <a href="${safeItem}" target="_blank">[view]</a>`;
     case 'audios':
-      return `<audio src="${item}" class="media-preview"></audio><a href="${item}" target="_blank">[view]</a>`;
+      return `<audio src="${safeItem}" class="media-preview"></audio> ${safeItem} <a href="${safeItem}" target="_blank">[view]</a>`;
     case 'documents':
     case 'scripts':
     case 'styles':
     case 'fonts':
     case 'data':
-      return `<a href="${item}" target="_blank">${item}</a>`;
+    case 'links':
+    case 'api_endpoints':
+      return `${safeItem} <a href="${safeItem}" target="_blank">[view]</a>`;
     case 'text_data':
     case 'secrets':
     case 'hidden_forms':
-      return `<pre>${item}</pre>`;
+    case 'data_attributes':
+      return `<pre>${safeItem}</pre>`;
     default:
-      return item;
+      return safeItem;
   }
 }
 
 // Main execution block
 (function () {
   try {
-    console.log("Starting the resource scan...");
+    console.log("Starting Ripsnort v2.0 scan...");
     const resources = fetchResources();
     generateHTML(resources);
-    console.log("Resource scan completed. Results generated.");
+    console.log("Ripsnort scan completed. Results generated.");
   } catch (err) {
     console.error("Error scanning the page:", err);
   }
