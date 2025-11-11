@@ -18,6 +18,7 @@
         <strong>1. Character Removal (Applied first):</strong><br>
         <input type="checkbox" id="removeLower"> <label for="removeLower">Remove lowercase letters (a-z)</label><br>
         <input type="checkbox" id="removeUpper"> <label for="removeUpper">Remove uppercase letters (A-Z)</label><br>
+        <input type="checkbox" id="removeNumbers"> <label for="removeNumbers">Remove numbers (0-9)</label><br>
         <input type="checkbox" id="removeSpecial"> <label for="removeSpecial">Remove special characters (e.g., -, _, @, etc.)</label><br>
         <hr style="margin: 10px 0;">
         <strong>2. Add Text (Applied second):</strong><br>
@@ -25,6 +26,11 @@
         <input type="text" id="prependText" placeholder="Valuation-"><br>
         <label for="appendText" style="display: inline-block; width: 70px;">Append:</label>
         <input type="text" id="appendText" placeholder="_final"><br>
+        <hr style="margin: 10px 0;">
+        <strong>3. Sequential Numbering (Applied last):</strong><br>
+        <input type="checkbox" id="addSeqNum"> <label for="addSeqNum">Add sequential numbers to start of filename</label><br>
+        <label for="startNum" style="display: inline-block; width: 100px; margin-left: 20px;">Start at:</label>
+        <input type="number" id="startNum" value="1" min="1" style="width: 60px;"><br>
     </fieldset>
 
     <button onclick="generatePreview()">Generate Preview</button>
@@ -35,10 +41,6 @@
         // Global variable to hold files for processing
         window.fileProcessingQueue = [];
 
-        /**
-         * [NEW FUNCTION]
-         * Generates the new filename based on selected options.
-         */
         function getNewFileName(originalName) {
             // 1. Separate base name and extension
             const dotIndex = originalName.lastIndexOf('.');
@@ -55,13 +57,13 @@
             // 2. Apply character removal toggles
             const removeLower = document.getElementById('removeLower').checked;
             const removeUpper = document.getElementById('removeUpper').checked;
+            const removeNumbers = document.getElementById('removeNumbers').checked;
             const removeSpecial = document.getElementById('removeSpecial').checked;
 
             if (removeLower) { baseName = baseName.replace(/[a-z]/g, ''); }
             if (removeUpper) { baseName = baseName.replace(/[A-Z]/g, ''); }
+            if (removeNumbers) { baseName = baseName.replace(/[0-9]/g, ''); }
             if (removeSpecial) { 
-                // Removes anything that is NOT a letter or a number
-                // We do this so that if toggles 1 & 2 are off, it doesn't remove letters.
                 baseName = baseName.replace(/[^a-zA-Z0-9]/g, ''); 
             }
 
@@ -74,20 +76,12 @@
             return baseName + extension;
         }
 
-        /**
-         * [NEW FUNCTION]
-         * Called when "Cancel" button in preview is clicked.
-         */
         function cancelPreview() {
             document.getElementById('previewArea').innerHTML = '';
             window.fileProcessingQueue = [];
             document.getElementById('pdfInput').value = ''; // Clear file input
         }
 
-        /**
-         * [MODIFIED]
-         * Renamed from processPDFs. Now generates a preview and a confirmation button.
-         */
         async function generatePreview() {
             const input = document.getElementById('pdfInput');
             const previewArea = document.getElementById('previewArea');
@@ -96,17 +90,37 @@
                 return;
             }
 
+            // Get sequencing options
+            const addNumbers = document.getElementById('addSeqNum').checked;
+            const startAt = parseInt(document.getElementById('startNum').value, 10) || 1;
+            const totalFiles = input.files.length;
+            const maxNum = startAt + totalFiles - 1;
+            const padding = String(maxNum).length; // For zero-padding (e.g., 01, 02...)
+
             window.fileProcessingQueue = []; // Clear previous queue
             let previewHtml = '<h3>Preview of New Filenames:</h3>';
             previewHtml += '<ul style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; list-style-type: none; font-family: monospace;">';
 
-            for (const file of input.files) {
-                const newName = getNewFileName(file.name);
-                window.fileProcessingQueue.push({ file: file, newName: newName });
+            for (let i = 0; i < input.files.length; i++) {
+                const file = input.files[i];
+                // 1. Get name with removal and prepend/append
+                const modifiedName = getNewFileName(file.name);
+                let finalName;
+
+                // 2. Apply sequential numbering if checked
+                if (addNumbers) {
+                    const currentFileNumber = startAt + i;
+                    const numString = String(currentFileNumber).padStart(padding, '0');
+                    finalName = numString + "-" + modifiedName; // e.g., "01-MyFile.pdf"
+                } else {
+                    finalName = modifiedName;
+                }
+
+                window.fileProcessingQueue.push({ file: file, newName: finalName });
                 
                 previewHtml += `<li style="margin-bottom: 5px;">
                     <strong>Old:</strong> ${file.name}<br>
-                    <strong>New:</strong> ${newName}
+                    <strong>New:</strong> ${finalName}
                 </li><hr style="margin: 5px 0;">`;
             }
             
@@ -120,10 +134,6 @@
             document.getElementById('confirmButton').onclick = startProcessing;
         }
 
-        /**
-         * [NEW FUNCTION]
-         * This was the logic from the old processPDFs. It runs the actual processing.
-         */
         async function startProcessing() {
             const filesToProcess = window.fileProcessingQueue;
             if (!filesToProcess || filesToProcess.length === 0) {
@@ -160,10 +170,7 @@
         }
 
 
-        /**
-         * [MODIFIED]
-         * Now accepts a newName parameter and uses it in the return object.
-         */
+        
         async function processSinglePDF(file, newName) {
             try {
                 const arrayBuffer = await file.arrayBuffer();
@@ -192,10 +199,6 @@
             }
         }
 
-        /**
-         * [UNCHANGED]
-         * Decodes page content streams.
-         */
         async function getDecodedContent(page, pdfDoc) {
             const contents = page.node.get(PDFLib.PDFName.of('Contents'));
             const buffers = [];
@@ -247,10 +250,6 @@
             }
         }
 
-        /**
-         * [UNCHANGED]
-         * Encodes and sets the modified page content.
-         */
         async function setEncodedContent(page, pdfDoc, modifiedContent) {
             const newEncoded = pako.deflate(modifiedContent);
             const newDict = PDFLib.PDFDict.withContext(pdfDoc.context);
@@ -261,10 +260,6 @@
             page.node.set(PDFLib.PDFName.of('Contents'), newRef);
         }
 
-        /**
-         * [UNCHANGED]
-         * Triggers the file download.
-         */
         function download(bytes, fileName, mimeType) {
             const blob = new Blob([bytes], { type: mimeType });
             const url = URL.createObjectURL(blob);
