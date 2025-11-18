@@ -1,72 +1,208 @@
 javascript:(function() {
-    // Function to flatten nested objects
-    function flattenObject(obj, parent = '', res = {}) {
-        for (let key in obj) {
-            const propName = parent ? `${parent}.${key}` : key;
-            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                flattenObject(obj[key], propName, res);
-            } else {
-                res[propName] = obj[key];
+    // Store for all our separate tables
+    const tables = {};
+    
+    // Helper to get unique ID
+    const generateId = () => Math.random().toString(36).substr(2, 9);
+
+    // 1. The Relational Extractor
+    function processItem(item, tableName, parentId = null) {
+        if (!tables[tableName]) tables[tableName] = [];
+        
+        const row = {};
+        // Create Primary Key and Foreign Key
+        const currentId = generateId();
+        row['_id'] = currentId;
+        if (parentId) row['_link'] = parentId;
+
+        // We separate "Data" from "Nested Lists"
+        const arraysToProcess = {};
+
+        function flatten(obj, prefix = '') {
+            for (let key in obj) {
+                if (!obj.hasOwnProperty(key)) continue;
+                const val = obj[key];
+                const newKey = prefix ? `${prefix}.${key}` : key;
+
+                if (Array.isArray(val)) {
+                    // It's a list! Save it to process as a child table later
+                    // We use the key name as the new table name (e.g., "legs")
+                    arraysToProcess[newKey] = val;
+                } else if (typeof val === 'object' && val !== null) {
+                    // It's a single object (e.g., address), flatten it into this row
+                    flatten(val, newKey);
+                } else {
+                    // It's a value, add to row
+                    row[newKey] = val;
+                }
             }
         }
-        return res;
+
+        flatten(item);
+        tables[tableName].push(row);
+
+        // Now recurse for the arrays we found
+        for (let arrayKey in arraysToProcess) {
+            // Create a unique table name based on the path (e.g., "legs_openingTimes")
+            // to avoid collisions if multiple things have "openingTimes"
+            const childTableName = tableName === 'main' ? arrayKey : `${tableName}_${arrayKey.split('.').pop()}`;
+            
+            arraysToProcess[arrayKey].forEach(childItem => {
+                if (typeof childItem === 'object' && childItem !== null) {
+                    processItem(childItem, childTableName, currentId);
+                } else {
+                    // Handle arrays of primitives (e.g., ["tag1", "tag2"])
+                    if (!tables[childTableName]) tables[childTableName] = [];
+                    tables[childTableName].push({ 
+                        '_link': currentId, 
+                        'value': childItem 
+                    });
+                }
+            });
+        }
     }
 
-    // Function to create toolbar
-    function createToolbar() {
-        const toolbar = document.createElement('div');
-        toolbar.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #f8f9fa;
-            padding: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 1000;
+    // 2. UI Creator (Tabs/Multiple Tables)
+    function createUI() {
+        // CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            .j2t-container { font-family: sans-serif; padding: 20px; background: #f4f4f4; min-height: 100vh; }
+            .j2t-header { position: fixed; top: 0; left: 0; width: 100%; background: #333; color: white; padding: 10px; z-index: 1000; display: flex; gap: 10px; align-items: center; }
+            .j2t-scroll { margin-top: 60px; }
+            .j2t-table-wrapper { background: white; margin-bottom: 30px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 5px; }
+            .j2t-table-title { font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 10px; text-transform: capitalize; border-bottom: 2px solid #eee; padding-bottom: 5px; display: flex; justify-content: space-between; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #eee; padding: 8px; text-align: left; border: 1px solid #ddd; position: sticky; top: 0; }
+            td { padding: 6px; border: 1px solid #ddd; vertical-align: top; white-space: pre-wrap; }
+            .btn { padding: 5px 10px; background: #fff; color: #333; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; border: 1px solid #ccc; }
+            .btn:hover { background: #e0e0e0; }
+            .key-col { background: #fcf8e3; font-family: monospace; color: #8a6d3b; }
         `;
+        document.head.appendChild(style);
 
-        // Download HTML button
-        const downloadHtmlBtn = document.createElement('button');
-        downloadHtmlBtn.textContent = 'Download as HTML';
-        downloadHtmlBtn.onclick = () => {
-            const htmlContent = document.documentElement.outerHTML;
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'page.html';
-            a.click();
-            URL.revokeObjectURL(url);
-        };
+        const container = document.createElement('div');
+        container.className = 'j2t-container';
 
-        // Download CSV button
-        const downloadCsvBtn = document.createElement('button');
-        downloadCsvBtn.textContent = 'Download as CSV';
-        downloadCsvBtn.onclick = () => {
-            const table = document.querySelector('table');
-            let csv = [];
-            for (let i = 0; i < table.rows.length; i++) {
-                let row = [], cols = table.rows[i].cells;
-                for (let j = 0; j < cols.length; j++) {
-                    row.push('"' + cols[j].textContent.replace(/"/g, '""') + '"');
-                }
-                csv.push(row.join(','));
+        const header = document.createElement('div');
+        header.className = 'j2t-header';
+        header.innerHTML = '<strong>Relational JSON Viewer</strong>';
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn';
+        closeBtn.textContent = 'Close / Reload';
+        closeBtn.onclick = () => window.location.reload();
+        header.appendChild(closeBtn);
+        container.appendChild(header);
+
+        const scrollArea = document.createElement('div');
+        scrollArea.className = 'j2t-scroll';
+        container.appendChild(scrollArea);
+
+        // Render Tables
+        Object.keys(tables).forEach(name => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'j2t-table-wrapper';
+            
+            // Header with CSV download for THIS specific table
+            const title = document.createElement('div');
+            title.className = 'j2t-table-title';
+            title.innerHTML = `<span>Table: ${name} <small>(${tables[name].length} rows)</small></span>`;
+            
+            const dlBtn = document.createElement('button');
+            dlBtn.className = 'btn';
+            dlBtn.textContent = 'Download CSV';
+            dlBtn.onclick = () => downloadCSV(name, tables[name]);
+            title.appendChild(dlBtn);
+            
+            wrapper.appendChild(title);
+
+            const tableEl = document.createElement('table');
+            const rows = tables[name];
+            
+            // Get all unique keys
+            const allKeys = new Set();
+            // Force ID and Link to be first
+            if (rows[0]['_id']) allKeys.add('_id');
+            if (rows[0]['_link']) allKeys.add('_link');
+            rows.forEach(r => Object.keys(r).forEach(k => allKeys.add(k)));
+            const keys = Array.from(allKeys);
+
+            // Table Head
+            const thead = tableEl.createTHead();
+            const tr = thead.insertRow();
+            keys.forEach(k => {
+                const th = document.createElement('th');
+                th.textContent = k;
+                tr.appendChild(th);
+            });
+
+            // Table Body
+            const tbody = tableEl.createTBody();
+            // Limit preview to 100 rows to prevent crashing on massive datasets
+            const previewRows = rows.slice(0, 100); 
+            previewRows.forEach(row => {
+                const tr = tbody.insertRow();
+                keys.forEach(k => {
+                    const td = tr.insertCell();
+                    if (k === '_id' || k === '_link') td.className = 'key-col';
+                    td.textContent = row[k] !== undefined ? row[k] : '';
+                });
+            });
+            
+            if (rows.length > 100) {
+                const tr = tbody.insertRow();
+                const td = tr.insertCell();
+                td.colSpan = keys.length;
+                td.style.textAlign = 'center';
+                td.style.fontStyle = 'italic';
+                td.textContent = `... ${rows.length - 100} more rows hidden (Download CSV to view all) ...`;
             }
-            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'data.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-        };
 
-        // View Source button
-        const viewSourceBtn = document.createElement('button');
-        viewSourceBtn.textContent = 'View Source';
-        viewSourceBtn.onclick = () => {
-            const sourceWindow = window.open('', '_blank');
+            wrapper.appendChild(tableEl);
+            scrollArea.appendChild(wrapper);
+        });
+
+        document.body.innerHTML = '';
+        document.body.appendChild(container);
+    }
+
+    function downloadCSV(filename, data) {
+        if (!data || !data.length) return;
+        const allKeys = new Set();
+        data.forEach(r => Object.keys(r).forEach(k => allKeys.add(k)));
+        const keys = Array.from(allKeys);
+
+        let csv = keys.map(k => `"${k}"`).join(',') + '\n';
+        data.forEach(row => {
+            csv += keys.map(k => {
+                let val = row[k] === undefined ? '' : String(row[k]);
+                return `"${val.replace(/"/g, '""')}"`;
+            }).join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.csv`;
+        a.click();
+    }
+
+    // 3. Main Logic
+    try {
+        const jsonContent = document.body.innerText.trim();
+        const jsonData = JSON.parse(jsonContent);
+        const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
+
+        dataArray.forEach(item => processItem(item, 'main'));
+        createUI();
+
+    } catch (e) {
+        console.error(e);
+        alert("Invalid JSON. Please view a raw JSON page.");
+    }
+})();
             sourceWindow.document.write('<html><body><pre>' + 
                 document.documentElement.outerHTML
                     .replace(/&/g, '&amp;')
