@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termux Doc Master-Sheet</title>
+<style>
+    /* COMPACT, HIGH-DENSITY STYLING */
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #111; background: #fff; padding: 20px; max-width: 1400px; margin: 0 auto; }
+    h1 { border-bottom: 4px solid #222; padding-bottom: 10px; margin-bottom: 20px; }
+    h2 { background: #222; color: #fff; padding: 6px 12px; margin-top: 40px; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: 'Menlo', 'Consolas', 'Monaco', monospace; margin-bottom: 10px; border: 1px solid #ccc; table-layout: fixed; }
+    
+    th { background: #eee; text-align: left; padding: 8px; border: 1px solid #ccc; font-family: sans-serif; font-weight: 700; width: 35%; color: #333; }
+    th.task-col { width: 20%; }
+    
+    td { padding: 6px; border: 1px solid #ddd; vertical-align: top; word-break: break-all; background: #fafafa; }
+    
+    /* SYNTAX HIGHLIGHTING SIMULATION */
+    .cmd { color: #d63384; font-weight: bold; display: block; margin-bottom: 4px; }
+    
+    /* UTILITY CLASSES */
+    .desc { font-family: sans-serif; color: #444; font-weight: 600; display: block; margin-bottom: 2px; font-size: 12px; }
+    .note { font-family: sans-serif; color: #666; font-style: italic; font-size: 10px; display: block; margin-top: 2px; font-weight: normal; }
+    
+    /* TAGS */
+    .tag { display: inline-block; padding: 1px 4px; border-radius: 3px; color: #fff; font-size: 9px; font-family: sans-serif; margin-right: 4px; vertical-align: middle; }
+    .im { background: #663399; } /* ImageMagick */
+    .gs { background: #d35400; } /* Ghostscript */
+    .sh { background: #27ae60; } /* Shell/Utils */
+    .pdf { background: #c0392b; } /* PDF Tools */
+</style>
+</head>
+<body>
+
+<h1>Termux Document Master-Sheet</h1>
+
+<h2>0. System Prep (Installation)</h2>
+<div style="font-family: sans-serif; font-size: 12px; margin-bottom: 15px; background: #e8f4f8; padding: 10px; border-left: 4px solid #007bff;">
+    <strong>Why do I need this?</strong> Linux tools are often bundled. For example, to get the <code>pdftotext</code> command, you must install the <code>poppler</code> package.
+</div>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 25%;">Tool Needed</th>
+            <th style="width: 15%;">Termux Package</th>
+            <th>Install Command</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="desc">The "Everything" Install</span>
+                <span class="note">Installs all tools listed below at once.</span>
+            </td>
+            <td>(All)</td>
+            <td>pkg update && pkg upgrade && pkg install imagemagick ghostscript qpdf exiftool poppler pdfgrep zip python tesseract unpaper pngquant && pip install ocrmypdf</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="desc">pdftotext, pdfimages</span>
+                <span class="note">For extraction.</span>
+            </td>
+            <td><code>poppler</code></td>
+            <td>pkg install poppler</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="desc">magick, convert, montage</span>
+                <span class="note">For image fixing.</span>
+            </td>
+            <td><code>imagemagick</code></td>
+            <td>pkg install imagemagick</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="desc">gs</span>
+                <span class="note">For PDF rewriting/merging.</span>
+            </td>
+            <td><code>ghostscript</code></td>
+            <td>pkg install ghostscript</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="desc">exiftool</span>
+                <span class="note">For metadata/renaming.</span>
+            </td>
+            <td><code>exiftool</code></td>
+            <td>pkg install exiftool</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="desc">ocrmypdf</span>
+                <span class="note">For OCR (Text Layers).</span>
+            </td>
+            <td><code>python</code> (via pip)</td>
+            <td>pkg install python tesseract unpaper pngquant && pip install ocrmypdf</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>1. Image & Scan Enhancement (ImageMagick)</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Single File Command</th>
+            <th>Batch Folder Loop (Copy/Paste)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Recipe A: "Valuation Pro"</span>
+                <span class="note">Fixes skew, cleans noise, mild contrast, vivid color. Best for mixed content.</span>
+            </td>
+            <td>magick -density 200 "IN.pdf" -deskew 40% -despeckle -sigmoidal-contrast 10x50% -modulate 100,130 -unsharp 0x1.5 -quality 90 "OUT.jpg"</td>
+            <td>for f in *.pdf; do magick -density 200 "$f" -deskew 40% -despeckle -sigmoidal-contrast 10x50% -modulate 100,130 -unsharp 0x1.5 -quality 90 "${f%.pdf}.jpg"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Recipe B: "Strict Text"</span>
+                <span class="note">Forces dark grays to black, light grays to white. Best for faded documents.</span>
+            </td>
+            <td>magick -density 200 "IN.pdf" -deskew 40% -despeckle -black-threshold 50% -white-threshold 85% -unsharp 0x1.5 -quality 85 "OUT.jpg"</td>
+            <td>for f in *.pdf; do magick -density 200 "$f" -deskew 40% -despeckle -black-threshold 50% -white-threshold 85% -unsharp 0x1.5 -quality 85 "${f%.pdf}.jpg"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Recipe C: "Grayscale Saver"</span>
+                <span class="note">Converts to B&W to minimize file size.</span>
+            </td>
+            <td>magick -density 150 "IN.pdf" -colorspace Gray -deskew 40% -contrast-stretch 1% -quality 80 "OUT.jpg"</td>
+            <td>for f in *.pdf; do magick -density 150 "$f" -colorspace Gray -deskew 40% -contrast-stretch 1% -quality 80 "${f%.pdf}.jpg"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Format: Lossless PNG</span>
+                <span class="note">For intermediate editing without quality loss.</span>
+            </td>
+            <td>magick -density 300 "IN.pdf" "OUT.png"</td>
+            <td>for f in *.pdf; do magick -density 300 "$f" "${f%.pdf}.png"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Format: WebP (Modern)</span>
+                <span class="note">Google's format. 30-50% smaller than JPG at same quality.</span>
+            </td>
+            <td>magick "IN.jpg" -quality 85 "OUT.webp"</td>
+            <td>for f in *.jpg; do magick "$f" -quality 85 "${f%.jpg}.webp"; done</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>2. PDF Manipulation (Ghostscript / QPDF)</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Single File / List</th>
+            <th>Batch Folder Loop</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Merge PDFs (Simple)</span>
+                <span class="note">Joins files sequentially.</span>
+            </td>
+            <td>gs -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile="MERGED.pdf" -dBATCH "A.pdf" "B.pdf"</td>
+            <td>gs -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile="MERGED_ALL.pdf" -dBATCH *.pdf</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Compress: Ebook (150dpi)</span>
+                <span class="note">Good balance of size/quality.</span>
+            </td>
+            <td>gs -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dNOPAUSE -dBATCH -sOutputFile="small.pdf" "BIG.pdf"</td>
+            <td>mkdir small; for f in *.pdf; do gs -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dNOPAUSE -dBATCH -sOutputFile="small/$f" "$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Compress: Screen (72dpi)</span>
+                <span class="note">Smallest size, low quality.</span>
+            </td>
+            <td>gs -sDEVICE=pdfwrite -dPDFSETTINGS=/screen -dNOPAUSE -dBATCH -sOutputFile="tiny.pdf" "BIG.pdf"</td>
+            <td>mkdir tiny; for f in *.pdf; do gs -sDEVICE=pdfwrite -dPDFSETTINGS=/screen -dNOPAUSE -dBATCH -sOutputFile="tiny/$f" "$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Split into Pages</span>
+                <span class="note">Extracts every page as a separate file.</span>
+            </td>
+            <td>gs -sDEVICE=pdfwrite -o "page-%d.pdf" "IN.pdf"</td>
+            <td>for f in *.pdf; do mkdir "${f%.pdf}_p"; gs -sDEVICE=pdfwrite -o "${f%.pdf}_p/p-%d.pdf" "$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag pdf">QPDF</span><span class="desc">Unlock / Decrypt</span>
+                <span class="note">Removes password (if known).</span>
+            </td>
+            <td>qpdf --decrypt --password=PASS "LOCKED.pdf" "OPEN.pdf"</td>
+            <td># Batch assumes same password<br>for f in *.pdf; do qpdf --decrypt --password=PASS "$f" "unlocked_$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag pdf">QPDF</span><span class="desc">Linearize (Repair)</span>
+                <span class="note">Fixes web viewing & structural errors.</span>
+            </td>
+            <td>qpdf --linearize --replace-input "BROKEN.pdf"</td>
+            <td>for f in *.pdf; do qpdf --linearize --replace-input "$f"; done</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>3. Data Extraction (Poppler / Utils)</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Single File Command</th>
+            <th>Batch Folder Loop</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag pdf">POP</span><span class="desc">Extract Raw Images</span>
+                <span class="note">Saves images embedded in PDF without re-encoding. Highest quality.</span>
+            </td>
+            <td>pdfimages -j "IN.pdf" "image_root_name"</td>
+            <td>for f in *.pdf; do pdfimages -j "$f" "${f%.pdf}_img"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag pdf">POP</span><span class="desc">Extract Text</span>
+                <span class="note">Dumps text layer to .txt file.</span>
+            </td>
+            <td>pdftotext -layout "IN.pdf" "OUT.txt"</td>
+            <td>for f in *.pdf; do pdftotext -layout "$f" "${f%.pdf}.txt"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">GREP</span><span class="desc">Search Inside PDFs</span>
+                <span class="note">Finds PDFs containing a specific word.</span>
+            </td>
+            <td>pdfgrep -H "Invoice" "IN.pdf"</td>
+            <td>pdfgrep -H "Valuation" *.pdf</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>4. Privacy & Metadata (Scrubbers)</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Single File Command</th>
+            <th>Batch Folder Loop</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Nuclear Scrub</span>
+                <span class="note">Rewrites PDF. 100% removal of history/metadata.</span>
+            </td>
+            <td>gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="clean.pdf" -c "[/Producer()/Author()/Title()/DOCINFO pdfmark" -f "IN.pdf"</td>
+            <td>mkdir clean; for f in *.pdf; do gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="clean/$f" -c "[/Producer()/Author()/Title()/DOCINFO pdfmark" -f "$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag gs">GS</span><span class="desc">Inject Title "Valuation"</span>
+                <span class="note">Forces Title tag update during rewrite.</span>
+            </td>
+            <td>gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="titled.pdf" -c "[/Title(Valuation)/DOCINFO pdfmark" -f "IN.pdf"</td>
+            <td>mkdir titled; for f in *.pdf; do gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="titled/$f" -c "[/Title(Valuation)/DOCINFO pdfmark" -f "$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">EXIF</span><span class="desc">Rename from Title</span>
+                <span class="note">Files become "Title.pdf"</span>
+            </td>
+            <td>exiftool '-filename&lt;Title.pdf' "IN.pdf"</td>
+            <td>exiftool '-filename&lt;Title.pdf' -ext pdf .</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">EXIF</span><span class="desc">Rename from Date</span>
+                <span class="note">Files become "YYYY-MM-DD_filename.pdf"</span>
+            </td>
+            <td>exiftool -d %Y-%m-%d '-filename&lt;${CreateDate}_%f.%e' "IN.pdf"</td>
+            <td>exiftool -d %Y-%m-%d '-filename&lt;${CreateDate}_%f.%e' -ext pdf .</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>5. OCR (Text Recognition)</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Single File Command</th>
+            <th>Batch Folder Loop</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag pdf">OCR</span><span class="desc">Add Text Layer</span>
+                <span class="note">Standard processing.</span>
+            </td>
+            <td>ocrmypdf "IN.pdf" "SEARCHABLE.pdf"</td>
+            <td>for f in *.pdf; do ocrmypdf "$f" "ocr_$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag pdf">OCR</span><span class="desc">Force OCR / Redo</span>
+                <span class="note">Ignores existing (bad) text layer.</span>
+            </td>
+            <td>ocrmypdf --force-ocr "IN.pdf" "REDO.pdf"</td>
+            <td>for f in *.pdf; do ocrmypdf --force-ocr "$f" "redo_$f"; done</td>
+        </tr>
+         <tr>
+            <td>
+                <span class="tag pdf">OCR</span><span class="desc">Deskew & Clean</span>
+                <span class="note">Straightens pages before reading text.</span>
+            </td>
+            <td>ocrmypdf --deskew --clean "IN.pdf" "CLEAN.pdf"</td>
+            <td>for f in *.pdf; do ocrmypdf --deskew --clean "$f" "clean_$f"; done</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>6. Termux Life Hacks & File Ops</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="task-col">Task / Goal</th>
+            <th>Command / Trick</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <span class="tag sh">NET</span><span class="desc">Instant File Transfer</span>
+                <span class="note">Host current folder on Wi-Fi. Access via PC browser at PhoneIP:8000.</span>
+            </td>
+            <td>python -m http.server 8000</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">ZIP</span><span class="desc">Encrypted Backup</span>
+                <span class="note">Zip folder with a password.</span>
+            </td>
+            <td>zip -er secrets.zip my_folder/</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">FIND</span><span class="desc">Find Large Files</span>
+                <span class="note">Locate PDFs larger than 10MB.</span>
+            </td>
+            <td>find . -name "*.pdf" -size +10M</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag sh">HASH</span><span class="desc">Find Duplicates</span>
+                <span class="note">Compare files by content (MD5), not name.</span>
+            </td>
+            <td>find . -type f -exec md5sum {} + | sort | uniq -w32 -d</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Watermark "COPY"</span>
+                <span class="note">Add transparent text to center.</span>
+            </td>
+            <td>for f in *.jpg; do magick "$f" -gravity center -pointsize 100 -fill "rgba(0,0,0,0.2)" -annotate 0 "COPY" "wm_$f"; done</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="tag im">IM</span><span class="desc">Contact Sheet</span>
+                <span class="note">Create a grid image of all PDFs (page 1).</span>
+            </td>
+            <td>montage -density 150 -tile 3x0 -geometry 300x+5+5 -border 2 -label "%t" *.pdf[0] "overview.jpg"</td>
+<tr>montage -density 150 -tile 0x0 -geometry 80x+5+5 -border 2 -label "%t" *.pdf[0] "overview.pdf"
+</tr>
+        </tr>
+    </tbody>
+</table>
+
+</body>
+</html>
