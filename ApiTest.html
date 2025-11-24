@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google API Key Tester (Legacy & New APIs)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+            color: #333;
+            flex-direction: column;
+        }
+        .container {
+            text-align: center;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+            max-width: 600px;
+            width: 100%;
+        }
+        input {
+            width: 100%;
+            max-width: 320px;
+            padding: 12px;
+            margin: 12px 0;
+            border: 1px solid #d1d1d1;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #fafafa;
+            color: #333;
+        }
+        button {
+            padding: 12px 24px;
+            background: #333;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #555;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        #map {
+            width: 600px;
+            height: 400px;
+            margin: 24px auto;
+            border: 1px solid #d1d1d1;
+            border-radius: 8px;
+            display: none;
+        }
+        #services {
+            margin-top: 24px;
+            text-align: left;
+            width: 600px;
+            margin: 0 auto;
+        }
+        #services ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #services li {
+            margin: 12px 0;
+            padding: 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .enabled { color: #2ecc71; }
+        .disabled { color: #e74c3c; }
+        .warning { color: #f39c12; font-style: italic; }
+        .legacy { background-color: #f9f9f9; border-left: 4px solid #d1d1d1; }
+        .new { background-color: #ffffff; border-left: 4px solid #e0e0e0; }
+        small { font-size: 12px; color: #666; display: block; margin-top: 8px; }
+        .spinner {
+            border: 2px solid #d1d1d1;
+            border-top: 2px solid #333;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .testing .spinner { display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Google API Key Tester</h2>
+        <p style="font-size: 14px; color: #666;">Enter your Google API key to test both legacy and new APIs. Legacy APIs (e.g., old Places/Directions) are supported for existing projects but cannot be enabled for new ones as of March 2025.</p>
+        <input id="api-key" type="text" placeholder="Enter Google API Key">
+        <br>
+        <button onclick="testKey()">Test Key</button>
+        <div id="status" class="testing">
+            <span id="status-text"></span>
+            <div class="spinner"></div>
+        </div>
+    </div>
+    <div id="map"></div>
+    <div id="services"></div>
+
+    <script>
+        let map = null;
+        let placesService = null;
+
+        async function testKey() {
+            const key = document.getElementById('api-key').value.trim();
+            const statusElement = document.getElementById('status');
+            const statusTextElement = document.getElementById('status-text');
+            const mapElement = document.getElementById('map');
+            const servicesElement = document.getElementById('services');
+
+            // Reset
+            statusTextElement.textContent = 'Testing...';
+            statusElement.classList.add('testing');
+            mapElement.style.display = 'none';
+            servicesElement.innerHTML = '';
+            if (map) map = null;
+            if (placesService) placesService = null;
+
+            if (!key) {
+                statusTextElement.textContent = 'Please enter an API key.';
+                statusElement.classList.remove('testing');
+                statusTextElement.style.color = '#e74c3c';
+                return;
+            }
+
+            let isInvalid = false;
+            let legacyError = false;
+            const originalAlert = window.alert;
+            window.alert = function(msg) {
+                if (msg.toLowerCase().includes('key') || msg.includes('MapError')) {
+                    isInvalid = true;
+                }
+                if (msg.includes('LegacyApiNotActivatedMapError') || msg.includes('legacy API')) {
+                    legacyError = true;
+                }
+            };
+
+            // Remove existing script
+            const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+            if (existingScript) existingScript.remove();
+
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
+            script.async = true;
+            script.defer = true;
+
+            script.onload = async function() {
+                window.alert = originalAlert;
+
+                let mapsStatus = 'Disabled';
+                let mapsDetails = '';
+                if (!isInvalid) {
+                    try {
+                        map = new google.maps.Map(document.getElementById('map'), {
+                            center: { lat: -33.8688, lng: 151.2093 },
+                            zoom: 12
+                        });
+                        mapElement.style.display = 'block';
+                        mapsStatus = 'Enabled';
+                        const bounds = map.getBounds()?.toJSON();
+                        mapsDetails = bounds ? `Map loaded at Sydney (Bounds: Lat ${bounds.south.toFixed(4)}-${bounds.north.toFixed(4)}, Lng ${bounds.west.toFixed(4)}-${bounds.east.toFixed(4)})` : 'Map loaded';
+                        placesService = new google.maps.places.PlacesService(map);
+                    } catch (e) {
+                        isInvalid = true;
+                        mapsDetails = `Error: ${e.message}`;
+                    }
+                }
+
+                const servicesList = document.createElement('ul');
+                servicesElement.appendChild(servicesList);
+                addServiceStatus(servicesList, 'Maps JavaScript API', mapsStatus, mapsStatus === 'Enabled' ? 'enabled' : 'disabled', mapsDetails, 'new');
+
+                if (isInvalid && !legacyError) {
+                    statusTextElement.textContent = 'Invalid Key: Not authorized for Maps API.';
+                    statusTextElement.style.color = '#e74c3c';
+                    statusElement.classList.remove('testing');
+                    return;
+                }
+
+                if (legacyError) {
+                    addServiceStatus(servicesList, 'Legacy Services Note', 'Warning: Legacy APIs (e.g., old Places/Directions) not enabled. Common for new projects.', 'warning', 'Migrate to new APIs for future-proofing.', '');
+                }
+
+                // Test legacy Places API (web service)
+                let legacyPlacesStatus = await testLegacyPlaces(key);
+                addServiceStatus(servicesList, 'Places API (Legacy - Web)', legacyPlacesStatus.status, legacyPlacesStatus.status === 'Enabled' ? 'enabled' : 'disabled', legacyPlacesStatus.details, 'legacy');
+
+                // Test legacy Places JS Service
+                let legacyPlacesJsStatus = await testLegacyPlacesJs(placesService);
+                addServiceStatus(servicesList, 'Places Service (Legacy - JS)', legacyPlacesJsStatus.status, legacyPlacesJsStatus.status === 'Enabled' ? 'enabled' : 'disabled', legacyPlacesJsStatus.details, 'legacy');
+
+                // Test new Places API
+                let newPlacesStatus = await testNewPlaces(key);
+                addServiceStatus(servicesList, 'Places API (New)', newPlacesStatus.status, newPlacesStatus.status === 'Enabled' ? 'enabled' : 'disabled', newPlacesStatus.details, 'new');
+
+                // Test Geocoding API
+                let geocodingStatus = await testGeocoding(key);
+                addServiceStatus(servicesList, 'Geocoding API', geocodingStatus.status, geocodingStatus.status === 'Enabled' ? 'enabled' : 'disabled', geocodingStatus.details, 'new');
+
+                // Test legacy Directions API
+                let legacyDirectionsStatus = await testLegacyDirections(key);
+                addServiceStatus(servicesList, 'Directions API (Legacy)', legacyDirectionsStatus.status, legacyDirectionsStatus.status === 'Enabled' ? 'enabled' : 'disabled', legacyDirectionsStatus.details, 'legacy');
+
+                // Test new Routes API
+                let newRoutesStatus = await testRoutes(key);
+                addServiceStatus(servicesList, 'Routes API (New)', newRoutesStatus.status, newRoutesStatus.status === 'Enabled' ? 'enabled' : 'disabled', newRoutesStatus.details, 'new');
+
+                statusTextElement.textContent = 'Testing complete. Legacy APIs work for existing projects; migrate to new for future-proofing.';
+                statusTextElement.style.color = '#333';
+                statusElement.classList.remove('testing');
+            };
+
+            script.onerror = function() {
+                window.alert = originalAlert;
+                statusTextElement.textContent = 'Error: Failed to load Maps JS API.';
+                statusTextElement.style.color = '#e74c3c';
+                statusElement.classList.remove('testing');
+            };
+
+            document.head.appendChild(script);
+        }
+
+        function addServiceStatus(list, name, status, className, details, type) {
+            const li = document.createElement('li');
+            li.className = type;
+            li.innerHTML = `<strong>${name}:</strong> <span class="${className}">${status}</span>${details ? `<br><small>${details}</small>` : ''}`;
+            list.appendChild(li);
+        }
+
+        async function testLegacyPlaces(key) {
+            try {
+                const res = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=Sydney+Opera+House&key=${encodeURIComponent(key)}`);
+                const data = await res.json();
+                if (data.status === 'OK' && data.results.length > 0) {
+                    return { status: 'Enabled', details: `Found: ${data.results[0].name} (${data.results[0].formatted_address})` };
+                } else if (data.status === 'REQUEST_DENIED') {
+                    return { status: 'Disabled', details: `Error: ${data.error_message || 'Not authorized'}` };
+                } else {
+                    return { status: 'Error', details: `Status: ${data.status}` };
+                }
+            } catch (e) {
+                return { status: 'Error', details: `Failed: ${e.message}` };
+            }
+        }
+
+        function testLegacyPlacesJs(service) {
+            if (!service) return { status: 'Error', details: 'PlacesService not initialized (Maps API failed)' };
+            return new Promise((resolve) => {
+                try {
+                    service.findPlaceFromQuery({
+                        query: 'Sydney Opera House',
+                        fields: ['name', 'formatted_address']
+                    }, (results, status) => {
+                        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+                            resolve({ status: 'Enabled', details: `Found: ${results[0].name} (${results[0].formatted_address})` });
+                        } else if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
+                            resolve({ status: 'Disabled', details: `Request denied: Likely not authorized or legacy not enabled.` });
+                        } else {
+                            resolve({ status: 'Error', details: `Status: ${status}` });
+                        }
+                    });
+                } catch (e) {
+                    resolve({ status: 'Error', details: `Failed: ${e.message}` });
+                }
+            });
+        }
+
+        async function testNewPlaces(key) {
+            try {
+                const res = await fetch(`https://places.googleapis.com/v1/places:searchText?key=${encodeURIComponent(key)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        textQuery: 'Sydney Opera House',
+                        maxResultCount: 1
+                    })
+                });
+                const data = await res.json();
+                if (data.places && data.places.length > 0) {
+                    return { status: 'Enabled', details: `Found: ${data.places[0].displayName.text} (${data.places[0].formattedAddress})` };
+                } else if (res.status === 403) {
+                    return { status: 'Disabled', details: 'Not authorized (REQUEST_DENIED)' };
+                } else {
+                    return { status: 'Error', details: `${data.error?.message || res.status}` };
+                }
+            } catch (e) {
+                return { status: 'Error', details: `Failed: ${e.message}` };
+            }
+        }
+
+        async function testGeocoding(key) {
+            try {
+                const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=Sydney&key=${encodeURIComponent(key)}`);
+                const data = await res.json();
+                if (data.status === 'OK') {
+                    const loc = data.results[0].geometry.location;
+                    return { status: 'Enabled', details: `Found: Lat ${loc.lat.toFixed(4)}, Lng ${loc.lng.toFixed(4)} (${data.results[0].formatted_address})` };
+                } else if (data.status === 'REQUEST_DENIED') {
+                    return { status: 'Disabled', details: `Error: ${data.error_message}` };
+                } else {
+                    return { status: 'Error', details: `Status: ${data.status}` };
+                }
+            } catch (e) {
+                return { status: 'Error', details: `Failed: ${e.message}` };
+            }
+        }
+
+        async function testLegacyDirections(key) {
+            try {
+                const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=Sydney&destination=Melbourne&key=${encodeURIComponent(key)}`);
+                const data = await res.json();
+                if (data.status === 'OK' && data.routes.length > 0) {
+                    const route = data.routes[0].legs[0];
+                    return { status: 'Enabled', details: `Route: ${route.distance.text}, ${route.duration.text}` };
+                } else if (data.status === 'REQUEST_DENIED') {
+                    return { status: 'Disabled', details: `Error: ${data.error_message}` };
+                } else {
+                    return { status: 'Error', details: `Status: ${data.status}` };
+                }
+            } catch (e) {
+                return { status: 'Error', details: `Failed: ${e.message}` };
+            }
+        }
+
+        async function testRoutes(key) {
+            try {
+                const res = await fetch(`https://routes.googleapis.com/directions/v2:computeRoutes?key=${encodeURIComponent(key)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        origin: { address: 'Sydney' },
+                        destination: { address: 'Melbourne' },
+                        travelMode: 'DRIVE',
+                        computeAlternativeRoutes: false,
+                        routeModifiers: { avoidTolls: false, avoidHighways: false, avoidFerries: false }
+                    })
+                });
+                const data = await res.json();
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    return { status: 'Enabled', details: `Route: ${route.distanceMeters / 1000} km, ${Math.round(route.duration.replace('s', '') / 60)} min` };
+                } else if (res.status === 403) {
+                    return { status: 'Disabled', details: 'Not authorized (REQUEST_DENIED)' };
+                } else {
+                    return { status: 'Error', details: `${data.error?.message || res.status}` };
+                }
+            } catch (e) {
+                return { status: 'Error', details: `Failed: ${e.message}` };
+            }
+        }
+    </script>
+</body>
+</html>
