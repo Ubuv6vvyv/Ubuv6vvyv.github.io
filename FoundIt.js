@@ -868,10 +868,6 @@ function extract_info(data) {
   return extract_data;
 }
 
-// ==========================================
-// PASTE THIS AFTER YOUR ORIGINAL REGEX BLOCK
-// ==========================================
-
 (async function() {
     console.clear();
     const LOG_STYLES = {
@@ -885,31 +881,27 @@ function extract_info(data) {
 
     console.log(`%c 🚀 STARTING INTELLIGENT API & PARAMETER SCAN...`, LOG_STYLES.header);
 
-    // --- 1. CONFIGURATION ---
     const CONFIG = {
-        // Files to IGNORE during active probing (don't waste time on images)
+
         ignoredExtensions: ['.jpg','.jpeg','.png','.gif','.svg','.css','.ico','.woff','.woff2','.ttf','.eot','.mp4'],
-        // Keywords that suggest an endpoint might return JSON/Data
+
         apiKeywords: ['api', 'v1', 'v2', 'v3', 'graphql', 'user', 'account', 'settings', 'data', 'json', 'config', 'admin'],
-        // Max endpoints to actively probe (to prevent browser lag/rate limiting)
+
         maxProbeLimit: 30 
     };
 
-    // --- 2. HELPER FUNCTIONS ---
-
-    // Clean quotes and ensure absolute URL
     function normalizeURL(str) {
         if (!str) return null;
         let clean = str.replace(/^['"]|['"]$/g, '').trim();
-        // Remove trailing slashes for consistency
+
         if (clean.endsWith('/')) clean = clean.slice(0, -1);
-        
+
         try {
-            // If valid URL, return it
+
             new URL(clean); 
             return clean;
         } catch (e) {
-            // If relative, make absolute
+
             if (clean.startsWith('/')) {
                 return window.location.origin + clean;
             }
@@ -917,7 +909,6 @@ function extract_info(data) {
         }
     }
 
-    // Check if URL is likely a static asset
     function isStaticAsset(urlStr) {
         try {
             const u = new URL(urlStr);
@@ -926,21 +917,19 @@ function extract_info(data) {
         } catch { return true; }
     }
 
-    // Score a URL to determine if we should active probe it
     function getInterestScore(urlStr) {
         let score = 0;
         const lower = urlStr.toLowerCase();
         if (CONFIG.apiKeywords.some(k => lower.includes(k))) score += 2;
-        if (urlStr.includes('?')) score += 1; // Has params
-        if (!urlStr.split('/').pop().includes('.')) score += 1; // No extension (RESTful)
+        if (urlStr.includes('?')) score += 1; 
+        if (!urlStr.split('/').pop().includes('.')) score += 1; 
         return score;
     }
 
-    // Active Probe: Fetch and check content type
     async function probeEndpoint(url) {
         try {
             const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 3000); // 3s timeout
+            const id = setTimeout(() => controller.abort(), 3000); 
 
             const res = await fetch(url, { 
                 method: 'GET', 
@@ -951,7 +940,7 @@ function extract_info(data) {
 
             const type = res.headers.get('content-type') || '';
             const isJson = type.includes('application/json');
-            
+
             return {
                 url: url,
                 status: res.status,
@@ -964,9 +953,6 @@ function extract_info(data) {
         }
     }
 
-    // --- 3. EXECUTION ---
-
-    // A. Fetch External JS
     let combinedSource = document.documentElement.outerHTML;
     const scripts = Array.from(document.querySelectorAll('script[src]'));
     console.log(`%c 📦 Reading HTML and ${scripts.length} external scripts...`, LOG_STYLES.info);
@@ -976,13 +962,10 @@ function extract_info(data) {
     ));
     combinedSource += "\n" + scriptContents.join("\n");
 
-    // B. Run Regex Extraction (using your original function)
     const rawData = extract_info(combinedSource);
 
-    // C. Process URLs & Paths
     let rawUrls = [...(rawData.url || []), ...(rawData.path || []), ...(rawData.incomplete_path || [])];
-    
-    // Normalize and Deduplicate
+
     let uniqueUrls = new Set();
     rawUrls.forEach(u => {
         const full = normalizeURL(u);
@@ -992,9 +975,8 @@ function extract_info(data) {
     });
 
     let candidates = Array.from(uniqueUrls);
-    
-    // D. Extract Parameters
-    let paramMap = {}; // { "id": ["url1", "url2"] }
+
+    let paramMap = {}; 
     candidates.forEach(u => {
         try {
             const urlObj = new URL(u);
@@ -1005,8 +987,6 @@ function extract_info(data) {
         } catch(e){}
     });
 
-    // E. Filter High-Value Targets for Probing
-    // Sort by "Interest Score" and take top N
     let targetsToProbe = candidates
         .map(u => ({ url: u, score: getInterestScore(u) }))
         .sort((a, b) => b.score - a.score)
@@ -1015,16 +995,12 @@ function extract_info(data) {
 
     console.log(`%c ⚡ Active Probing ${targetsToProbe.length} high-probability endpoints...`, LOG_STYLES.info);
 
-    // F. Run Active Probes
     const probeResults = await Promise.all(targetsToProbe.map(probeEndpoint));
     const jsonEndpoints = probeResults.filter(r => r.valid && r.isJson);
     const aliveEndpoints = probeResults.filter(r => r.valid && !r.isJson && r.status === 200);
 
-    // --- 4. OUTPUT ---
-    
     console.log(`%c 🏁 SCAN COMPLETE`, LOG_STYLES.header);
 
-    // OUTPUT 1: Secrets (From your original regex)
     const secrets = [...new Set(rawData.secret || [])];
     if (secrets.length > 0) {
         console.group('%c 🧨 CRITICAL: Hardcoded Secrets Found', LOG_STYLES.danger);
@@ -1032,7 +1008,6 @@ function extract_info(data) {
         console.groupEnd();
     }
 
-    // OUTPUT 2: JSON Endpoints (The Gold Mine)
     if (jsonEndpoints.length > 0) {
         console.group('%c 💎 VERIFIED JSON ENDPOINTS (Clickable)', LOG_STYLES.success);
         console.log("These endpoints responded with application/json. Inspect them!");
@@ -1043,7 +1018,6 @@ function extract_info(data) {
         console.groupEnd();
     }
 
-    // OUTPUT 3: URL Parameters (For Fuzzing)
     const paramsFound = Object.keys(paramMap);
     if (paramsFound.length > 0) {
         console.groupCollapsed(`%c 🧩 Discovered Parameters (${paramsFound.length})`, LOG_STYLES.warning);
@@ -1052,14 +1026,12 @@ function extract_info(data) {
         console.groupEnd();
     }
 
-    // OUTPUT 4: Other Alive Endpoints
     if (aliveEndpoints.length > 0) {
         console.groupCollapsed(`%c 🔗 Other Alive Endpoints (Status 200)`, LOG_STYLES.info);
         aliveEndpoints.forEach(e => console.log(e.url));
         console.groupEnd();
     }
 
-    // OUTPUT 5: All Candidate URLs (Raw List)
     console.groupCollapsed('📂 Full List of Unique/Cleaned Paths');
     candidates.forEach(c => console.log(c));
     console.groupEnd();
