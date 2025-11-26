@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Ultimate Scraper – Enhanced UI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin:0; background:#0d1117; color:#c9d1d9; padding:10px; }
+        h1 { text-align:center; color:#58a6ff; font-size:24px; margin:10px 0; }
+        .container { max-width:100%; margin:auto; display:flex; flex-direction:column; gap:10px; }
+        .panel { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:15px; }
+        #map { height:300px; border:2px solid #58a6ff; border-radius:8px; }
+        input, select, button { padding:8px; margin:5px 0; width:100%; border-radius:6px; border:none; box-sizing:border-box; }
+        button { background:#238636; color:white; font-weight:bold; cursor:pointer; }
+        button:hover { background:#2ea043; }
+        button.extreme { background:#b62324; }
+        button.extreme:hover { background:#d73a3a; }
+        .checkbox-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:5px; margin:10px 0; }
+        #output { background:#010409; color:#7fffd4; font-family:monospace; padding:10px; height:400px; overflow:auto; border-radius:8px; font-size:14px; }
+        .warning { background:#3d1f00; color:#ff9f0a; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; }
+        .mode { font-size:18px; margin:5px 0; color:#79c0ff; }
+        @media (min-width: 768px) {
+            .container { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+            #map { height:600px; }
+            h1 { font-size:28px; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Google Maps Ultimate Scraper</h1>
+<p style="text-align:center; color:#8b949e; font-size:14px;">Responsive UI: Works great on mobile/portrait. Choose your search intensity.</p>
+
+<div class="container">
+    <!-- Controls Panel -->
+    <div class="panel">
+        <h2 style="font-size:18px; margin:5px 0;">Location & Search</h2>
+        <input type="text" id="center" placeholder="City/Address (default: Melbourne)" value="Melbourne, Australia">
+        <button onclick="findMyLocation()">Find My Location</button>
+        <input type="number" id="radius" placeholder="Radius (meters, default 5000)" value="5000" min="500" max="50000">
+        
+        <select id="preset" onchange="setPreset()">
+            <option value="">Custom Search (type below)</option>
+            <option value="restaurants">Restaurants</option>
+            <option value="cafes">Cafes</option>
+            <option value="hotels">Hotels</option>
+            <option value="schools">Schools</option>
+            <option value="hospitals">Hospitals</option>
+            <option value="parks">Parks</option>
+            <option value="museums">Museums</option>
+            <option value="bars">Bars</option>
+            <option value="gas stations">Gas Stations</option>
+            <option value="pharmacies">Pharmacies</option>
+            <option value="barbers">Barbers</option>
+        </select>
+        <input type="text" id="keyword" placeholder="Keyword (or use preset above)" value="">
+
+        <h2 style="font-size:18px; margin:5px 0;">Extract Data</h2>
+        <div class="checkbox-grid">
+            <label><input type="checkbox" id="extractName" checked> Name</label>
+            <label><input type="checkbox" id="extractAddress" checked> Address</label>
+            <label><input type="checkbox" id="extractRating" checked> Rating</label>
+            <label><input type="checkbox" id="extractPhone" checked> Phone</label>
+            <label><input type="checkbox" id="extractWebsite" checked> Website</label>
+            <label><input type="checkbox" id="extractHours"> Opening Hours</label>
+            <label><input type="checkbox" id="extractReviews" checked> Reviews (up to 5)</label>
+            <label><input type="checkbox" id="extractPhotos"> Photos (up to 3)</label>
+            <label><input type="checkbox" id="extractReverse"> Reverse Geocode</label>
+        </div>
+
+        <h2 style="font-size:18px; margin:5px 0;">Search Intensity</h2>
+        <div class="mode">Low (Quick, Low Cost)</div>
+        <button onclick="startSearch('single')">Quick Single Search (~1-20 places)</button>
+        <button onclick="startSearch('pagination')">Paginated Search (~20-60 places)</button>
+
+        <div class="mode">Medium (Detailed, Moderate Cost)</div>
+        <button onclick="startSearch('grid')">Grid Search (~100 calls)</button>
+        <button onclick="startSearch('spiral')">Spiral Search (~300 calls)</button>
+
+        <div class="mode">High (Extreme, High Cost)</div>
+        <button class="extreme" onclick="startSearch('insane')">Insane Mode (Grid + Spiral + Deep Dive)</button>
+        <button class="extreme" onclick="deepDiveEverything()">Deep Dive All Places</button>
+
+        <h2 style="font-size:18px; margin:5px 0;">Export Options</h2>
+        <button onclick="exportTXT()">Export TXT</button>
+        <button onclick="exportHTML()">Export HTML Table</button>
+        <button onclick="exportJSON()">Export JSON</button>
+        <button onclick="exportCSV()">Export CSV</button>
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+
+    <!-- Map + Output -->
+    <div>
+        <div id="map"></div>
+        <pre id="output" class="warning">Loading map... Default: Melbourne, Australia. After search, details will auto-extract if selected.</pre>
+    </div>
+</div>
+
+<script>
+    const API_KEY = 'AIzaSyDLQb7ZkPE2NufhvDOCrZzWmPsEzxJnFTE';
+    let map, placesService, geocoder, autocomplete;
+    let allPlaces = [];
+    let markers = [];
+    let currentCenter = { lat: -37.8136, lng: 144.9631 };
+    const output = document.getElementById('output');
+
+    function log(msg) {
+        output.textContent += `[${new Date().toISOString().slice(11,19)}] ${msg}\n`;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: currentCenter,
+            zoom: 12
+        });
+        placesService = new google.maps.places.PlacesService(map);
+        geocoder = new google.maps.Geocoder();
+        initAutocomplete();
+        log('Ready. Use controls to search and extract.');
+    }
+
+    function initAutocomplete() {
+        const input = document.getElementById('center');
+        autocomplete = new google.maps.places.Autocomplete(input);
+        autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            if (place.geometry) {
+                currentCenter = place.geometry.location.toJSON();
+                map.setCenter(currentCenter);
+                log(`Location set to: ${place.formatted_address}`);
+            }
+        });
+    }
+
+    function findMyLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                currentCenter = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                map.setCenter(currentCenter);
+                document.getElementById('center').value = `${currentCenter.lat}, ${currentCenter.lng}`;
+                log(`Found your location: ${currentCenter.lat}, ${currentCenter.lng}`);
+            }, err => {
+                log(`Geolocation error: ${err.message}`);
+            });
+        } else {
+            log('Geolocation not supported.');
+        }
+    }
+
+    function setPreset() {
+        const preset = document.getElementById('preset').value;
+        document.getElementById('keyword').value = preset;
+    }
+
+    function getOptions() {
+        return {
+            keyword: document.getElementById('keyword').value || 'restaurant',
+            extractName: document.getElementById('extractName').checked,
+            extractAddress: document.getElementById('extractAddress').checked,
+            extractRating: document.getElementById('extractRating').checked,
+            extractPhone: document.getElementById('extractPhone').checked,
+            extractWebsite: document.getElementById('extractWebsite').checked,
+            extractHours: document.getElementById('extractHours').checked,
+            extractReviews: document.getElementById('extractReviews').checked,
+            extractPhotos: document.getElementById('extractPhotos').checked,
+            extractReverse: document.getElementById('extractReverse').checked
+        };
+    }
+
+    function needsDetails(opts) {
+        return opts.extractAddress || opts.extractPhone || opts.extractWebsite || opts.extractHours || opts.extractReviews || opts.extractPhotos || opts.extractReverse;
+    }
+
+    async function startSearch(mode) {
+        allPlaces = []; clearMarkers();
+        const centerInput = document.getElementById('center').value || "Melbourne, Australia";
+        const radius = parseInt(document.getElementById('radius').value) || 5000;
+        const opts = getOptions();
+
+        if (!opts.keyword) {
+            log('Please enter a keyword or select a preset.');
+            return;
+        }
+
+        log(`Starting ${mode.toUpperCase()} search for "${opts.keyword}"...`);
+
+        const center = await new Promise(resolve => {
+            geocoder.geocode({ address: centerInput }, (results, status) => {
+                if (status === 'OK') {
+                    resolve(results[0].geometry.location.toJSON());
+                } else {
+                    log('Geocoding failed, using Melbourne default.');
+                    resolve({ lat: -37.8136, lng: 144.9631 });
+                }
+            });
+        });
+        currentCenter = center;
+        map.setCenter(center);
+
+        if (mode === 'single') doNearbySearch(center, radius, opts);
+        if (mode === 'pagination') doNearbySearch(center, radius, opts, true);
+        if (mode === 'grid') doGridSearch(center, radius, opts);
+        if (mode === 'spiral') doSpiralSearch(center, radius, opts);
+        if (mode === 'insane') {
+            doGridSearch(center, radius, opts);
+            setTimeout(() => doSpiralSearch(center, radius * 2, opts), 5000);
+            setTimeout(deepDiveEverything, 10000);
+        }
+
+        if (needsDetails(opts)) {
+            log('Details extraction will start automatically in 5 seconds...');
+            setTimeout(deepDiveEverything, 5000);
+        }
+    }
+
+    function doNearbySearch(center, radius, opts, paginate = false) {
+        const request = { location: center, radius, keyword: opts.keyword };
+        placesService.nearbySearch(request, (results, status, pagination) => {
+            if (status === 'OK') {
+                results.forEach(place => addUniquePlace(place));
+                log(`Found ${results.length} places (total unique: ${allPlaces.length})`);
+                if (paginate && pagination?.hasNextPage) {
+                    log('Fetching next page...');
+                    setTimeout(() => pagination.nextPage(), 2000);
+                }
+            } else log(`Search failed: ${status}`);
+        });
+    }
+
+    function doGridSearch(center, radius, opts) {
+        const gridSize = 2;
+        const step = radius / gridSize;
+        let calls = 0;
+        for (let x = -gridSize; x <= gridSize; x++) {
+            for (let y = -gridSize; y <= gridSize; y++) {
+                const latOffset = x * step * 0.00001;
+                const lngOffset = y * step * 0.00001;
+                doNearbySearch({ lat: center.lat + latOffset, lng: center.lng + lngOffset }, radius / 2, opts);
+                calls++;
+            }
+        }
+        log(`Grid search launched (${calls} calls)`);
+    }
+
+    function doSpiralSearch(center, maxRadius, opts) {
+        let calls = 0;
+        for (let r = 1000; r <= maxRadius; r += 2000) {
+            for (let angle = 0; angle < 360; angle += 30) {
+                const rad = angle * Math.PI / 180;
+                const lat = center.lat + (r / 111000) * Math.cos(rad);
+                const lng = center.lng + (r / 111000) * Math.sin(rad) / Math.cos(center.lat * Math.PI / 180);
+                doNearbySearch({ lat, lng }, 3000, opts);
+                calls++;
+            }
+        }
+        log(`Spiral search launched (~${calls} calls)`);
+    }
+
+    function addUniquePlace(place) {
+        if (!allPlaces.find(p => p.place_id === place.place_id)) {
+            allPlaces.push(place);
+            addMarker(place.geometry.location, place.name);
+        }
+    }
+
+    function deepDiveEverything() {
+        const opts = getOptions();
+        if (allPlaces.length === 0) {
+            log('No places found to dive into.');
+            return;
+        }
+        log(`Deep diving ${allPlaces.length} places for selected details...`);
+        allPlaces.forEach((place, i) => {
+            setTimeout(() => {
+                const fields = ['url'];
+                if (opts.extractName) fields.push('name');
+                if (opts.extractAddress) fields.push('formatted_address');
+                if (opts.extractRating) fields.push('rating');
+                if (opts.extractPhone) fields.push('formatted_phone_number');
+                if (opts.extractWebsite) fields.push('website');
+                if (opts.extractHours) fields.push('opening_hours');
+                if (opts.extractReviews) fields.push('reviews');
+                if (opts.extractPhotos) fields.push('photos');
+
+                placesService.getDetails({ placeId: place.place_id, fields }, (details, status) => {
+                    if (status === 'OK') {
+                        place.fullDetails = details;
+                        if (opts.extractPhotos && details.photos) {
+                            place.photoUrls = details.photos.slice(0, 3).map(photo => photo.getUrl({ maxWidth: 800 }));
+                        }
+                        if (opts.extractReverse) {
+                            geocoder.geocode({ location: place.geometry.location }, (results, revStatus) => {
+                                if (revStatus === 'OK') place.reverseAddress = results[0].formatted_address;
+                            });
+                        }
+                        log(`Dived ${i+1}/${allPlaces.length}: ${details.name || place.name}`);
+                    } else {
+                        log(`Dive failed for ${place.name}: ${status}`);
+                    }
+                });
+            }, i * 100);
+        });
+    }
+
+    function addMarker(loc, title) {
+        markers.push(new google.maps.Marker({ position: loc, map, title }));
+    }
+
+    function clearMarkers() {
+        markers.forEach(m => m.setMap(null));
+        markers = [];
+    }
+
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c * 1000;
+    }
+
+    function getSortedPlaces() {
+        return [...allPlaces].sort((a, b) => {
+            const distA = calculateDistance(currentCenter.lat, currentCenter.lng, a.geometry.location.lat(), a.geometry.location.lng());
+            const distB = calculateDistance(currentCenter.lat, currentCenter.lng, b.geometry.location.lat(), b.geometry.location.lng());
+            return distA - distB;
+        });
+    }
+
+    function buildData(place) {
+        const d = place.fullDetails || {};
+        const opts = getOptions();
+        let data = {};
+        data.distance = calculateDistance(currentCenter.lat, currentCenter.lng, place.geometry.location.lat(), place.geometry.location.lng()).toFixed(0) + 'm';
+        if (opts.extractName) data.name = d.name || place.name || 'N/A';
+        if (opts.extractAddress) data.address = d.formatted_address || place.reverseAddress || 'N/A';
+        if (opts.extractRating) data.rating = (d.rating || place.rating) ? `${d.rating || place.rating}/5` : 'N/A';
+        if (opts.extractPhone) data.phone = d.formatted_phone_number || 'N/A';
+        if (opts.extractWebsite) data.website = d.website || 'N/A';
+        data.googleMapsUrl = d.url || `https://www.google.com/maps/search/?api=1&query=${place.geometry.location.lat()},${place.geometry.location.lng()}&query_place_id=${place.place_id}`;
+        if (opts.extractHours && d.opening_hours) data.hours = d.opening_hours.weekday_text?.join('\n') || 'N/A';
+        if (opts.extractReviews && d.reviews) data.reviews = d.reviews.slice(0,5).map(r => `${r.author_name}: ${r.text} (${r.rating})`).join('\n');
+        if (opts.extractPhotos && place.photoUrls) data.photos = place.photoUrls.join('\n');
+        data.lat = place.geometry.location.lat();
+        data.lng = place.geometry.location.lng();
+        data.place_id = place.place_id;
+        return data;
+    }
+
+    function exportTXT() {
+        if (allPlaces.length === 0) { log('No data to export.'); return; }
+        const sorted = getSortedPlaces();
+        let txt = `Google Maps Scrape - ${new Date().toLocaleString()}\nTotal: ${allPlaces.length}\n\n`;
+        sorted.forEach((place, i) => {
+            const data = buildData(place);
+            txt += `${i+1}. ${data.name || place.name} (Distance: ${data.distance})\n`;
+            for (let key in data) {
+                if (key !== 'name' && key !== 'lat' && key !== 'lng' && key !== 'place_id') txt += `   ${key.charAt(0).toUpperCase() + key.slice(1)}: ${data[key]}\n`;
+            }
+            txt += '\n---\n';
+        });
+        download(txt, 'scrape.txt', 'text/plain;charset=utf-8');
+    }
+
+    function exportHTML() {
+        if (allPlaces.length === 0) { log('No data to export.'); return; }
+        const sorted = getSortedPlaces();
+        let html = `<html><head><title>Scrape Results</title><style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background: #f2f2f2; } td { white-space: pre-wrap; } a { color: #0066cc; text-decoration: none; } a:hover { text-decoration: underline; }</style></head><body><h1>Google Maps Scrape</h1><table><tr>`;
+        const opts = getOptions();
+        const headers = ['Distance'];
+        if (opts.extractName) headers.push('Name');
+        if (opts.extractAddress) headers.push('Address');
+        if (opts.extractRating) headers.push('Rating');
+        if (opts.extractPhone) headers.push('Phone');
+        if (opts.extractWebsite) headers.push('Website');
+        headers.push('Google Maps Link');
+        if (opts.extractHours) headers.push('Hours');
+        if (opts.extractReviews) headers.push('Reviews');
+        if (opts.extractPhotos) headers.push('Photos');
+        headers.push('Lat', 'Lng');
+        html += headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        sorted.forEach(place => {
+            const data = buildData(place);
+            html += '<tr>' + headers.map(h => {
+                if (h === 'Distance') return `<td>${data.distance}</td>`;
+                if (h === 'Google Maps Link') return `<td><a href="${data.googleMapsUrl}" target="_blank">View on Maps</a></td>`;
+                if (h === 'Website') return `<td>${data.website !== 'N/A' ? `<a href="${data.website}" target="_blank">${data.website}</a>` : 'N/A'}</td>`;
+                if (h === 'Lat') return `<td>${data.lat}</td>`;
+                if (h === 'Lng') return `<td>${data.lng}</td>`;
+                return `<td>${(data[h.toLowerCase()] || 'N/A').replace(/\n/g, '<br>')}</td>`;
+            }).join('') + '</tr>';
+        });
+        html += '</table></body></html>';
+        download(html, 'scrape.html', 'text/html;charset=utf-8');
+    }
+
+    function exportJSON() {
+        if (allPlaces.length === 0) { log('No data to export.'); return; }
+        const sorted = getSortedPlaces();
+        const jsonData = sorted.map(place => buildData(place));
+        download(JSON.stringify(jsonData, null, 2), 'scrape.json', 'application/json;charset=utf-8');
+    }
+
+    function exportCSV() {
+        if (allPlaces.length === 0) { log('No data to export.'); return; }
+        const sorted = getSortedPlaces();
+        const opts = getOptions();
+        const headers = ['Distance'];
+        if (opts.extractName) headers.push('Name');
+        if (opts.extractAddress) headers.push('Address');
+        if (opts.extractRating) headers.push('Rating');
+        if (opts.extractPhone) headers.push('Phone');
+        if (opts.extractWebsite) headers.push('Website');
+        headers.push('Google Maps Link');
+        if (opts.extractHours) headers.push('Hours');
+        if (opts.extractReviews) headers.push('Reviews');
+        if (opts.extractPhotos) headers.push('Photos');
+        headers.push('Lat', 'Lng', 'Place ID');
+
+        let csv = headers.join(',') + '\n';
+        sorted.forEach(place => {
+            const data = buildData(place);
+            csv += headers.map(h => {
+                if (h === 'Distance') return data.distance;
+                if (h === 'Google Maps Link') return data.googleMapsUrl;
+                if (h === 'Lat') return data.lat;
+                if (h === 'Lng') return data.lng;
+                if (h === 'Place ID') return data.place_id;
+                let val = data[h.toLowerCase()] || 'N/A';
+                val = val.replace(/"/g, '""').replace(/\n/g, ' ');
+                return `"${val}"`;
+            }).join(',') + '\n';
+        });
+        download(csv, 'scrape.csv', 'text/csv;charset=utf-8');
+    }
+
+    function download(content, filename, type) {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        log(`Exported ${filename}`);
+    }
+
+    function clearAll() {
+        clearMarkers();
+        allPlaces = [];
+        output.textContent = 'Cleared. Ready for new search.\n';
+    }
+</script>
+
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDLQb7ZkPE2NufhvDOCrZzWmPsEzxJnFTE&libraries=places&callback=initMap"></script>
+</body>
+</html>
