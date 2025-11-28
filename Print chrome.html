@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Deep Cast Scan</title>
+    <style>
+        body { background-color: #050505; color: #00ff41; font-family: 'Courier New', monospace; padding: 30px; font-size: 20px; overflow-y: auto; }
+        h1, h2 { border-bottom: 1px solid #00ff41; margin-top: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .row { display: flex; justify-content: space-between; border-bottom: 1px solid #222; padding: 4px 0; }
+        .key { color: #fff; font-weight: bold; }
+        .val { color: #00ff41; text-align: right; }
+        .val.no { color: #ff3333; }
+        .val.yes { color: #00ff41; }
+    </style>
+</head>
+<body>
+
+    <h1>// SYSTEM INTERNALS</h1>
+    <div id="sys-data"></div>
+
+    <h2>// CODEC SUPPORT (Media Source)</h2>
+    <div id="codec-data"></div>
+
+    <h2>// GRAPHICS & FINGERPRINT</h2>
+    <div id="gfx-data"></div>
+
+    <script>
+        function log(id, key, val, isBool = false) {
+            const el = document.getElementById(id);
+            const row = document.createElement('div');
+            row.className = 'row';
+            let valClass = 'val';
+            if (isBool) valClass += (val ? ' yes' : ' no');
+            
+            // Format boolean to text if needed
+            let displayVal = val;
+            if (isBool && val === true) displayVal = "SUPPORTED";
+            if (isBool && val === false) displayVal = "UNSUPPORTED";
+
+            row.innerHTML = `<span class="key">${key}</span> <span class="val ${valClass}">${displayVal}</span>`;
+            el.appendChild(row);
+        }
+
+        // --- 1. System & Network ---
+        log('sys-data', 'User Agent', navigator.userAgent.replace('Mozilla/5.0', ''));
+        log('sys-data', 'Touch Points', navigator.maxTouchPoints);
+        log('sys-data', 'Cookies Enabled', navigator.cookieEnabled, true);
+        
+        // Network Info (Chromium specific)
+        if (navigator.connection) {
+            log('sys-data', 'Connection Type', navigator.connection.effectiveType || "Unknown");
+            log('sys-data', 'Downlink (Est)', navigator.connection.downlink + " Mbps");
+            log('sys-data', 'Save Data Mode', navigator.connection.saveData, true);
+        }
+
+        // --- 2. Codec Support ---
+        // We check if the browser can play specific high-value formats
+        const codecs = [
+            { name: 'MP4 (H.264)', type: 'video/mp4; codecs="avc1.42E01E"' },
+            { name: 'WebM (VP9)', type: 'video/webm; codecs="vp9"' },
+            { name: 'HEVC (H.265)', type: 'video/mp4; codecs="hevc"' }, // Crucial for 4K
+            { name: 'Ogg Theora', type: 'video/ogg; codecs="theora"' },
+            { name: 'FLAC Audio', type: 'audio/flac' },
+            { name: 'Dolby Digital (AC-3)', type: 'audio/mp4; codecs="ac-3"' }
+        ];
+
+        codecs.forEach(c => {
+            const canPlay = document.createElement('video').canPlayType(c.type);
+            const supported = (canPlay === "probably" || canPlay === "maybe");
+            log('codec-data', c.name, supported, true);
+        });
+
+        // --- 3. Canvas Fingerprint ---
+        // Draw a hidden image and hash it. Used to identify unique hardware rendering.
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = "top";
+            ctx.font = "14px 'Arial'";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#f60";
+            ctx.fillRect(125,1,62,20);
+            ctx.fillStyle = "#069";
+            ctx.fillText("CATT_TERMUX_TEST", 2, 15);
+            ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+            ctx.fillText("CATT_TERMUX_TEST", 4, 17);
+            
+            // Generate a hash of the image data
+            const dataURI = canvas.toDataURL();
+            let hash = 0;
+            for (let i = 0; i < dataURI.length; i++) {
+                const char = dataURI.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            log('gfx-data', 'Canvas Hash', hash);
+            
+            // WebGL Renderer Info again (important context)
+            const gl = canvas.getContext('webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            log('gfx-data', 'GPU', gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
+            
+        } catch (e) {
+            log('gfx-data', 'Canvas/WebGL', 'Error');
+        }
+
+    </script>
+</body>
+</html>
