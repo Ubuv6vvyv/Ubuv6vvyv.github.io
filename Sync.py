@@ -4,7 +4,7 @@ import glob
 import random
 BPM = 155
 BEATS_PER_CUT = 4   
-MAX_DURATION = 180  
+MAX_DURATION = 30  
 OUTPUT_FILE = "shuffle_sync.mp4"
 SHUFFLE_SEGMENTS = True
 WIDTH = 1080
@@ -30,13 +30,13 @@ for ext in extensions:
     files.extend(glob.glob(ext))
 files.sort()
 if not files:
-    print("No files found!")
+    print("No files found idiot!")
     exit()
 print(f"BPM: {BPM} | Cut Length: {seconds_per_cut:.3f}s")
 print(f"Shuffle Mode: {'ON' if SHUFFLE_SEGMENTS else 'OFF'}")
 segment_pool = []
 scaling_filter = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},setsar=1"
-print("Inventorying available segments...")
+print("Checking. Finding segments...")
 for f in files:
     if f.lower().endswith(('.jpg', '.png', '.jpeg')):
         photo_slots = int(max_chunks * 0.05) 
@@ -71,12 +71,12 @@ if SHUFFLE_SEGMENTS:
                 found_match = True
                 break
         if not found_match:
-            print("Only duplicates remain in pool. Stopping early to prevent repetition.")
+            print("Only duplicates remain in pool. Stopping early")
             break
 else:
     segment_pool.sort(key=lambda x: (x['file'], x['start']))
     final_playlist = segment_pool[:max_chunks] 
-print(f"Generated {len(final_playlist)} unique cuts.")
+print(f"Generated {len(final_playlist)} unique cuts. Hold on...")
 concat_list = []
 generated_chunks = 0
 for i, clip in enumerate(final_playlist):
@@ -112,7 +112,7 @@ for i, clip in enumerate(final_playlist):
     subprocess.run(cmd)
     concat_list.append(f"file '{chunk_name}'")
 if concat_list:
-    print(f"Stitching clips...")
+    print(f"Stitching clips... calm down...")
     with open("mylist.txt", "w") as f:
         for item in concat_list:
             f.write(f"{item}\n")
@@ -124,6 +124,6 @@ if concat_list:
         fname = chunk.split("'")[1]
         if os.path.exists(fname): os.remove(fname)
     os.remove("mylist.txt")
-    print(f"Done! Saved as {OUTPUT_FILE}")
+    print(f"Its done. Saved as {OUTPUT_FILE}")
 else:
     print("Could not generate any clips.")
