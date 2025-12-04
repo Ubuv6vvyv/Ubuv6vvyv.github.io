@@ -5,7 +5,9 @@
     <meta content="width=device-width,initial-scale=1" name=viewport>
     <title> Detector v5.1</title>
     <script src=https://cdn.tailwindcss.com></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sansation:wght@300;400;700&display=swap" rel=stylesheet>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quattrocento:wght@400;700&family=SUSE+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #f8fafc;
@@ -16,7 +18,8 @@
         }
 
         body {
-            font-family: 'Sansation', sans-serif;
+            font-family: "Quattrocento", serif;
+  font-weight: 400;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
@@ -24,13 +27,16 @@
 
         .editor {
             min-height: 300px;
+max-height: 300px;
             border: 2px solid #cbd5e1;
-            padding: 1.5rem;
+            padding: 1.2rem;
             background: #fff;
             border-radius: 12px;
-            font-family: 'Georgia', serif;
-            font-size: 1.05rem;
+            font-family: "Quattrocento", serif;
+  font-weight: 400;
+            font-size: 0.6rem;
             white-space: pre-wrap;
+overflow: auto;
         }
 
         .editor:focus {
@@ -87,7 +93,7 @@
             color: #991b1b;
             padding: 0 2px;
             border-radius: 2px;
-            font-weight: 700;
+            font-weight: 600;
             border-bottom: 1px solid #f87171;
         }
 
@@ -102,8 +108,10 @@
         .snippet-box {
             background-color: #f8fafc;
             border-left: 3px solid #cbd5e1;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-family: "SUSE Mono", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+            font-size: 0.6rem;
             line-height: 1.5;
         }
     </style>
@@ -111,8 +119,8 @@
 <body>
     <div class="max-w-5xl mx-auto p-4 sm:p-8">
         <header class="mb-10 text-center">
-            <h1 class="font-bold mb-2 text-3xl sm:text-4xl text-slate-800">🕵️ AI Detector v5.1</h1>
-            <p class="text-slate-500 text-sm sm:text-base">Deep Stylometry • Structural Rigidity • Lexicon • Pattern Vectors</p>
+            <h1 class="font-bold mb-2 text-3xl sm:text-4xl text-slate-800">AI Detector v5.1</h1>
+            <p class="text-slate-500 text-sm sm:text-base"> Think you can fool me? Paste your text below.</p>
         </header>
 
         <div class="bg-white shadow-xl p-6 rounded-xl border border-slate-200 mb-8">
@@ -425,7 +433,6 @@
 };
 
 
-
         const Utils = {
             htmlToText: e => {
                 const t = document.createElement("div");
@@ -503,7 +510,7 @@
                         }
                     }
                 });
-                const density = totalHits / this.wordCount;
+                const density = totalHits / (this.wordCount || 1);
                 if (density > 0.03) scorer.add(100, "critical");
                 else if (density > 0.015) scorer.add(60, "high");
                 else if (density > 0.005) scorer.add(30, "medium");
@@ -511,7 +518,7 @@
             }
         }
 
-        // --- 2. RESTORED & UPGRADED: EMOJI FORENSICS ---
+        // --- 2. EMOJI FORENSICS ---
         class EmojiAnalyzer {
             constructor(text) { this.text = text; this.emojis = Utils.extractEmojis(text); }
             analyze() {
@@ -557,7 +564,7 @@
             }
         }
 
-        // --- 3. RESTORED & UPGRADED: STRUCTURAL RIGIDITY ---
+        // --- 3. STRUCTURAL RIGIDITY ---
         class StructuralRigidityAnalyzer {
             constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
             analyze() {
@@ -610,7 +617,7 @@
             }
         }
 
-        // --- 4. RESTORED & UPGRADED: PUNCTUATION VECTORS ---
+        // --- 4. PUNCTUATION VECTORS ---
         class PunctuationAnalyzer {
             constructor(text) { this.text = text; }
             analyze() {
@@ -632,18 +639,11 @@
                     });
                 }
 
-                // 2. Balanced Parentheses
-                const openP = (this.text.match(/\(/g) || []).length;
-                const closeP = (this.text.match(/\)/g) || []).length;
-                if (openP > 3 && openP === closeP) {
-                    scorer.add(20, "low"); // Slight indicator
-                }
-
                 return { name: "Punctuation Vectors", score: scorer.getScore(), matches, summary: "Punctuation consistency check", details: scorer.getDetails() };
             }
         }
 
-        // --- 5. NEW: BINARY PATTERN ANALYZER (Not just X, but also Y) ---
+        // --- 5. BINARY PATTERN ANALYZER ---
         class BinaryPatternAnalyzer {
             constructor(text) { this.text = text; }
             analyze() {
@@ -802,6 +802,151 @@
             }
         }
 
+        // --- 12. NEW: COGNITIVE LOAD ANALYZER (Academic/Hedging/FalseBalance) ---
+        class CognitiveLoadAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                const categories = [
+                    { id: 'academicCosplay', label: 'Pseudo-Academic', weight: 'high', list: PatternConfig.academicCosplay },
+                    { id: 'hedgingLanguage', label: 'Excessive Hedging', weight: 'medium', list: PatternConfig.hedgingLanguage },
+                    { id: 'falseBalance', label: 'False Balance', weight: 'high', list: PatternConfig.falseBalance }
+                ];
+
+                let totalHits = 0;
+
+                categories.forEach(cat => {
+                    cat.list.forEach(phrase => {
+                        const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                        let match;
+                        while ((match = regex.exec(this.text)) !== null) {
+                            totalHits++;
+                            if (matches.length < 15) {
+                                matches.push({
+                                    type: cat.label,
+                                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                    context: "Artificial Nuance/Complexity",
+                                    weight: cat.weight
+                                });
+                            }
+                        }
+                    });
+                });
+
+                // Scoring Logic: Academic language in non-academic contexts is a strong signal
+                const density = totalHits / (this.wordCount || 1);
+                
+                if (density > 0.02) scorer.add(85, "high");
+                else if (density > 0.01) scorer.add(50, "medium");
+                else if (totalHits > 2) scorer.add(20, "low");
+
+                return { 
+                    name: "Cognitive Load", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: totalHits > 0 ? `${totalHits} instances of artificial complexity` : "Natural tone complexity", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- 13. NEW: CORPORATE SPEAK ANALYZER (Buzzwords/Process Verbs) ---
+        class CorporateSpeakAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                // Buzzwords are critical indicators of LLM training data bias
+                PatternConfig.buzzwordClusters.forEach(phrase => {
+                    if (this.text.toLowerCase().includes(phrase.toLowerCase())) {
+                        matches.push({
+                            type: "Buzzword Cluster",
+                            snippet: `...${phrase}...`,
+                            context: "High-probability LLM Cluster",
+                            weight: "critical"
+                        });
+                        scorer.add(100, "critical");
+                    }
+                });
+
+                // Process verbs (utilize, leverage) are common, but high density indicates AI
+                let verbCount = 0;
+                PatternConfig.processVerbs.forEach(word => {
+                    const regex = new RegExp(`\\b${word}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        verbCount++;
+                        if (matches.length < 10) {
+                            matches.push({
+                                type: "Process Verb",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "Corporate/Consultant Tone",
+                                weight: "low"
+                            });
+                        }
+                    }
+                });
+
+                if (verbCount > 5) scorer.add(60, "medium");
+
+                return { 
+                    name: "Corporate Speak", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: matches.length ? "Detected 'Consultant' persona" : "No corporate jargon", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- 14. NEW: META FILLER ANALYZER (Meta Commentary/List Introducers) ---
+        class MetaFillerAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                const fillers = [
+                    ...PatternConfig.metaCommentary.map(p => ({ p, type: "Meta-Commentary" })),
+                    ...PatternConfig.listIntroducers.map(p => ({ p, type: "List Introducer" }))
+                ];
+
+                let count = 0;
+                fillers.forEach(item => {
+                    const regex = new RegExp(`\\b${item.p}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        count++;
+                        matches.push({
+                            type: item.type,
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Structural padding",
+                            weight: "medium"
+                        });
+                    }
+                });
+
+                if (count > 2) scorer.add(40 + (count * 10), "high");
+
+                return { 
+                    name: "Structural Filler", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: count > 0 ? "Detected structural padding phrases" : "Concise structure", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
         // --- RENDERER ---
         class ResultRenderer {
             constructor() {
@@ -910,11 +1055,14 @@
                     new RepetitionAnalyzer(text),
                     new PassiveVoiceAnalyzer(text),
                     new BurstinessAnalyzer(text),
-                    // Restored/Merged:
                     new EmojiAnalyzer(text),
                     new StructuralRigidityAnalyzer(text),
                     new PunctuationAnalyzer(text),
-                    new BinaryPatternAnalyzer(text)
+                    new BinaryPatternAnalyzer(text),
+                    // NEW INTEGRATIONS
+                    new CognitiveLoadAnalyzer(text),
+                    new CorporateSpeakAnalyzer(text),
+                    new MetaFillerAnalyzer(text)
                 ];
                 const results = analyzers.map(a => a.analyze());
                 const totalScorer = new WeightedScorer();
@@ -932,6 +1080,7 @@
             }
         }
         document.addEventListener("DOMContentLoaded", () => new App());
+
     </script>
 </body>
 </html>
