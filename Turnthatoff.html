@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bio-Lab: Swarm Engine v2</title>
+<style>
+:root{--bg:#050505;--panel:#111;--border:#222;--text:#888;--val:#eee;--c-core:#00a8ff;--c-fm:#e84118;--c-venom:#fbc531;--c-lfo:#4cd137;--c-psych:#9c27b0;}
+body{font-family:'Courier New',monospace;background:var(--bg);color:var(--text);margin:0;padding:10px;display:flex;justify-content:center;}
+#rack{width:100%;max-width:600px;display:flex;flex-direction:column;gap:8px;padding-bottom:60px;}
+.master-panel{background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:15px;text-align:center;margin-bottom:10px;}
+.btn-main{width:100%;padding:15px;font-size:1.1em;font-weight:bold;text-transform:uppercase;background:#222;color:#fff;border:2px solid #444;cursor:pointer;letter-spacing:2px;transition:0.2s;}
+.btn-main.active{background:var(--c-fm);border-color:var(--c-fm);box-shadow:0 0 15px var(--c-fm);color:#000;animation:pulse 2s infinite;}
+.module{background:var(--panel);border-left:4px solid #444;border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:12px;position:relative;}
+.module h3{margin:0 0 10px 0;font-size:0.8em;text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:space-between;}
+.m-core{border-left-color:var(--c-core);}
+.m-fm{border-left-color:var(--c-fm);}
+.m-venom{border-left-color:var(--c-venom);}
+.m-lfo{border-left-color:var(--c-lfo);}
+.m-psych{border-left-color:var(--c-psych);}
+.m-core h3{color:var(--c-core);}
+.m-fm h3{color:var(--c-fm);}
+.m-venom h3{color:var(--c-venom);}
+.m-lfo h3{color:var(--c-lfo);}
+.m-psych h3{color:var(--c-psych);}
+.slider-row{display:grid;grid-template-columns:80px 1fr 50px;align-items:center;margin-bottom:8px;font-size:0.75em;}
+.val-display{text-align:right;color:var(--val);font-weight:bold;}
+input[type=range]{-webkit-appearance:none;background:transparent;margin:0 10px;}
+input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;background:#333;border-radius:2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:16px;width:16px;border-radius:50%;margin-top:-6px;cursor:pointer;background:#888;border:2px solid #222;box-shadow:0 2px 5px rgba(0,0,0,0.5);}
+.m-core input::-webkit-slider-thumb{background:var(--c-core);}
+.m-fm input::-webkit-slider-thumb{background:var(--c-fm);}
+.m-venom input::-webkit-slider-thumb{background:var(--c-venom);}
+.m-lfo input::-webkit-slider-thumb{background:var(--c-lfo);}
+.m-psych input::-webkit-slider-thumb{background:var(--c-psych);}
+.preset-bank{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px;}
+.preset-btn{background:#222;color:#666;border:1px solid #333;padding:8px 2px;font-size:0.65em;cursor:pointer;text-transform:uppercase;}
+.preset-btn:hover{background:#333;color:#fff;}
+@keyframes pulse{0%{box-shadow:0 0 15px var(--c-fm);}50%{box-shadow:0 0 25px var(--c-fm);}100%{box-shadow:0 0 15px var(--c-fm);}}
+</style>
+</head>
+<body>
+<div id="rack">
+<div class="master-panel">
+<button id="btn-pwr" class="btn-main">Engage System</button>
+<div class="preset-bank">
+<button class="preset-btn" onclick="loadP('cicada')">Cicada</button>
+<button class="preset-btn" onclick="loadP('dentist')">Dentist</button>
+<button class="preset-btn" onclick="loadP('mosquito')">Mosquito</button>
+<button class="preset-btn" onclick="loadP('hive')">Hive</button>
+<button class="preset-btn" onclick="loadP('fry')">Brain Fry</button>
+<button class="preset-btn" onclick="loadP('alarm')">Red Alert</button>
+<button class="preset-btn" onclick="loadP('geiger')">Radiation</button>
+<button class="preset-btn" onclick="loadP('ufo')">Abduction</button>
+<button class="preset-btn" onclick="loadP('chalk')">Chalkboard</button>
+<button class="preset-btn" onclick="loadP('shepard')">Shepard</button>
+<button class="preset-btn" onclick="loadP('rough')">Roughness</button>
+<button class="preset-btn" onclick="loadP('inharmonic')">Metallic</button>
+<button class="preset-btn" onclick="loadP('canine')">Dog Whistle</button>
+<button class="preset-btn" onclick="loadP('washer')">Washing Machine</button>
+<button class="preset-btn" onclick="loadP('hum60')">60Hz Hum</button>
+<button class="preset-btn" onclick="loadP('screech')">Metal Screech</button>
+</div>
+</div>
+
+<div class="module m-core">
+<h3>Primary Source</h3>
+<div class="slider-row"><span>Base Pitch</span><input type="range" id="p-freq" min="0" max="1000" value="500"><span id="v-p-freq" class="val-display">Mid</span></div>
+<div class="slider-row"><span>Sharpness</span><input type="range" id="p-shape" min="0" max="100" value="100"><span id="v-p-shape" class="val-display">Saw</span></div>
+<div class="slider-row"><span>Twin Detune</span><input type="range" id="p-detune" min="0" max="500" value="20"><span id="v-p-detune" class="val-display">20hz</span></div>
+</div>
+
+<div class="module m-fm">
+<h3>Parasite (Insect FM)</h3>
+<div class="slider-row"><span>Buzz Speed</span><input type="range" id="fm-rate" min="0" max="2000" value="300"><span id="v-fm-rate" class="val-display">300hz</span></div>
+<div class="slider-row"><span>Sting Depth</span><input type="range" id="fm-depth" min="0" max="2000" value="500"><span id="v-fm-depth" class="val-display">500</span></div>
+</div>
+
+<div class="module m-psych">
+<h3>Roughness Generator (20-70Hz AM)</h3>
+<div class="slider-row"><span>AM Rate</span><input type="range" id="rough-rate" min="0" max="70" value="0"><span id="v-rough-rate" class="val-display">Off</span></div>
+<div class="slider-row"><span>AM Depth</span><input type="range" id="rough-depth" min="0" max="100" value="0"><span id="v-rough-depth" class="val-display">0%</span></div>
+</div>
+
+<div class="module m-psych">
+<h3>Inharmonic FM (Non-Integer Ratio)</h3>
+<div class="slider-row"><span>Ratio</span><input type="range" id="inharm-ratio" min="100" max="300" value="141"><span id="v-inharm-ratio" class="val-display">1.41</span></div>
+<div class="slider-row"><span>Intensity</span><input type="range" id="inharm-depth" min="0" max="1000" value="0"><span id="v-inharm-depth" class="val-display">Off</span></div>
+</div>
+
+<div class="module m-psych">
+<h3>Beating & Dissonance</h3>
+<div class="slider-row"><span>Beat Freq</span><input type="range" id="beat-offset" min="0" max="50" value="0"><span id="v-beat-offset" class="val-display">Off</span></div>
+<div class="slider-row"><span>Mix Level</span><input type="range" id="beat-mix" min="0" max="100" value="0"><span id="v-beat-mix" class="val-display">0%</span></div>
+</div>
+
+<div class="module m-psych">
+<h3>Shepard Tone (Infinite Rise)</h3>
+<div class="slider-row"><span>Speed</span><input type="range" id="shepard-spd" min="0" max="100" value="0"><span id="v-shepard-spd" class="val-display">Off</span></div>
+<div class="slider-row"><span>Layers</span><input type="range" id="shepard-mix" min="0" max="100" value="0"><span id="v-shepard-mix" class="val-display">0%</span></div>
+</div>
+
+<div class="module m-psych">
+<h3>Chaos Engine (Intermittency)</h3>
+<div class="slider-row"><span>Stutter</span><input type="range" id="chaos-rate" min="0" max="100" value="0"><span id="v-chaos-rate" class="val-display">Off</span></div>
+<div class="slider-row"><span>Variance</span><input type="range" id="chaos-var" min="0" max="100" value="50"><span id="v-chaos-var" class="val-display">50%</span></div>
+</div>
+
+<div class="module m-venom">
+<h3>Digital Venom</h3>
+<div class="slider-row"><span>Bit Crush</span><input type="range" id="dist-crush" min="0" max="100" value="0"><span id="v-dist-crush" class="val-display">Off</span></div>
+<div class="slider-row"><span>Resonance</span><input type="range" id="filt-res" min="0" max="80" value="0"><span id="v-filt-res" class="val-display">Off</span></div>
+<div class="slider-row"><span>Filter Freq</span><input type="range" id="filt-freq" min="0" max="1000" value="1000"><span id="v-filt-freq" class="val-display">Open</span></div>
+</div>
+
+<div class="module m-lfo">
+<h3>Pitch Modulation</h3>
+<div class="slider-row"><span>Wobble Spd</span><input type="range" id="lfo-p-spd" min="0" max="200" value="10"><span id="v-lfo-p-spd" class="val-display">1hz</span></div>
+<div class="slider-row"><span>Wobble Dep</span><input type="range" id="lfo-p-dep" min="0" max="1000" value="50"><span id="v-lfo-p-dep" class="val-display">Low</span></div>
+</div>
+
+<div class="module m-lfo">
+<h3>Filter & Amp Mod</h3>
+<div class="slider-row"><span>Wah Speed</span><input type="range" id="lfo-f-spd" min="0" max="200" value="5"><span id="v-lfo-f-spd" class="val-display">0.5hz</span></div>
+<div class="slider-row"><span>Wah Depth</span><input type="range" id="lfo-f-dep" min="0" max="1000" value="0"><span id="v-lfo-f-dep" class="val-display">Off</span></div>
+<hr style="border:0;border-top:1px solid #333;margin:5px 0;">
+<div class="slider-row"><span>Tremolo Spd</span><input type="range" id="lfo-a-spd" min="0" max="500" value="50"><span id="v-lfo-a-spd" class="val-display">5hz</span></div>
+<div class="slider-row"><span>Tremolo Dep</span><input type="range" id="lfo-a-dep" min="0" max="100" value="0"><span id="v-lfo-a-dep" class="val-display">Off</span></div>
+</div>
+</div>
+
+<script>
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+let isPlaying=false,nodes={},shepardOscs=[],chaosInterval=null,shepardGlideInterval=null;
+
+function makeDistortionCurve(a){const k=a,n=44100,c=new Float32Array(n);for(let i=0;i<n;++i){const x=(i*2)/n-1;if(a>0){c[i]=Math.tanh(x*k*5);if(Math.random()>0.5)c[i]+=(Math.random()*0.1);}else{c[i]=x;}}return c;}
+
+function init(){
+if(nodes.osc1)return;
+nodes.master=ctx.createGain();
+nodes.limiter=ctx.createDynamicsCompressor();
+nodes.osc1=ctx.createOscillator();
+nodes.osc2=ctx.createOscillator();
+nodes.oscMix=ctx.createGain();
+nodes.fmOsc=ctx.createOscillator();
+nodes.fmGain=ctx.createGain();
+nodes.filter=ctx.createBiquadFilter();
+nodes.shaper=ctx.createWaveShaper();
+nodes.pLfo=ctx.createOscillator();
+nodes.pLfoGain=ctx.createGain();
+nodes.fLfo=ctx.createOscillator();
+nodes.fLfoGain=ctx.createGain();
+nodes.aLfo=ctx.createOscillator();
+nodes.aLfoGain=ctx.createGain();
+nodes.tremGateway=ctx.createGain();
+
+// NEW NODES
+nodes.roughLfo=ctx.createOscillator();
+nodes.roughGain=ctx.createGain();
+nodes.roughMod=ctx.createGain();
+nodes.inharmonicOsc=ctx.createOscillator();
+nodes.inharmonicGain=ctx.createGain();
+nodes.beatOsc=ctx.createOscillator();
+nodes.beatGain=ctx.createGain();
+nodes.shepardMix=ctx.createGain();
+nodes.chaosGate=ctx.createGain();
+
+// Shepard tone layers (4 octaves)
+for(let i=0;i<4;i++){
+const o=ctx.createOscillator();
+const g=ctx.createGain();
+o.type='sine';
+o.connect(g);
+g.connect(nodes.shepardMix);
+shepardOscs.push({osc:o,gain:g,octave:i});
+}
+
+// ROUTING
+nodes.fmOsc.connect(nodes.fmGain);
+nodes.fmGain.connect(nodes.osc1.frequency);
+nodes.pLfo.connect(nodes.pLfoGain);
+nodes.pLfoGain.connect(nodes.osc1.detune);
+nodes.pLfoGain.connect(nodes.osc2.detune);
+nodes.fLfo.connect(nodes.fLfoGain);
+nodes.fLfoGain.connect(nodes.filter.frequency);
+nodes.aLfo.connect(nodes.aLfoGain);
+nodes.aLfoGain.connect(nodes.tremGateway.gain);
+
+// Roughness AM modulator
+nodes.roughLfo.connect(nodes.roughGain);
+nodes.roughGain.connect(nodes.roughMod.gain);
+
+// Inharmonic FM
+nodes.inharmonicOsc.connect(nodes.inharmonicGain);
+nodes.inharmonicGain.connect(nodes.osc1.frequency);
+
+// Beat oscillator
+nodes.beatOsc.connect(nodes.beatGain);
+
+// Signal chain
+nodes.osc1.connect(nodes.oscMix);
+nodes.osc2.connect(nodes.oscMix);
+nodes.beatGain.connect(nodes.oscMix);
+nodes.inharmonicOsc.connect(nodes.oscMix);
+
+nodes.oscMix.connect(nodes.roughMod);
+nodes.roughMod.connect(nodes.shaper);
+nodes.shaper.connect(nodes.filter);
+nodes.filter.connect(nodes.chaosGate);
+nodes.chaosGate.connect(nodes.tremGateway);
+nodes.shepardMix.connect(nodes.tremGateway);
+nodes.tremGateway.connect(nodes.master);
+nodes.master.connect(nodes.limiter);
+nodes.limiter.connect(ctx.destination);
+
+const t=ctx.currentTime;
+[nodes.osc1,nodes.osc2,nodes.fmOsc,nodes.pLfo,nodes.fLfo,nodes.aLfo,nodes.roughLfo,nodes.inharmonicOsc,nodes.beatOsc].forEach(n=>n.start(t));
+shepardOscs.forEach(s=>s.osc.start(t));
+nodes.master.gain.setValueAtTime(0,t);
+nodes.chaosGate.gain.setValueAtTime(1,t);
+nodes.roughMod.gain.setValueAtTime(1,t);
+}
+
+function toggle(){
+if(!nodes.osc1)init();
+if(ctx.state==='suspended')ctx.resume();
+const btn=document.getElementById('btn-pwr');
+isPlaying=!isPlaying;
+if(isPlaying){
+nodes.master.gain.setTargetAtTime(0.3,ctx.currentTime,0.1);
+btn.classList.add('active');
+btn.textContent="SYSTEM ACTIVE - CLICK TO KILL";
+update();
+}else{
+nodes.master.gain.setTargetAtTime(0,ctx.currentTime,0.05);
+btn.classList.remove('active');
+btn.textContent="ENGAGE SYSTEM";
+if(chaosInterval)clearInterval(chaosInterval);
+if(shepardGlideInterval)clearInterval(shepardGlideInterval);
+}
+}
+
+const getLogFreq=(v)=>{const min=Math.log(20),max=Math.log(18000),scale=(max-min)/1000;return Math.exp(min+scale*v);};
+
+function update(){
+if(!nodes.osc1)return;
+const t=ctx.currentTime,r=0.05;
+
+// CORE
+const freq=getLogFreq(document.getElementById('p-freq').value);
+nodes.osc1.frequency.setTargetAtTime(freq,t,r);
+const detuneVal=document.getElementById('p-detune').value;
+nodes.osc2.frequency.setTargetAtTime(freq+parseFloat(detuneVal),t,r);
+document.getElementById('v-p-detune').innerText=detuneVal+"Hz";
+document.getElementById('v-p-freq').innerText=Math.round(freq)+"Hz";
+const shape=document.getElementById('p-shape').value;
+const type=shape<33?'sine':shape<66?'triangle':'sawtooth';
+nodes.osc1.type=type;
+nodes.osc2.type=type;
+document.getElementById('v-p-shape').innerText=type;
+
+// FM
+const fmRate=document.getElementById('fm-rate').value;
+const fmDepth=document.getElementById('fm-depth').value;
+nodes.fmOsc.frequency.setTargetAtTime(fmRate,t,r);
+nodes.fmGain.gain.setTargetAtTime(fmDepth*2,t,r);
+document.getElementById('v-fm-rate').innerText=fmRate+"Hz";
+document.getElementById('v-fm-depth').innerText=fmDepth;
+
+// ROUGHNESS (20-70Hz AM)
+const roughRate=document.getElementById('rough-rate').value;
+const roughDepth=document.getElementById('rough-depth').value/100;
+nodes.roughLfo.frequency.setTargetAtTime(Math.max(0.1,roughRate),t,r);
+nodes.roughGain.gain.setTargetAtTime(roughDepth,t,r);
+document.getElementById('v-rough-rate').innerText=roughRate+"Hz";
+document.getElementById('v-rough-depth').innerText=Math.round(roughDepth*100)+"%";
+
+// INHARMONIC FM
+const inharmonicRatio=document.getElementById('inharm-ratio').value/100;
+const inharmonicDepth=document.getElementById('inharm-depth').value;
+nodes.inharmonicOsc.frequency.setTargetAtTime(freq*inharmonicRatio,t,r);
+nodes.inharmonicGain.gain.setTargetAtTime(inharmonicDepth,t,r);
+document.getElementById('v-inharm-ratio').innerText=inharmonicRatio.toFixed(2);
+document.getElementById('v-inharm-depth').innerText=inharmonicDepth;
+
+// BEATING
+const beatOffset=document.getElementById('beat-offset').value;
+const beatMix=document.getElementById('beat-mix').value/100;
+nodes.beatOsc.frequency.setTargetAtTime(freq+parseFloat(beatOffset),t,r);
+nodes.beatGain.gain.setTargetAtTime(beatMix*0.3,t,r);
+document.getElementById('v-beat-offset').innerText=beatOffset+"Hz";
+document.getElementById('v-beat-mix').innerText=Math.round(beatMix*100)+"%";
+
+// SHEPARD TONE
+const shepardSpd=document.getElementById('shepard-spd').value/100;
+const shepardMixVal=document.getElementById('shepard-mix').value/100;
+nodes.shepardMix.gain.setTargetAtTime(shepardMixVal*0.2,t,r);
+document.getElementById('v-shepard-spd').innerText=shepardSpd>0?(shepardSpd*10).toFixed(1)+"s":"Off";
+document.getElementById('v-shepard-mix').innerText=Math.round(shepardMixVal*100)+"%";
+
+if(shepardSpd>0&&isPlaying){
+if(!shepardGlideInterval){
+shepardGlideInterval=setInterval(()=>{
+if(!isPlaying)return;
+const baseF=getLogFreq(document.getElementById('p-freq').value);
+shepardOscs.forEach((s,i)=>{
+const octF=baseF*(Math.pow(2,i));
+const currentF=s.osc.frequency.value;
+const targetF=currentF*Math.pow(2,0.001*shepardSpd);
+if(targetF>baseF*16){s.osc.frequency.setValueAtTime(baseF,ctx.currentTime);}
+else{s.osc.frequency.setValueAtTime(targetF,ctx.currentTime);}
+const normalizedPos=(Math.log2(s.osc.frequency.value/baseF)%4)/4;
+const envelope=Math.sin(normalizedPos*Math.PI);
+s.gain.gain.setValueAtTime(envelope*0.3,ctx.currentTime);
+});
+},50);
+}
+}else{
+if(shepardGlideInterval){clearInterval(shepardGlideInterval);shepardGlideInterval=null;}
+shepardOscs.forEach(s=>s.gain.gain.setTargetAtTime(0,t,0.1));
+}
+
+// CHAOS (Intermittency)
+const chaosRate=document.getElementById('chaos-rate').value;
+const chaosVar=document.getElementById('chaos-var').value/100;
+document.getElementById('v-chaos-rate').innerText=chaosRate>0?chaosRate+"ms":"Off";
+document.getElementById('v-chaos-var').innerText=Math.round(chaosVar*100)+"%";
+
+if(chaosRate>0&&isPlaying){
+if(!chaosInterval){
+chaosInterval=setInterval(()=>{
+if(!isPlaying)return;
+const rnd=Math.random();
+if(rnd<chaosVar){
+nodes.chaosGate.gain.setValueAtTime(0,ctx.currentTime);
+setTimeout(()=>{nodes.chaosGate.gain.setValueAtTime(1,ctx.currentTime);},Math.random()*50+10);
+}
+},parseInt(chaosRate)*10);
+}
+}else{
+if(chaosInterval){clearInterval(chaosInterval);chaosInterval=null;}
+}
+
+// VENOM
+const crush=document.getElementById('dist-crush').value;
+nodes.shaper.curve=makeDistortionCurve(parseInt(crush));
+nodes.shaper.oversample='4x';
+document.getElementById('v-dist-crush').innerText=crush+"%";
+const res=document.getElementById('filt-res').value;
+const cutInput=document.getElementById('filt-freq').value;
+const cutFreq=getLogFreq(cutInput);
+if(res>0||crush>0){
+nodes.filter.type='highpass';
+nodes.filter.frequency.setTargetAtTime(cutFreq,t,r);
+nodes.filter.Q.setTargetAtTime(res,t,r);
+document.getElementById('v-filt-res').innerText=res+"%";
+document.getElementById('v-filt-freq').innerText=Math.round(cutFreq)+"Hz";
+}else{
+nodes.filter.type='allpass';
+nodes.filter.Q.value=0;
+document.getElementById('v-filt-res').innerText="Off";
+document.getElementById('v-filt-freq').innerText="Open";
+}
+
+// LFO PITCH
+const pSpd=document.getElementById('lfo-p-spd').value/10;
+const pDep=document.getElementById('lfo-p-dep').value;
+nodes.pLfo.frequency.setTargetAtTime(pSpd,t,r);
+nodes.pLfoGain.gain.setTargetAtTime(pDep,t,r);
+document.getElementById('v-lfo-p-spd').innerText=pSpd+"Hz";
+document.getElementById('v-lfo-p-dep').innerText=pDep;
+
+// LFO FILTER & AMP
+const fSpd=document.getElementById('lfo-f-spd').value/10;
+const fDep=document.getElementById('lfo-f-dep').value;
+nodes.fLfo.frequency.setTargetAtTime(fSpd,t,r);
+nodes.fLfoGain.gain.setTargetAtTime(fDep*5,t,r);
+document.getElementById('v-lfo-f-spd').innerText=fSpd+"Hz";
+document.getElementById('v-lfo-f-dep').innerText=fDep;
+const aSpd=document.getElementById('lfo-a-spd').value/10;
+const aDep=document.getElementById('lfo-a-dep').value/100;
+nodes.aLfo.frequency.setTargetAtTime(aSpd,t,r);
+nodes.aLfoGain.gain.setTargetAtTime(aDep,t,r);
+document.getElementById('v-lfo-a-spd').innerText=aSpd+"Hz";
+document.getElementById('v-lfo-a-dep').innerText=Math.round(aDep*100)+"%";
+}
+
+const presets={
+cicada:{pFreq:800,pShape:100,pDetune:20,fmRate:80,fmDepth:1500,crush:50,res:10,cut:800,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:300,aDep:80,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+dentist:{pFreq:900,pShape:50,pDetune:5,fmRate:1200,fmDepth:200,crush:0,res:0,cut:1000,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+mosquito:{pFreq:650,pShape:100,pDetune:0,fmRate:0,fmDepth:0,crush:20,res:0,cut:500,pSpd:20,pDep:30,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+hive:{pFreq:200,pShape:100,pDetune:200,fmRate:40,fmDepth:500,crush:80,res:30,cut:400,pSpd:10,pDep:100,fSpd:50,fDep:500,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+fry:{pFreq:100,pShape:0,pDetune:10,fmRate:1900,fmDepth:2000,crush:100,res:0,cut:0,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+alarm:{pFreq:700,pShape:50,pDetune:0,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:50,pDep:400,fSpd:0,fDep:0,aSpd:50,aDep:100,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+geiger:{pFreq:50,pShape:100,pDetune:500,fmRate:0,fmDepth:0,crush:100,res:80,cut:800,pSpd:200,pDep:1000,fSpd:0,fDep:0,aSpd:500,aDep:100,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:80,chaosVar:90},
+ufo:{pFreq:500,pShape:0,pDetune:10,fmRate:20,fmDepth:500,crush:0,res:0,cut:1000,pSpd:10,pDep:1000,fSpd:20,fDep:1000,aSpd:80,aDep:50,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+chalk:{pFreq:800,pShape:100,pDetune:0,fmRate:0,fmDepth:0,crush:30,res:40,cut:700,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:35,roughDepth:80,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:20,chaosVar:70},
+shepard:{pFreq:400,pShape:0,pDetune:0,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:50,shepardMix:100,chaosRate:0,chaosVar:50},
+rough:{pFreq:600,pShape:100,pDetune:0,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:40,roughDepth:90,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+inharmonic:{pFreq:500,pShape:66,pDetune:0,fmRate:0,fmDepth:0,crush:20,res:20,cut:600,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:0,roughDepth:0,inharmonicRatio:177,inharmonicDepth:800,beatOffset:25,beatMix:60,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+canine:{pFreq:950,pShape:0,pDetune:0,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:30,pDep:200,fSpd:0,fDep:0,aSpd:100,aDep:40,roughRate:0,roughDepth:0,inharmonicRatio:141,inharmonicDepth:0,beatOffset:15,beatMix:30,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+washer:{pFreq:120,pShape:100,pDetune:180,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:5,pDep:80,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:55,roughDepth:70,inharmonicRatio:141,inharmonicDepth:0,beatOffset:0,beatMix:0,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+hum60:{pFreq:150,pShape:0,pDetune:0,fmRate:0,fmDepth:0,crush:0,res:0,cut:1000,pSpd:0,pDep:0,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:60,roughDepth:50,inharmonicRatio:200,inharmonicDepth:300,beatOffset:1,beatMix:80,shepardSpd:0,shepardMix:0,chaosRate:0,chaosVar:50},
+screech:{pFreq:850,pShape:100,pDetune:35,fmRate:400,fmDepth:1200,crush:60,res:50,cut:750,pSpd:80,pDep:300,fSpd:0,fDep:0,aSpd:0,aDep:0,roughRate:45,roughDepth:85,inharmonicRatio:210,inharmonicDepth:900,beatOffset:28,beatMix:70,shepardSpd:0,shepardMix:0,chaosRate:15,chaosVar:80}
+};
+
+function loadP(name){
+const p=presets[name];
+document.getElementById('p-freq').value=p.pFreq;
+document.getElementById('p-shape').value=p.pShape;
+document.getElementById('p-detune').value=p.pDetune;
+document.getElementById('fm-rate').value=p.fmRate;
+document.getElementById('fm-depth').value=p.fmDepth;
+document.getElementById('dist-crush').value=p.crush;
+document.getElementById('filt-res').value=p.res;
+document.getElementById('filt-freq').value=p.cut;
+document.getElementById('lfo-p-spd').value=p.pSpd;
+document.getElementById('lfo-p-dep').value=p.pDep;
+document.getElementById('lfo-f-spd').value=p.fSpd;
+document.getElementById('lfo-f-dep').value=p.fDep;
+document.getElementById('lfo-a-spd').value=p.aSpd;
+document.getElementById('lfo-a-dep').value=p.aDep;
+document.getElementById('rough-rate').value=p.roughRate;
+document.getElementById('rough-depth').value=p.roughDepth;
+document.getElementById('inharm-ratio').value=p.inharmonicRatio;
+document.getElementById('inharm-depth').value=p.inharmonicDepth;
+document.getElementById('beat-offset').value=p.beatOffset;
+document.getElementById('beat-mix').value=p.beatMix;
+document.getElementById('shepard-spd').value=p.shepardSpd;
+document.getElementById('shepard-mix').value=p.shepardMix;
+document.getElementById('chaos-rate').value=p.chaosRate;
+document.getElementById('chaos-var').value=p.chaosVar;
+if(!isPlaying)toggle();
+update();
+}
+
+document.getElementById('btn-pwr').addEventListener('click',toggle);
+document.querySelectorAll('input[type=range]').forEach(el=>{el.addEventListener('input',update);});
+</script>
+</body>
+</html>
