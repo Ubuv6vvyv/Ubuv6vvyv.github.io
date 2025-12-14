@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# ============= CONFIGURATION =============
+# This puts the Document Type FIRST (e.g., "Delivery Order S00051987...")
+# =========================================
+KEEP_ORIGINAL=true      # Keep the trailing original filename parts?
+MAX_LENGTH=50           # Limit length of the original name part
+PARALLEL_JOBS=8         # How many files to process at once
+# =========================================
+
+# Comprehensive list of document types
+DOC_TYPES="(Delivery Order|Bill of Lading|B/L|HBL|MBL|Booking Confirmation|Commercial Invoice|Packing List|Tax Invoice|Arrival Notice|Cartage Advice|Delivery Docket|Air Waybill|AWB|Sea Waybill|House Bill of Lading|Master Bill of Lading|Freight Invoice|Certificate of Origin|Customs Declaration|Export Declaration|Import Declaration|Dangerous Goods|MSDS|Safety Data Sheet|Cargo Manifest|Container Load Plan|Delivery Instruction|Gate Pass|Inspection Report|Letter of Credit|Shipping Instruction|Warehouse Receipt|Insurance Certificate|VGM Declaration|Equipment Interchange Receipt|EIR|Forwarder's Cargo Receipt|FCR|Shipper's Letter of Instruction|SLI|Dock Receipt|Weight Certificate|Container Packing Certificate|Outturn Report|Notice of Arrival|Interim Receipt|Cargo Availability|Export Packing List|Proforma Invoice|Consular Invoice|OBL|H/BL|Straight Bill of Lading|Express Bill of Lading|Freight Bill|Pre-Shipment Inspection|Mate's Receipt|NAFTA Certificate|Customs Clearance|Debit Note|Credit Note|Certificate of Analysis|Compliance Certificate|Dangerous Goods Declaration|Export License|Import License|Consignee Certificate|Fumigation Certificate|Phytosanitary Certificate|Health Certificate|Veterinary Certificate|Purchase Order|Electronic Export Information|EEI|Non-Negotiable Sea Waybill|Tally Sheet|Multimodal Dangerous Goods Form)"
+
+process_file() {
+    f="$1"
+    if [ ! -f "$f" ]; then return; fi
+
+    dir_path=$(dirname "$f")
+    filename=$(basename "$f")
+    extension="${filename##*.}"
+    
+    # === STEP 1: SCAN PDF CONTENT (Try, but don't stop if it fails) ===
+    # We use a timeout so it doesn't hang on bad files
+    text=$(timeout 10s pdftotext -f 1 -l 2 -layout "$f" - 2>/dev/null)
+    
+    # Init variables
+    pdf_s=""
+    pdf_hbl=""
+    pdf_container=""
+    pdf_doctype=""
+
+    if [ -n "$text" ]; then
+        # Expanded Regex: S + 5 to 12 digits (catches S00067983 and longer)
+        pdf_s=$(echo "$text" | grep -oE "\bS[0-9]{5,12}[A-Z]?\b" | head -n 1)
+        
+        pdf_hbl=$(echo "$text" | awk '
+            /House Bill|House B\/L|H\.B\/L|HBL|HB\/L|HAWB|Booking Ref|Ref No|Shipment Ref/i {
+                if (match($0, /\b(F[0-9]{5}[A-Z]{3}[A-Z0-9]{3}[A-Z0-9]{5,8})\b/)) { print substr($0, RSTART, RLENGTH); exit }
+                if (match($0, /\b(S[A-Z]{2,4}[0-9A-Z]{5,10})\b/)) { print substr($0, RSTART, RLENGTH); exit }
+                if (match($0, /\b([A-Z]{3,}[0-9]+[A-Z0-9]{7,})\b/)) { print substr($0, RSTART, RLENGTH); exit }
+            }' | head -n 1)
+        pdf_container=$(echo "$text" | grep -oE "\b[A-Z]{4}[0-9]{7}\b" | head -n 1)
+        pdf_doctype=$(echo "$text" | grep -ioE "$DOC_TYPES" | head -n 1)
+    fi
+
+    # === STEP 2: FALLBACK TO FILENAME (Essential for Scans) ===
+    # We create a "clean" version of the filename (replace - and _ with spaces)
+    # This ensures "Shipment-Cartage-Advice" becomes "Shipment Cartage Advice" for matching
+    clean_filename_search=$(echo "$filename" | sed -r 's/[-_]/ /g')
+
+    # 1. Extract IDs from filename if not found in PDF
+    s_id="${pdf_s:-$(echo "$filename" | grep -oE "S[0-9]{5,12}[A-Z]?" | head -n 1)}"
+    hbl_id="${pdf_hbl:-$(echo "$filename" | grep -oE "(F[0-9]{5}[A-Z]{3}[A-Z0-9]{3}[A-Z0-9]{5,8}|S[A-Z]{2,4}[0-9A-Z]{5,8}|[A-Z]{2,4}[0-9]{3,}[A-Z0-9]{3,})" | head -n 1)}"
+    c_id="${pdf_container:-$(echo "$filename" | grep -oE "\b[A-Z]{4}[0-9]{7}\b" | head -n 1)}"
+
+    # 2. Extract DocType from the CLEANED filename
+    doc_type="${pdf_doctype:-$(echo "$clean_filename_search" | grep -ioE "$DOC_TYPES" | head -n 1)}"
+    
+    # If still no DocType, default to 'Document'
+    doc_type="${doc_type:-Document}"
+    
+    # Normalize DocType (remove extra spaces/chars)
+    clean_type=$(echo "$doc_type" | tr -d '\r' | tr '/' '-' | tr '\n' ' ' | xargs)
+
+    # === STEP 3: PREPARE ID STRING ===
+    id_string=""
+    [ -n "$s_id" ] && id_string="$s_id"
+    [ -n "$hbl_id" ] && [ "$hbl_id" != "$s_id" ] && id_string="${id_string} $hbl_id"
+    [ -n "$c_id" ] && [ "$c_id" != "$hbl_id" ] && id_string="${id_string} $c_id"
+    id_string=$(echo "$id_string" | xargs)
+
+    # === STEP 4: CLEAN "ORIGINAL" NAME ===
+    base="${filename%.*}"
+    
+    if [ "$KEEP_ORIGINAL" = true ]; then
+        # Remove the IDs we found from the filename so they aren't duplicated
+        [ -n "$s_id" ] && base=$(echo "$base" | sed "s/${s_id}//g")
+        [ -n "$hbl_id" ] && base=$(echo "$base" | sed "s/${hbl_id}//g")
+        [ -n "$c_id" ] && base=$(echo "$base" | sed "s/${c_id}//g")
+        
+        # Remove the DocType we found (handle spaces, dashes, and underscores)
+        # e.g. Removes "Cartage Advice", "Cartage-Advice", "Cartage_Advice"
+        [ -n "$doc_type" ] && base=$(echo "$base" | sed "s/${doc_type}//gi")
+        [ -n "$doc_type" ] && base=$(echo "$base" | sed "s/$(echo $doc_type | sed 's/ /-/g')//gi")
+        [ -n "$doc_type" ] && base=$(echo "$base" | sed "s/$(echo $doc_type | sed 's/ /_/g')//gi")
+
+        # Aggressive cleanup of leftover punctuation
+        base=$(echo "$base" | sed -r 's/[-_.,()]/ /g' | xargs)
+        
+        # Trim length
+        [ ${#base} -gt $MAX_LENGTH ] && base="${base:0:$MAX_LENGTH}"
+        
+        # If base is tiny or meaningless, drop it
+        if [ ${#base} -lt 3 ]; then base=""; fi
+    else
+        base=""
+    fi
+
+    # === STEP 5: BUILD NEW NAME (DocType First) ===
+    # Structure: [DocType] [IDs] [Original].pdf
+    
+    if [ -n "$base" ]; then
+        new_name="${clean_type} ${id_string} ${base}.${extension}"
+    else
+        new_name="${clean_type} ${id_string}.${extension}"
+    fi
+
+    # Final cleanup of double spaces
+    new_name=$(echo "$new_name" | sed 's/  */ /g' | sed 's/ \././g')
+
+    # === STEP 6: RENAME ===
+    target="$dir_path/$new_name"
+
+    if [ "$filename" != "$new_name" ]; then
+        if [ -e "$target" ]; then
+             echo "⚠ EXISTS: $new_name"
+        else
+             mv "$f" "$target" 2>/dev/null
+             echo "✓ $new_name"
+        fi
+    fi
+}
+
+export -f process_file
+export KEEP_ORIGINAL MAX_LENGTH DOC_TYPES
+
+# === MAIN EXECUTION ===
+echo "════════════════════════════════════════"
+echo "PDF Batch Renamer (Migrator Edition)"
+echo "Target Format: [DocType] [ID] [Original].pdf"
+echo "Processing 22,000+ Files..."
+echo "════════════════════════════════════════"
+
+# Find all PDF files (case insensitive) and process in parallel
+find . -type f -iname "*.pdf" -print0 | xargs -0 -P $PARALLEL_JOBS -I {} bash -c 'process_file "$@"' _ {}
+
+echo ""
+echo "✅ Complete!"
