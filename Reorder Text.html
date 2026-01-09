@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Text Tool</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:9px/1.2 monospace;padding:4px;background:#f5f5f5;color:#222;padding-bottom:20px}
+input[type="file"],textarea,button,select,input[type="text"]{font:9px monospace;width:100%;margin:2px 0;padding:3px;background:#fff;color:#222;border:1px solid #666}
+button{cursor:pointer}
+button:active{background:#ddd}
+.toggle{display:flex;gap:2px;flex-wrap:wrap}
+.toggle button{flex:1;min-width:45%}
+#output{white-space:pre-wrap;word-break:break-word;margin-top:4px;max-height:50vh;overflow-y:auto;border:1px solid #666;padding:3px;font-size:8px;background:#fff}
+.row{display:flex;gap:2px}
+.row>*{flex:1}
+h3{font-size:9px;margin:4px 0 2px;color:#000;font-weight:bold}
+.modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid #666;padding:8px;z-index:999;max-width:90%;max-height:80vh;overflow-y:auto}
+.modal.show{display:block}
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:998}
+.overlay.show{display:block}
+label{font-size:8px;display:block;margin-top:4px}
+</style>
+</head>
+<body>
+<input type="file" id="file" accept=".txt">
+<textarea id="input" rows="3" placeholder="Paste text..."></textarea>
+<div class="row">
+<button onclick="clear()">Clear</button>
+<button onclick="load()">Load</button>
+<button onclick="saveOutput()">Save Output</button>
+</div>
+
+<h3>SORT</h3>
+<div class="toggle">
+<button onclick="sortWords()">Words A-Z</button>
+<button onclick="sortWordsRev()">Words Z-A</button>
+<button onclick="sortLines()">Lines A-Z</button>
+<button onclick="sortLinesRev()">Lines Z-A</button>
+<button onclick="sortLength()">By Length</button>
+<button onclick="sortComplex()">By Complexity</button>
+<button onclick="sortNumeric()">Numeric</button>
+<button onclick="sortWordsInPara()">Words in Para</button>
+<button onclick="sortDomain()">By Domain</button>
+<button onclick="sortByLastWord()">By Last Word</button>
+<button onclick="sortRandom()">Randomize</button>
+<button onclick="sortByVowels()">By Vowel %</button>
+<button onclick="sortByDigits()">By Digit Count</button>
+<button onclick="sortByUnique()">By Unique Chars</button>
+<button onclick="sortByCapitals()">By Capitals</button>
+<button onclick="sortByWhitespace()">By Whitespace</button>
+<button onclick="sortByEntropy()">By Entropy</button>
+<button onclick="sortByPattern()">By Pattern</button>
+</div>
+
+<h3>ANALYZE</h3>
+<div class="toggle">
+<button onclick="topWords()">Top Words</button>
+<button onclick="uniqueWords()">Unique Words</button>
+<button onclick="entropy()">Entropy</button>
+<button onclick="showNgramModal()">N-grams</button>
+<button onclick="stats()">Stats</button>
+<button onclick="readability()">Readability</button>
+<button onclick="visualize()">Visualize</button>
+</div>
+
+<h3>EXTRACT</h3>
+<div class="toggle">
+<button onclick="extractEmails()">Emails</button>
+<button onclick="extractUrls()">URLs</button>
+<button onclick="extractPhones()">Phones</button>
+<button onclick="extractAddresses()">Addresses</button>
+<button onclick="extractCodes()">Codes</button>
+<button onclick="extractContainers()">Containers</button>
+<button onclick="extractAll()">Extract All</button>
+<button onclick="showExtractLinesModal()">Extract Lines With</button>
+</div>
+
+<h3>TRANSFORM</h3>
+<div class="toggle">
+<button onclick="removeSpecial()">Remove Special</button>
+<button onclick="removeNumbers()">Remove Numbers</button>
+<button onclick="showRemoveWordsModal()">Remove Words</button>
+<button onclick="showDeleteLinesModal()">Delete Lines With</button>
+<button onclick="dedupe()">Dedupe Lines</button>
+<button onclick="reverse()">Reverse</button>
+<button onclick="extractNums()">Extract Numbers</button>
+<button onclick="wordFreqMatrix()">Freq Matrix</button>
+<button onclick="uppercase()">UPPERCASE</button>
+<button onclick="lowercase()">lowercase</button>
+<button onclick="titlecase()">Title Case</button>
+<button onclick="sentencecase()">Sentence case</button>
+<button onclick="removeEmpty()">Remove Empty</button>
+<button onclick="numberLines()">Number Lines</button>
+<button onclick="shuffle()">Shuffle Lines</button>
+<button onclick="wordCount()">Word Count</button>
+<button onclick="wrapFixer()">Wrap Fixer</button>
+<button onclick="rot13()">ROT13</button>
+<button onclick="leetSpeak()">1337 Speak</button>
+<button onclick="sortChars()">Sort Chars</button>
+<button onclick="removeConsecutive()">Remove Consecutive</button>
+</div>
+
+<h3>WHITESPACE</h3>
+<div class="toggle">
+<button onclick="normalizeWhitespace()">Normalize All</button>
+<button onclick="normalizeBreaks()">Normalize Breaks</button>
+<button onclick="spacesToNewlines()">Spaces→Newlines</button>
+<button onclick="newlinesToSpaces()">Newlines→Spaces</button>
+<button onclick="tabsToSpaces()">Tabs→Spaces</button>
+<button onclick="spacesToTabs()">Spaces→Tabs</button>
+<button onclick="trimLines()">Trim Lines</button>
+<button onclick="collapseSpaces()">Collapse Spaces</button>
+</div>
+
+<div id="output"></div>
+
+<div class="overlay" id="overlay" onclick="closeModals()"></div>
+<div class="modal" id="ngramModal">
+<h3>N-GRAM GENERATOR</h3>
+<label>N-gram size (1=unigram, 2=bigram, 3=trigram):</label>
+<input type="text" id="ngramSize" value="2">
+<label>Max results:</label>
+<input type="text" id="ngramLimit" value="50">
+<div class="row" style="margin-top:4px">
+<button onclick="generateNgrams()">Generate</button>
+<button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="removeModal">
+<h3>REMOVE WORDS/PHRASES</h3>
+<label>Enter words/phrases to remove (one per line):</label>
+<textarea id="removeList" rows="8" placeholder="copyright
+all rights reserved
+cookie policy
+privacy notice"></textarea>
+<label><input type="checkbox" id="caseSensitive"> Case sensitive</label>
+<div class="row" style="margin-top:4px">
+<button onclick="removeWords()">Remove</button>
+<button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="extractLinesModal">
+<h3>EXTRACT LINES CONTAINING</h3>
+<label>Enter words/phrases to find (one per line, lines with ANY match will be extracted):</label>
+<textarea id="extractLinesList" rows="8" placeholder="error
+warning
+exception"></textarea>
+<label><input type="checkbox" id="extractCaseSensitive"> Case sensitive</label>
+<div class="row" style="margin-top:4px">
+<button onclick="extractLinesContaining()">Extract</button>
+<button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="deleteLinesModal">
+<h3>DELETE LINES CONTAINING</h3>
+<label>Enter words/phrases to find (one per line, lines with ANY match will be deleted):</label>
+<textarea id="deleteLinesList" rows="8" placeholder="spam
+advertisement
+cookie"></textarea>
+<label><input type="checkbox" id="deleteCaseSensitive"> Case sensitive</label>
+<div class="row" style="margin-top:4px">
+<button onclick="deleteLinesContaining()">Delete</button>
+<button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<script>
+let txt='';
+const o=document.getElementById('output'),inp=document.getElementById('input');
+
+document.getElementById('file').onchange=e=>{
+const f=e.target.files[0];
+if(f&&f.size<50e6){
+const r=new FileReader();
+r.onload=ev=>{inp.value=ev.target.result;txt=ev.target.result};
+r.readAsText(f);
+}else alert('File too large (max 50MB)');
+};
+
+function clear(){inp.value='';txt='';o.textContent='';document.getElementById('file').value=''}
+
+function load(){txt=inp.value;o.textContent=txt?`Loaded ${txt.length} chars`:'No text'}
+
+function saveOutput(){
+const content=o.textContent;
+if(!content||content==='No text'){alert('No output to save');return}
+const blob=new Blob([content],{type:'text/plain'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download='output_'+Date.now()+'.txt';
+a.click();
+URL.revokeObjectURL(url);
+}
+
+function getWords(){return txt.toLowerCase().match(/\b[\w']+\b/g)||[]}
+
+function getLines(){return txt.split('\n').filter(l=>l.trim())}
+
+function closeModals(){
+document.getElementById('overlay').classList.remove('show');
+document.getElementById('ngramModal').classList.remove('show');
+document.getElementById('removeModal').classList.remove('show');
+document.getElementById('extractLinesModal').classList.remove('show');
+document.getElementById('deleteLinesModal').classList.remove('show');
+}
+
+function showNgramModal(){
+if(!txt){o.textContent='No text';return}
+document.getElementById('overlay').classList.add('show');
+document.getElementById('ngramModal').classList.add('show');
+}
+
+function showRemoveWordsModal(){
+if(!txt){o.textContent='No text';return}
+document.getElementById('overlay').classList.add('show');
+document.getElementById('removeModal').classList.add('show');
+}
+
+function showExtractLinesModal(){
+if(!txt){o.textContent='No text';return}
+document.getElementById('overlay').classList.add('show');
+document.getElementById('extractLinesModal').classList.add('show');
+}
+
+function showDeleteLinesModal(){
+if(!txt){o.textContent='No text';return}
+document.getElementById('overlay').classList.add('show');
+document.getElementById('deleteLinesModal').classList.add('show');
+}
+
+function sortWords(){
+if(!txt){o.textContent='No text';return}
+o.textContent=getWords().sort().join(' ');
+}
+
+function sortWordsRev(){
+if(!txt){o.textContent='No text';return}
+o.textContent=getWords().sort().reverse().join(' ');
+}
+
+function sortLines(){
+if(!txt){o.textContent='No text';return}
+o.textContent=getLines().sort().join('\n');
+}
+
+function sortLinesRev(){
+if(!txt){o.textContent='No text';return}
+o.textContent=getLines().sort().reverse().join('\n');
+}
+
+function sortLength(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+o.textContent=lines.sort((a,b)=>a.length-b.length||a.localeCompare(b)).join('\n');
+}
+
+function sortComplex(){
+if(!txt){o.textContent='No text';return}
+const calc=s=>{
+let score=0;
+score+=s.length;
+score+=(s.match(/[A-Z]/g)||[]).length*2;
+score+=(s.match(/[^a-zA-Z0-9\s]/g)||[]).length*3;
+score+=(s.match(/\b\w{8,}\b/g)||[]).length*5;
+const words=s.match(/\b\w+\b/g)||[];
+score+=new Set(words).size*2;
+return score;
+};
+const lines=getLines();
+o.textContent=lines.sort((a,b)=>calc(b)-calc(a)).join('\n');
+}
+
+function sortNumeric(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const extract=s=>{
+const m=s.match(/\d+\.?\d*/);
+return m?parseFloat(m[0]):Infinity;
+};
+o.textContent=lines.sort((a,b)=>extract(a)-extract(b)).join('\n');
+}
+
+function sortWordsInPara(){
+if(!txt){o.textContent='No text';return}
+const paras=txt.split(/\n\s*\n/);
+const result=paras.map(p=>{
+const words=p.match(/\b[\w']+\b/g)||[];
+const sorted=words.sort();
+const nonWords=p.match(/[^\w'\s]+/g)||[];
+return sorted.join(' ')+(nonWords.length?' '+nonWords.join(' '):'');
+});
+o.textContent=result.join('\n\n');
+}
+
+function sortDomain(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const extractDomain=s=>{
+const m=s.match(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+return m?m[1]:'';
+};
+o.textContent=lines.sort((a,b)=>{
+const da=extractDomain(a),db=extractDomain(b);
+return da.localeCompare(db)||a.localeCompare(b);
+}).join('\n');
+}
+
+function sortByLastWord(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const lastWord=s=>{
+const w=s.match(/\b\w+\b/g);
+return w?w[w.length-1].toLowerCase():'';
+};
+o.textContent=lines.sort((a,b)=>lastWord(a).localeCompare(lastWord(b))).join('\n');
+}
+
+function sortRandom(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+o.textContent=lines.sort(()=>Math.random()-0.5).join('\n');
+}
+
+function sortByVowels(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const vowelPct=s=>{
+const total=s.replace(/\s/g,'').length;
+if(!total)return 0;
+const vowels=(s.match(/[aeiouAEIOU]/g)||[]).length;
+return vowels/total;
+};
+o.textContent=lines.sort((a,b)=>vowelPct(b)-vowelPct(a)).join('\n');
+}
+
+function topWords(){
+if(!txt){o.textContent='No text';return}
+const w=getWords(),m={};
+w.forEach(x=>m[x]=(m[x]||0)+1);
+const s=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,100);
+let out='';
+for(let i=0;i<s.length;i++)out+=`${s[i][1]} ${s[i][0]}\n`;
+o.textContent=out;
+}
+
+function uniqueWords(){
+if(!txt){o.textContent='No text';return}
+const w=getWords();
+const unique=[...new Set(w)].sort();
+o.textContent=`UNIQUE WORDS (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function removeSpecial(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/[^a-zA-Z0-9\s]/g,'');
+}
+
+function removeNumbers(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/\d+/g,'');
+}
+
+function removeWords(){
+const list=document.getElementById('removeList').value.split('\n').filter(x=>x.trim());
+const caseSens=document.getElementById('caseSensitive').checked;
+if(!txt||!list.length){alert('Need text and removal list');return}
+let result=txt;
+list.forEach(term=>{
+const escaped=term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const flags=caseSens?'g':'gi';
+result=result.replace(new RegExp(escaped,flags),'');
+});
+o.textContent=result;
+closeModals();
+}
+
+function normalizeWhitespace(){
+if(!txt){o.textContent='No text';return}
+let result=txt.replace(/\r\n/g,'\n');
+result=result.replace(/\r/g,'\n');
+result=result.replace(/\t/g,'    ');
+result=result.replace(/ +/g,' ');
+result=result.replace(/\n{3,}/g,'\n\n');
+result=result.replace(/^ +/gm,'');
+result=result.replace(/ +$/gm,'');
+o.textContent=result;
+}
+
+function normalizeBreaks(){
+if(!txt){o.textContent='No text';return}
+let result=txt.replace(/\r\n/g,'\n');
+result=result.replace(/\r/g,'\n');
+result=result.replace(/\n{3,}/g,'\n\n');
+result=result.replace(/[ \t]+\n/g,'\n');
+result=result.replace(/\n[ \t]+/g,'\n');
+o.textContent=result;
+}
+
+function spacesToNewlines(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/ +/g,'\n');
+}
+
+function newlinesToSpaces(){
+if(!txt){o.textContent='No text';return}
+let result=txt.replace(/\n+/g,' ');
+result=result.replace(/ +/g,' ');
+o.textContent=result.trim();
+}
+
+function tabsToSpaces(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/\t/g,'    ');
+}
+
+function spacesToTabs(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/    /g,'\t').replace(/  /g,'\t');
+}
+
+function trimLines(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.split('\n').map(l=>l.trim()).join('\n');
+}
+
+function collapseSpaces(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/ +/g,' ').replace(/\t+/g,'\t');
+}
+
+function uppercase(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.toUpperCase();
+}
+
+function lowercase(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.toLowerCase();
+}
+
+function titlecase(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function sentencecase(){
+if(!txt){o.textContent='No text';return}
+let result=txt.toLowerCase();
+result=result.replace(/(^\w|[.!?]\s+\w)/g,c=>c.toUpperCase());
+o.textContent=result;
+}
+
+function removeEmpty(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.split('\n').filter(l=>l.trim()).join('\n');
+}
+
+function numberLines(){
+if(!txt){o.textContent='No text';return}
+const lines=txt.split('\n');
+o.textContent=lines.map((l,i)=>`${i+1}. ${l}`).join('\n');
+}
+
+function shuffle(){
+if(!txt){o.textContent='No text';return}
+const lines=txt.split('\n');
+for(let i=lines.length-1;i>0;i--){
+const j=Math.floor(Math.random()*(i+1));
+[lines[i],lines[j]]=[lines[j],lines[i]];
+}
+o.textContent=lines.join('\n');
+}
+
+function wordCount(){
+if(!txt){o.textContent='No text';return}
+const lines=txt.split('\n');
+let out='WORD COUNT PER LINE\n\n';
+lines.forEach((l,i)=>{
+const words=l.match(/\b\w+\b/g)||[];
+out+=`${i+1}. ${words.length} words: ${l.substring(0,50)}${l.length>50?'...':''}\n`;
+});
+const total=getWords().length;
+out+=`\nTOTAL: ${total} words`;
+o.textContent=out;
+}
+
+function wrapFixer(){
+if(!txt){o.textContent='No text';return}
+let result=txt.replace(/\n(?=[a-z])/g,' ');
+result=result.replace(/ +/g,' ');
+result=result.replace(/\n{3,}/g,'\n\n');
+o.textContent=result;
+}
+
+function rot13(){
+if(!txt){o.textContent='No text';return}
+const rot=c=>{
+if(c>='a'&&c<='z')return String.fromCharCode((c.charCodeAt(0)-97+13)%26+97);
+if(c>='A'&&c<='Z')return String.fromCharCode((c.charCodeAt(0)-65+13)%26+65);
+return c;
+};
+o.textContent=txt.split('').map(rot).join('');
+}
+
+function leetSpeak(){
+if(!txt){o.textContent='No text';return}
+const leet={'a':'4','e':'3','i':'1','o':'0','s':'5','t':'7','l':'1','A':'4','E':'3','I':'1','O':'0','S':'5','T':'7','L':'1'};
+o.textContent=txt.split('').map(c=>leet[c]||c).join('');
+}
+
+function sortChars(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+o.textContent=lines.map(l=>l.split('').sort().join('')).join('\n');
+}
+
+function removeConsecutive(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.replace(/(.)\1+/g,'$1');
+}
+
+function visualize(){
+if(!txt){o.textContent='No text';return}
+const lines=txt.split('\n');
+let out='TEXT STRUCTURE VISUALIZATION\n\n';
+lines.forEach((line,i)=>{
+const len=line.length;
+const spaces=line.match(/^ +/)?line.match(/^ +/)[0].length:0;
+const tabs=line.match(/^\t+/)?line.match(/^\t+/)[0].length:0;
+const trail=line.match(/ +$/)?line.match(/ +$/)[0].length:0;
+const isEmpty=!line.trim();
+let vis='';
+if(isEmpty)vis='[EMPTY]';
+else{
+if(spaces)vis+=`·${spaces}·`;
+if(tabs)vis+=`→${tabs}→`;
+vis+=line.substring(spaces+tabs,Math.min(line.length-trail,40));
+if(line.length-trail>40)vis+='...';
+if(trail)vis+=`·${trail}`;
+vis+=` (${len})`;
+}
+out+=`${String(i+1).padStart(4)} ${vis}\n`;
+});
+o.textContent=out;
+}
+
+function entropy(){
+if(!txt){o.textContent='No text';return}
+const m={},l=txt.length;
+for(let i=0;i<l;i++){
+const c=txt[i];
+m[c]=(m[c]||0)+1;
+}
+let e=0;
+const keys=Object.keys(m);
+for(let i=0;i<keys.length;i++){
+const p=m[keys[i]]/l;
+e-=p*Math.log2(p);
+}
+o.textContent=`Entropy: ${e.toFixed(4)} bits/char\nUnique: ${keys.length}\nLength: ${l}`;
+}
+
+function extractEmails(){
+if(!txt){o.textContent='No text';return}
+const emails=txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g)||[];
+const unique=[...new Set(emails)];
+o.textContent=`EMAILS (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractUrls(){
+if(!txt){o.textContent='No text';return}
+const urls=txt.match(/https?:\/\/[^\s<>"]+/g)||[];
+const unique=[...new Set(urls)];
+o.textContent=`URLS (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractPhones(){
+if(!txt){o.textContent='No text';return}
+const patterns=[
+/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+/\(\d{3}\)\s?\d{3}[-.\s]?\d{4}/g,
+/\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g,
+/\b\d{10,11}\b/g
+];
+let phones=[];
+patterns.forEach(p=>phones.push(...(txt.match(p)||[])));
+const unique=[...new Set(phones)];
+o.textContent=`PHONES (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractAddresses(){
+if(!txt){o.textContent='No text';return}
+const patterns=[
+/\b\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|way|court|ct|circle|cir|place|pl)\.?\s+[\w\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/gi,
+/\b\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd)\.?(?:\s+(?:apt|suite|unit|#)\s*\w+)?\b/gi,
+/\b[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}\b/g
+];
+let addresses=[];
+patterns.forEach(p=>addresses.push(...(txt.match(p)||[])));
+const unique=[...new Set(addresses)];
+o.textContent=`ADDRESSES (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractCodes(){
+if(!txt){o.textContent='No text';return}
+const patterns=[
+/\b[A-Z0-9]{4,}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)*\b/g,
+/\b[A-Z]{3,}[0-9]{3,}\b/g,
+/\b[0-9]{3,}[A-Z]{3,}\b/g,
+/\b[A-Z0-9]{8,}\b/g,
+/\b[A-F0-9]{32}\b/gi,
+/\b[A-F0-9]{40}\b/gi,
+/\b[A-Za-z0-9+\/]{20,}={0,2}\b/g
+];
+let codes=[];
+patterns.forEach(p=>codes.push(...(txt.match(p)||[])));
+const unique=[...new Set(codes)];
+o.textContent=`CODES (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractContainers(){
+if(!txt){o.textContent='No text';return}
+const containers=txt.match(/\b[A-Z]{4}\d{7}\b/g)||[];
+const unique=[...new Set(containers)];
+o.textContent=`SHIPPING CONTAINERS (${unique.length})\n\n${unique.join('\n')}`;
+}
+
+function extractAll(){
+if(!txt){o.textContent='No text';return}
+let out='EXTRACT ALL PATTERNS\n\n';
+const emails=txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g)||[];
+if(emails.length){
+out+=`EMAILS (${[...new Set(emails)].length})\n`;
+[...new Set(emails)].forEach(e=>out+=`${e}\n`);
+out+='\n';
+}
+const urls=txt.match(/https?:\/\/[^\s<>"]+/g)||[];
+if(urls.length){
+out+=`URLS (${[...new Set(urls)].length})\n`;
+[...new Set(urls)].forEach(u=>out+=`${u}\n`);
+out+='\n';
+}
+const phonePatterns=[/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g,/\(\d{3}\)\s?\d{3}[-.\s]?\d{4}/g,/\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g];
+let phones=[];
+phonePatterns.forEach(p=>phones.push(...(txt.match(p)||[])));
+if(phones.length){
+out+=`PHONES (${[...new Set(phones)].length})\n`;
+[...new Set(phones)].forEach(p=>out+=`${p}\n`);
+out+='\n';
+}
+const addrPatterns=[/\b\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd)\.?(?:\s+(?:apt|suite|unit|#)\s*\w+)?\b/gi];
+let addresses=[];
+addrPatterns.forEach(p=>addresses.push(...(txt.match(p)||[])));
+if(addresses.length){
+out+=`ADDRESSES (${[...new Set(addresses)].length})\n`;
+[...new Set(addresses)].forEach(a=>out+=`${a}\n`);
+out+='\n';
+}
+const codePatterns=[/\b[A-Z0-9]{4,}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)*\b/g,/\b[A-Z]{3,}[0-9]{3,}\b/g,/\b[0-9]{3,}[A-Z]{3,}\b/g];
+let codes=[];
+codePatterns.forEach(p=>codes.push(...(txt.match(p)||[])));
+if(codes.length){
+out+=`CODES (${[...new Set(codes)].length})\n`;
+[...new Set(codes)].slice(0,100).forEach(c=>out+=`${c}\n`);
+out+='\n';
+}
+const containers=txt.match(/\b[A-Z]{4}\d{7}\b/g)||[];
+if(containers.length){
+out+=`CONTAINERS (${[...new Set(containers)].length})\n`;
+[...new Set(containers)].forEach(c=>out+=`${c}\n`);
+}
+o.textContent=out||'No patterns found';
+}
+
+function generateNgrams(){
+const n=parseInt(document.getElementById('ngramSize').value)||2;
+const limit=parseInt(document.getElementById('ngramLimit').value)||50;
+if(n<1||n>10){alert('N must be 1-10');return}
+const w=getWords().slice(0,10000),m={};
+for(let i=0;i<=w.length-n;i++){
+const g=w.slice(i,i+n).join(' ');
+m[g]=(m[g]||0)+1;
+}
+const s=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,limit);
+let out=`${n}-GRAMS (${n===1?'unigrams':n===2?'bigrams':n===3?'trigrams':n+'-grams'})\n\n`;
+for(let i=0;i<s.length;i++)out+=`${s[i][1]} ${s[i][0]}\n`;
+o.textContent=out;
+closeModals();
+}
+
+function stats(){
+if(!txt){o.textContent='No text';return}
+const w=getWords(),s=txt.split(/[.!?]+/).filter(x=>x.trim());
+const wl=w.map(x=>x.length);
+const sum=wl.reduce((a,b)=>a+b,0);
+const avg=sum/wl.length||0;
+const u=new Set(w).size;
+let out='';
+out+=`Chars: ${txt.length}\n`;
+out+=`Words: ${w.length}\n`;
+out+=`Unique: ${u}\n`;
+out+=`Sentences: ${s.length}\n`;
+out+=`Avg word: ${avg.toFixed(2)}\n`;
+out+=`Max word: ${Math.max(...wl,0)}\n`;
+out+=`Lines: ${getLines().length}`;
+o.textContent=out;
+}
+
+function readability(){
+if(!txt){o.textContent='No text';return}
+const w=getWords().slice(0,5000);
+const s=txt.split(/[.!?]+/).filter(x=>x.trim()).length;
+const syl=word=>{
+word=word.toLowerCase().replace(/[^a-z]/g,'');
+if(word.length<=3)return 1;
+word=word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/,'');
+return(word.match(/[aeiouy]{1,2}/g)||[]).length||1;
+};
+const totalSyl=w.reduce((a,b)=>a+syl(b),0);
+const avgWords=w.length/s||0;
+const avgSyl=totalSyl/w.length||0;
+const fk=206.835-1.015*avgWords-84.6*avgSyl;
+const fkg=0.39*avgWords+11.8*avgSyl-15.59;
+o.textContent=`Flesch: ${fk.toFixed(1)}\nGrade: ${fkg.toFixed(1)}\nAvg words/sent: ${avgWords.toFixed(1)}\nAvg syl/word: ${avgSyl.toFixed(2)}`;
+}
+
+function dedupe(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+o.textContent=[...new Set(lines)].join('\n');
+}
+
+function reverse(){
+if(!txt){o.textContent='No text';return}
+o.textContent=txt.split('').reverse().join('');
+}
+
+function extractNums(){
+if(!txt){o.textContent='No text';return}
+const nums=txt.match(/\d+\.?\d*/g)||[];
+o.textContent=nums.join('\n');
+}
+
+function wordFreqMatrix(){
+if(!txt){o.textContent='No text';return}
+const w=getWords().slice(0,5000),m={};
+w.forEach(x=>m[x]=(m[x]||0)+1);
+const s=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,50);
+let out='WORD FREQUENCY MATRIX\n\n';
+for(let i=0;i<s.length;i++){
+const bar='█'.repeat(Math.ceil(s[i][1]/5));
+out+=`${s[i][0].padEnd(15)} ${bar} ${s[i][1]}\n`;
+}
+o.textContent=out;
+}
+
+function extractLinesContaining(){
+const list=document.getElementById('extractLinesList').value.split('\n').filter(x=>x.trim());
+const caseSens=document.getElementById('extractCaseSensitive').checked;
+if(!txt||!list.length){alert('Need text and search terms');return}
+const lines=txt.split('\n');
+const matches=[];
+lines.forEach(line=>{
+const testLine=caseSens?line:line.toLowerCase();
+const hasMatch=list.some(term=>{
+const testTerm=caseSens?term:term.toLowerCase();
+return testLine.includes(testTerm);
+});
+if(hasMatch)matches.push(line);
+});
+o.textContent=matches.length?`EXTRACTED ${matches.length} LINES\n\n${matches.join('\n')}`:'No matching lines found';
+closeModals();
+}
+
+function deleteLinesContaining(){
+const list=document.getElementById('deleteLinesList').value.split('\n').filter(x=>x.trim());
+const caseSens=document.getElementById('deleteCaseSensitive').checked;
+if(!txt||!list.length){alert('Need text and search terms');return}
+const lines=txt.split('\n');
+const kept=[];
+lines.forEach(line=>{
+const testLine=caseSens?line:line.toLowerCase();
+const hasMatch=list.some(term=>{
+const testTerm=caseSens?term:term.toLowerCase();
+return testLine.includes(testTerm);
+});
+if(!hasMatch)kept.push(line);
+});
+o.textContent=kept.length?kept.join('\n'):'All lines deleted';
+closeModals();
+}
+
+function sortByDigits(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const digitCount=s=>(s.match(/\d/g)||[]).length;
+o.textContent=lines.sort((a,b)=>digitCount(b)-digitCount(a)||a.localeCompare(b)).join('\n');
+}
+
+function sortByUnique(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const uniqueCount=s=>new Set(s.toLowerCase().replace(/\s/g,'')).size;
+o.textContent=lines.sort((a,b)=>uniqueCount(b)-uniqueCount(a)||a.localeCompare(b)).join('\n');
+}
+
+function sortByCapitals(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const capCount=s=>(s.match(/[A-Z]/g)||[]).length;
+o.textContent=lines.sort((a,b)=>capCount(b)-capCount(a)||a.localeCompare(b)).join('\n');
+}
+
+function sortByWhitespace(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const wsCount=s=>(s.match(/\s/g)||[]).length;
+o.textContent=lines.sort((a,b)=>wsCount(b)-wsCount(a)||a.localeCompare(b)).join('\n');
+}
+
+function sortByEntropy(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const calcEntropy=s=>{
+if(!s.length)return 0;
+const m={};
+for(let i=0;i<s.length;i++)m[s[i]]=(m[s[i]]||0)+1;
+let e=0;
+Object.values(m).forEach(c=>{
+const p=c/s.length;
+e-=p*Math.log2(p);
+});
+return e;
+};
+o.textContent=lines.sort((a,b)=>calcEntropy(b)-calcEntropy(a)).join('\n');
+}
+
+function sortByPattern(){
+if(!txt){o.textContent='No text';return}
+const lines=getLines();
+const getPattern=s=>{
+return s.replace(/[a-z]/g,'a')
+.replace(/[A-Z]/g,'A')
+.replace(/\d/g,'0')
+.replace(/\s/g,'_')
+.replace(/[^aA0_]/g,'*');
+};
+o.textContent=lines.sort((a,b)=>{
+const pa=getPattern(a),pb=getPattern(b);
+return pa.localeCompare(pb)||a.localeCompare(b);
+}).join('\n');
+}
+</script>
+</body>
+</html>
