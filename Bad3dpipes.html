@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MAXIMUM DISORIENTATION - INTERACTIVE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#000;font-family:'Courier New',monospace; transition: filter 0.05s linear;}
+/* The Global Invert Class - Toggled by JS for violent strobing */
+body.invert { filter: invert(1); }
+
+/* LAYERS */
+#cvBg, #cvMoire, #c3d, #cvHerm {position:fixed;top:0;left:0;width:100%;height:100%}
+
+#cvBg      {z-index:1} 
+#cvMoire   {z-index:2; opacity:0.6; mix-blend-mode: hard-light;} 
+#c3d       {z-index:3}
+#cvHerm    {z-index:4; pointer-events:none; opacity:0.6;}
+
+#ui{position:fixed;bottom:12px;left:12px;background:#000;border:2px solid #fff;padding:10px 12px;width:215px;z-index:10;}
+#ui.collapsed #sliders{display:none}
+#hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:6px;border-bottom:1px solid #333;padding-bottom:5px}
+#hdr span{font-size:10px;letter-spacing:3px;color:#fff;text-transform:uppercase;font-weight:900}
+.row{margin:5px 0}
+.row label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:#fff;margin-bottom:2px;font-weight:bold}
+.row label b{color:#fff;min-width:28px;text-align:right}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:#333;border-radius:0;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:0;background:#fff;cursor:pointer;border:1px solid black}
+.btns{display:flex;gap:5px;margin-top:10px}
+.btns button{flex:1;font-family:inherit;font-size:9px;letter-spacing:2px;text-transform:uppercase;background:#000;border:1px solid #fff;color:#fff;padding:6px 0;cursor:pointer;font-weight:bold}
+.btns button:active{background:#fff;color:#000}
+</style>
+</head>
+<body>
+
+<canvas id="cvBg"></canvas>
+<canvas id="cvMoire"></canvas>
+<canvas id="cvHerm"></canvas>
+
+<div id="ui">
+  <div id="hdr" onclick="toggleUI()">
+    <span>⚙ SEIZURE OPTICS</span>
+    <span id="tog">▲</span>
+  </div>
+  <div id="sliders">
+    <div class="row"><label>SPEED <b id="vSpeed">10</b></label>
+      <input type="range" min="1" max="40" value="10" oninput="C.speed=+this.value;vSpeed.textContent=this.value"></div>
+    <div class="row"><label>PIPES <b id="vPipes">12</b></label>
+      <input type="range" min="1" max="28" value="12" oninput="C.pipeCount=+this.value;vPipes.textContent=this.value"></div>
+    <div class="row"><label>CHAOS <b id="vChaos">22</b></label>
+      <input type="range" min="1" max="100" value="22" oninput="C.chaos=+this.value;vChaos.textContent=this.value"></div>
+    <div class="row"><label>THICKNESS <b id="vThick">4</b></label>
+      <input type="range" min="1" max="10" value="4" oninput="C.thick=+this.value;vThick.textContent=this.value"></div>
+    <div class="row"><label>STROBE <b id="vStrobe">12</b></label>
+      <input type="range" min="0" max="20" value="12" oninput="C.strobe=+this.value;vStrobe.textContent=this.value"></div>
+    <div class="row"><label>VERTIGO <b id="vVertigo">60</b></label>
+      <input type="range" min="0" max="100" value="60" oninput="C.vertigo=+this.value;vVertigo.textContent=this.value"></div>
+    <div class="row"><label>PATTERN <b id="vPat">SINE</b></label>
+      <input type="range" min="0" max="3" value="0" step="1"
+        oninput="C.pattern=+this.value;vPat.textContent=['SINE','HELIX','ORBIT','WAVE'][this.value]"></div>
+    <div class="btns">
+      <button onclick="hardReset()">RESET</button>
+      <button onclick="toggleWire()">WIRE</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const C={speed:10,pipeCount:12,chaos:22,thick:4,towardCam:70,strobe:12,vertigo:60,resetSecs:30,camSpin:4,pattern:0};
+let wireMode=false,frame=0,lastReset=Date.now();
+function toggleUI(){const u=document.getElementById('ui');u.classList.toggle('collapsed');document.getElementById('tog').textContent=u.classList.contains('collapsed')?'▼':'▲';}
+function toggleWire(){wireMode=!wireMode;pipes.forEach(p=>p.mat.wireframe=wireMode);}
+
+/* ═══════════════════════════════════════════════════
+   LAYER 1 — High Contrast Snake Illusion
+═══════════════════════════════════════════════════ */
+const cvBg=document.getElementById('cvBg'),bgCtx=cvBg.getContext('2d');
+let bgW,bgH,bgCX,bgCY;
+function resizeBg(){cvBg.width=bgW=innerWidth;cvBg.height=bgH=innerHeight;bgCX=bgW/2;bgCY=bgH/2;}
+resizeBg();
+
+const RINGS=2, SEGS_PER_RING=150;
+const ringAngles=Array.from({length:RINGS},()=>Math.random()*Math.PI*2);
+const ringSpeed=Array.from({length:RINGS},(_,i)=>i%2===0?0.2:-0.002);
+
+function drawBg(){
+  bgCtx.fillStyle='#000'; // Pure Black Base
+  bgCtx.fillRect(0,0,bgW,bgH);
+  const maxR=Math.hypot(bgW,bgH)*0.6;
+  
+  for(let ri=0;ri<RINGS;ri++){
+    const r1=maxR*(ri/RINGS), r2=maxR*((ri+1)/RINGS);
+    const rot=ringAngles[ri];
+    
+    for(let si=0;si<SEGS_PER_RING;si++){
+      const a1=rot+(si/SEGS_PER_RING)*Math.PI*2;
+      const a2=rot+((si+1)/SEGS_PER_RING)*Math.PI*2;
+      const even=(ri+si)%2===0;
+
+      // STEPPED GRADIENT for illusion trigger (Black -> Grey -> White -> Grey -> Black)
+      const grad=bgCtx.createRadialGradient(bgCX,bgCY,r1,bgCX,bgCY,r2);
+      if(even){
+          grad.addColorStop(0,'#000'); grad.addColorStop(0.5,'#fff'); grad.addColorStop(1,'#000');
+      } else {
+          grad.addColorStop(0,'#fff'); grad.addColorStop(0.5,'#000'); grad.addColorStop(1,'#fff');
+      }
+      
+      bgCtx.fillStyle=grad;
+      bgCtx.beginPath();bgCtx.arc(bgCX,bgCY,r2,a1,a2);bgCtx.arc(bgCX,bgCY,r1,a2,a1,true);bgCtx.closePath();bgCtx.fill();
+    }
+    // High contrast separator
+    bgCtx.strokeStyle='#fff'; bgCtx.lineWidth=1;
+    bgCtx.beginPath();bgCtx.arc(bgCX,bgCY,r2,0,Math.PI*2);bgCtx.stroke();
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   LAYER 2 — White Moiré on Black
+═══════════════════════════════════════════════════ */
+const cvM=document.getElementById('cvMoire'),mCtx=cvM.getContext('2d');
+let mW,mH,moireAngle=0;
+function resizeMoire(){cvM.width=mW=innerWidth;cvM.height=mH=innerHeight;}
+resizeMoire();
+
+function drawMoire(){
+  mCtx.clearRect(0,0,mW,mH);
+  const d=Math.max(mW,mH)*1.5;
+  const sp=14; // Tighter grid = more vibration
+  
+  mCtx.lineWidth=1;
+  mCtx.strokeStyle='rgba(255,255,255,0.7)'; // Bright White
+
+  mCtx.save();mCtx.translate(mW/2,mH/2);
+  for(let x=-d;x<d;x+=sp){mCtx.beginPath();mCtx.moveTo(x,-d);mCtx.lineTo(x,d);mCtx.stroke();}
+  mCtx.restore();
+  
+  mCtx.save();mCtx.translate(mW/2,mH/2);mCtx.rotate(moireAngle);
+  for(let x=-d;x<d;x+=sp){mCtx.beginPath();mCtx.moveTo(x,-d);mCtx.lineTo(x,d);mCtx.stroke();}
+  mCtx.restore();
+}
+
+/* ═══════════════════════════════════════════════════
+   LAYER 4 — Hermann Grid (High Contrast)
+═══════════════════════════════════════════════════ */
+const cvH=document.getElementById('cvHerm'),hCtx=cvH.getContext('2d');
+let hW,hH;
+function resizeHerm(){cvH.width=hW=innerWidth;cvH.height=hH=innerHeight;}
+resizeHerm();
+
+function drawHerm(){
+  hCtx.clearRect(0,0,hW,hH);
+  const sp=40;
+  hCtx.strokeStyle='rgba(255,255,255,0.9)';hCtx.lineWidth=1;
+  for(let x=0;x<=hW+sp;x+=sp){hCtx.beginPath();hCtx.moveTo(x,0);hCtx.lineTo(x,hH);hCtx.stroke();}
+  for(let y=0;y<=hH+sp;y+=sp){hCtx.beginPath();hCtx.moveTo(0,y);hCtx.lineTo(hW,y);hCtx.stroke();}
+  
+  // Flashing dots
+  for(let x=0;x<=hW+sp;x+=sp){
+    for(let y=0;y<=hH+sp;y+=sp){
+      if(Math.random()<1.1){
+        hCtx.fillStyle='#fff'; hCtx.beginPath();hCtx.arc(x,y,3,0,Math.PI*2);hCtx.fill();
+      }
+    }
+  }
+}
+setInterval(drawHerm, 80);
+
+/* ═══════════════════════════════════════════════════
+   THREE.JS — RESTORED PIPES + VERTIGO + USER CONTROL
+═══════════════════════════════════════════════════ */
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x000000,0.02); // Black Fog
+const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,600);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.setClearColor(0x000000,0); 
+renderer.domElement.id='c3d';
+document.body.insertBefore(renderer.domElement,document.getElementById('cvHerm'));
+
+/* Lighting — High Contrast */
+scene.add(new THREE.AmbientLight(0x404040));
+const pL1=new THREE.PointLight(0xffffff,2,80);scene.add(pL1);
+const pL2=new THREE.PointLight(0xffffff,2,80);scene.add(pL2);
+
+/* Texture Generation — Stark Black & White */
+function makeStripeTex(){
+  const w=256,h=128,n=8;
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#fff';
+  const sw=w/(n*2);
+  for(let i=0;i<n*4;i+=2){
+    const x=i*sw-h*0.9;
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+sw,0);ctx.lineTo(x+sw+h,h);ctx.lineTo(x+h,h);ctx.closePath();ctx.fill();
+  }
+  const tex=new THREE.CanvasTexture(c);
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(2,10);return tex;
+}
+const STRIPE=makeStripeTex();
+
+function makeRingTex(){
+  const sz=128,c=document.createElement('canvas');c.width=c.height=sz;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#000';ctx.fillRect(0,0,sz,sz);
+  for(let r=4;r<60;r+=8){
+    ctx.beginPath();ctx.arc(sz/2,sz/2,r,0,Math.PI*2);
+    ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c);return tex;
+}
+const RINGTEX=makeRingTex();
+
+const BOUND=6.5,SEG=12;
+const AXIS6=[new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1)];
+
+function patternBias(pos,dirs,t){
+  if(C.pattern===0){const tg=Math.sin(pos.z*1.1+t*0.0008)*BOUND*0.65;return dirs.slice().sort((a,b)=>Math.abs((pos.y+a.y)-tg)-Math.abs((pos.y+b.y)-tg));}
+  if(C.pattern===1){const az=Math.atan2(pos.x,pos.z);const tang=new THREE.Vector3(Math.cos(az),Math.sin(t*0.0004)*0.5,-Math.sin(az)).normalize();return dirs.slice().sort((a,b)=>b.dot(tang)-a.dot(tang));}
+  if(C.pattern===2){const rad=pos.clone().setY(0).normalize();const perp=new THREE.Vector3(-rad.z,Math.sin(t*0.0005)*0.35,rad.x).normalize();return dirs.slice().sort((a,b)=>b.dot(perp)-a.dot(perp));}
+  return dirs.slice().sort((a,b)=>Math.sin((pos.x+b.x)+(pos.y+b.y)+(pos.z+b.z)-t*0.003)-Math.sin((pos.x+a.x)+(pos.y+a.y)+(pos.z+a.z)-t*0.003));
+}
+
+class Pipe{
+  constructor(){
+    this.group=new THREE.Group();scene.add(this.group);
+    
+    // High Gloss White Material against Black Fog
+    this.mat=new THREE.MeshPhongMaterial({
+        map:STRIPE,
+        color:0xffffff,
+        specular:0xffffff,
+        shininess:300,
+        emissive:0x222222
+    });
+    this.ballMat=new THREE.MeshPhongMaterial({
+        map:RINGTEX,
+        color:0xffffff,
+        specular:0xffffff,
+        shininess:300
+    });
+
+    if(Math.random()<0.70){
+      const ax=Math.floor(Math.random()*3),sg=Math.random()<.5?1:-1;
+      const p=[0,0,0];p[ax]=sg*BOUND;p[(ax+1)%3]=(Math.random()-.5)*BOUND*1.6;p[(ax+2)%3]=(Math.random()-.5)*BOUND*1.6;
+      this.pos=new THREE.Vector3(...p);
+    } else {
+      this.pos=new THREE.Vector3((Math.random()-.5)*BOUND*1.4,(Math.random()-.5)*BOUND*1.4,(Math.random()-.5)*BOUND*1.4);
+    }
+    this.dir=this.biasedDir();this.dist=0;this.segs=[];
+    this.addBall(this.pos.clone());this.addSeg(this.pos.clone(),this.dir.clone());
+  }
+  get R(){return 0.052*C.thick;}
+  biasedDir(){
+    if(Math.random()<0.65){const toO=this.pos.clone().negate().normalize();return AXIS6.reduce((b,d)=>d.dot(toO)>b.dot(toO)?d:b,AXIS6[0]).clone();}
+    return AXIS6[Math.floor(Math.random()*6)].clone();
+  }
+  move(t){
+    this.pos.addScaledVector(this.dir,C.speed*0.015);this.dist+=C.speed*0.015;this.updateLast();
+    const oob=Math.abs(this.pos.x)>=BOUND||Math.abs(this.pos.y)>=BOUND||Math.abs(this.pos.z)>=BOUND;
+    if(this.dist>=this.R*9&&(Math.random()<C.chaos*0.006||oob))this.turn(t);
+  }
+  turn(t){
+    let dirs=AXIS6.filter(d=>!d.equals(this.dir)&&!d.equals(this.dir.clone().negate()));
+    dirs=dirs.filter(d=>{const tp=this.pos.clone().add(d);return(Math.abs(tp.x)<=Math.abs(this.pos.x)||Math.abs(tp.x)<=BOUND)&&(Math.abs(tp.y)<=Math.abs(this.pos.y)||Math.abs(tp.y)<=BOUND)&&(Math.abs(tp.z)<=Math.abs(this.pos.z)||Math.abs(tp.z)<=BOUND);});
+    if(!dirs.length)return;
+    let nd;
+    if(Math.random()<C.towardCam*0.01){
+      const toCam=cam.position.clone().sub(this.pos).normalize();
+      nd=dirs.slice().sort((a,b)=>b.dot(toCam)-a.dot(toCam))[0].clone();
+    } else {
+      const pd=patternBias(this.pos,dirs,t);
+      nd=Math.random()<0.65?pd[0].clone():pd[Math.floor(Math.random()*pd.length)].clone();
+    }
+    const r=this.R*2;this.shortenLast(r);this.addCorner(this.pos.clone(),this.dir.clone(),nd,r);this.addBall(this.pos.clone());
+    this.addSeg(this.pos.clone().add(nd.clone().multiplyScalar(r)),nd);this.dir=nd;this.dist=0;
+  }
+  /* Original Geometry Logic Restored */
+  mkCyl(s,d,l){const g=new THREE.CylinderGeometry(this.R,this.R,Math.max(0.001,l),SEG);const m=new THREE.Mesh(g,this.mat);m.position.copy(s).addScaledVector(d,l/2);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d);return m;}
+  addSeg(s,d){const sg={start:s.clone(),dir:d.clone(),mesh:this.mkCyl(s,d,.001)};this.segs.push(sg);this.group.add(sg.mesh);}
+  updateLast(){const s=this.segs[this.segs.length-1];const l=Math.max(.001,this.pos.distanceTo(s.start));this.group.remove(s.mesh);s.mesh=this.mkCyl(s.start,s.dir,l);this.group.add(s.mesh);}
+  shortenLast(a){const s=this.segs[this.segs.length-1];const ep=this.pos.clone().sub(this.dir.clone().multiplyScalar(a));const l=Math.max(.001,ep.distanceTo(s.start));this.group.remove(s.mesh);s.mesh=this.mkCyl(s.start,s.dir,l);this.group.add(s.mesh);}
+  addCorner(pos,from,to,r){const curve=new THREE.QuadraticBezierCurve3(pos.clone().sub(from.clone().multiplyScalar(r)),pos,pos.clone().add(to.clone().multiplyScalar(r)));this.group.add(new THREE.Mesh(new THREE.TubeGeometry(curve,6,this.R,SEG,false),this.mat));}
+  addBall(pos){const m=new THREE.Mesh(new THREE.SphereGeometry(this.R*1.6,SEG,SEG),this.ballMat);m.position.copy(pos);this.group.add(m);}
+  remove(){scene.remove(this.group);}
+}
+
+let pipes=[];
+function hardReset(){
+  // HARD FLASH
+  document.body.classList.add('invert');
+  setTimeout(()=>document.body.classList.remove('invert'), 10);
+  
+  pipes.forEach(p=>p.remove());pipes=[];
+  for(let i=0;i<Math.round(C.pipeCount);i++)pipes.push(new Pipe());
+  lastReset=Date.now();
+}
+hardReset();
+
+/* ═══════════════════════════════════════════════════
+   CAMERA CONTROL & VERTIGO INTEGRATION
+═══════════════════════════════════════════════════ */
+let camDist=13,camH=0,camV=0.18,lastTouches=[];
+let lastInteract = 0; // Timestamp of last user input
+let vertigoPhase = 0;
+
+const onInteract = () => { lastInteract = Date.now(); };
+
+const gT=e=>Array.from(e.touches).map(t=>({x:t.clientX,y:t.clientY}));
+renderer.domElement.addEventListener('touchstart',e=>{onInteract(); lastTouches=gT(e);},{passive:true});
+renderer.domElement.addEventListener('touchmove',e=>{
+  onInteract();
+  const ts=gT(e);
+  if(ts.length===1&&lastTouches.length>=1){camH+=(ts[0].x-lastTouches[0].x)*0.007;camV+=(ts[0].y-lastTouches[0].y)*0.005;camV=Math.max(-1.45,Math.min(1.45,camV));}
+  else if(ts.length>=2&&lastTouches.length>=2){const pr=Math.hypot(lastTouches[0].x-lastTouches[1].x,lastTouches[0].y-lastTouches[1].y);const cr=Math.hypot(ts[0].x-ts[1].x,ts[0].y-ts[1].y);if(pr>0)camDist=Math.max(1.5,Math.min(90,camDist*(pr/cr)));}
+  lastTouches=ts;
+},{passive:true});
+renderer.domElement.addEventListener('touchend',e=>{onInteract(); lastTouches=gT(e);},{passive:true});
+let mDown=false,lm={x:0,y:0};
+renderer.domElement.addEventListener('mousedown',e=>{onInteract(); mDown=true;lm={x:e.clientX,y:e.clientY};});
+window.addEventListener('mouseup',()=>mDown=false);
+renderer.domElement.addEventListener('mousemove',e=>{if(!mDown)return;onInteract(); camH+=(e.clientX-lm.x)*0.006;camV+=(e.clientY-lm.y)*0.004;camV=Math.max(-1.45,Math.min(1.45,camV));lm={x:e.clientX,y:e.clientY};});
+renderer.domElement.addEventListener('wheel',e=>{onInteract(); camDist=Math.max(1.5,Math.min(90,camDist*(1+e.deltaY*0.001)));},{passive:true});
+
+
+let bgT=0;
+function animate(){
+  requestAnimationFrame(animate);frame++;
+  const t=performance.now();
+  if(Date.now()-lastReset>C.resetSecs*1000)hardReset();
+
+  for(let i=0;i<RINGS;i++)ringAngles[i]+=ringSpeed[i]*C.speed;
+  bgT++; if(bgT%2===0)drawBg();
+  
+  moireAngle+=0.0008*C.speed;
+  if(bgT%2===0)drawMoire();
+  STRIPE.offset.y=(t*0.0003*C.speed)%1;
+
+  // GLOBAL STROBE
+  if(C.strobe > 0 && Math.random() < C.strobe * 0.125){
+    document.body.classList.toggle('invert');
+  } else {
+    document.body.classList.remove('invert');
+  }
+
+  /* VERTIGO & CAMERA LOGIC */
+  const timeSinceInteract = Date.now() - lastInteract;
+  const isIdle = timeSinceInteract > 1500; // 1.5s timeout
+
+  let finalFOV = 70;
+  let finalDist = camDist;
+
+  if (isIdle) {
+    // 1. Auto Rotate Angle
+    camH += 0.001 * C.camSpin;
+    
+    // 2. Auto Vertigo Calculation
+    vertigoPhase += C.vertigo * 0.0005;
+    // Limit FOV swing to avoid clipping
+    const fovMod = Math.sin(vertigoPhase) * 20; 
+    finalFOV = 70 + fovMod;
+    
+    // Dolly Zoom Math: Calculate distance based on FOV to maintain subject size
+    const zoomFactor = Math.tan((70 * Math.PI)/360) / Math.tan((finalFOV * Math.PI)/360);
+    finalDist = camDist * zoomFactor;
+
+    // 3. Subtle vertical sway
+    camV += Math.cos(t*0.001) * 0.002;
+    camV = Math.max(-1.45,Math.min(1.45,camV));
+  } else {
+    // Sync phase so resumption is smooth
+    vertigoPhase = 0;
+  }
+
+  // Smoothly interpolate FOV for transition
+  cam.fov += (finalFOV - cam.fov) * 0.1;
+  cam.updateProjectionMatrix();
+
+  // Apply Camera Position
+  cam.position.set(
+    Math.sin(camH) * Math.cos(camV) * finalDist,
+    Math.sin(camV) * finalDist,
+    Math.cos(camH) * Math.cos(camV) * finalDist
+  );
+  cam.lookAt(0,0,0);
+
+  pL1.position.set(Math.sin(t*0.001)*16, 10, Math.cos(t*0.001)*16);
+  pL2.position.set(Math.sin(t*0.0013)*16, -10, Math.cos(t*0.0013)*16);
+
+  pipes.forEach(p=>p.move(t));
+  renderer.render(scene,cam);
+}
+animate();
+
+window.addEventListener('resize',()=>{
+  cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+  resizeBg();resizeMoire();resizeHerm();
+});
+</script>
+</body>
+</html>

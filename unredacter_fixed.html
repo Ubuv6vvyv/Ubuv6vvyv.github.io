@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Unredacter Mobile</title>
+<style>
+:root{--bg:#121212;--surface:#1e1e1e;--primary:#bb86fc;--secondary:#03dac6;--error:#cf6679;--text-main:#e0e0e0;--text-muted:#a0a0a0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);margin:0;padding:0;min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--surface);padding:15px 20px;box-shadow:0 2px 8px rgba(0,0,0,.5);position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:1.2rem;color:var(--primary)}
+.step-indicator{font-size:.8rem;color:var(--text-muted)}
+main{flex:1;padding:20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+.step-section{display:none;animation:fadeIn .3s ease}
+.step-section.active{display:flex;flex-direction:column;gap:15px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--surface);border-radius:12px;padding:15px;box-shadow:0 4px 6px rgba(0,0,0,.3)}
+label{display:block;margin-bottom:8px;font-weight:500;font-size:.9rem;color:var(--text-muted)}
+input[type="text"],select,input[type="number"]{width:100%;padding:12px;background:#2c2c2c;border:1px solid #444;border-radius:8px;color:white;font-size:1rem;margin-bottom:10px}
+.range-wrap{margin-bottom:15px}
+.range-header{display:flex;justify-content:space-between;margin-bottom:5px}
+input[type="range"]{width:100%;height:6px;background:#444;border-radius:3px;outline:none;-webkit-appearance:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:var(--primary);border-radius:50%;cursor:pointer}
+.btn{background:var(--primary);color:#000;border:none;padding:15px;border-radius:30px;font-weight:bold;font-size:1rem;width:100%;cursor:pointer;text-align:center;box-shadow:0 4px 12px rgba(187,134,252,.3);transition:transform .1s}
+.btn:active{transform:scale(.98)}
+.btn.secondary{background:#333;color:white;box-shadow:none}
+.btn-group{display:flex;gap:10px}
+.canvas-container{position:relative;width:100%;max-width:100%;overflow:auto;background:#000;border-radius:8px;border:1px solid #333;touch-action:none}
+canvas{display:block;max-width:100%;height:auto}
+.overlay-canvas{position:absolute;top:0;left:0;pointer-events:none}
+.console{background:#000;font-family:'Courier New',monospace;padding:15px;border-radius:8px;min-height:80px;border:1px solid #333;font-size:1.1rem;line-height:1.4;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto}
+.helper-text{font-size:.8rem;color:#777;margin-top:-5px;margin-bottom:10px}
+#cropCanvas{cursor:crosshair}
+.crop-active{cursor:crosshair!important}
+</style>
+</head>
+<body>
+
+<header>
+<h1>Unredacter <span style="font-size:.5em;opacity:.7">Mobile</span></h1>
+<span class="step-indicator" id="stepIndicator">Step 1/3</span>
+</header>
+
+<main>
+
+<div id="step1" class="step-section active">
+<div class="card">
+<label>Upload Pixelated Image</label>
+<input type="file" id="fileInput" accept="image/*">
+<p class="helper-text">Select screenshot with redacted text</p>
+</div>
+
+<div class="card" id="cropCard" style="display:none">
+<div class="canvas-container">
+<canvas id="cropCanvas"></canvas>
+<canvas id="cropOverlay" class="overlay-canvas"></canvas>
+</div>
+<p class="helper-text" style="text-align:center;margin-top:10px;color:var(--secondary)">
+Drag to select the pixelated text area
+</p>
+</div>
+
+<button class="btn" id="cropBtn" style="display:none">Confirm Selection</button>
+</div>
+
+<div id="step2" class="step-section">
+<div class="card" style="text-align:center">
+<div class="canvas-container">
+<canvas id="mainCanvas"></canvas>
+<canvas id="gridCanvas" class="overlay-canvas"></canvas>
+</div>
+<p class="helper-text" style="margin-top:10px;color:var(--secondary)">
+Align red grid to pixel blocks perfectly
+</p>
+</div>
+
+<div class="card">
+<div class="range-wrap">
+<div class="range-header">
+<label>Block Size</label>
+<span id="bsVal">8px</span>
+</div>
+<input type="range" id="blockSize" min="2" max="30" value="8">
+</div>
+
+<div class="range-wrap">
+<div class="range-header">
+<label>X Offset</label>
+<span id="oxVal">0</span>
+</div>
+<input type="range" id="offsetX" min="0" max="30" value="0">
+</div>
+
+<div class="range-wrap">
+<div class="range-header">
+<label>Y Offset</label>
+<span id="oyVal">0</span>
+</div>
+<input type="range" id="offsetY" min="0" max="30" value="0">
+</div>
+</div>
+
+<div class="btn-group">
+<button class="btn secondary" onclick="goToStep(1)">Back</button>
+<button class="btn" onclick="goToStep(3)">Next</button>
+</div>
+</div>
+
+<div id="step3" class="step-section">
+<div class="card">
+<label>Font</label>
+<select id="fontFamily">
+<option value="Arial">Arial</option>
+<option value="Helvetica">Helvetica</option>
+<option value="Roboto">Roboto</option>
+<option value="Segoe UI">Segoe UI</option>
+<option value="Verdana">Verdana</option>
+<option value="Times New Roman">Times New Roman</option>
+<option value="Courier New">Courier New</option>
+<option value="monospace">Monospace</option>
+</select>
+
+<div class="range-wrap">
+<div class="range-header">
+<label>Font Size</label>
+<span id="fsVal">16px</span>
+</div>
+<input type="range" id="fontSize" min="8" max="48" value="16">
+</div>
+
+<label>Text Color</label>
+<select id="textColor">
+<option value="black">Black (on light bg)</option>
+<option value="white">White (on dark bg)</option>
+</select>
+
+<label>Characters to Try</label>
+<input type="text" id="charset" value="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?'-">
+<p class="helper-text">Add any special chars you expect</p>
+</div>
+
+<div class="card">
+<label>Result</label>
+<div class="console" id="output">Ready to start...</div>
+<div id="status" style="color:var(--secondary);margin-top:5px;font-size:.8rem"></div>
+</div>
+
+<div class="btn-group">
+<button class="btn secondary" onclick="goToStep(2)">Back</button>
+<button class="btn" id="startBtn">Start</button>
+<button class="btn" id="stopBtn" style="display:none;background:var(--error)">Stop</button>
+</div>
+</div>
+
+</main>
+
+<canvas id="workCanvas" style="display:none"></canvas>
+
+<script>
+let currentStep=1,cropImg=new Image(),croppedImg=new Image(),isRunning=false,cropRect=null,isDragging=false;
+
+const $={
+fileInput:document.getElementById('fileInput'),
+cropCard:document.getElementById('cropCard'),
+cropCanvas:document.getElementById('cropCanvas'),
+cropOverlay:document.getElementById('cropOverlay'),
+cropBtn:document.getElementById('cropBtn'),
+mainCanvas:document.getElementById('mainCanvas'),
+gridCanvas:document.getElementById('gridCanvas'),
+workCanvas:document.getElementById('workCanvas'),
+blockSize:document.getElementById('blockSize'),
+offsetX:document.getElementById('offsetX'),
+offsetY:document.getElementById('offsetY'),
+fontSize:document.getElementById('fontSize'),
+fontFamily:document.getElementById('fontFamily'),
+textColor:document.getElementById('textColor'),
+charset:document.getElementById('charset'),
+startBtn:document.getElementById('startBtn'),
+stopBtn:document.getElementById('stopBtn'),
+output:document.getElementById('output'),
+status:document.getElementById('status'),
+bsVal:document.getElementById('bsVal'),
+oxVal:document.getElementById('oxVal'),
+oyVal:document.getElementById('oyVal'),
+fsVal:document.getElementById('fsVal')
+};
+
+const cropCtx=$.cropCanvas.getContext('2d'),cropOCtx=$.cropOverlay.getContext('2d'),
+mainCtx=$.mainCanvas.getContext('2d',{willReadFrequently:true}),
+gridCtx=$.gridCanvas.getContext('2d'),
+workCtx=$.workCanvas.getContext('2d',{willReadFrequently:true});
+
+// File input
+$.fileInput.addEventListener('change',e=>{
+const file=e.target.files[0];
+if(!file)return;
+const reader=new FileReader();
+reader.onload=ev=>{
+cropImg.src=ev.target.result;
+cropImg.onload=()=>{
+$.cropCard.style.display='block';
+$.cropBtn.style.display='block';
+setupCropCanvas();
+};
+};
+reader.readAsDataURL(file);
+});
+
+// Crop canvas setup
+function setupCropCanvas(){
+const maxW=$.cropCard.offsetWidth-30;
+const scale=Math.min(1,maxW/cropImg.width);
+const dw=cropImg.width*scale,dh=cropImg.height*scale;
+$.cropCanvas.width=cropImg.width;
+$.cropCanvas.height=cropImg.height;
+$.cropCanvas.style.width=dw+'px';
+$.cropCanvas.style.height=dh+'px';
+$.cropOverlay.width=cropImg.width;
+$.cropOverlay.height=cropImg.height;
+$.cropOverlay.style.width=dw+'px';
+$.cropOverlay.style.height=dh+'px';
+cropCtx.drawImage(cropImg,0,0);
+cropRect=null;
+drawCropOverlay();
+}
+
+// Crop interaction
+$.cropCanvas.addEventListener('mousedown',startCrop);
+$.cropCanvas.addEventListener('touchstart',e=>{e.preventDefault();startCrop(e.touches[0])});
+$.cropCanvas.addEventListener('mousemove',moveCrop);
+$.cropCanvas.addEventListener('touchmove',e=>{e.preventDefault();moveCrop(e.touches[0])});
+$.cropCanvas.addEventListener('mouseup',endCrop);
+$.cropCanvas.addEventListener('touchend',endCrop);
+
+let startX,startY;
+function startCrop(e){
+const rect=$.cropCanvas.getBoundingClientRect();
+const scaleX=$.cropCanvas.width/rect.width;
+const scaleY=$.cropCanvas.height/rect.height;
+startX=(e.clientX-rect.left)*scaleX;
+startY=(e.clientY-rect.top)*scaleY;
+isDragging=true;
+cropRect={x:startX,y:startY,w:0,h:0};
+}
+
+function moveCrop(e){
+if(!isDragging)return;
+const rect=$.cropCanvas.getBoundingClientRect();
+const scaleX=$.cropCanvas.width/rect.width;
+const scaleY=$.cropCanvas.height/rect.height;
+const curX=(e.clientX-rect.left)*scaleX;
+const curY=(e.clientY-rect.top)*scaleY;
+cropRect.w=curX-startX;
+cropRect.h=curY-startY;
+drawCropOverlay();
+}
+
+function endCrop(){
+isDragging=false;
+if(cropRect&&Math.abs(cropRect.w)>10&&Math.abs(cropRect.h)>10){
+// Normalize rect
+if(cropRect.w<0){cropRect.x+=cropRect.w;cropRect.w=-cropRect.w;}
+if(cropRect.h<0){cropRect.y+=cropRect.h;cropRect.h=-cropRect.h;}
+drawCropOverlay();
+}
+}
+
+function drawCropOverlay(){
+cropOCtx.clearRect(0,0,$.cropOverlay.width,$.cropOverlay.height);
+if(!cropRect)return;
+cropOCtx.fillStyle='rgba(0,0,0,0.5)';
+cropOCtx.fillRect(0,0,$.cropOverlay.width,$.cropOverlay.height);
+cropOCtx.clearRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+cropOCtx.strokeStyle='#bb86fc';
+cropOCtx.lineWidth=2;
+cropOCtx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+}
+
+// Confirm crop
+$.cropBtn.addEventListener('click',()=>{
+if(!cropRect||cropRect.w<10||cropRect.h<10){alert('Select a region first');return;}
+const tempCanvas=document.createElement('canvas');
+tempCanvas.width=cropRect.w;
+tempCanvas.height=cropRect.h;
+const tempCtx=tempCanvas.getContext('2d');
+tempCtx.drawImage(cropImg,cropRect.x,cropRect.y,cropRect.w,cropRect.h,0,0,cropRect.w,cropRect.h);
+croppedImg.src=tempCanvas.toDataURL();
+croppedImg.onload=()=>goToStep(2);
+});
+
+// Sliders
+[$.blockSize,$.offsetX,$.offsetY,$.fontSize].forEach(el=>el.addEventListener('input',()=>{
+updateLabels();
+if(currentStep===2)drawGrid();
+}));
+
+function updateLabels(){
+$.bsVal.textContent=$.blockSize.value+'px';
+$.oxVal.textContent=$.offsetX.value;
+$.oyVal.textContent=$.offsetY.value;
+$.fsVal.textContent=$.fontSize.value+'px';
+}
+
+// Navigation
+function goToStep(s){
+document.querySelectorAll('.step-section').forEach(el=>el.classList.remove('active'));
+document.getElementById(`step${s}`).classList.add('active');
+document.getElementById('stepIndicator').textContent=`Step ${s}/3`;
+currentStep=s;
+if(s===2){
+const maxW=document.querySelector('#step2 .canvas-container').offsetWidth;
+const scale=Math.min(1,maxW/croppedImg.width);
+const dw=croppedImg.width*scale,dh=croppedImg.height*scale;
+$.mainCanvas.width=croppedImg.width;
+$.mainCanvas.height=croppedImg.height;
+$.mainCanvas.style.width=dw+'px';
+$.mainCanvas.style.height=dh+'px';
+$.gridCanvas.width=croppedImg.width;
+$.gridCanvas.height=croppedImg.height;
+$.gridCanvas.style.width=dw+'px';
+$.gridCanvas.style.height=dh+'px';
+mainCtx.drawImage(croppedImg,0,0);
+drawGrid();
+}
+}
+
+function drawGrid(){
+gridCtx.clearRect(0,0,$.gridCanvas.width,$.gridCanvas.height);
+const bs=+$.blockSize.value,ox=+$.offsetX.value,oy=+$.offsetY.value;
+gridCtx.strokeStyle='rgba(255,0,0,0.8)';
+gridCtx.lineWidth=1;
+gridCtx.beginPath();
+for(let x=ox;x<$.gridCanvas.width;x+=bs){
+gridCtx.moveTo(x+.5,0);
+gridCtx.lineTo(x+.5,$.gridCanvas.height);
+}
+for(let y=oy;y<$.gridCanvas.height;y+=bs){
+gridCtx.moveTo(0,y+.5);
+gridCtx.lineTo($.gridCanvas.width,y+.5);
+}
+gridCtx.stroke();
+}
+
+// Unredaction algorithm
+$.startBtn.addEventListener('click',startUnredaction);
+$.stopBtn.addEventListener('click',stopUnredaction);
+
+async function startUnredaction(){
+isRunning=true;
+$.startBtn.style.display='none';
+$.stopBtn.style.display='block';
+$.output.textContent='';
+$.status.textContent='Running...';
+
+const bs=+$.blockSize.value,ox=+$.offsetX.value,oy=+$.offsetY.value;
+const font=`${$.fontSize.value}px ${$.fontFamily.value}`;
+const charset=$.charset.value;
+const textColor=$.textColor.value;
+const bgColor=textColor==='black'?'white':'black';
+
+// Get target pixelated data
+const targetData=mainCtx.getImageData(0,0,$.mainCanvas.width,$.mainCanvas.height);
+const targetBlocks=pixelate(targetData,bs,ox,oy);
+
+// Setup work canvas
+$.workCanvas.width=$.mainCanvas.width;
+$.workCanvas.height=$.mainCanvas.height;
+
+let result='';
+let maxChars=Math.floor($.mainCanvas.width/bs)*3; // Safety limit
+
+for(let i=0;i<maxChars&&isRunning;i++){
+let bestChar='',minDiff=Infinity;
+
+for(let char of charset){
+const candidate=result+char;
+
+// Render candidate
+workCtx.fillStyle=bgColor;
+workCtx.fillRect(0,0,$.workCanvas.width,$.workCanvas.height);
+workCtx.fillStyle=textColor;
+workCtx.font=font;
+workCtx.textBaseline='top';
+workCtx.fillText(candidate,0,0);
+
+// Pixelate rendered text
+const renderedData=workCtx.getImageData(0,0,$.workCanvas.width,$.workCanvas.height);
+const renderedBlocks=pixelate(renderedData,bs,ox,oy);
+
+// Compare
+const diff=compareBlocks(targetBlocks,renderedBlocks);
+if(diff<minDiff){
+minDiff=diff;
+bestChar=char;
+}
+
+// Yield to UI
+await new Promise(r=>setTimeout(r,0));
+}
+
+if(!bestChar||minDiff>100000){
+$.status.textContent='Completed or stuck';
+break;
+}
+
+result+=bestChar;
+$.output.textContent=result;
+$.status.textContent=`Added: "${bestChar}" (diff: ${Math.floor(minDiff)})`;
+$.output.scrollTop=$.output.scrollHeight;
+
+// Check if we've gone past the image
+workCtx.font=font;
+if(workCtx.measureText(result).width>$.workCanvas.width-bs*2)break;
+}
+
+stopUnredaction();
+}
+
+function stopUnredaction(){
+isRunning=false;
+$.startBtn.style.display='block';
+$.stopBtn.style.display='none';
+$.status.textContent='Stopped';
+}
+
+// Pixelation function
+function pixelate(imgData,bs,ox,oy){
+const blocks=[];
+const w=imgData.width,h=imgData.height,d=imgData.data;
+
+for(let by=oy;by<h;by+=bs){
+for(let bx=ox;bx<w;bx+=bs){
+let r=0,g=0,b=0,n=0;
+for(let y=0;y<bs;y++){
+for(let x=0;x<bs;x++){
+const cx=bx+x,cy=by+y;
+if(cx>=w||cy>=h)continue;
+const i=(cy*w+cx)*4;
+r+=d[i];g+=d[i+1];b+=d[i+2];
+n++;
+}
+}
+if(n>0)blocks.push({r:r/n,g:g/n,b:b/n});
+}
+}
+return blocks;
+}
+
+function compareBlocks(b1,b2){
+const len=Math.min(b1.length,b2.length);
+let diff=0;
+for(let i=0;i<len;i++){
+diff+=Math.abs(b1[i].r-b2[i].r)+Math.abs(b1[i].g-b2[i].g)+Math.abs(b1[i].i-b2[i].b);
+}
+return diff;
+}
+
+updateLabels();
+</script>
+</body>
+</html>

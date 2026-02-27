@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>SPHERE — 360° Capture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--c0:#020408;--cyan:#00f0ff;--amber:#ffaa00;--green:#00ff88;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--c0);color:#e0e8f0;font-family:'Space Mono',monospace;overflow:hidden;height:100dvh;width:100vw;touch-action:none}
+.scr{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center}
+.scr.on{display:flex}
+
+/* WELCOME */
+#s-welcome{background:radial-gradient(ellipse at 30% 40%,rgba(0,240,255,.06),transparent 60%),radial-gradient(ellipse at 80% 70%,rgba(255,170,0,.04),transparent 50%),var(--c0);padding:28px 24px;text-align:center;overflow-y:auto;gap:0}
+.w-logo{font-family:'Orbitron',sans-serif;font-size:2.4rem;font-weight:900;letter-spacing:.12em;background:linear-gradient(90deg,var(--cyan),#80c8ff,var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 20px rgba(0,240,255,.3));margin-bottom:4px}
+.w-sub{font-size:.7rem;letter-spacing:.3em;color:rgba(0,240,255,.6);text-transform:uppercase;margin-bottom:24px}
+.w-desc{color:#7899b0;font-size:.8rem;line-height:1.8;max-width:320px;margin:0 auto 24px}
+.features{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:320px;margin:0 auto 24px}
+.feat{background:rgba(0,240,255,.04);border:1px solid rgba(0,240,255,.12);border-radius:8px;padding:12px 8px;text-align:center}
+.feat-icon{font-size:1.4rem;margin-bottom:6px}
+.feat-label{font-size:.65rem;color:#5a7a90;letter-spacing:.05em}
+.btn{padding:14px 36px;border:none;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.15em;cursor:pointer;transition:.2s;text-transform:uppercase}
+.btn-primary{background:var(--cyan);color:#000;box-shadow:0 0 24px rgba(0,240,255,.4)}
+.btn-ghost{background:transparent;color:var(--cyan);border:1px solid rgba(0,240,255,.4)}
+.btn-sm{padding:9px 20px;font-size:.65rem}
+.w-warn{font-size:.65rem;color:#5a6a75;margin-top:14px;max-width:300px}
+
+/* CAPTURE */
+#s-capture{background:#000;justify-content:stretch;overflow:hidden}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#ovr{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#s-capture::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,240,255,.007) 2px,rgba(0,240,255,.007) 4px);pointer-events:none;z-index:2}
+
+/* HUD */
+#hud{position:absolute;bottom:0;left:0;right:0;padding:12px 18px 38px;background:linear-gradient(transparent,rgba(0,0,0,.88));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5}
+.shot-track{width:100%;max-width:360px}
+.track-bar{height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+.track-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--amber));transition:width .5s}
+.shot-info{display:flex;justify-content:space-between;font-size:.62rem;color:#5a7a90;padding:4px 0}
+#capture-hint{font-size:.76rem;color:#c0d8e8;letter-spacing:.05em;text-align:center;min-height:1.2em;transition:color .3s}
+#capture-hint.locked{color:var(--amber)}
+.hud-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+/* Big capture button */
+.cap-row{display:flex;align-items:center;gap:14px;margin-top:2px}
+#big-cap{width:68px;height:68px;border-radius:50%;border:3px solid rgba(0,240,255,.55);background:rgba(0,240,255,.07);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.25s;position:relative}
+#big-cap::after{content:'';width:30px;height:30px;border-radius:50%;background:rgba(0,240,255,.28);transition:.25s}
+#big-cap.armed{border-color:var(--amber);background:rgba(255,170,0,.14);box-shadow:0 0 28px rgba(255,170,0,.45)}
+#big-cap.armed::after{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.cap-label{font-size:.58rem;color:#5a7a90;letter-spacing:.07em;text-align:center;max-width:70px;line-height:1.5}
+
+/* Orient badge */
+#orient-badge{position:absolute;top:16px;right:14px;background:rgba(0,0,0,.65);border:1px solid rgba(0,240,255,.15);border-radius:6px;padding:7px 11px;font-size:.58rem;color:rgba(0,240,255,.65);letter-spacing:.06em;line-height:1.75;text-align:right;z-index:5}
+
+/* Progress ring */
+#cap-progress-ring{position:absolute;top:16px;left:16px;width:52px;height:52px;z-index:5}
+.ring-text{fill:var(--cyan);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700}
+
+/* Zone ring (center of screen) */
+#zone-ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0;transition:opacity .35s;z-index:4}
+
+/* Calibration modal */
+#calib-overlay{position:absolute;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px;z-index:20}
+#calib-overlay.on{display:flex}
+.calib-title{font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--cyan);letter-spacing:.15em}
+.calib-desc{font-size:.72rem;color:#7899b0;text-align:center;max-width:280px;line-height:1.75}
+
+/* PROCESSING */
+#s-proc{gap:20px;padding:30px;text-align:center;background:radial-gradient(ellipse at center,rgba(0,240,255,.04),transparent 70%),var(--c0)}
+.proc-title{font-family:'Orbitron',sans-serif;font-size:1.2rem;font-weight:700;color:var(--cyan);letter-spacing:.15em}
+#proc-canvas{max-width:90vw;max-height:40vh;border-radius:6px;border:1px solid rgba(0,240,255,.15);display:none}
+.proc-track{width:80%;max-width:340px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.proc-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--amber));transition:width .1s}
+#proc-status{font-size:.7rem;color:#5a7a90;letter-spacing:.1em}
+
+/* VIEWER */
+#s-viewer{background:#000;overflow:hidden}
+#three-canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+#viewer-overlay{position:absolute;inset:0;pointer-events:none;background:linear-gradient(transparent 85%,rgba(0,0,0,.8));display:flex;flex-direction:column;justify-content:flex-end}
+#viewer-ui{pointer-events:all;padding:12px 18px 32px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.proj-strip{display:flex;gap:6px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:4px;backdrop-filter:blur(8px)}
+.pbtn{padding:8px 16px;border-radius:3px;border:none;background:transparent;color:#7899b0;font-family:'Space Mono',monospace;font-size:.65rem;letter-spacing:.08em;cursor:pointer;transition:.2s;text-transform:uppercase}
+.pbtn.act{background:var(--cyan);color:#000;box-shadow:0 0 12px rgba(0,240,255,.4)}
+.exp-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.exp-btn{padding:9px 20px;border-radius:4px;font-size:.65rem;font-family:'Orbitron',sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:.2s;border:none;font-weight:700}
+.exp-png{background:var(--cyan);color:#000;box-shadow:0 0 12px rgba(0,240,255,.3)}
+.exp-jpg{background:transparent;color:var(--amber);border:1px solid rgba(255,170,0,.4)}
+.exp-webp{background:transparent;color:#a0c0d0;border:1px solid rgba(160,192,208,.3)}
+#vback{position:absolute;top:18px;left:14px;pointer-events:all;padding:9px 18px;background:rgba(0,0,0,.5);border:1px solid rgba(0,240,255,.2);border-radius:4px;color:var(--cyan);font-size:.65rem;font-family:'Space Mono',monospace;cursor:pointer;backdrop-filter:blur(8px)}
+#fov-indicator{position:absolute;top:18px;right:14px;pointer-events:none;font-size:.65rem;color:rgba(0,240,255,.5);background:rgba(0,0,0,.4);padding:6px 10px;border-radius:4px}
+
+/* FLAT VIEW */
+#flat-view{position:absolute;inset:0;display:none;background:#000;align-items:center;justify-content:center;overflow:hidden}
+#flat-img{max-width:100%;max-height:100%;transform-origin:center;cursor:grab;user-select:none}
+#fback{position:absolute;top:18px;left:14px;pointer-events:all;padding:9px 18px;background:rgba(0,0,0,.7);border:1px solid rgba(0,240,255,.2);border-radius:4px;color:var(--cyan);font-size:.65rem;font-family:'Space Mono',monospace;cursor:pointer}
+
+/* TOAST */
+#toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,240,255,.12);border:1px solid rgba(0,240,255,.3);color:var(--cyan);font-size:.75rem;padding:10px 22px;border-radius:4px;pointer-events:none;opacity:0;transition:.3s;z-index:1000;letter-spacing:.08em;white-space:nowrap;backdrop-filter:blur(8px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- WELCOME -->
+<div id="s-welcome" class="scr on">
+  <div class="w-logo">SPHERE</div>
+  <div class="w-sub">360° Photosphere Studio</div>
+  <p class="w-desc">Calibrate once to set your origin. Follow the stable guide dots and the minimap to capture all zones. Tap CAPTURE when armed. No auto-fire.</p>
+  <div class="features">
+    <div class="feat"><div class="feat-icon">🎯</div><div class="feat-label">Stable guide overlay</div></div>
+    <div class="feat"><div class="feat-icon">📡</div><div class="feat-label">Smoothed gyro + EMA</div></div>
+    <div class="feat"><div class="feat-icon">🗺️</div><div class="feat-label">Live radar minimap</div></div>
+    <div class="feat"><div class="feat-icon">👁️</div><div class="feat-label">Sphere / planet viewer</div></div>
+  </div>
+  <button class="btn btn-primary" onclick="startApp()">BEGIN CAPTURE</button>
+  <p class="w-warn">⚠ Gyroscope needs HTTPS or localhost.<br>Termux: <code>python3 -m http.server 8080</code></p>
+</div>
+
+<!-- CAPTURE -->
+<div id="s-capture" class="scr">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="ovr"></canvas>
+
+  <!-- Calibration modal -->
+  <div id="calib-overlay" class="on">
+    <div class="calib-title">SET ORIGIN</div>
+    <div class="calib-desc">Stand still. Hold phone upright pointing forward. This locks all guide positions relative to where you're facing right now.</div>
+    <button class="btn btn-primary" onclick="doCalibrate()">LOCK ORIGIN</button>
+  </div>
+
+  <!-- Zone ring (center, hidden until in zone) -->
+  <canvas id="zone-ring" width="180" height="180"></canvas>
+
+  <div id="orient-badge">
+    <div id="yaw-val">YAW —</div>
+    <div id="pit-val">PITCH —</div>
+    <div id="calib-status" style="color:rgba(255,100,100,.8)">UNCALIBRATED</div>
+  </div>
+
+  <svg id="cap-progress-ring" viewBox="0 0 52 52">
+    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(0,240,255,.12)" stroke-width="3"/>
+    <circle id="ring-prog" cx="26" cy="26" r="22" fill="none" stroke="#00f0ff" stroke-width="3"
+      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round"
+      transform="rotate(-90 26 26)" style="transition:stroke-dashoffset .4s"/>
+    <text class="ring-text" x="26" y="30" text-anchor="middle"><tspan id="ring-num">0</tspan></text>
+  </svg>
+
+  <div id="hud">
+    <div class="shot-track">
+      <div class="track-bar"><div class="track-fill" id="track-fill" style="width:0%"></div></div>
+      <div class="shot-info"><span id="shot-count">0 / 17 shots</span><span id="shot-pct">0%</span></div>
+    </div>
+    <div id="capture-hint">Move into a target circle, then press CAPTURE</div>
+    <div class="cap-row">
+      <div>
+        <div id="big-cap" onclick="manualCapture()"></div>
+        <div class="cap-label" id="cap-lbl">OUT OF<br>ZONE</div>
+      </div>
+    </div>
+    <div class="hud-btns">
+      <button class="btn btn-ghost btn-sm" onclick="showCalibOverlay()">⊕ RECALIBRATE</button>
+      <button class="btn btn-ghost btn-sm" id="skip-btn" style="display:none" onclick="skipToStitch()">STITCH NOW</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSING -->
+<div id="s-proc" class="scr">
+  <div class="proc-title">STITCHING</div>
+  <canvas id="proc-canvas"></canvas>
+  <div class="proc-track"><div class="proc-fill" id="proc-fill" style="width:0%"></div></div>
+  <div id="proc-status">INITIALIZING...</div>
+  <button class="btn btn-primary" id="view-btn" style="display:none;margin-top:12px" onclick="showViewer()">OPEN VIEWER →</button>
+</div>
+
+<!-- VIEWER -->
+<div id="s-viewer" class="scr">
+  <canvas id="three-canvas"></canvas>
+  <div id="fov-indicator">FOV: <span id="fov-val">75</span>°</div>
+  <button id="vback" onclick="goBack()">← BACK</button>
+  <div id="viewer-overlay">
+    <div id="viewer-ui">
+      <div class="proj-strip">
+        <button class="pbtn act" id="pb-sphere" onclick="setProj('sphere')">SPHERE</button>
+        <button class="pbtn" id="pb-flat" onclick="setProj('flat')">FLAT MAP</button>
+        <button class="pbtn" id="pb-planet" onclick="setProj('planet')">PLANET</button>
+      </div>
+      <div class="exp-row">
+        <button class="exp-btn exp-png" onclick="exportPano('png')">↓ PNG</button>
+        <button class="exp-btn exp-jpg" onclick="exportPano('jpeg')">↓ JPEG</button>
+        <button class="exp-btn exp-webp" onclick="exportPano('webp')">↓ WEBP</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FLAT VIEW -->
+<div id="flat-view">
+  <img id="flat-img" alt="Equirectangular">
+  <button id="fback" onclick="closeFlatView()">← SPHERE</button>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── MATH ──────────────────────────────────────
+const{PI,atan2,asin,acos,cos,sin,sqrt,abs,min,max,tan,floor,hypot}=Math;
+const rad=d=>d*PI/180, deg=r=>r*180/PI;
+const clamp=(v,a,b)=>max(a,min(b,v));
+// Normalize angle to [-180, 180]
+const wrap=a=>{while(a>180)a-=360;while(a<-180)a+=360;return a;};
+
+function sphereDist(y1,p1,y2,p2){
+  const toVec=(y,p)=>[cos(rad(p))*sin(rad(y)),cos(rad(p))*cos(rad(y)),sin(rad(p))];
+  const[a,b,c]=toVec(y1,p1),[d,e,f]=toVec(y2,p2);
+  return deg(acos(clamp(a*d+b*e+c*f,-1,1)));
+}
+
+function projectOntoScreen(tRelYaw,tRelPitch,camRelYaw,camRelPitch,W,H,fovH){
+  // Project a target at relative position (tRelYaw, tRelPitch) onto screen
+  // given camera is at (camRelYaw, camRelPitch)
+  const fovV=fovH*(H/W);
+  const ty=rad(tRelYaw), tp=rad(tRelPitch);
+  const cy=rad(camRelYaw), cp=rad(camRelPitch);
+  // Direction to target in world space
+  const[dx,dy,dz]=[cos(tp)*sin(ty),cos(tp)*cos(ty),sin(tp)];
+  // Camera basis (forward, right, up)
+  const fw=[cos(cp)*sin(cy),cos(cp)*cos(cy),sin(cp)];
+  const rw=[cos(cy),-sin(cy),0];
+  const uw=[-sin(cp)*sin(cy),-sin(cp)*cos(cy),cos(cp)];
+  const u=dx*rw[0]+dy*rw[1]+dz*rw[2];
+  const v=dx*uw[0]+dy*uw[1]+dz*uw[2];
+  const w=dx*fw[0]+dy*fw[1]+dz*fw[2];
+  if(w<=0.04)return null; // behind camera
+  const pxH=W/(2*tan(fovH/2)), pxV=H/(2*tan(fovV/2));
+  return{sx:W/2+(u/w)*pxH, sy:H/2-(v/w)*pxV, depth:w,
+         angDist:deg(acos(clamp(w,-1,1)))};
+}
+
+function sampleBilinear(pix,W,H,px,py){
+  const x0=clamp(floor(px),0,W-2),y0=clamp(floor(py),0,H-2);
+  const fx=px-x0,fy=py-y0;
+  return[0,1,2].map(c=>{
+    const i=(r,cc)=>(r*W+cc)*4+c;
+    return pix[i(y0,x0)]*(1-fx)*(1-fy)+pix[i(y0,x0+1)]*fx*(1-fy)+
+           pix[i(y0+1,x0)]*(1-fx)*fy+pix[i(y0+1,x0+1)]*fx*fy;
+  });
+}
+
+// ── CONSTANTS ─────────────────────────────────
+const CAP_W=960, CAP_H=540, EQ_W=4096, EQ_H=2048;
+const FOVH=rad(62);  // estimated phone horizontal FOV in radians
+const ZONE_R=26;     // degrees — how close to snap "armed"
+
+// ── SENSOR SMOOTHING ──────────────────────────
+// EMA factor — 0.08 means ~90% smoothed.
+// Lag: moves 50% toward target in ~8 frames (~133ms at 60fps).
+// Increase toward 0.15 if feel sluggish; decrease for more stability.
+const EMA=0.08;
+
+let smAlpha=null, smBeta=90, smGamma=0;  // smoothed absolute sensor values
+let baseAlpha=0, baseBeta=90;             // calibration snapshot
+let calibrated=false;
+let relYaw=0, relPitch=0;                 // computed relative orientation (what we use)
+
+// ── TARGET GRID ───────────────────────────────
+// Targets are RELATIVE OFFSETS from the calibration point (0°,0°).
+// ry = relative yaw (left/right), rp = relative pitch (up/down).
+// They never change after calibration — only our camera position (relYaw,relPitch) moves.
+function makeTargets(){
+  const t=[];
+  t.push({ry:0,rp:82,done:false,label:'ZENITH'});
+  [0,90,180,270].forEach((y,i)=>t.push({ry:y,rp:42,done:false,label:`U${i+1}`}));
+  [0,45,90,135,180,225,270,315].forEach((y,i)=>t.push({ry:y,rp:0,done:false,label:`E${i+1}`}));
+  [0,90,180,270].forEach((y,i)=>t.push({ry:y,rp:-42,done:false,label:`D${i+1}`}));
+  return t;
+}
+
+// ── STATE ─────────────────────────────────────
+let targets=[], captures=[], videoStream=null;
+let captureRunning=false, equiCanvas=null;
+let nearestIdx=null, nearestDist=999, zoneArmed=false;
+let radarCanvas=null, radarCtx=null;
+
+// ── APP START ─────────────────────────────────
+async function startApp(){
+  document.getElementById('s-welcome').classList.remove('on');
+  document.getElementById('s-capture').classList.add('on');
+  targets=makeTargets(); captures=[];
+  captureRunning=true;
+  await initCamera();
+  initOrientation();
+  resizeOvr();
+  window.addEventListener('resize',resizeOvr);
+  requestAnimationFrame(captureLoop);
+}
+
+function resizeOvr(){
+  const o=document.getElementById('ovr');
+  o.width=o.clientWidth; o.height=o.clientHeight;
+}
+
+async function initCamera(){
+  const v=document.getElementById('video');
+  try{
+    videoStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}},audio:false});
+    v.srcObject=videoStream;
+    await new Promise(r=>v.addEventListener('loadedmetadata',r,{once:true}));
+  }catch(e){toast('Camera: '+e.message,4000);}
+}
+
+// ── ORIENTATION ───────────────────────────────
+function initOrientation(){
+  const listen=()=>{
+    window.addEventListener('deviceorientation',onOrient,{passive:true});
+  };
+  if(typeof DeviceOrientationEvent?.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission()
+      .then(s=>{if(s==='granted')listen();else toast('Gyro denied — manual only');})
+      .catch(()=>toast('Gyro permission error'));
+  }else if('DeviceOrientationEvent' in window){
+    listen();
+  }else{
+    toast('No gyroscope detected');
+  }
+}
+
+function onOrient(e){
+  if(e.alpha==null)return;
+
+  if(smAlpha===null){
+    // First sample — prime the smoother, don't emit yet
+    smAlpha=e.alpha; smBeta=e.beta??90; smGamma=e.gamma??0;
+    return;
+  }
+
+  // ── Wrap-aware EMA for alpha (compass, 0–360) ──
+  // We compute the shortest angular delta so EMA doesn't try to go the long way around 0/360.
+  let da=wrap(e.alpha-smAlpha);
+  smAlpha=(smAlpha+EMA*da+360)%360;
+
+  // ── Regular EMA for beta and gamma (bounded, no wrap issue) ──
+  smBeta +=EMA*((e.beta??90) -smBeta);
+  smGamma+=EMA*((e.gamma??0)-smGamma);
+
+  // ── Derive relative orientation from calibration baseline ──
+  if(!calibrated)return;
+
+  // Relative yaw: how much we've turned left/right from calibration
+  relYaw=wrap(smAlpha-baseAlpha);
+
+  // Relative pitch: beta ≈ 90 when phone is upright, decreases when tilting up.
+  // We want positive = looking up, so flip the sign.
+  relPitch=clamp(baseBeta-smBeta,-85,85);
+}
+
+function showCalibOverlay(){document.getElementById('calib-overlay').classList.add('on');}
+
+function doCalibrate(){
+  if(smAlpha===null){
+    // Sensor hasn't fired yet — just zero everything
+    baseAlpha=0; baseBeta=90;
+  }else{
+    baseAlpha=smAlpha;
+    baseBeta=smBeta;
+  }
+  relYaw=0; relPitch=0;
+  calibrated=true;
+  // Don't reset captures — allow re-calibrating mid-session
+  document.getElementById('calib-status').textContent='CALIBRATED ✓';
+  document.getElementById('calib-status').style.color='rgba(0,240,255,.65)';
+  document.getElementById('calib-overlay').classList.remove('on');
+  toast('Origin locked — start capturing!');
+}
+
+// ── MAIN LOOP ─────────────────────────────────
+function captureLoop(ts){
+  if(!captureRunning)return;
+  if(!calibrated){requestAnimationFrame(captureLoop);return;}
+
+  document.getElementById('yaw-val').textContent=`YAW ${relYaw.toFixed(0)}°`;
+  document.getElementById('pit-val').textContent=`PITCH ${relPitch.toFixed(0)}°`;
+
+  // Find nearest uncaptured target to current aim
+  nearestIdx=null; nearestDist=999;
+  targets.forEach((t,i)=>{
+    if(t.done)return;
+    const d=sphereDist(relYaw,relPitch,t.ry,t.rp);
+    if(d<nearestDist){nearestDist=d;nearestIdx=i;}
+  });
+
+  const wasArmed=zoneArmed;
+  zoneArmed=(nearestIdx!==null && nearestDist<ZONE_R);
+
+  const btn=document.getElementById('big-cap');
+  if(zoneArmed!==wasArmed){
+    btn.classList.toggle('armed',zoneArmed);
+    document.getElementById('capture-hint').classList.toggle('locked',zoneArmed);
+  }
+
+  if(zoneArmed && nearestIdx!==null){
+    const t=targets[nearestIdx];
+    document.getElementById('capture-hint').textContent=`In zone: ${t.label} — press CAPTURE`;
+    document.getElementById('cap-lbl').textContent='CAPTURE';
+    drawZoneRing(nearestDist/ZONE_R,ts);
+  }else{
+    const remaining=targets.filter(t=>!t.done);
+    if(remaining.length){
+      const next=remaining.reduce((a,b)=>{
+        const da=sphereDist(relYaw,relPitch,a.ry,a.rp);
+        const db=sphereDist(relYaw,relPitch,b.ry,b.rp);
+        return da<db?a:b;
+      });
+      const nd=sphereDist(relYaw,relPitch,next.ry,next.rp);
+      document.getElementById('capture-hint').textContent=
+        `${dirHint(relYaw,relPitch,next.ry,next.rp)} ${nd.toFixed(0)}° to ${next.label}`;
+    }else{
+      document.getElementById('capture-hint').textContent='All captured!';
+    }
+    document.getElementById('cap-lbl').textContent='OUT OF\nZONE';
+    hideZoneRing();
+  }
+
+  drawOverlay(ts);
+  drawRadar(ts);
+  requestAnimationFrame(captureLoop);
+}
+
+function dirHint(cy,cp,ty,tp){
+  const dy=wrap(ty-cy), dp=tp-cp;
+  const a=[];
+  if(dp>10)a.push('↑');else if(dp<-10)a.push('↓');
+  if(dy>10)a.push('→');else if(dy<-10)a.push('←');
+  return a.join('')||'•';
+}
+
+// ── OVERLAY ───────────────────────────────────
+// Targets projected onto camera view using smoothed RELATIVE orientation.
+// Because targets and camera both live in the same relative frame,
+// global compass drift cancels out completely.
+function drawOverlay(ts){
+  const ovr=document.getElementById('ovr');
+  const ctx=ovr.getContext('2d');
+  const W=ovr.width, H=ovr.height;
+  ctx.clearRect(0,0,W,H);
+
+  targets.forEach((t,i)=>{
+    // Project target position relative to where we're aiming
+    const pt=projectOntoScreen(t.ry,t.rp,relYaw,relPitch,W,H,FOVH);
+    if(!pt)return; // behind camera
+
+    const{sx,sy}=pt;
+
+    // Soft fade for targets near screen edges (they're visible but de-emphasized)
+    const ex=clamp(1-abs(sx-W/2)/(W*0.6),0.08,1);
+    const ey=clamp(1-abs(sy-H/2)/(H*0.6),0.08,1);
+    const edgeFade=ex*ey;
+
+    if(t.done){
+      ctx.beginPath();ctx.arc(sx,sy,11,0,PI*2);
+      ctx.fillStyle=`rgba(0,255,136,${.18*edgeFade})`;ctx.fill();
+      ctx.strokeStyle=`rgba(0,255,136,${.75*edgeFade})`;ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle=`rgba(0,255,136,${edgeFade})`;
+      ctx.font='11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('✓',sx,sy);
+      return;
+    }
+
+    const isNearest=(i===nearestIdx);
+    const r=isNearest?26:19;
+
+    // Outer glow when armed
+    if(isNearest&&zoneArmed){
+      ctx.beginPath();ctx.arc(sx,sy,r+12,0,PI*2);
+      const g=ctx.createRadialGradient(sx,sy,r,sx,sy,r+12);
+      g.addColorStop(0,'rgba(255,170,0,.22)');g.addColorStop(1,'rgba(255,170,0,0)');
+      ctx.fillStyle=g;ctx.fill();
+    }
+
+    // Ring
+    const ringColor=isNearest&&zoneArmed?`rgba(255,170,0,${.85*edgeFade})`
+                   :isNearest?`rgba(255,200,80,${.65*edgeFade})`
+                   :`rgba(0,240,255,${.5*edgeFade})`;
+    ctx.beginPath();ctx.arc(sx,sy,r,0,PI*2);
+    ctx.strokeStyle=ringColor;ctx.lineWidth=isNearest?2:1.5;ctx.stroke();
+
+    // Fill
+    const fillA=isNearest&&zoneArmed?.12:.05;
+    ctx.fillStyle=isNearest&&zoneArmed?`rgba(255,170,0,${fillA*edgeFade})`:`rgba(0,240,255,${fillA*edgeFade})`;
+    ctx.fill();
+
+    // Center dot
+    ctx.beginPath();ctx.arc(sx,sy,4,0,PI*2);
+    ctx.fillStyle=isNearest&&zoneArmed?'rgba(255,170,0,.85)':'rgba(0,240,255,.65)';ctx.fill();
+
+    // Label for nearest
+    if(isNearest){
+      ctx.font='bold 9px Space Mono,monospace';
+      ctx.fillStyle=zoneArmed?'rgba(255,170,0,.9)':'rgba(0,240,255,.65)';
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText(t.label,sx,sy-r-3);
+    }
+  });
+
+  // ── Crosshair ──
+  const cx=W/2, cy=H/2;
+  const cc=zoneArmed?'rgba(255,170,0,.75)':'rgba(0,240,255,.5)';
+  ctx.strokeStyle=cc;ctx.lineWidth=1;
+  [[cx-30,cy,cx-8,cy],[cx+8,cy,cx+30,cy],[cx,cy-30,cx,cy-8],[cx,cy+8,cx,cy+30]]
+    .forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+
+  // Dashed zone threshold circle
+  const zr=ZONE_R/90*H*0.82;
+  ctx.beginPath();ctx.arc(cx,cy,zr,0,PI*2);
+  ctx.strokeStyle=zoneArmed?'rgba(255,170,0,.3)':'rgba(0,240,255,.12)';
+  ctx.lineWidth=1;ctx.setLineDash([4,7]);ctx.stroke();ctx.setLineDash([]);
+}
+
+// ── ZONE RING (center screen pulse) ───────────
+function drawZoneRing(proximity,ts){
+  const c=document.getElementById('zone-ring');
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,180,180);
+  const pulse=0.5+0.5*sin(ts*0.005);
+  const progress=clamp(1-proximity,0,1);
+  ctx.strokeStyle=`rgba(255,170,0,${.12+pulse*.1})`;ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(90,90,70,0,PI*2);ctx.stroke();
+  ctx.strokeStyle=`rgba(255,170,0,${.45+pulse*.4})`;ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(90,90,70,-PI/2,-PI/2+progress*PI*2);ctx.stroke();
+  document.getElementById('zone-ring').style.opacity='1';
+}
+function hideZoneRing(){document.getElementById('zone-ring').style.opacity='0';}
+
+// ── RADAR MINIMAP ─────────────────────────────
+// Shows all targets in a 2D equirectangular projection.
+// The crosshair is always in the center (since targets are relative to us).
+// Completed targets = green, uncaptured = cyan dots, nearest = amber.
+function drawRadar(ts){
+  const HUDH=document.getElementById('hud').offsetHeight||170;
+  if(!radarCanvas){
+    radarCanvas=document.createElement('canvas');
+    radarCtx=radarCanvas.getContext('2d');
+    radarCanvas.style.cssText=`position:absolute;right:12px;bottom:${HUDH+10}px;`+
+      `border-radius:5px;opacity:.88;pointer-events:none;z-index:5`;
+    document.getElementById('s-capture').appendChild(radarCanvas);
+  }
+  const RW=134,RH=82;
+  if(radarCanvas.width!==RW){radarCanvas.width=RW;radarCanvas.height=RH;}
+  const ctx=radarCtx;
+  ctx.clearRect(0,0,RW,RH);
+
+  // BG
+  ctx.fillStyle='rgba(2,4,8,.84)';
+  rrect(ctx,0,0,RW,RH,5);ctx.fill();
+  ctx.strokeStyle='rgba(0,240,255,.16)';ctx.lineWidth=1;
+  rrect(ctx,0,0,RW,RH,5);ctx.stroke();
+
+  // Grid
+  ctx.strokeStyle='rgba(0,240,255,.06)';ctx.lineWidth=.5;
+  [.25,.5,.75].forEach(f=>{
+    ctx.beginPath();ctx.moveTo(RW*f,0);ctx.lineTo(RW*f,RH);ctx.stroke();
+  });
+  ctx.beginPath();ctx.moveTo(0,RH*.5);ctx.lineTo(RW,RH*.5);ctx.stroke();
+
+  // Equator ring labels (tiny)
+  ctx.fillStyle='rgba(0,240,255,.2)';ctx.font='6px Space Mono,monospace';
+  ctx.textAlign='center';
+  ['-180','-90','0','90','180'].forEach((l,i)=>{
+    ctx.fillText(l,RW*i/4,RH-2);
+  });
+
+  // Targets as dots: x = ry mapped to [-180,180], y = rp mapped to [-90,90]
+  targets.forEach((t,i)=>{
+    // Normalize ry to [-180,180] so it wraps nicely on the map
+    const ry=wrap(t.ry);
+    const tx=RW/2+(ry/180)*(RW/2);
+    const ty=RH/2-(t.rp/90)*(RH/2);
+
+    if(t.done){
+      ctx.beginPath();ctx.arc(tx,ty,4,0,PI*2);
+      ctx.fillStyle='rgba(0,255,136,.82)';ctx.fill();
+    }else{
+      const isN=(i===nearestIdx);
+      ctx.beginPath();ctx.arc(tx,ty,isN?5.5:3.5,0,PI*2);
+      ctx.fillStyle=isN&&zoneArmed?'rgba(255,170,0,.9)':isN?'rgba(255,190,60,.7)':'rgba(0,240,255,.42)';ctx.fill();
+      if(isN){ctx.strokeStyle='rgba(255,200,80,.5)';ctx.lineWidth=1.5;ctx.stroke();}
+    }
+  });
+
+  // Current aim — center crosshair (we're always at 0,0 in relative frame)
+  const ax=RW/2, ay=RH/2;
+  ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(ax-5,ay);ctx.lineTo(ax+5,ay);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(ax,ay-5);ctx.lineTo(ax,ay+5);ctx.stroke();
+  // Small dot at aim center
+  ctx.beginPath();ctx.arc(ax,ay,2,0,PI*2);
+  ctx.fillStyle='rgba(255,255,255,.7)';ctx.fill();
+
+  // Label
+  ctx.fillStyle='rgba(0,240,255,.3)';ctx.font='7px Space Mono,monospace';ctx.textAlign='left';
+  ctx.fillText('MAP',3,9);
+}
+
+function rrect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+
+// ── CAPTURE ───────────────────────────────────
+function manualCapture(){
+  if(!calibrated){toast('Calibrate first!');return;}
+  if(!zoneArmed||nearestIdx===null){toast('Move into a target zone first');return;}
+  const t=targets[nearestIdx];
+  const v=document.getElementById('video');
+  const c=document.createElement('canvas');
+  c.width=CAP_W;c.height=CAP_H;
+  c.getContext('2d').drawImage(v,0,0,CAP_W,CAP_H);
+  const pix=c.getContext('2d').getImageData(0,0,CAP_W,CAP_H).data;
+  captures.push({pixels:pix,yaw:t.ry,pitch:t.rp});
+  t.done=true;
+
+  // Flash
+  const fl=document.createElement('div');
+  fl.style.cssText='position:fixed;inset:0;background:rgba(0,240,255,.28);pointer-events:none;z-index:999;transition:opacity .3s';
+  document.body.appendChild(fl);
+  requestAnimationFrame(()=>{fl.style.opacity='0';setTimeout(()=>fl.remove(),340);});
+
+  toast(`✓ ${t.label} captured`);
+  updateShotUI();
+  if(captures.length>=1)document.getElementById('skip-btn').style.display='';
+  if(captures.length>=targets.length)setTimeout(startStitch,600);
+}
+
+function updateShotUI(){
+  const done=captures.length, total=targets.length, pct=(done/total*100)|0;
+  document.getElementById('track-fill').style.width=pct+'%';
+  document.getElementById('shot-count').textContent=`${done} / ${total} shots`;
+  document.getElementById('shot-pct').textContent=pct+'%';
+  document.getElementById('ring-num').textContent=done;
+  document.getElementById('ring-prog').style.strokeDashoffset=(138.2*(1-done/total)).toFixed(1);
+}
+
+function skipToStitch(){
+  if(!captures.length){toast('Take at least 1 shot');return;}
+  startStitch();
+}
+
+// ── STITCHING ─────────────────────────────────
+function startStitch(){
+  captureRunning=false;
+  videoStream?.getTracks().forEach(t=>t.stop());
+  if(radarCanvas){radarCanvas.remove();radarCanvas=null;}
+  document.getElementById('s-capture').classList.remove('on');
+  document.getElementById('s-proc').classList.add('on');
+  setTimeout(runStitch,120);
+}
+
+function runStitch(){
+  const canvas=document.getElementById('proc-canvas');
+  canvas.width=EQ_W;canvas.height=EQ_H;canvas.style.display='block';
+  const ctx=canvas.getContext('2d');
+  const img=ctx.createImageData(EQ_W,EQ_H);
+  const out=img.data;
+
+  const caps=captures.map(c=>{
+    const y=rad(c.yaw),p=rad(c.pitch);
+    const tanH=tan(FOVH/2), tanV=tan(FOVH/2*(CAP_H/CAP_W));
+    return{pix:c.pixels,tanH,tanV,
+      fw:[cos(p)*sin(y),cos(p)*cos(y),sin(p)],
+      rw:[cos(y),-sin(y),0],
+      uw:[-sin(p)*sin(y),-sin(p)*cos(y),cos(p)]};
+  });
+
+  let row=0;
+  function tick(){
+    const end=min(row+28,EQ_H);
+    for(let y=row;y<end;y++){
+      const lat=(0.5-y/EQ_H)*PI, slat=sin(lat), clat=cos(lat);
+      for(let x=0;x<EQ_W;x++){
+        const lon=(x/EQ_W-0.5)*PI*2;
+        const dx=clat*sin(lon), dy=clat*cos(lon), dz=slat;
+        let tr=0,tg=0,tb=0,tw=0;
+        for(const cp of caps){
+          const u=dx*cp.rw[0]+dy*cp.rw[1]+dz*cp.rw[2];
+          const v=dx*cp.uw[0]+dy*cp.uw[1]+dz*cp.uw[2];
+          const w=dx*cp.fw[0]+dy*cp.fw[1]+dz*cp.fw[2];
+          if(w<=0.01)continue;
+          const nx=u/w, ny=v/w;
+          if(abs(nx)>cp.tanH||abs(ny)>cp.tanV)continue;
+          const px=(nx/cp.tanH+1)/2*CAP_W;
+          const py=(1-(ny/cp.tanV+1)/2)*CAP_H;
+          if(px<0||px>=CAP_W-1||py<0||py>=CAP_H-1)continue;
+          const wt=1/max(nx*nx+ny*ny,0.001);
+          const[r,g,b]=sampleBilinear(cp.pix,CAP_W,CAP_H,px,py);
+          tr+=r*wt;tg+=g*wt;tb+=b*wt;tw+=wt;
+        }
+        const oi=(y*EQ_W+x)*4;
+        if(tw>0){out[oi]=clamp(tr/tw|0,0,255);out[oi+1]=clamp(tg/tw|0,0,255);out[oi+2]=clamp(tb/tw|0,0,255);out[oi+3]=255;}
+        else{out[oi]=16;out[oi+1]=20;out[oi+2]=26;out[oi+3]=255;}
+      }
+    }
+    row=end;
+    const pct=(row/EQ_H*100)|0;
+    document.getElementById('proc-fill').style.width=pct+'%';
+    document.getElementById('proc-status').textContent=`STITCHING... ${pct}%`;
+    row<EQ_H?requestAnimationFrame(tick):(ctx.putImageData(img,0,0),equiCanvas=canvas,
+      document.getElementById('proc-status').textContent='COMPLETE ✓',
+      document.getElementById('view-btn').style.display='',toast('Panorama ready!'));
+  }
+  tick();
+}
+
+// ── THREE.JS VIEWER ───────────────────────────
+let renderer,camera,scene,sphere;
+let vYaw=0,vPitch=0,vFov=75;
+let tA=null,tB=null,lpd=0,animLoop=null;
+
+function showViewer(){
+  document.getElementById('s-proc').classList.remove('on');
+  document.getElementById('s-viewer').classList.add('on');
+  initThree();
+}
+
+function initThree(){
+  const c=document.getElementById('three-canvas');
+  renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+  renderer.setPixelRatio(devicePixelRatio);resize3();
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(vFov,c.clientWidth/c.clientHeight,.1,1000);
+  const geo=new THREE.SphereGeometry(100,80,40);geo.scale(-1,1,1);
+  const tex=new THREE.CanvasTexture(equiCanvas);
+  tex.minFilter=tex.magFilter=THREE.LinearFilter;
+  sphere=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:tex}));
+  scene.add(sphere);
+  bindVTouch(c);
+  window.addEventListener('resize',resize3);
+  if(animLoop)cancelAnimationFrame(animLoop);
+  rLoop();
+}
+
+function resize3(){
+  if(!renderer)return;
+  const c=document.getElementById('three-canvas');
+  const w=c.clientWidth||innerWidth,h=c.clientHeight||innerHeight;
+  renderer.setSize(w,h,false);
+  if(camera){camera.aspect=w/h;camera.updateProjectionMatrix();}
+}
+
+function rLoop(){
+  animLoop=requestAnimationFrame(rLoop);
+  camera.rotation.order='YXZ';
+  camera.rotation.y=rad(vYaw);camera.rotation.x=rad(vPitch);
+  renderer.render(scene,camera);
+}
+
+function bindVTouch(el){
+  el.addEventListener('touchstart',e=>{e.preventDefault();
+    if(e.touches.length===1){tA={x:e.touches[0].clientX,y:e.touches[0].clientY};tB=null;}
+    else{tA={x:e.touches[0].clientX,y:e.touches[0].clientY};tB={x:e.touches[1].clientX,y:e.touches[1].clientY};lpd=hypot(tA.x-tB.x,tA.y-tB.y);}
+  },{passive:false});
+  el.addEventListener('touchmove',e=>{e.preventDefault();
+    if(e.touches.length===1&&tA&&!tB){
+      vYaw-=(e.touches[0].clientX-tA.x)*(vFov/60*.22);
+      vPitch=clamp(vPitch-(e.touches[0].clientY-tA.y)*(vFov/60*.22),-85,85);
+      tA={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    }else if(e.touches.length===2&&tB){
+      const na={x:e.touches[0].clientX,y:e.touches[0].clientY};
+      const nb={x:e.touches[1].clientX,y:e.touches[1].clientY};
+      const d=hypot(na.x-nb.x,na.y-nb.y);
+      vFov=clamp(vFov+(lpd-d)*.08,20,130);
+      camera.fov=vFov;camera.updateProjectionMatrix();
+      document.getElementById('fov-val').textContent=vFov|0;
+      lpd=d;tA=na;tB=nb;
+    }
+  },{passive:false});
+  el.addEventListener('touchend',e=>{
+    if(!e.touches.length){tA=null;tB=null;}
+    else if(e.touches.length===1){tA={x:e.touches[0].clientX,y:e.touches[0].clientY};tB=null;}
+  });
+}
+
+function setProj(m){
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('act'));
+  document.getElementById('pb-'+m).classList.add('act');
+  if(m==='flat'){document.getElementById('flat-img').src=equiCanvas.toDataURL('image/jpeg',.9);document.getElementById('flat-view').style.display='flex';return;}
+  if(m==='sphere'){vFov=75;vPitch=0;}
+  else if(m==='planet'){vFov=120;vPitch=-85;}
+  camera.fov=vFov;camera.updateProjectionMatrix();
+  document.getElementById('fov-val').textContent=vFov|0;
+}
+function closeFlatView(){document.getElementById('flat-view').style.display='none';document.getElementById('pb-sphere').click();}
+
+function exportPano(fmt){
+  if(!equiCanvas){toast('No panorama');return;}
+  toast('Preparing...',1000);
+  setTimeout(()=>{
+    const url=fmt==='png'?equiCanvas.toDataURL('image/png'):equiCanvas.toDataURL('image/'+fmt,.92);
+    const a=document.createElement('a');a.href=url;a.download=`sphere360.${fmt==='jpeg'?'jpg':fmt}`;
+    document.body.appendChild(a);a.click();a.remove();toast('Download started!');
+  },60);
+}
+
+function goBack(){
+  if(!confirm('Return to capture? Starts fresh.'))return;
+  if(animLoop){cancelAnimationFrame(animLoop);animLoop=null;}
+  document.getElementById('s-viewer').classList.remove('on');
+  captures=[];targets=makeTargets();calibrated=false;captureRunning=true;
+  relYaw=0;relPitch=0;smAlpha=null;smBeta=90;smGamma=0;
+  document.getElementById('calib-status').textContent='UNCALIBRATED';
+  document.getElementById('calib-status').style.color='rgba(255,100,100,.8)';
+  document.getElementById('calib-overlay').classList.add('on');
+  updateShotUI();
+  document.getElementById('s-capture').classList.add('on');
+  resizeOvr();
+  initCamera();
+  requestAnimationFrame(captureLoop);
+}
+
+// Flat view pan/zoom
+(()=>{
+  const img=document.getElementById('flat-img');
+  let sc=1,ox=0,oy=0,la=null,lb=null,lp=0;
+  img.addEventListener('touchstart',e=>{e.preventDefault();
+    if(e.touches.length===1){la={x:e.touches[0].clientX,y:e.touches[0].clientY};lb=null;}
+    else{la={x:e.touches[0].clientX,y:e.touches[0].clientY};lb={x:e.touches[1].clientX,y:e.touches[1].clientY};lp=hypot(la.x-lb.x,la.y-lb.y);}
+  },{passive:false});
+  img.addEventListener('touchmove',e=>{e.preventDefault();
+    if(e.touches.length===1&&la&&!lb){ox+=e.touches[0].clientX-la.x;oy+=e.touches[0].clientY-la.y;la={x:e.touches[0].clientX,y:e.touches[0].clientY};}
+    else if(e.touches.length===2&&lb){const na={x:e.touches[0].clientX,y:e.touches[0].clientY};const nb={x:e.touches[1].clientX,y:e.touches[1].clientY};const d=hypot(na.x-nb.x,na.y-nb.y);sc=clamp(sc*d/lp,.5,6);lp=d;la=na;lb=nb;}
+    img.style.transform=`translate(${ox}px,${oy}px) scale(${sc})`;
+  },{passive:false});
+  img.addEventListener('touchend',e=>{if(!e.touches.length){la=null;lb=null;}else if(e.touches.length===1){la={x:e.touches[0].clientX,y:e.touches[0].clientY};lb=null;}});
+  document.getElementById('fback').addEventListener('click',()=>{sc=1;ox=0;oy=0;img.style.transform='';});
+})();
+
+let tT=null;
+function toast(msg,dur=2400){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  if(tT)clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),dur);
+}
+</script>
+</body>
+</html>

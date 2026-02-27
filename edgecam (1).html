@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EDGE CAM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--acc:#00ffe7;--acc2:#ff003c;--acc3:#ffe600;--bg:#000;}
+body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:#fff;height:100dvh;overflow:hidden;display:flex;flex-direction:column;user-select:none;}
+
+#start{position:fixed;inset:0;background:#000;z-index:200;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;}
+#start::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,231,.03) 2px,rgba(0,255,231,.03) 4px);pointer-events:none;}
+.title{font-family:'Orbitron',sans-serif;font-size:2.8rem;font-weight:700;letter-spacing:8px;color:var(--acc);text-shadow:0 0 30px var(--acc),0 0 60px rgba(0,255,231,.3);animation:pulse 2s infinite;}
+.sub{font-size:.7rem;letter-spacing:4px;color:#444;margin-top:-10px;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.boot-btn{background:transparent;border:1px solid var(--acc);color:var(--acc);padding:14px 44px;font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:3px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;}
+.boot-btn::before{content:'';position:absolute;inset:0;background:var(--acc);transform:translateX(-100%);transition:transform .3s;}
+.boot-btn:active::before{transform:translateX(0);}
+.boot-btn:active{color:#000;}
+
+/* VIEWFINDER fills remaining space */
+.media-wrap{position:relative;flex:1;min-height:0;overflow:hidden;background:#000;}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+video{display:none;}
+
+.scanlines{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.15) 3px,rgba(0,0,0,.15) 4px);z-index:5;transition:opacity .3s;}
+
+.hud{position:absolute;top:0;left:0;right:0;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;z-index:10;background:linear-gradient(rgba(0,0,0,.7),transparent);}
+.hud-info{font-size:.65rem;letter-spacing:1px;color:rgba(0,255,231,.6);}
+#fps-badge{background:rgba(0,255,231,.1);border:1px solid rgba(0,255,231,.3);padding:2px 8px;border-radius:2px;font-size:.65rem;color:var(--acc);}
+
+/* ZOOM CONTROLS — right edge of viewfinder */
+.zoom-col{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.zbtn{width:36px;height:36px;background:rgba(0,0,0,.6);border:1px solid rgba(0,255,231,.35);color:var(--acc);border-radius:3px;font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;}
+.zbtn:active{background:rgba(0,255,231,.2);transform:scale(.88);}
+#zoom-lvl{font-size:.6rem;color:rgba(0,255,231,.55);letter-spacing:0;text-align:center;min-width:36px;}
+
+/* CONTROLS PANEL */
+.overlay{position:absolute;bottom:0;left:0;right:0;z-index:10;background:linear-gradient(transparent 0%,rgba(0,0,0,.98) 28%);padding:8px 14px 18px;}
+.pill-track{display:flex;gap:7px;overflow-x:auto;padding:6px 0 10px;scrollbar-width:none;}
+.pill-track::-webkit-scrollbar{display:none;}
+.pill{flex-shrink:0;padding:5px 13px;border-radius:3px;border:1px solid #333;background:rgba(255,255,255,.04);font-size:.72rem;cursor:pointer;transition:.15s;white-space:nowrap;color:#666;font-family:'Share Tech Mono',monospace;letter-spacing:1px;}
+.pill.active{border-color:var(--acc);background:rgba(0,255,231,.12);color:var(--acc);box-shadow:0 0 12px rgba(0,255,231,.2),inset 0 0 12px rgba(0,255,231,.05);}
+.sliders{display:flex;gap:12px;margin:4px 0 8px;}
+.sg{flex:1;}
+.sg-lbl{font-size:.65rem;letter-spacing:1px;color:#555;display:flex;justify-content:space-between;margin-bottom:5px;text-transform:uppercase;}
+.sg-lbl span{color:var(--acc);}
+input[type=range]{width:100%;height:2px;background:#222;border-radius:1px;outline:none;-webkit-appearance:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:2px;background:var(--acc);border:1px solid #000;box-shadow:0 0 8px var(--acc);}
+.btn-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.btn{background:rgba(255,255,255,.07);color:#aaa;border:1px solid #333;padding:9px 16px;border-radius:2px;font-size:.75rem;cursor:pointer;transition:.15s;font-family:'Share Tech Mono',monospace;letter-spacing:1px;}
+.btn:active{transform:scale(.93);}
+.btn.prim{background:rgba(0,255,231,.15);color:var(--acc);border-color:var(--acc);font-family:'Orbitron',sans-serif;font-size:.7rem;}
+.btn.prim:active{background:var(--acc);color:#000;}
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:100;transition:opacity .12s;}
+.mode-desc{font-size:.62rem;color:#444;letter-spacing:1px;text-align:center;margin:3px 0 6px;min-height:14px;}
+</style>
+</head>
+<body>
+<div class="flash" id="flash"></div>
+
+<div id="start">
+  <div class="title">EDGE CAM</div>
+  <div class="sub">LIVE FILTER SYSTEM v3</div>
+  <button class="boot-btn" onclick="boot()">⚡ INITIALIZE</button>
+</div>
+
+<div class="media-wrap" id="mw">
+  <div class="scanlines" id="scn"></div>
+  <canvas id="cv"></canvas>
+  <video id="vid" playsinline muted autoplay></video>
+  <div class="hud">
+    <div class="hud-info" id="res-info">-- × --</div>
+    <div id="fps-badge">-- FPS</div>
+    <div class="hud-info" id="mode-hud">--</div>
+  </div>
+  <div class="zoom-col">
+    <div class="zbtn" onclick="adjZoom(.25)">＋</div>
+    <div id="zoom-lvl">1×</div>
+    <div class="zbtn" onclick="adjZoom(-.25)">－</div>
+  </div>
+</div>
+
+<div class="overlay">
+  <div class="pill-track" id="pills"></div>
+  <div class="mode-desc" id="mdesc"></div>
+  <div class="sliders">
+    <div class="sg">
+      <div class="sg-lbl"><span id="l1n">PARAM1</span>&nbsp;<span id="v1">-</span></div>
+      <input type="range" id="s1" oninput="v1.textContent=this.value">
+    </div>
+    <div class="sg">
+      <div class="sg-lbl"><span id="l2n">PARAM2</span>&nbsp;<span id="v2">-</span></div>
+      <input type="range" id="s2" oninput="v2.textContent=this.value">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="flipCam()" style="flex:0 0 auto">🔄 FLIP</button>
+    <button class="btn" onclick="toggleCRT()" id="scnBtn" style="flex:0 0 auto;color:var(--acc)">📺 CRT</button>
+    <button class="btn prim" onclick="snap()" style="flex:1;max-width:140px">📸 SNAP</button>
+  </div>
+</div>
+
+<script>
+const vid=document.getElementById('vid'),cv=document.getElementById('cv');
+const ctx=cv.getContext('2d',{willReadFrequently:true,alpha:false});
+const mw=document.getElementById('mw');
+const s1=document.getElementById('s1'),s2=document.getElementById('s2');
+const v1=document.getElementById('v1'),v2=document.getElementById('v2');
+const l1n=document.getElementById('l1n'),l2n=document.getElementById('l2n');
+const fpsBadge=document.getElementById('fps-badge'),resInfo=document.getElementById('res-info');
+const modeHud=document.getElementById('mode-hud'),mDesc=document.getElementById('mdesc');
+
+let stream,frontCam=false,running=false;
+let rawBuf=null,lumaBuf=null,nightPrev=null;
+let frameCount=0,lastSec=0,fps=0,crtOn=true;
+let currentMode='neon';
+let CW=0,CH=0;
+
+// ── ZOOM ───────────────────────────────────────────────────────────────────
+let zoom=1,pinchStartDist=0,pinchStartZoom=1;
+const zoomEl=document.getElementById('zoom-lvl');
+function adjZoom(d){zoom=Math.max(1,Math.min(5,zoom+d));zoomEl.textContent=zoom.toFixed(2).replace(/\.?0+$/,'')+'×';}
+
+cv.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){e.preventDefault();pinchStartDist=tDist(e);pinchStartZoom=zoom;}
+},{passive:false});
+cv.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){e.preventDefault();zoom=Math.max(1,Math.min(5,pinchStartZoom*tDist(e)/pinchStartDist));zoomEl.textContent=zoom.toFixed(2).replace(/\.?0+$/,'')+'×';}
+},{passive:false});
+function tDist(e){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;return Math.sqrt(dx*dx+dy*dy);}
+
+// ── PRECOMPUTED HUES (HUE → RGB, 360 entries) ──────────────────────────────
+const HLUT=new Uint8Array(360*3);
+(()=>{for(let h=0;h<360;h++){const x=(1-Math.abs((h/60)%2-1))*255|0;let r=0,g=0,b=0;if(h<60){r=255;g=x;}else if(h<120){r=x;g=255;}else if(h<180){g=255;b=x;}else if(h<240){g=x;b=255;}else if(h<300){r=x;b=255;}else{r=255;b=x;}HLUT[h*3]=r;HLUT[h*3+1]=g;HLUT[h*3+2]=b;}})();
+
+// ── THERMAL LUT (iron colormap) ────────────────────────────────────────────
+const TLUT=new Uint8Array(768);
+(()=>{
+  const S=[[0,[0,0,0]],[40,[30,0,100]],[90,[120,0,160]],[140,[200,0,60]],[180,[255,60,0]],[210,[255,180,0]],[235,[255,255,100]],[255,[255,255,255]]];
+  for(let i=0;i<256;i++){
+    let lo=S[0],hi=S[S.length-1];
+    for(let s=0;s<S.length-1;s++){if(i>=S[s][0]&&i<=S[s+1][0]){lo=S[s];hi=S[s+1];break;}}
+    const t=(i-lo[0])/(hi[0]-lo[0]||1);
+    TLUT[i*3]  =lo[1][0]+(hi[1][0]-lo[1][0])*t|0;
+    TLUT[i*3+1]=lo[1][1]+(hi[1][1]-lo[1][1])*t|0;
+    TLUT[i*3+2]=lo[1][2]+(hi[1][2]-lo[1][2])*t|0;
+  }
+})();
+
+// ── FILTER CONFIG ──────────────────────────────────────────────────────────
+const FILTERS=[
+  {id:'neon',    lbl:'⚡NEON',    desc:'Angle-hued Sobel edges · direction = color',
+   s1:{n:'Threshold', min:2,  max:80,  val:14,  step:1},
+   s2:{n:'Hue Shift', min:0,  max:359, val:0,   step:1}},
+  {id:'night',   lbl:'👁 NIGHT',  desc:'Green phosphor · persistence trail · grain',
+   s1:{n:'Amplify',   min:1,  max:12,  val:4,   step:.1},
+   s2:{n:'Persist',   min:0,  max:95,  val:30,  step:1}},
+  {id:'thermal', lbl:'🌡THERMAL', desc:'Iron heat-map · white edge contour overlay',
+   s1:{n:'Contrast',  min:.3, max:4,   val:1.6, step:.05},
+   s2:{n:'Edge Mix',  min:0,  max:1,   val:.25, step:.01}},
+  {id:'emboss',  lbl:'⛰ EMBOSS', desc:'Relief convolution · metallic color blend',
+   s1:{n:'Depth',     min:.5, max:8,   val:2.5, step:.1},
+   s2:{n:'Metallic',  min:0,  max:1,   val:.4,  step:.01}},
+  {id:'mirror',  lbl:'🪞MIRROR',  desc:'Symmetry: H · V · Quad · Diagonal',
+   s1:{n:'Mode 0–3',  min:0,  max:3,   val:0,   step:1},
+   s2:{n:'Blend',     min:0,  max:1,   val:1,   step:.02}},
+  {id:'duotone', lbl:'◑DUOTONE', desc:'Dual-hue luminance gradient · smoothstep',
+   s1:{n:'Shadow Hue',min:0,  max:359, val:240, step:1},
+   s2:{n:'High Hue',  min:0,  max:359, val:30,  step:1}},
+];
+
+// ── UI SETUP ───────────────────────────────────────────────────────────────
+const pillsEl=document.getElementById('pills');
+FILTERS.forEach(f=>{
+  const el=document.createElement('div');
+  el.className='pill'+(f.id===currentMode?' active':'');
+  el.textContent=f.lbl;el.onclick=()=>setMode(f.id);
+  pillsEl.appendChild(el);
+});
+function setMode(id){
+  currentMode=id;
+  document.querySelectorAll('.pill').forEach((p,i)=>p.classList.toggle('active',FILTERS[i].id===id));
+  const f=FILTERS.find(x=>x.id===id);
+  setSl(s1,l1n,v1,f.s1);setSl(s2,l2n,v2,f.s2);
+  mDesc.textContent=f.desc;
+  modeHud.textContent=f.lbl.replace(/[^\w ]/g,'').trim();
+  setTimeout(()=>document.querySelector('.pill.active')?.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}),50);
+}
+function setSl(inp,ln,vn,c){inp.min=c.min;inp.max=c.max;inp.step=c.step;inp.value=c.val;ln.textContent=c.n;vn.textContent=c.val;}
+setMode('neon');
+
+function toggleCRT(){
+  crtOn=!crtOn;
+  document.getElementById('scn').style.opacity=crtOn?1:0;
+  document.getElementById('scnBtn').style.color=crtOn?'var(--acc)':'#555';
+}
+
+// ── CAMERA ─────────────────────────────────────────────────────────────────
+async function boot(){document.getElementById('start').style.display='none';await getStream();}
+async function getStream(){
+  stream?.getTracks().forEach(t=>t.stop());
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:frontCam?'user':'environment',width:{ideal:1280},height:{ideal:720}},audio:false
+    });
+    vid.srcObject=stream;await vid.play();
+    if(!running){running=true;requestAnimationFrame(loop);}
+  }catch(e){alert('Camera: '+e.message);}
+}
+function flipCam(){frontCam=!frontCam;zoom=1;zoomEl.textContent='1×';getStream();}
+
+// ── BUFFERS ────────────────────────────────────────────────────────────────
+function allocBuffers(w,h){
+  CW=w;CH=h;
+  rawBuf=new Uint8ClampedArray(w*h*4);
+  lumaBuf=new Float32Array(w*h);
+  nightPrev=new Float32Array(w*h);
+}
+
+// ── SYNC canvas px size to container CSS size ──────────────────────────────
+function syncCanvas(){
+  const w=mw.clientWidth|0,h=mw.clientHeight|0;
+  if(w&&h&&(cv.width!==w||cv.height!==h)){
+    cv.width=w;cv.height=h;
+    allocBuffers(w,h);
+    resInfo.textContent=w+'×'+h;
+  }
+}
+
+// ── DRAW VIDEO → CANVAS (cover scaling + zoom, centred) ───────────────────
+function drawVideoCover(){
+  const vw=vid.videoWidth,vh=vid.videoHeight;
+  if(!vw||!vh)return;
+  const scale=Math.max(CW/vw,CH/vh)*zoom;
+  const dw=vw*scale,dh=vh*scale;
+  ctx.drawImage(vid,(CW-dw)/2,(CH-dh)/2,dw,dh);
+}
+
+// ── LUMA PASS ─────────────────────────────────────────────────────────────
+function calcLuma(s){
+  const n=CW*CH;
+  for(let i=0,j=0;j<n;j++,i+=4)lumaBuf[j]=s[i]*.299+s[i+1]*.587+s[i+2]*.114;
+}
+
+// ── MAIN LOOP ──────────────────────────────────────────────────────────────
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(vid.readyState<2)return;
+  syncCanvas();
+  if(!CW||!CH)return;
+
+  frameCount++;
+  if(ts-lastSec>=1000){fps=frameCount;frameCount=0;lastSec=ts;fpsBadge.textContent=fps+' FPS';}
+
+  drawVideoCover();
+  const id=ctx.getImageData(0,0,CW,CH);
+  const d=id.data;
+  rawBuf.set(d);
+
+  const p1=parseFloat(s1.value),p2=parseFloat(s2.value);
+  switch(currentMode){
+    case 'neon':    fNeon(d,rawBuf,p1,p2);break;
+    case 'night':   fNight(d,rawBuf,p1,p2);break;
+    case 'thermal': fThermal(d,rawBuf,p1,p2);break;
+    case 'emboss':  fEmboss(d,rawBuf,p1,p2);break;
+    case 'mirror':  fMirror(d,rawBuf,p1,p2);break;
+    case 'duotone': fDuotone(d,rawBuf,p1,p2);break;
+  }
+  ctx.putImageData(id,0,0);
+}
+
+// ── FILTER 1: NEON ─────────────────────────────────────────────────────────
+function fNeon(d,s,thr,hueShift){
+  const W=CW,H=CH,hs=hueShift|0;
+  calcLuma(s);
+  for(let x=0;x<W;x++){let i=x*4;d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;i=((H-1)*W+x)*4;d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;}
+  for(let y=0;y<H;y++){let i=y*W*4;d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;i=(y*W+W-1)*4;d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;}
+  for(let y=1;y<H-1;y++){
+    const yo=y*W;
+    for(let x=1;x<W-1;x++){
+      const j=yo+x,i=j*4;
+      const tl=lumaBuf[j-W-1],tc=lumaBuf[j-W],tr=lumaBuf[j-W+1];
+      const ml=lumaBuf[j-1],mr=lumaBuf[j+1];
+      const bl=lumaBuf[j+W-1],bc=lumaBuf[j+W],br=lumaBuf[j+W+1];
+      const gx=-tl-2*ml-bl+tr+2*mr+br;
+      const gy=-tl-2*tc-tr+bl+2*bc+br;
+      const mag=Math.sqrt(gx*gx+gy*gy);
+      if(mag<thr){d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;continue;}
+      const hue=(((Math.atan2(gy,gx)/Math.PI+1)*180+hs)%360|0+360)%360;
+      const bright=Math.min(1,(mag-thr)/180+.55);
+      d[i]  =HLUT[hue*3]*bright|0;
+      d[i+1]=HLUT[hue*3+1]*bright|0;
+      d[i+2]=HLUT[hue*3+2]*bright|0;
+      d[i+3]=255;
+    }
+  }
+}
+
+// ── FILTER 2: NIGHT VISION ─────────────────────────────────────────────────
+function fNight(d,s,gain,persistPct){
+  const W=CW,H=CH,persist=persistPct/100,wh=W/2,hh=H/2;
+  for(let j=0,i=0;j<W*H;j++,i+=4){
+    const x=j%W,y=j/W|0;
+    const rawL=(s[i]*.299+s[i+1]*.587+s[i+2]*.114)*gain;
+    const L=rawL*(1-persist)+nightPrev[j]*persist;
+    nightPrev[j]=L;
+    const grain=(Math.random()-.5)*18;
+    const nx=(x-wh)/wh,ny=(y-hh)/hh;
+    const vig=Math.max(0,1-(nx*nx+ny*ny)*.5);
+    const out=Math.max(0,Math.min(255,(L+grain)*vig));
+    d[i]=out*.06|0;d[i+1]=out|0;d[i+2]=out*.18|0;d[i+3]=255;
+  }
+}
+
+// ── FILTER 3: THERMAL ──────────────────────────────────────────────────────
+function fThermal(d,s,contrast,edgeMix){
+  const W=CW,H=CH;
+  calcLuma(s);
+  for(let i=0,j=0;i<d.length;i+=4,j++){
+    const lu=Math.max(0,Math.min(255,(lumaBuf[j]-128)*contrast+128))|0;
+    d[i]=TLUT[lu*3];d[i+1]=TLUT[lu*3+1];d[i+2]=TLUT[lu*3+2];d[i+3]=255;
+  }
+  if(edgeMix<0.01)return;
+  for(let y=1;y<H-1;y++){
+    const yo=y*W;
+    for(let x=1;x<W-1;x++){
+      const j=yo+x;
+      const gx=-lumaBuf[j-W-1]-2*lumaBuf[j-1]-lumaBuf[j+W-1]+lumaBuf[j-W+1]+2*lumaBuf[j+1]+lumaBuf[j+W+1];
+      const gy=-lumaBuf[j-W-1]-2*lumaBuf[j-W]-lumaBuf[j-W+1]+lumaBuf[j+W-1]+2*lumaBuf[j+W]+lumaBuf[j+W+1];
+      const mag=Math.min(1,Math.sqrt(gx*gx+gy*gy)/180)*edgeMix;
+      if(mag<0.02)continue;
+      const i=j*4;
+      d[i]  =d[i]  +(255-d[i]  )*mag|0;
+      d[i+1]=d[i+1]+(255-d[i+1])*mag|0;
+      d[i+2]=d[i+2]+(255-d[i+2])*mag|0;
+    }
+  }
+}
+
+// ── FILTER 4: EMBOSS ───────────────────────────────────────────────────────
+function fEmboss(d,s,depth,metallic){
+  const W=CW,H=CH,bias=128;
+  const L=k=>{const p=k*4;return s[p]*.299+s[p+1]*.587+s[p+2]*.114;};
+  for(let y=1;y<H-1;y++){
+    const yo=y*W;
+    for(let x=1;x<W-1;x++){
+      const j=yo+x,i=j*4;
+      const v=Math.max(0,Math.min(255,bias+depth*(
+        -L(j-W-1)-L(j-W)-L(j-W+1)-L(j-1)+L(j+1)+L(j+W-1)+L(j+W)+L(j+W+1)
+      )/4))|0;
+      const sr=s[i],sg=s[i+1],sb=s[i+2],sm=Math.max(sr,sg,sb)||1;
+      d[i]  =v+(sr/sm*v-v)*metallic|0;
+      d[i+1]=v+(sg/sm*v-v)*metallic|0;
+      d[i+2]=v+(sb/sm*v-v)*metallic|0;
+      d[i+3]=255;
+    }
+  }
+}
+
+// ── FILTER 5: MIRROR ───────────────────────────────────────────────────────
+function fMirror(d,s,mode,blend){
+  const W=CW,H=CH,hw=W>>1,hh=H>>1;
+  mode=mode|0;
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i=(y*W+x)*4;
+      let sx=x,sy=y;
+      if(mode===0)sx=x<hw?x:W-1-x;
+      else if(mode===1)sy=y<hh?y:H-1-y;
+      else if(mode===2){sx=x<hw?x:W-1-x;sy=y<hh?y:H-1-y;}
+      else{sx=y<hh?x:W-1-x;sy=y<hh?y:H-1-y;}
+      const si=(sy*W+sx)*4;
+      d[i]  =s[si]  *blend+s[i]  *(1-blend)|0;
+      d[i+1]=s[si+1]*blend+s[i+1]*(1-blend)|0;
+      d[i+2]=s[si+2]*blend+s[i+2]*(1-blend)|0;
+      d[i+3]=255;
+    }
+  }
+}
+
+// ── FILTER 6: DUOTONE ──────────────────────────────────────────────────────
+function fDuotone(d,s,hue1,hue2){
+  hue1=((hue1|0)%360+360)%360;hue2=((hue2|0)%360+360)%360;
+  const r1=HLUT[hue1*3],g1=HLUT[hue1*3+1],b1=HLUT[hue1*3+2];
+  const r2=HLUT[hue2*3],g2=HLUT[hue2*3+1],b2=HLUT[hue2*3+2];
+  for(let i=0;i<d.length;i+=4){
+    let t=(s[i]*.299+s[i+1]*.587+s[i+2]*.114)/255;
+    t=t*t*(3-2*t); // smoothstep
+    d[i]  =r1+(r2-r1)*t|0;
+    d[i+1]=g1+(g2-g1)*t|0;
+    d[i+2]=b1+(b2-b1)*t|0;
+    d[i+3]=255;
+  }
+}
+
+// ── SNAP ───────────────────────────────────────────────────────────────────
+function snap(){
+  const fl=document.getElementById('flash');
+  fl.style.opacity=1;setTimeout(()=>fl.style.opacity=0,120);
+  const a=document.createElement('a');
+  a.download='EDGECAM_'+currentMode+'_'+Date.now()+'.png';
+  a.href=cv.toDataURL('image/png');a.click();
+}
+</script>
+</body>
+</html>
