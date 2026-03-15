@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>DISTURB</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#ccc;font-family:'Share Tech Mono',monospace;overflow-x:hidden}
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #1a1a1a}
+#hdr h1{font-size:1.1rem;letter-spacing:6px;color:#fff;font-weight:400}
+#hdr span{font-size:.55rem;letter-spacing:2px;color:#444}
+#canvas-wrap{width:100%;max-width:500px;margin:0 auto;position:relative}
+canvas{display:block;width:100%;image-rendering:pixelated}
+.pill-scroll{display:flex;gap:5px;overflow-x:auto;padding:8px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;border-bottom:1px solid #111}
+.pill-scroll::-webkit-scrollbar{display:none}
+.pill{flex-shrink:0;padding:4px 10px;border:1px solid #222;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:.55rem;letter-spacing:1px;cursor:pointer;background:#000;color:#444;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:all .1s}
+.pill.active{background:#fff;color:#000;border-color:#fff}
+.controls{background:#050505;padding:10px 12px 14px;max-width:500px;margin:0 auto;border-top:1px solid #111}
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.ctrl-label{font-size:.55rem;letter-spacing:1px;color:#444;width:88px;flex-shrink:0}
+.ctrl-val{font-size:.55rem;color:#fff;width:34px;text-align:right;flex-shrink:0}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:2px;border-radius:1px;outline:none;cursor:pointer;background:#1a1a1a}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #000;box-shadow:0 0 0 1px #fff}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #000}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;padding:9px;border:1px solid #333;background:#000;color:#888;font-family:'Share Tech Mono',monospace;font-size:.6rem;letter-spacing:2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:active{background:#fff;color:#000;border-color:#fff}
+.auto-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #111}
+.btn-auto{flex-shrink:0;width:90px;padding:10px 0;border:1px solid #333;background:#000;color:#555;font-family:'Share Tech Mono',monospace;font-size:.6rem;letter-spacing:2px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.btn-auto.on{border-color:#fff;color:#000;background:#fff;box-shadow:0 0 18px rgba(255,255,255,.25)}
+.warn{font-size:.5rem;color:#333;text-align:center;padding:5px 0 0;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="hdr"><h1>DISTURB</h1><span>VISUAL DISCOMFORT ENGINE</span></div>
+<div class="pill-scroll" id="pills"></div>
+<div id="canvas-wrap"><canvas id="c"></canvas></div>
+<div class="controls">
+  <div id="sliders"></div>
+  <div class="auto-row">
+    <button class="btn btn-auto" id="btnAuto">&#9654; AUTO</button>
+    <div class="ctrl-row" style="flex:1;margin:0">
+      <span class="ctrl-label" style="width:72px">SPEED</span>
+      <input type="range" id="slSpeed" min="1" max="100" step="1" value="18">
+      <span class="ctrl-val" id="vlSpeed">18</span>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="btnR">&#8635; REGENERATE</button>
+    <button class="btn" id="btnS">&#8595; SAVE PNG</button>
+  </div>
+  <div class="warn">&#9888; MAY CAUSE EYE STRAIN · NOT FOR PHOTOSENSITIVE VIEWERS</div>
+</div>
+
+<script>
+(function(){
+var canvas=document.getElementById('c');
+var ctx=canvas.getContext('2d');
+var W=500,H=500,current=0;
+
+/* ─── helpers ─── */
+var PI=Math.PI, PI2=PI*2;
+function setpx(d,i,v){d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;}
+function thresh(v){return v>0?255:0;}
+
+/* ─── illusion definitions ─── */
+var ILL=[];
+
+/* 1 — OUCHI FLOAT */
+ILL.push({
+  name:'OUCHI',
+  params:[
+    {n:'freq',   l:'FREQUENCY',  min:4,   max:80,  val:22,  step:1},
+    {n:'disc',   l:'DISC SIZE',  min:.05, max:.48, val:.28, step:.005},
+    {n:'angle',  l:'BG ANGLE',   min:0,   max:89,  val:0,   step:1},
+    {n:'xfreq',  l:'X/Y RATIO',  min:.2,  max:5,   val:1,   step:.05},
+    {n:'wobble', l:'EDGE WOBBLE',min:0,   max:30,  val:0,   step:.5},
+    {n:'wfreq',  l:'WOBBLE FREQ',min:1,   max:24,  val:6,   step:.5},
+    {n:'ovality',l:'OVALITY',    min:.1,  max:3,   val:1,   step:.05},
+    {n:'phase',  l:'DISC PHASE', min:0,   max:PI2, val:0,   step:.05}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2,cy=H/2,R=p.disc*W;
+    var rad=p.angle*PI/180;
+    var sc=PI*0.06;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var ang=Math.atan2(dy,dx);
+        var wob=p.wobble*Math.sin(ang*p.wfreq+p.phase);
+        var edx=dx/p.ovality, edy=dy;
+        var inD=(edx*edx+edy*edy)<=(R+wob)*(R+wob);
+        var v;
+        if(inD){
+          v=Math.sin(y*p.freq*sc*2);
+        } else {
+          var rx=dx*Math.cos(rad)-dy*Math.sin(rad);
+          v=Math.sin(rx*p.freq*p.xfreq*sc*2);
+        }
+        setpx(d,(y*W+x)*4,thresh(v));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 2 — VIBRATING RINGS */
+ILL.push({
+  name:'VIBE RINGS',
+  params:[
+    {n:'rings',  l:'RING COUNT',  min:4,   max:60,  val:24,  step:1},
+    {n:'freq',   l:'WAVE FREQ',   min:2,   max:80,  val:28,  step:1},
+    {n:'thick',  l:'RING THICK',  min:.2,  max:.9,  val:.45, step:.01},
+    {n:'twist',  l:'TWIST',       min:0,   max:8,   val:1.5, step:.05},
+    {n:'phase',  l:'PHASE',       min:0,   max:PI2, val:0,   step:.05},
+    {n:'harmonic',l:'HARMONIC',   min:0,   max:1,   val:0,   step:.01},
+    {n:'hfreq',  l:'HARM FREQ',   min:1,   max:8,   val:3,   step:.1},
+    {n:'radmod', l:'RADIAL MOD',  min:0,   max:6,   val:0,   step:.1}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2,cy=H/2,R=W*.5;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>R){setpx(d,(y*W+x)*4,0);continue;}
+        var ang=Math.atan2(dy,dx);
+        var nr=dist/R;
+        /* radial frequency modulation — rings compress/expand radially */
+        var nrmod=nr+Math.sin(nr*PI2*p.radmod)*0.08;
+        var wave=Math.sin(nrmod*p.rings*PI2+ang*p.freq+p.twist*nrmod*PI2+p.phase);
+        var ring=Math.sin(nrmod*p.rings*PI2);
+        var harm=Math.sin(nrmod*p.rings*p.hfreq*PI2+ang*p.freq*p.hfreq+p.phase);
+        var v=(wave*(1-p.harmonic)+harm*p.harmonic)*p.thick+ring*(1-p.thick);
+        setpx(d,(y*W+x)*4,thresh(v));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 3 — DENSE CHECKERBOARD WARP */
+ILL.push({
+  name:'WARP CHECKER',
+  params:[
+    {n:'cells',  l:'CELL DENSITY',min:4,   max:60,  val:20,  step:1},
+    {n:'amp',    l:'WARP AMP',    min:0,   max:40,  val:10,  step:.5},
+    {n:'wfreq',  l:'WARP FREQ',   min:.5,  max:10,  val:2.5, step:.1},
+    {n:'rot',    l:'ROTATION',    min:0,   max:45,  val:0,   step:.5},
+    {n:'type',   l:'WARP TYPE',   min:0,   max:2,   val:0,   step:1},
+    {n:'amp2',   l:'WARP 2 AMP',  min:0,   max:30,  val:0,   step:.5},
+    {n:'wfreq2', l:'WARP 2 FREQ', min:.5,  max:12,  val:4,   step:.1},
+    {n:'pinch',  l:'PINCH',       min:0,   max:2,   val:0,   step:.02}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2,cy=H/2,cs=W/p.cells;
+    var rot=p.rot*PI/180;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var rx=dx*Math.cos(rot)-dy*Math.sin(rot);
+        var ry=dx*Math.sin(rot)+dy*Math.cos(rot);
+        var dist=Math.sqrt(rx*rx+ry*ry);
+        var wf=p.wfreq*PI2/W, wf2=p.wfreq2*PI2/W;
+        var wx,wy;
+        if(p.type<1){wx=Math.sin(ry*wf)*p.amp;wy=Math.sin(rx*wf)*p.amp;}
+        else if(p.type<2){wx=Math.sin(dist*wf)*p.amp;wy=Math.cos(dist*wf)*p.amp;}
+        else{wx=Math.sin((rx+ry)*wf)*p.amp;wy=Math.sin((rx-ry)*wf)*p.amp;}
+        /* second warp layer at perpendicular phase */
+        wx+=Math.sin(ry*wf2+PI/2)*p.amp2;
+        wy+=Math.cos(rx*wf2+PI/2)*p.amp2;
+        /* radial pinch/barrel */
+        var pf=1+p.pinch*(dist/W)*(dist/W);
+        var fx=rx*pf+wx, fy=ry*pf+wy;
+        var cx2=Math.floor(fx/cs),cy2=Math.floor(fy/cs);
+        setpx(d,(y*W+x)*4,(cx2+cy2)%2===0?255:0);
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 4 — RADIAL SAWTOOTH DRIFT */
+ILL.push({
+  name:'RADIAL DRIFT',
+  params:[
+    {n:'rings',  l:'RINGS',       min:6,   max:80,  val:30,  step:1},
+    {n:'teeth',  l:'TEETH/RING',  min:4,   max:120, val:40,  step:1},
+    {n:'slant',  l:'SLANT',       min:0,   max:2,   val:.8,  step:.02},
+    {n:'pol',    l:'POLARITY',    min:0,   max:1,   val:1,   step:.01},
+    {n:'squeeze',l:'SQUEEZE',     min:.1,  max:3,   val:1,   step:.05},
+    {n:'teethmod',l:'TEETH MOD',  min:0,   max:60,  val:0,   step:1},
+    {n:'eccx',   l:'ECCENTRIC X', min:-.4, max:.4,  val:0,   step:.01},
+    {n:'eccy',   l:'ECCENTRIC Y', min:-.4, max:.4,  val:0,   step:.01}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2+p.eccx*W, cy=H/2+p.eccy*H, R=W*.5;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>R){setpx(d,(y*W+x)*4,0);continue;}
+        var ang=((Math.atan2(dy,dx)+PI)/PI2);
+        var nr=Math.pow(dist/R,p.squeeze);
+        var ring=Math.floor(nr*p.rings);
+        /* radially modulate teeth count */
+        var teeth=p.teeth+Math.sin(nr*PI2)*p.teethmod;
+        var t=(ang*teeth+nr*p.slant*p.rings)%1;
+        t=((t%1)+1)%1;
+        var pol=ring%2===0?1:p.pol;
+        var saw=t<.5?t*2:2-t*2;
+        setpx(d,(y*W+x)*4,thresh(saw*2-1)*pol+(1-pol)*thresh(-(saw*2-1)));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 5 — MOIRE CRASH */
+ILL.push({
+  name:'MOIRE CRASH',
+  params:[
+    {n:'freq',   l:'FREQUENCY',   min:10,  max:120, val:50,  step:1},
+    {n:'angle',  l:'ANGLE DIFF',  min:.1,  max:12,  val:2.5, step:.1},
+    {n:'layers', l:'LAYERS',      min:2,   max:5,   val:2,   step:1},
+    {n:'phase',  l:'PHASE',       min:0,   max:PI,  val:0,   step:.02},
+    {n:'radial', l:'RADIAL MIX',  min:0,   max:1,   val:0,   step:.01},
+    {n:'fmod',   l:'FREQ WARP',   min:0,   max:1,   val:0,   step:.01},
+    {n:'zoom',   l:'SCALE DIFF',  min:.5,  max:2,   val:1,   step:.01},
+    {n:'spin',   l:'SPIRAL MIX',  min:0,   max:1,   val:0,   step:.01}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2,cy=H/2;
+    var f=p.freq/W*PI2,layers=Math.round(p.layers);
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var dist=Math.sqrt(dx*dx+dy*dy);
+        var ang=Math.atan2(dy,dx);
+        var sum=0;
+        for(var l=0;l<layers;l++){
+          var a=l*p.angle*PI/180;
+          var scale=l===0?1:p.zoom;
+          var lx2=(dx*Math.cos(a)+dy*Math.sin(a))*scale;
+          /* frequency modulation — freq varies with radius */
+          var flocal=f*(1+p.fmod*Math.sin(dist*f*0.1));
+          sum+=Math.sin(lx2*flocal+l*p.phase);
+          if(p.radial>0) sum+=Math.sin(dist*flocal*p.radial+l*p.phase)*p.radial;
+          /* spiral component */
+          if(p.spin>0) sum+=Math.sin((dist*f+ang*4)*p.spin+l*p.phase)*p.spin;
+        }
+        setpx(d,(y*W+x)*4,thresh(sum/layers));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 6 — ZIGZAG SHIMMER */
+ILL.push({
+  name:'ZIGZAG',
+  params:[
+    {n:'rows',   l:'ROW DENSITY', min:4,   max:80,  val:26,  step:1},
+    {n:'zfreq',  l:'ZAG FREQ',    min:1,   max:30,  val:8,   step:.5},
+    {n:'zamp',   l:'ZAG AMP',     min:0,   max:40,  val:12,  step:.5},
+    {n:'thick',  l:'LINE THICK',  min:.05, max:.95, val:.5,  step:.01},
+    {n:'phase2', l:'ROW PHASE',   min:0,   max:PI,  val:PI/2,step:.05},
+    {n:'crossamp',l:'CROSS AMP',  min:0,   max:30,  val:0,   step:.5},
+    {n:'ampmod', l:'AMP WAVE',    min:0,   max:1,   val:0,   step:.01},
+    {n:'cols',   l:'COL DENSITY', min:0,   max:80,  val:0,   step:1}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var rh=H/p.rows;
+    var cw=p.cols>0?W/p.cols:0;
+    for(var y=0;y<H;y++){
+      var row=Math.floor(y/rh);
+      var ph=row%2===0?0:p.phase2;
+      /* amplitude modulation along Y */
+      var ampScale=1+p.ampmod*Math.sin(y/H*PI2*3);
+      for(var x=0;x<W;x++){
+        var zag=Math.sin(x/W*p.zfreq*PI2+ph)*p.zamp*ampScale;
+        /* perpendicular cross-zigzag */
+        var crosszag=p.crossamp>0?Math.sin(y/H*p.zfreq*PI2+ph*1.3)*p.crossamp:0;
+        var ly=(y%rh)+zag;
+        var lx=p.cols>0?(x%cw)+crosszag:0;
+        var v=Math.sin(ly/rh*PI2);
+        var v2=p.cols>0?Math.sin(lx/cw*PI2):0;
+        var val=p.cols>0?(v+v2)/2:v;
+        setpx(d,(y*W+x)*4,val>Math.cos(p.thick*PI)?255:0);
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 7 — PERIPHERAL DRIFT (dense) */
+ILL.push({
+  name:'DRIFT RINGS',
+  params:[
+    {n:'rings',  l:'RING COUNT',  min:8,   max:80,  val:32,  step:1},
+    {n:'seg',    l:'SEGMENTS',    min:8,   max:128, val:48,  step:1},
+    {n:'steps',  l:'LUMA STEPS',  min:2,   max:6,   val:4,   step:1},
+    {n:'inner',  l:'INNER HOLE',  min:0,   max:.35, val:0,   step:.005},
+    {n:'skew',   l:'STEP SKEW',   min:.1,  max:.9,  val:.25, step:.01},
+    {n:'spiral', l:'SPIRAL DRIFT',min:0,   max:4,   val:0,   step:.05},
+    {n:'segvar', l:'SEG VARY',    min:0,   max:1,   val:0,   step:.01},
+    {n:'tilt',   l:'TILT',        min:0,   max:PI2, val:0,   step:.05}
+  ],
+  draw:function(p){
+    var cx=W/2,cy=H/2,R=W*.5;
+    ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+    var steps=Math.round(p.steps);
+    var lumas=[];
+    for(var i=0;i<steps;i++){
+      var t=i%2===0?i/steps*p.skew:(1-(i/steps*p.skew));
+      lumas.push(Math.round(t*255));
+    }
+    for(var r=p.rings;r>=1;r--){
+      var nr=r/p.rings;
+      var r1=(nr)*(R-p.inner*W)+p.inner*W;
+      var r0=((r-1)/p.rings)*(R-p.inner*W)+p.inner*W;
+      /* vary segment count by ring */
+      var seg=Math.round(p.seg*(1+p.segvar*(r%3-1)*0.3));
+      seg=Math.max(4,seg);
+      for(var s=0;s<seg;s++){
+        var a1=(s/seg)*PI2+p.tilt+nr*p.spiral;
+        var a2=((s+1)/seg)*PI2+p.tilt+nr*p.spiral;
+        var li=(r+s)%steps;
+        var L=lumas[li];
+        ctx.fillStyle='rgb('+L+','+L+','+L+')';
+        ctx.beginPath();
+        ctx.moveTo(cx+Math.cos(a1)*r0,cy+Math.sin(a1)*r0);
+        ctx.arc(cx,cy,r0,a1,a2);
+        ctx.arc(cx,cy,r1,a2,a1,true);
+        ctx.closePath();ctx.fill();
+      }
+    }
+  }
+});
+
+/* 8 — CONCENTRIC INTERFERENCE */
+ILL.push({
+  name:'INTERFERENCE',
+  params:[
+    {n:'f1',     l:'FREQ 1',      min:4,   max:100, val:30,  step:1},
+    {n:'f2',     l:'FREQ 2',      min:4,   max:100, val:31,  step:1},
+    {n:'cx2',    l:'SRC 2 X',     min:0,   max:1,   val:.65, step:.01},
+    {n:'cy2',    l:'SRC 2 Y',     min:0,   max:1,   val:.35, step:.01},
+    {n:'mix',    l:'MIX',         min:0,   max:1,   val:.5,  step:.01},
+    {n:'f3',     l:'FREQ 3',      min:0,   max:100, val:0,   step:1},
+    {n:'cx3',    l:'SRC 3 X',     min:0,   max:1,   val:.2,  step:.01},
+    {n:'cy3',    l:'SRC 3 Y',     min:0,   max:1,   val:.8,  step:.01}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx1=W/2,cy1=H/2;
+    var sx2=p.cx2*W,sy2=p.cy2*H;
+    var sx3=p.cx3*W,sy3=p.cy3*H;
+    var f1=p.f1/W*PI2,f2=p.f2/W*PI2,f3=p.f3/W*PI2;
+    var use3=p.f3>0;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var d1=Math.sqrt((x-cx1)*(x-cx1)+(y-cy1)*(y-cy1));
+        var d2=Math.sqrt((x-sx2)*(x-sx2)+(y-sy2)*(y-sy2));
+        var v;
+        if(use3){
+          var d3=Math.sqrt((x-sx3)*(x-sx3)+(y-sy3)*(y-sy3));
+          v=(Math.sin(d1*f1)+Math.sin(d2*f2)*p.mix+Math.sin(d3*f3)*(1-p.mix))/3;
+        } else {
+          v=Math.sin(d1*f1)*(1-p.mix)+Math.sin(d2*f2)*p.mix;
+        }
+        setpx(d,(y*W+x)*4,thresh(v));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* 9 — SPIRAL NOISE */
+ILL.push({
+  name:'SPIRAL',
+  params:[
+    {n:'arms',   l:'SPIRAL ARMS', min:1,   max:12,  val:3,   step:1},
+    {n:'freq',   l:'STRIPE FREQ', min:4,   max:80,  val:20,  step:1},
+    {n:'taper',  l:'TAPER',       min:.1,  max:4,   val:1.2, step:.05},
+    {n:'squish', l:'SQUISH',      min:.1,  max:3,   val:1,   step:.05},
+    {n:'twist',  l:'TWIST',       min:0,   max:20,  val:4,   step:.1},
+    {n:'counter',l:'COUNTER ARMS',min:0,   max:1,   val:0,   step:.01},
+    {n:'radmod', l:'RADIAL MOD',  min:0,   max:8,   val:0,   step:.1},
+    {n:'jitter', l:'JITTER',      min:0,   max:4,   val:0,   step:.05}
+  ],
+  draw:function(p){
+    var img=ctx.createImageData(W,H),d=img.data;
+    var cx=W/2,cy=H/2,R=W*.5;
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var dx=x-cx,dy=y-cy;
+        var dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>R){setpx(d,(y*W+x)*4,0);continue;}
+        var ang=Math.atan2(dy,dx);
+        var nr=Math.pow(dist/R,p.squish);
+        /* radial frequency modulation */
+        var freqLocal=p.freq*(1+p.radmod*Math.sin(nr*PI2*2)*0.3);
+        var spiral=ang*p.arms/PI2+nr*p.twist;
+        var counterSpiral=-ang*p.arms/PI2+nr*p.twist;
+        /* angular jitter based on radius */
+        var jit=p.jitter*Math.sin(nr*PI2*7+ang*3);
+        var stripe=Math.sin((spiral+jit)*freqLocal*PI2+nr*freqLocal*p.taper*PI2)*(1-p.counter)
+                  +Math.sin((counterSpiral+jit)*freqLocal*PI2+nr*freqLocal*p.taper*PI2)*p.counter;
+        setpx(d,(y*W+x)*4,thresh(stripe));
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+
+/* ─── engine ─── */
+function setSize(){
+  var wrap=document.getElementById('canvas-wrap');
+  W=Math.min(wrap.offsetWidth,500);H=W;
+  canvas.width=W;canvas.height=H;
+}
+
+function getParams(il){
+  var p={};
+  for(var j=0;j<il.params.length;j++){
+    var pr=il.params[j];
+    var el=document.getElementById('sl_'+pr.n);
+    p[pr.n]=el?parseFloat(el.value):pr.val;
+  }
+  return p;
+}
+
+var fmt=function(v){return parseFloat(v)%1===0?String(parseInt(v)):parseFloat(v).toFixed(2);};
+
+function redraw(){
+  ctx.clearRect(0,0,W,H);
+  ILL[current].draw(getParams(ILL[current]));
+}
+
+function buildUI(idx){
+  var il=ILL[idx];
+  var sc=document.getElementById('sliders');sc.innerHTML='';
+  for(var j=0;j<il.params.length;j++){
+    (function(pr){
+      var row=document.createElement('div');row.className='ctrl-row';
+      var lbl=document.createElement('span');lbl.className='ctrl-label';lbl.textContent=pr.l;
+      var sl=document.createElement('input');sl.type='range';
+      sl.id='sl_'+pr.n;sl.min=pr.min;sl.max=pr.max;sl.step=pr.step;sl.value=pr.val;
+      var val=document.createElement('span');val.className='ctrl-val';val.id='vl_'+pr.n;
+      val.textContent=fmt(pr.val);
+      sl.addEventListener('input',function(){val.textContent=fmt(sl.value);redraw();});
+      row.appendChild(lbl);row.appendChild(sl);row.appendChild(val);
+      sc.appendChild(row);
+    })(il.params[j]);
+  }
+  /* seed auto-state for new illusion */
+  autoInit();
+}
+
+function selectIllusion(idx){
+  current=idx;
+  var pills=document.querySelectorAll('.pill');
+  for(var i=0;i<pills.length;i++)pills[i].classList.toggle('active',i===idx);
+  buildUI(idx);redraw();
+}
+
+function savePng(){
+  var a=document.createElement('a');
+  a.download=ILL[current].name.toLowerCase().replace(/ /g,'_')+'.png';
+  a.href=canvas.toDataURL('image/png');a.click();
+}
+
+/* ─── AUTO-ANIMATE ─── */
+var autoOn=false, rafId=null;
+/* per-param sine oscillator: {center, amp, freq, phase} */
+var autoWaves=[];
+
+function autoInit(){
+  autoWaves=[];
+  var il=ILL[current];
+  for(var j=0;j<il.params.length;j++){
+    var pr=il.params[j];
+    var el=document.getElementById('sl_'+pr.n);
+    var cur=el?parseFloat(el.value):pr.val;
+    var range=pr.max-pr.min;
+    /* center on current value, swing ±35% of range, unique slow freq per param */
+    autoWaves.push({
+      center: cur,
+      amp:    range*0.35,
+      freq:   0.04+Math.random()*0.09,  /* 0.04–0.13 Hz — slow base cycle */
+      phase:  Math.random()*Math.PI*2    /* stagger so params don't move in sync */
+    });
+  }
+}
+
+function autoTick(ts){
+  if(!autoOn) return;
+  rafId=requestAnimationFrame(autoTick);
+
+  var speed=parseFloat(document.getElementById('slSpeed').value);
+  /* speed 1→ time runs at 0.05×, speed 100 → 3×  (exponential feel) */
+  var timeScale=0.05+Math.pow(speed/100,2)*2.95;
+  var t=ts/1000*timeScale;
+
+  var il=ILL[current];
+  for(var j=0;j<il.params.length;j++){
+    var pr=il.params[j];
+    var w=autoWaves[j];
+    if(!w) continue;
+
+    /* sum two sines at slightly different rates → Lissajous-style organic drift */
+    var v=w.center
+         + w.amp * Math.sin(t*w.freq*Math.PI*2 + w.phase)
+         + w.amp * 0.35 * Math.sin(t*w.freq*Math.PI*2*1.618 + w.phase*0.7);
+
+    /* soft-clamp so we never hit hard walls */
+    var lo=pr.min+(pr.max-pr.min)*0.05;
+    var hi=pr.max-(pr.max-pr.min)*0.05;
+    v=Math.max(lo,Math.min(hi,v));
+
+    var el=document.getElementById('sl_'+pr.n);
+    var vl=document.getElementById('vl_'+pr.n);
+    if(el){ el.value=v; if(vl) vl.textContent=fmt(v); }
+  }
+  redraw();
+}
+
+function toggleAuto(){
+  autoOn=!autoOn;
+  var btn=document.getElementById('btnAuto');
+  btn.innerHTML=autoOn?'&#9646;&#9646; AUTO':'&#9654; AUTO';
+  btn.classList.toggle('on',autoOn);
+  if(autoOn){
+    autoInit();
+    rafId=requestAnimationFrame(autoTick);
+  } else {
+    if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+  }
+}
+
+/* speed slider label */
+var slSpeed=document.getElementById('slSpeed');
+slSpeed.addEventListener('input',function(){
+  document.getElementById('vlSpeed').textContent=slSpeed.value;
+});
+
+var pillWrap=document.getElementById('pills');
+for(var ii=0;ii<ILL.length;ii++){
+  (function(idx){
+    var p=document.createElement('div');p.className='pill';
+    p.textContent=ILL[idx].name;
+    p.addEventListener('click',function(){selectIllusion(idx);});
+    pillWrap.appendChild(p);
+  })(ii);
+}
+
+document.getElementById('btnAuto').addEventListener('click',toggleAuto);
+document.getElementById('btnR').addEventListener('click',redraw);
+document.getElementById('btnS').addEventListener('click',savePng);
+window.addEventListener('resize',function(){setSize();redraw();});
+setSize();selectIllusion(0);
+})();
+</script>
+</body>
+</html>

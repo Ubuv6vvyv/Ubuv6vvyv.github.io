@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Harmonic Lab | Unified Ultimate</title>
+<style>
+:root{--bg:#101012;--panel:#15151a;--border:#2a2a30;--cyan:#00f2ff;--magenta:#ff0055;--amber:#ffaa00;--lime:#aaff00;--purple:#aa00ff;--text:#eee;--text-dim:#777}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none;user-select:none}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:10px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+header{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;padding:0 5px}
+h1{font-size:.8rem;text-transform:uppercase;letter-spacing:4px;margin:0;color:var(--text-dim);font-weight:800}
+
+/* Toolbar */
+.toolbar{width:100%;max-width:900px;background:var(--panel);border:1px solid var(--border);padding:10px;border-radius:12px;display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;margin-bottom:15px;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
+.viz-box{width:100%;max-width:900px;height:90px;background:#050505;border-radius:12px;border:1px solid var(--border);margin-bottom:15px;position:relative;cursor:crosshair;overflow:hidden;box-shadow:inset 0 0 30px rgba(0,0,0,1)}
+canvas{width:100%;height:100%;display:block}
+.time-hint{position:absolute;bottom:6px;right:10px;font-size:.65rem;font-family:monospace;color:var(--amber);pointer-events:none;background:rgba(0,0,0,0.7);padding:2px 6px;border-radius:4px}
+
+/* Rack Grid */
+.rack{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;width:100%;max-width:950px}
+.module{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:border-color .2s}
+.module:hover{border-color:#444}
+.module h3{font-size:.6rem;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px 0;border-bottom:1px solid #282830;padding-bottom:4px;display:flex;justify-content:space-between;color:var(--text-dim)}
+
+/* Color Accents */
+.accent-cyan h3{color:var(--cyan)}
+.accent-mag h3{color:var(--magenta)}
+.accent-amb h3{color:var(--amber)}
+.accent-lime h3{color:var(--lime)}
+.accent-purp h3{color:var(--purple)}
+
+/* Inputs */
+.control{display:flex;flex-direction:column;gap:2px}
+.label-row{display:flex;justify-content:space-between;align-items:center;font-size:.55rem;font-weight:600;color:#888}
+.label-row span{font-family:monospace;color:var(--text)}
+input[type=range]{width:100%;height:4px;background:#222;border-radius:2px;appearance:none;cursor:pointer;margin:4px 0}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:12px;height:12px;background:#ccc;border-radius:50%;border:2px solid var(--panel);transition:transform .1s}
+input[type=range]::-webkit-slider-thumb:active{transform:scale(1.3);background:#fff}
+
+/* Slider Colors */
+.accent-cyan input[type=range]::-webkit-slider-thumb:active{background:var(--cyan)}
+.accent-mag input[type=range]::-webkit-slider-thumb:active{background:var(--magenta)}
+.accent-amb input[type=range]::-webkit-slider-thumb:active{background:var(--amber)}
+.accent-lime input[type=range]::-webkit-slider-thumb:active{background:var(--lime)}
+.accent-purp input[type=range]::-webkit-slider-thumb:active{background:var(--purple)}
+
+button{background:#222;color:#eee;border:1px solid #333;padding:10px 12px;border-radius:6px;font-size:.65rem;font-weight:700;cursor:pointer;transition:all .15s;text-transform:uppercase}
+button:hover{background:#333;border-color:#555}
+button.active{background:var(--cyan);color:#000;border-color:var(--cyan);box-shadow:0 0 10px rgba(0,242,255,0.2)}
+button.danger{color:#ff5555;border-color:#422}
+.file-input{position:relative;overflow:hidden;grid-column:span 2}
+.file-input input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer}
+.status-footer{font-size:.65rem;color:var(--text-dim);text-align:center;margin-top:20px;font-family:monospace}
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Harmonic Lab | Unified</h1>
+    <div id="v-status" style="font-size:.65rem;color:var(--cyan);font-family:monospace">READY</div>
+</header>
+
+<div class="toolbar">
+    <div class="file-input">
+        <button style="width:100%">📂 Load Audio</button>
+        <input type="file" id="audioInput" accept="audio/*">
+    </div>
+    <button id="playBtn" disabled>▶ Play</button>
+    <button id="stopBtn" disabled>⏹ Stop</button>
+</div>
+
+<div class="viz-box" id="vizBox">
+    <canvas id="viz"></canvas>
+    <div class="time-hint" id="timeCode">00:00 / 00:00</div>
+</div>
+
+<div class="rack">
+    <div class="module accent-cyan">
+        <h3>Pitch & Speed <span>CORE</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Speed</label><span id="v-rate">1.0x</span></div>
+            <input type="range" id="rate" min="0.1" max="2" step="0.01" value="1" data-def="1">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Fine Trim</label><span id="v-fRate">±0</span></div>
+            <input type="range" id="fRate" min="-0.1" max="0.1" step="0.001" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Pitch Bend</label><span id="v-bend">0c</span></div>
+            <input type="range" id="bend" min="-1200" max="1200" step="10" value="0" data-def="0">
+        </div>
+    </div>
+
+    <div class="module accent-purp">
+        <h3>Vibrato (FM) <span>PITCH LFO</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Speed</label><span id="v-vibRate">3Hz</span></div>
+            <input type="range" id="vibRate" min="0.1" max="30" step="0.1" value="3" data-def="3">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Depth</label><span id="v-vibDepth">0</span></div>
+            <input type="range" id="vibDepth" min="0" max="800" value="0" data-def="0">
+        </div>
+    </div>
+
+    <div class="module accent-lime">
+        <h3>Wah-Wah <span>FILTER LFO</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Rate</label><span id="v-wahRate">2Hz</span></div>
+            <input type="range" id="wahRate" min="0.1" max="10" step="0.1" value="2" data-def="2">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Depth</label><span id="v-wahDepth">0</span></div>
+            <input type="range" id="wahDepth" min="0" max="1500" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Base Freq</label><span id="v-wahCenter">800Hz</span></div>
+            <input type="range" id="wahCenter" min="100" max="3000" value="800" data-def="800">
+        </div>
+    </div>
+
+    <div class="module accent-mag">
+        <h3>Tremolo (AM) <span>VOL LFO</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Rate</label><span id="v-tremRate">4Hz</span></div>
+            <input type="range" id="tremRate" min="0.1" max="30" step="0.1" value="4" data-def="4">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Depth</label><span id="v-tremDepth">0%</span></div>
+            <input type="range" id="tremDepth" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Shape</label><span id="v-tremShape">SINE</span></div>
+            <input type="range" id="tremShape" min="0" max="1" step="1" value="0" data-def="0">
+        </div>
+    </div>
+
+    <div class="module accent-amb">
+        <h3>Harmonizer <span>RING MOD</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Mix</label><span id="v-ringMix">0%</span></div>
+            <input type="range" id="ringMix" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Tone</label><span id="v-ringFreq">80Hz</span></div>
+            <input type="range" id="ringFreq" min="20" max="1000" value="80" data-def="80">
+        </div>
+    </div>
+
+    <div class="module accent-cyan">
+        <h3>Robot & Vowel <span>COLOR</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Robot Metal</label><span id="v-robot">0%</span></div>
+            <input type="range" id="robot" min="0" max="95" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Vowel Morph</label><span id="v-vow">0%</span></div>
+            <input type="range" id="vow" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Bass</label><span id="v-bass">0dB</span></div>
+            <input type="range" id="bass" min="-12" max="12" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Treble</label><span id="v-treble">0dB</span></div>
+            <input type="range" id="treble" min="-12" max="12" value="0" data-def="0">
+        </div>
+    </div>
+
+    <div class="module accent-purp">
+        <h3>Space & Time <span>FX</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Chorus</label><span id="v-chorus">0%</span></div>
+            <input type="range" id="chorus" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Echo</label><span id="v-echo">0%</span></div>
+            <input type="range" id="echo" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Reverb</label><span id="v-verb">0%</span></div>
+            <input type="range" id="verb" min="0" max="100" value="0" data-def="0">
+        </div>
+    </div>
+
+    <div class="module accent-cyan">
+        <h3>Stereo Field <span>OUTPUT</span></h3>
+        <div class="control">
+            <div class="label-row"><label>Width</label><span id="v-width">0%</span></div>
+            <input type="range" id="width" min="0" max="100" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Tilt EQ</label><span id="v-tilt">0</span></div>
+            <input type="range" id="tilt" min="-0.5" max="0.5" step="0.01" value="0" data-def="0">
+        </div>
+        <div class="control">
+            <div class="label-row"><label>Master Vol</label><span id="v-gain">90%</span></div>
+            <input type="range" id="gain" min="0" max="120" value="90" data-def="90">
+        </div>
+    </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+// --- STATE ---
+let buffer = null;
+let srcNode = null;
+let isPlaying = false;
+let startTime = 0;
+let pauseOffset = 0;
+let vizCache = null;
+
+// --- PRELOAD REVERB ---
+let reverbBuf = null;
+const convNode = AC.createConvolver();
+async function initReverb(){
+    const len=AC.sampleRate*2.0; const buf=AC.createBuffer(2,len,AC.sampleRate);
+    const dL=buf.getChannelData(0); const dR=buf.getChannelData(1);
+    for(let i=0;i<len;i++){ const d=Math.pow(1-i/len,3); dL[i]=(Math.random()*2-1)*d; dR[i]=(Math.random()*2-1)*d; }
+    reverbBuf=buf; convNode.buffer=reverbBuf;
+}
+initReverb();
+
+// --- NODES REF ---
+const nodes = {
+    vibOsc:null, vibGain:null,
+    wahOsc:null, wahGain:null, wahFilter:null,
+    tremOsc:null, tremGain:null,
+    ringOsc:null, ringGain:null,
+    robotFb:null, robotOut:null,
+    vowF1:null, vowF2:null,
+    bass:null, treble:null,
+    chorusDelay:null, chorusLFO:null, chorusMix:null,
+    tilt:null, widthDelay:null,
+    echoMix:null, verbMix:null,
+    master:null
+};
+
+// --- GRAPH ---
+function buildGraph() {
+    const src = AC.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+
+    // 1. VIBRATO (FM)
+    const vibOsc = AC.createOscillator();
+    const vibGain = AC.createGain();
+    vibOsc.connect(vibGain);
+    vibGain.connect(src.detune);
+    vibOsc.start();
+    nodes.vibOsc = vibOsc; nodes.vibGain = vibGain;
+
+    // 2. WAH (Filter)
+    // Signal: Src -> WahFilter -> ...
+    const wahFilter = AC.createBiquadFilter(); wahFilter.type="bandpass"; wahFilter.Q.value=1;
+    const wahOsc = AC.createOscillator();
+    const wahGain = AC.createGain();
+    wahOsc.connect(wahGain); wahGain.connect(wahFilter.frequency);
+    wahOsc.start();
+    src.connect(wahFilter);
+    nodes.wahOsc=wahOsc; nodes.wahGain=wahGain; nodes.wahFilter=wahFilter;
+
+    // 3. TREMOLO (AM)
+    // Signal: WahFilter -> TremNode -> ...
+    const tremNode = AC.createGain();
+    const tremOsc = AC.createOscillator();
+    const tremGain = AC.createGain();
+    tremOsc.connect(tremGain); tremGain.connect(tremNode.gain);
+    tremOsc.start();
+    wahFilter.connect(tremNode);
+    nodes.tremOsc=tremOsc; nodes.tremGain=tremGain;
+
+    // 4. RING MOD (Parallel)
+    // Signal: Src -> RingMult -> ...
+    const ringOsc = AC.createOscillator(); ringOsc.type='sine';
+    const ringMult = AC.createGain(); ringMult.gain.value=0; 
+    const ringFilter = AC.createBiquadFilter(); ringFilter.frequency.value=4000; // tame highs
+    const ringOut = AC.createGain();
+    src.connect(ringMult); ringOsc.connect(ringMult.gain);
+    ringMult.connect(ringFilter); ringFilter.connect(ringOut);
+    ringOsc.start();
+    nodes.ringOsc=ringOsc; nodes.ringGain=ringOut;
+
+    // 5. ROBOT (Comb Parallel)
+    // Signal: TremNode -> Comb -> ...
+    const cIn = AC.createGain();
+    const cD = AC.createDelay(); cD.delayTime.value=0.01;
+    const cF = AC.createGain();
+    const cOut = AC.createGain();
+    tremNode.connect(cIn); cIn.connect(cD); cD.connect(cF); cF.connect(cD); cD.connect(cOut);
+    nodes.robotFb=cF; nodes.robotOut=cOut;
+
+    // SUM 1 (Dry/Trem + Ring + Robot)
+    const sum1 = AC.createGain();
+    tremNode.connect(sum1);
+    ringOut.connect(sum1);
+    cOut.connect(sum1);
+
+    // 6. EQ & VOWEL
+    const vF1=AC.createBiquadFilter(); vF1.type='peaking'; vF1.Q.value=4; vF1.gain.value=0;
+    const vF2=AC.createBiquadFilter(); vF2.type='peaking'; vF2.Q.value=4; vF2.gain.value=0;
+    const bass=AC.createBiquadFilter(); bass.type='lowshelf'; bass.frequency.value=200;
+    const treble=AC.createBiquadFilter(); treble.type='highshelf'; treble.frequency.value=3000;
+    
+    sum1.connect(vF1); vF1.connect(vF2); vF2.connect(bass); bass.connect(treble);
+    nodes.vowF1=vF1; nodes.vowF2=vF2; nodes.bass=bass; nodes.treble=treble;
+
+    // 7. CHORUS
+    const chIn = treble;
+    const chD = AC.createDelay(); chD.delayTime.value=0.02;
+    const chL = AC.createOscillator();
+    const chLA = AC.createGain();
+    const chM = AC.createGain();
+    chL.connect(chLA); chLA.connect(chD.delayTime); chL.start();
+    chIn.connect(chD); chD.connect(chM);
+    nodes.chorusDelay=chD; nodes.chorusLFO=chL; nodes.chorusMix=chM;
+
+    // 8. TILT
+    const tilt = AC.createBiquadFilter(); tilt.type='highshelf'; tilt.frequency.value=1000;
+    nodes.tilt=tilt;
+    chIn.connect(tilt); chM.connect(tilt);
+
+    // 9. WIDTH
+    const spl=AC.createChannelSplitter(2); const mer=AC.createChannelMerger(2);
+    const wD=AC.createDelay(); wD.delayTime.value=0;
+    tilt.connect(spl); spl.connect(mer,0,0); spl.connect(wD,1); wD.connect(mer,0,1);
+    nodes.widthDelay=wD;
+
+    // 10. ECHO & VERB
+    const echoIn = AC.createGain();
+    const eD=AC.createDelay(); eD.delayTime.value=0.4;
+    const eF=AC.createGain(); eF.gain.value=0.4;
+    const eM=AC.createGain();
+    mer.connect(echoIn); echoIn.connect(eD); eD.connect(eF); eF.connect(eD); eD.connect(eM);
+    nodes.echoMix=eM;
+
+    const vM = AC.createGain();
+    mer.connect(convNode); convNode.connect(vM);
+    nodes.verbMix=vM;
+
+    // MASTER
+    const mas = AC.createGain();
+    const lim = AC.createDynamicsCompressor(); lim.threshold.value=-2; lim.ratio.value=12;
+    mer.connect(mas); eM.connect(mas); vM.connect(mas);
+    mas.connect(lim); lim.connect(AC.destination);
+    nodes.master=mas;
+
+    return src;
+}
+
+// --- UPDATER ---
+function updateParams() {
+    const t = AC.currentTime; const r=0.05;
+    
+    // Pitch
+    if(srcNode) {
+        const sp = Math.max(0.1, parseFloat($('rate').value) + parseFloat($('fRate').value));
+        const bend = parseFloat($('bend').value);
+        srcNode.playbackRate.setTargetAtTime(sp, t, r);
+        srcNode.detune.setTargetAtTime(bend, t, r);
+    }
+
+    // Vibrato
+    nodes.vibOsc.frequency.setTargetAtTime(parseFloat($('vibRate').value), t, r);
+    nodes.vibGain.gain.setTargetAtTime(parseFloat($('vibDepth').value), t, r);
+
+    // Wah
+    nodes.wahOsc.frequency.setTargetAtTime(parseFloat($('wahRate').value), t, r);
+    nodes.wahGain.gain.setTargetAtTime(parseFloat($('wahDepth').value), t, r);
+    nodes.wahFilter.frequency.setTargetAtTime(parseFloat($('wahCenter').value), t, r);
+    // Auto-Q based on depth to keep it musical
+    const wd = parseFloat($('wahDepth').value);
+    nodes.wahFilter.Q.setTargetAtTime(wd > 100 ? 4 : 1, t, r); 
+
+    // Tremolo
+    nodes.tremOsc.frequency.setTargetAtTime(parseFloat($('tremRate').value), t, r);
+    nodes.tremGain.gain.setTargetAtTime(parseFloat($('tremDepth').value)/100, t, r);
+    nodes.tremOsc.type = $('tremShape').value==1 ? 'square':'sine';
+
+    // Ring
+    nodes.ringOsc.frequency.setTargetAtTime(parseFloat($('ringFreq').value), t, r);
+    nodes.ringGain.gain.setTargetAtTime(parseFloat($('ringMix').value)/100, t, r);
+
+    // Robot
+    const rob = parseFloat($('robot').value)/100;
+    nodes.robotFb.gain.setTargetAtTime(rob * 0.9, t, r);
+    nodes.robotOut.gain.setTargetAtTime(rob, t, r);
+
+    // Tone
+    const v = parseFloat($('vow').value)/100;
+    nodes.vowF1.gain.setTargetAtTime(v*20,t,r); nodes.vowF2.gain.setTargetAtTime(v*20,t,r);
+    nodes.vowF1.frequency.setTargetAtTime(300+v*500,t,r); nodes.vowF2.frequency.setTargetAtTime(800+v*1700,t,r);
+    nodes.bass.gain.setTargetAtTime(parseFloat($('bass').value),t,r);
+    nodes.treble.gain.setTargetAtTime(parseFloat($('treble').value),t,r);
+
+    // Space
+    nodes.chorusMix.gain.setTargetAtTime(parseFloat($('chorus').value)/100,t,r);
+    nodes.chorusLFO.frequency.value = 0.5 + (parseFloat($('chorus').value)/40);
+    nodes.echoMix.gain.setTargetAtTime(parseFloat($('echo').value)/100,t,r);
+    nodes.verbMix.gain.setTargetAtTime(parseFloat($('verb').value)/100,t,r);
+
+    // Output
+    nodes.tilt.gain.setTargetAtTime(parseFloat($('tilt').value)*10,t,r);
+    nodes.widthDelay.delayTime.setTargetAtTime((parseFloat($('width').value)/100)*0.02,t,r);
+    nodes.master.gain.setTargetAtTime(parseFloat($('gain').value)/100,t,r);
+
+    // UI Texts
+    $('v-rate').innerText=$('rate').value+"x"; $('v-fRate').innerText=($('fRate').value>=0?'+':'')+$('fRate').value;
+    $('v-bend').innerText=$('bend').value+"c";
+    $('v-vibRate').innerText=$('vibRate').value+"Hz"; $('v-vibDepth').innerText=$('vibDepth').value;
+    $('v-wahRate').innerText=$('wahRate').value+"Hz"; $('v-wahDepth').innerText=$('wahDepth').value; $('v-wahCenter').innerText=$('wahCenter').value+"Hz";
+    $('v-tremRate').innerText=$('tremRate').value+"Hz"; $('v-tremDepth').innerText=$('tremDepth').value+"%"; $('v-tremShape').innerText=$('tremShape').value==1?"SQR":"SIN";
+    $('v-ringMix').innerText=$('ringMix').value+"%"; $('v-ringFreq').innerText=$('ringFreq').value+"Hz";
+    $('v-robot').innerText=$('robot').value+"%"; $('v-vow').innerText=$('vow').value+"%";
+    $('v-bass').innerText=$('bass').value+"dB"; $('v-treble').innerText=$('treble').value+"dB";
+    $('v-chorus').innerText=$('chorus').value+"%"; $('v-echo').innerText=$('echo').value+"%"; $('v-verb').innerText=$('verb').value+"%";
+    $('v-width').innerText=$('width').value+"%"; $('v-tilt').innerText=$('tilt').value; $('v-gain').innerText=$('gain').value+"%";
+}
+document.querySelectorAll('input[type=range]').forEach(i=>i.oninput=updateParams);
+
+// --- PLAYBACK ---
+function stop(){ if(srcNode){try{srcNode.stop()}catch(e){} srcNode.disconnect(); srcNode=null;} isPlaying=false; $('playBtn').innerText="▶ Play"; $('playBtn').classList.remove('active'); cancelAnimationFrame(animFrame); drawHead();}
+function start(off){
+    if(!buffer)return; if(AC.state==='suspended')AC.resume(); stop();
+    srcNode=buildGraph(); updateParams();
+    off=off%buffer.duration; if(off<0)off=0;
+    const sp=Math.max(0.1,parseFloat($('rate').value)+parseFloat($('fRate').value));
+    startTime=AC.currentTime-(off/sp); pauseOffset=off;
+    srcNode.start(0,off); isPlaying=true;
+    $('playBtn').innerText="⏸ Pause"; $('playBtn').classList.add('active'); $('stopBtn').disabled=false;
+    animLoop();
+}
+$('playBtn').onclick=()=>{
+    if(isPlaying){ const sp=Math.max(0.1,parseFloat($('rate').value)+parseFloat($('fRate').value)); pauseOffset=(AC.currentTime-startTime)*sp; stop(); }
+    else start(pauseOffset);
+};
+$('stopBtn').onclick=()=>{stop(); pauseOffset=0; $('stopBtn').disabled=true; drawHead();};
+
+// --- FILE ---
+$('audioInput').onchange=async e=>{
+    if(e.target.files[0]){
+        $('v-status').innerText="Loading..."; const ab=await e.target.files[0].arrayBuffer();
+        buffer=await AC.decodeAudioData(ab); $('v-status').innerText=e.target.files[0].name;
+        $('playBtn').disabled=false; pauseOffset=0; preRender(); drawHead();
+    }
+};
+
+// --- VIZ ---
+const cv=$('viz'); const ctx=cv.getContext('2d'); let animFrame;
+function resize(){ cv.width=$('vizBox').offsetWidth; cv.height=$('vizBox').offsetHeight; if(buffer)preRender(); }
+window.onresize=resize; resize();
+function preRender(){
+    if(!buffer)return; const w=cv.width; const h=cv.height;
+    vizCache=document.createElement('canvas'); vizCache.width=w; vizCache.height=h;
+    const c=vizCache.getContext('2d'); c.fillStyle='#050505'; c.fillRect(0,0,w,h);
+    const d=buffer.getChannelData(0); const st=Math.ceil(d.length/w); const amp=h/2;
+    c.beginPath(); c.strokeStyle='#00f2ff'; c.lineWidth=1;
+    for(let i=0;i<w;i++){ const v=d[i*st]; const y=amp+v*amp*0.9; i===0?c.moveTo(i,y):c.lineTo(i,y); }
+    c.stroke();
+}
+function drawHead(){
+    if(!vizCache)return; const w=cv.width; const h=cv.height;
+    ctx.drawImage(vizCache,0,0);
+    let c=pauseOffset;
+    if(isPlaying){ const sp=Math.max(0.1,parseFloat($('rate').value)+parseFloat($('fRate').value)); c=(AC.currentTime-startTime)*sp; c%=buffer.duration; }
+    const x=(c/buffer.duration)*w;
+    ctx.beginPath(); ctx.strokeStyle='#ffaa00'; ctx.lineWidth=2; ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+    const f=s=>{const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`};
+    $('timeCode').innerText=`${f(c)} / ${f(buffer.duration)}`;
+}
+function animLoop(){ if(!isPlaying)return; drawHead(); animFrame=requestAnimationFrame(animLoop); }
+$('vizBox').onmousedown=e=>{
+    if(!buffer)return; const r=$('vizBox').getBoundingClientRect();
+    const t=((e.clientX-r.left)/r.width)*buffer.duration;
+    pauseOffset=t; if(isPlaying)start(t); else drawHead();
+};
+updateParams();
+</script>
+</body>
+</html>

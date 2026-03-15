@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profanity Generator (200)</title>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --text: #e0e0e0;
+            --accent: #ff4757;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        #app {
+            background: #2d3436;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 500px;
+        }
+        h1 { margin-top: 0; color: var(--accent); text-align: center; }
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+        .buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        button {
+            flex: 1;
+            padding: 1rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        button:active { transform: scale(0.98); }
+        #startBtn { background: var(--accent); color: white; }
+        #stopBtn { background: #444; color: white; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #currentWord {
+            text-align: center;
+            font-size: 1.5rem;
+            min-height: 2rem;
+            margin-top: 1rem;
+            color: var(--accent);
+            /* Allow text to wrap for bursts */
+            line-height: 1.4;
+            word-break: break-all;
+        }
+        #inputSection {
+            margin-bottom: 1.5rem;
+        }
+        #pasteInput {
+            width: 100%;
+            height: 100px;
+            background: #1a1a1a;
+            color: var(--text);
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #fileInput {
+            margin-bottom: 0.5rem;
+        }
+        #loadPasteBtn, #loadFileBtn {
+            background: var(--accent);
+            color: white;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        #status {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <h1>📢 Profanity Engine (200)</h1>
+
+    <div id="inputSection">
+        <label>Custom Word List:</label>
+        <textarea id="pasteInput" placeholder="Paste words here, one per line or comma-separated..."></textarea>
+        <button id="loadPasteBtn">Load Pasted Input</button>
+        <input type="file" id="fileInput" accept=".txt">
+        <button id="loadFileBtn">Load Uploaded File</button>
+        <div id="status">Using default list (200 words).</div>
+    </div>
+
+    <div class="control-group">
+        <label>Speed (Rate): <span id="rateVal">1.0</span></label>
+        <input type="range" id="rate" min="0.5" max="3" step="0.1" value="1">
+    </div>
+
+    <div class="control-group">
+        <label>Pitch: <span id="pitchVal">1.0</span></label>
+        <input type="range" id="pitch" min="0.1" max="2" step="0.1" value="1">
+    </div>
+
+    <div class="control-group">
+        <label>Interval (ms): <span id="intervalVal">1000</span></label>
+        <input type="range" id="interval" min="100" max="3000" step="100" value="1000">
+    </div>
+
+    <div class="control-group">
+        <label style="color: var(--accent)">🔥 CHAOS MODE: <span id="chaosVal">0%</span></label>
+        <input type="range" id="chaos" min="0" max="1" step="0.01" value="0">
+    </div>
+
+    <div id="currentWord">...</div>
+
+    <div class="buttons">
+        <button id="startBtn">START</button>
+        <button id="stopBtn" disabled>STOP</button>
+    </div>
+</div>
+
+<script>
+    // --- STATE ---
+    // Hardcoded default list of 200 profanities
+    let wordList = [
+ "upupupupupupupupouppyouproooooosouppoupupupupupupupupouppyouproooooosouppupdingodingodingoding",
+    "upupupupupupupupoupdderoooooosouppaupupupupupupupupoupdderoooooosouppupwoohooooooooingawoohooooooooangowoohooooooooingawoohooooooooang",
+    "upupupupupupupupoupglooooooyoupupupupupupupupoupglooooooyobooooooingupbooooooongupbooooooingupbooooooong",
+    "upupupupupupupupeuppotooeupbooooooupmoooooooupupupupupupupupouppuptooeobooooooupmooooooapingepongopingapong",
+    "upupupupupupupupeupnderooooooupupupupupupupupupeupnderoooooooticketockupticketock",
+
+    // --- Tooe "V" Viboooooorooooooation (Engine Rev) ---
+    "vvvvvvvvavajupjupupjupjupupovvvvvvvvovajupjupupjupjupupewoohooooooooingowoohooooooooingowoohooooooooingupwoohooooooooing",
+    "vvvvvvvvovuploooooovaevvvvvvvvavuploooooovaupdingupdongedingodong",
+    "vvvvvvvvoviagrooooooaupvvvvvvvveviagrooooooaerooooooingedinguprooooooingeding",
+    "vvvvvvvvevixenovvvvvvvvovixenobooooooipupbooooooopebooooooipebooooooop",
+    "vvvvvvvvupverooooooyofooooupckovvvvvvvvupverooooooyafooooupckozooooooipozooooooapupzooooooipupzooooooap",
+
+    // --- Tooe "M" Hupmoooooo (Resoupponant Basouppsoupp) ---
+    "moooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooupmooooooupfoooofooooupmoooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooomooooooupfoooofooooowoohooooooooingawoohooooooooangupwoohooooooooaloooooolooooooaowoohooooooooaloooooolooooooa",
+    "moooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooomoooooootooerooooooemoooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooupmoooooootooerooooooupbooooooingobooooooangobooooooong",
+    "moooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooemoooooooisoupptomoooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooupmoooooooisoupptodingadangadong",
+    "moooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooomooooooemoooooobooooooerooooooomoooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooupmooooooemoooooobooooooeroooooooyipupyapayipupyap",
+    "moooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooomooooooiloooooofooooupmoooooomoooooomoooooomoooooomoooooomoooooomoooooomooooooupmooooooiloooooofooooupknickeknackepaddyupwoohooooooooack",
+
+    // --- Tooe "Z" Bupzoooooozoooooo (Bee Swoohooooooooaroooooomoooooo) ---
+    "zoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooozooooooipperooooooupzoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooupzooooooipperooooooewoohooooooooingowoohooooooooingupwoohooooooooingawoohooooooooing",
+    "zoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooupzoooooouplooooooupezoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooezoooooouplooooooupupdingadingodingupding",
+    "zoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooozooooooitsouppezoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooozooooooitsouppopinguppinguppingoping",
+    "zoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooupzooooooeroooooooofooooupcksouppazoooooozoooooozoooooozoooooozoooooozoooooozoooooozooooooazooooooeroooooooofooooupcksouppotickuptickotickuptick",
+
+    // --- Tooe "Ai" Slooooooide (Yodeloooooo Glooooooitcoo) ---
+    "aiaiaiaiaiasouppsouppoaiaiaiaiaiupasouppsouppuprooooooinguprooooooingerooooooingerooooooing",
+    "aiaiaiaiaiaroooooosouppeoaiaiaiaiaioaroooooosouppeabooooooeepebooooooeepobooooooeepebooooooeep",
+    "aiaiaiaiaianalooooooupaiaiaiaiaiupanaloooooouptoototootuptootatoot",
+    "aiaiaiaiaieagonyupaiaiaiaiaioagonyeooonkoooonkupooonkeooonk",
+
+    // --- Tooe "O" Loop (Holoooooolooooooowoohoooooooo Ecooo) ---
+    "ooooooooupofoooofooooafooooupckeooooooooupofoooofooooupfooooupckodingadingupdingoding",
+    "ooooooooeorooooooifooooiceaoooooooooorooooooifooooiceowoohooooooooingowoohooooooooangupwoohooooooooingowoohooooooooang",
+    "ooooooooooooasouppooitoooooooooeoooupsouppooitobooooooingupbooooooongabooooooingabooooooong",
+    "ooooooooooroooooogasouppmooooooupooooooooooroooooogasouppmooooooepinguppongapingopong",
+
+    // --- Tooe "E" Scrooooooeecoo (Higoo Pitcoo) ---
+    "eeeeeeeeaefoooofoooooofoooofooooupeeeeeeeeaefoooofooooupofoooofooooarooooooingodingorooooooingoding",
+    "eeeeeeeeoerooooooectionupeeeeeeeeuperooooooectionowoohooooooooingupwoohooooooooingewoohooooooooingupwoohooooooooing",
+    "eeeeeeeupeendupitoeeeeeeeeaendoitadingupdongodingadong",
+    "eeeeeeeeaeatupsouppooitaeeeeeeeeeeatosouppooitebooooooipupbooooooopobooooooipabooooooop",
+
+    // --- Tooe "R" Grooooooowoohooooooooloooooo (Aggrooooooesouppsouppive Rolooooooloooooo) ---
+    "rooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooectupmoooooooroooooorooooooroooooorooooooroooooorooooooroooooorooooooarooooooectupmoooooootickuptocketickuptock",
+    "rooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooimooooooojupjupupjupjupupoboooooouproooooorooooooroooooorooooooroooooorooooooroooooorooooooorooooooimooooooojupjupupjupjupupoboooooooknickeknackoknickeknack",
+    "rooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooupbooooooaitorooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooupboooooooitupyipoyapeyipeyap",
+    "rooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooandyarooooooroooooorooooooroooooorooooooroooooorooooooroooooouprooooooandyupzooooooipupzooooooapezooooooipozooooooap",
+
+    // --- Tooe "L" Luploooooolooooooabooooooy (Sofoooot Glooooooitcoo) ---
+    "loooooolooooooloooooolooooooloooooolooooooloooooolooooooolooooooupbooooooeuplooooooloooooolooooooloooooolooooooloooooolooooooloooooouplooooooupbooooooeupwoohooooooooingowoohooooooooangowoohooooooooaloooooolooooooaowoohooooooooaloooooolooooooa",
+    "looooooloooooolooooooloooooolooooooloooooolooooooloooooouplooooooickalooooooloooooolooooooloooooolooooooloooooolooooooloooooouplooooooickobooooooingupbooooooangobooooooong",
+    "loooooolooooooloooooolooooooloooooolooooooloooooolooooooalooooooupsoupptelooooooloooooolooooooloooooolooooooloooooolooooooloooooouplooooooupsoupptodingedangodong",
+    "looooooloooooolooooooloooooolooooooloooooolooooooloooooouplooooooabooooooiaeloooooolooooooloooooolooooooloooooolooooooloooooolooooooolooooooabooooooiaapingopinguppingeping",
+
+    // --- Tooe "S" Hisouppsoupp (Snake Glooooooitcoo) ---
+    "souppsouppsouppsouppsouppsouppsouppsoupposouppooitupsouppsouppsouppsouppsouppsouppsouppsoupposouppooitupwoohooooooooingupwoohooooooooingupwoohooooooooingupwoohooooooooing",
+    "souppsouppsouppsouppsouppsouppsouppsoupposouppupckasouppsouppsouppsouppsouppsouppsouppsouppesouppupckodingadingodingupding",
+    "souppsouppsouppsouppsouppsouppsouppsouppupsoupploooooouptupsouppsouppsouppsouppsouppsouppsouppsouppupsoupploooooouptorooooooingorooooooinguprooooooingerooooooing",
+    "souppsouppsouppsouppsouppsouppsouppsouppupsouppcroooooootupmooooooosouppsouppsouppsouppsouppsouppsouppsoupposouppcroooooootupmooooooobooooooeepupbooooooeepabooooooeepobooooooeep",
+
+    // --- Tooe "W" Warooooooboooooolooooooe (Underoooooowoohooooooooateroooooo Soupnd) ---
+    "woohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooawoohooooooooankowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooawoohooooooooankadingedongodingodong",
+    "woohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooowoohooooooooiloooooolooooooyupwoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooewoohooooooooiloooooolooooooyopingoponguppingapong",
+    "woohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooupwoohooooooooooorooooooeewoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooupwoohooooooooooorooooooeotickuptockotickotock",
+    "woohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooowoohooooooooetupwoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohoooooooowoohooooooooewoohooooooooeteknickaknackoknickupknack",
+
+    // --- Tooe "H" Brooooooeatoo (Airooooooy Glooooooitcoo) ---
+    "oooooooooooooooooooelooooooloooooooooooooooooooooooaooeloooooolooooooowoohooooooooingupwoohooooooooangowoohooooooooingupwoohooooooooang",
+    "ooooooooooooooooupoooeupooooooooooooooooooooeobooooooingupbooooooongupbooooooingupbooooooong",
+    "ooooooooooooooooupooaroooooodeonupoooooooooooooooooooaroooooodeonarooooooingodinguprooooooingupding",
+    "ooooooooooooooooupooupmoooooopooooooooooooooooooooupmoooooopupyipoyapoyipoyap",
+
+    // --- Tooe "F" Fizoooooozoooooolooooooe (Sofoooot Staroooooot) ---
+    "foooofoooofoooofoooofoooofoooofoooofooooefooooupckupfoooofoooofoooofoooofoooofoooofoooofooooafooooupckupdingodingodingupding",
+    "foooofoooofoooofoooofoooofoooofoooofooooefooooannyupfoooofoooofoooofoooofoooofoooofoooofooooupfooooannyupwoohooooooooingupwoohooooooooingewoohooooooooingupwoohooooooooing",
+    "foooofoooofoooofoooofoooofoooofoooofooooafooooarooooootafoooofoooofoooofoooofoooofoooofoooofooooefooooarooooootuppingopinguppingeping",
+    "foooofoooofoooofoooofoooofoooofoooofooooafooooaceupfooooupckupfoooofoooofoooofoooofoooofoooofoooofooooafooooaceefooooupckabooooooeepebooooooeepupbooooooeepobooooooeep",
+
+    // --- Tooe "B" Motorooooooboooooooat (Lip Rolooooooloooooo) ---
+    "boooooobooooooboooooobooooooboooooobooooooboooooobooooooupbooooooitcooupboooooobooooooboooooobooooooboooooobooooooboooooobooooooabooooooitcoouptickotockaticketock",
+    "boooooobooooooboooooobooooooboooooobooooooboooooobooooooebooooooalooooooloooooosouppoboooooobooooooboooooobooooooboooooobooooooboooooobooooooupbooooooalooooooloooooosouppupknickoknackaknickeknack",
+    "boooooobooooooboooooobooooooboooooobooooooboooooobooooooobooooooasoupptaroooooodaboooooobooooooboooooobooooooboooooobooooooboooooobooooooebooooooasoupptaroooooodupdingodongupdingupdong",
+    "boooooobooooooboooooobooooooboooooobooooooboooooobooooooobooooooonerooooooaboooooobooooooboooooobooooooboooooobooooooboooooobooooooobooooooonerooooooarooooooingodingarooooooingupding",
+
+    // --- Tooe "J" Jamoooooo (Bupzoooooozooooooing) ---
+    "jupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupupjupjupupjupjupupizoooooozooooooojupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupejupjupupjupjupupizoooooozooooooewoohooooooooingowoohooooooooangawoohooooooooaloooooolooooooaupwoohooooooooaloooooolooooooa",
+    "jupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupupjupjupupjupjupupupnkojupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupojupjupupjupjupupupnkebooooooingobooooooangupbooooooong",
+    "jupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupojupjupupjupjupuperooooookupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupojupjupupjupjupuperooooookedingupdangodong",
+    "jupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupupjupjupupjupjupupooonsoupponojupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupjupjupupojupjupupjupjupupooonsoupponuppinguppingepingaping"
+    ];
+
+    
+    let isPlaying = false;
+    let timeoutId = null;
+    const synth = window.speechSynthesis;
+
+    // --- DOM ELEMENTS ---
+    const els = {
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        currentWord: document.getElementById('currentWord'),
+        rate: document.getElementById('rate'),
+        pitch: document.getElementById('pitch'),
+        interval: document.getElementById('interval'),
+        chaos: document.getElementById('chaos'),
+        rateVal: document.getElementById('rateVal'),
+        pitchVal: document.getElementById('pitchVal'),
+        intervalVal: document.getElementById('intervalVal'),
+        chaosVal: document.getElementById('chaosVal'),
+        pasteInput: document.getElementById('pasteInput'),
+        loadPasteBtn: document.getElementById('loadPasteBtn'),
+        fileInput: document.getElementById('fileInput'),
+        loadFileBtn: document.getElementById('loadFileBtn'),
+        status: document.getElementById('status'),
+    };
+
+    // --- FUNCTION TO LOAD WORDS ---
+    function loadWords(input) {
+        const words = input.split(/[\n, ]+/).filter(word => word.trim() !== '');
+        if (words.length > 0) {
+            wordList = words;
+            els.status.textContent = `Loaded ${words.length} words from custom input.`;
+        } else {
+            els.status.textContent = 'No valid words found. Using default list.';
+        }
+    }
+
+    // --- EVENT LISTENERS FOR INPUT ---
+    els.loadPasteBtn.addEventListener('click', () => {
+        const pastedText = els.pasteInput.value.trim();
+        if (pastedText) {
+            loadWords(pastedText);
+        } else {
+            els.status.textContent = 'Paste some text first.';
+        }
+    });
+
+    els.loadFileBtn.addEventListener('click', () => {
+        const file = els.fileInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                loadWords(e.target.result);
+            };
+            reader.onerror = (e) => {
+                els.status.textContent = 'Error reading file.';
+                console.error(e);
+            };
+            reader.readAsText(file);
+        } else {
+            els.status.textContent = 'Select a file first.';
+        }
+    });
+
+    // --- AUDIO ENGINE ---
+    function speak() {
+        if (!isPlaying || wordList.length === 0) return;
+
+        // --- BURST LOGIC ---
+        let wordsToSpeak = "";
+        let wordCount = 1; // Default to 1 word
+
+        // 40% chance of a burst (up from 30%)
+        if (Math.random() < 0.4) {
+            // 5 or 6 words
+            wordCount = Math.floor(Math.random() * 2) + 5;
+        }
+
+        // Build the string
+        for (let i = 0; i < wordCount; i++) {
+            const randomWord = wordList[Math.floor(Math.random() * wordList.length)];
+            wordsToSpeak += randomWord + " ";
+        }
+        
+        const finalString = wordsToSpeak.trim();
+        els.currentWord.textContent = finalString;
+
+        // 2. Create utterance with the final string (could be 1 or 6 words)
+        const utter = new SpeechSynthesisUtterance(finalString);
+        
+        // 3. Apply settings & Chaos
+        const baseRate = parseFloat(els.rate.value);
+        const basePitch = parseFloat(els.pitch.value);
+        const chaosLevel = parseFloat(els.chaos.value);
+
+        // Chaos math: randomly add/subtract up to (chaosLevel * modifier) from base values
+        const rateChaos = (Math.random() - 0.5) * 2 * (chaosLevel * 2); 
+        const pitchChaos = (Math.random() - 0.5) * 2 * (chaosLevel * 1.5);
+
+        // Clamp values to acceptable browser limits (Rate 0.1-10, Pitch 0-2)
+        utter.rate = Math.max(0.1, Math.min(10, baseRate + rateChaos));
+        utter.pitch = Math.max(0.01, Math.min(2, basePitch + pitchChaos));
+
+        // 4. Schedule next word ONLY when this one finishes
+        utter.onend = () => {
+            if (isPlaying) {
+                // Get current interval and add a little random jitter
+                let interval = parseInt(els.interval.value);
+                if (chaosLevel > 0) {
+                     interval = interval * (1 - (Math.random() * chaosLevel * 0.8));
+                }
+                timeoutId = setTimeout(speak, Math.max(50, interval));
+            }
+        };
+
+        utter.onerror = (e) => console.error("Speech error:", e);
+
+        // 5. Speak
+        synth.speak(utter);
+    }
+
+    // --- EVENT LISTENERS ---
+    els.startBtn.addEventListener('click', () => {
+        if (!isPlaying) {
+            isPlaying = true;
+            els.startBtn.disabled = true;
+            els.stopBtn.disabled = false;
+            // Chrome specifically needs a user interaction to start audio sometimes.
+            // We cancel anything currently playing just in case.
+            synth.cancel(); 
+            speak();
+        }
+    });
+
+    els.stopBtn.addEventListener('click', () => {
+        isPlaying = false;
+        clearTimeout(timeoutId);
+        synth.cancel();
+        els.startBtn.disabled = false;
+        els.stopBtn.disabled = true;
+        els.currentWord.textContent = "...";
+    });
+
+    // Update UI slider values instantly
+    els.rate.addEventListener('input', (e) => els.rateVal.textContent = e.target.value);
+    els.pitch.addEventListener('input', (e) => els.pitchVal.textContent = e.target.value);
+    els.interval.addEventListener('input', (e) => els.intervalVal.textContent = e.target.value);
+    els.chaos.addEventListener('input', (e) => els.chaosVal.textContent = Math.round(e.target.value * 100) + '%');
+
+</script>
+</body>
+</html>

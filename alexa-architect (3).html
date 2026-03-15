@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALEXA ARCHITECT</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--card:#0f0f1a;--border:#1e1e3a;--accent:#00ff88;--accent2:#ff0066;--accent3:#7c3aed;--text:#e2e8f0;--dim:#4a5568;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Space Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.15) 2px,rgba(0,0,0,0.15) 4px);pointer-events:none;z-index:999;}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:998;opacity:0.4;}
+.container{max-width:520px;margin:0 auto;padding:16px;}
+header{text-align:center;padding:24px 0 20px;}
+header h1{font-family:'VT323',monospace;font-size:3.2rem;color:var(--accent);letter-spacing:4px;text-shadow:0 0 20px rgba(0,255,136,0.5),0 0 40px rgba(0,255,136,0.2);animation:flicker 4s infinite;}
+header p{font-size:0.65rem;color:var(--dim);letter-spacing:0.15em;text-transform:uppercase;margin-top:4px;}
+.blink{animation:blink 1s step-end infinite;color:var(--accent2);}
+@keyframes flicker{0%,95%,100%{opacity:1;}96%{opacity:0.6;}97%{opacity:1;}98%{opacity:0.4;}99%{opacity:1;}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-3px);}40%{transform:translateX(3px);}60%{transform:translateX(-2px);}80%{transform:translateX(2px);}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:16px;position:relative;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.6;}
+.section-label{font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
+.preset-btn{background:#0a0a0f;border:1px solid var(--border);border-radius:3px;padding:10px 8px;cursor:pointer;transition:all 0.15s;text-align:left;position:relative;overflow:hidden;}
+.preset-btn:hover,.preset-btn.active{border-color:var(--accent);background:#0f1a12;}
+.preset-btn:hover::before,.preset-btn.active::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,0.05),transparent);}
+.preset-btn .pb-name{font-family:'VT323',monospace;font-size:1rem;color:var(--accent);display:block;letter-spacing:1px;}
+.preset-btn .pb-tag{font-size:0.55rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.1em;}
+.preset-btn .pb-badge{position:absolute;top:6px;right:6px;font-size:0.5rem;padding:2px 5px;border-radius:2px;letter-spacing:0.1em;font-weight:700;}
+.badge-chaos{background:rgba(255,0,102,0.2);color:var(--accent2);border:1px solid rgba(255,0,102,0.3);}
+.badge-weird{background:rgba(124,58,237,0.2);color:#a78bfa;border:1px solid rgba(124,58,237,0.3);}
+.badge-lol{background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);}
+.badge-eerie{background:rgba(0,255,136,0.1);color:var(--accent);border:1px solid rgba(0,255,136,0.2);}
+textarea{width:100%;background:#050508;border:1px solid var(--border);border-radius:3px;padding:12px;color:var(--text);font-family:'Space Mono',monospace;font-size:0.85rem;resize:vertical;min-height:80px;outline:none;transition:border 0.2s;margin-bottom:4px;}
+textarea:focus{border-color:var(--accent);}
+.char-count{font-size:0.6rem;color:var(--dim);text-align:right;margin-bottom:16px;}
+.sliders{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.slider-wrap label{display:flex;justify-content:space-between;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;}
+.slider-wrap label span{color:var(--accent);font-size:0.75rem;}
+input[type=range]{width:100%;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px rgba(0,255,136,0.5);transition:transform 0.1s;}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.3);}
+.selects{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+select{width:100%;background:#050508;border:1px solid var(--border);border-radius:3px;padding:10px 8px;color:var(--text);font-family:'Space Mono',monospace;font-size:0.7rem;outline:none;cursor:pointer;transition:border 0.2s;}
+select:focus{border-color:var(--accent);}
+.output-card{background:#000;border:1px solid #00ff8844;border-radius:4px;padding:16px;position:relative;}
+.output-card::before{content:'$ ';color:var(--accent2);font-size:0.75rem;}
+#preview{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--accent);word-break:break-all;white-space:pre-wrap;line-height:1.6;display:inline;}
+.copy-btn{width:100%;margin-top:14px;background:var(--accent);color:#000;border:none;padding:14px;border-radius:3px;font-family:'VT323',monospace;font-size:1.4rem;letter-spacing:3px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;}
+.copy-btn.did-copy{background:var(--accent2);animation:shake 0.3s ease;}
+.chaos-meter{height:4px;background:var(--border);border-radius:2px;margin-top:12px;overflow:hidden;}
+.chaos-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width 0.4s ease;width:0%;}
+.chaos-label{font-size:0.55rem;color:var(--dim);letter-spacing:0.15em;text-transform:uppercase;margin-top:4px;display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ALEXA<span class="blink">_</span>ARCH</h1>
+    <p>Voice Chaos Engine &bull; Termux Edition</p>
+  </header>
+
+  <div class="card">
+    <div class="section-label">Presets</div>
+    <div class="preset-grid" id="presetGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Speech Text</div>
+    <textarea id="text" placeholder="What should Alexa say?" oninput="build();updateCount()"></textarea>
+    <div class="char-count"><span id="charCount">0</span> chars</div>
+
+    <div class="section-label">Prosody</div>
+    <div class="sliders">
+      <div class="slider-wrap">
+        <label>Pitch <span id="v-pitch">medium</span></label>
+        <input type="range" id="pitch" min="0" max="4" value="2" oninput="build()">
+      </div>
+      <div class="slider-wrap">
+        <label>Speed <span id="v-rate">medium</span></label>
+        <input type="range" id="rate" min="0" max="4" value="2" oninput="build()">
+      </div>
+    </div>
+
+    <div class="section-label">Modifiers</div>
+    <div class="selects">
+      <select id="effect" onchange="build()">
+        <option value="none">Normal Voice</option>
+        <option value="whispered">Whisper</option>
+        <option value="excited">Excited</option>
+        <option value="disappointed">Disappointed</option>
+        <option value="drc">DRC Enhance</option>
+      </select>
+      <select id="lang" onchange="build()">
+        <option value="none">Default Accent</option>
+        <option value="en-GB">British 🇬🇧</option>
+        <option value="en-IN">Indian 🇮🇳</option>
+        <option value="en-US">American 🇺🇸</option>
+        <option value="en-AU">Australian 🇦🇺</option>
+        <option value="cy-GB">Welsh 🏴󠁧󠁢󠁷󠁬󠁹󠁳󠁿</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Command Output</div>
+    <div class="output-card"><div id="preview">Waiting for input...</div></div>
+    <div class="chaos-meter"><div class="chaos-fill" id="chaosFill"></div></div>
+    <div class="chaos-label"><span>ORDER</span><span id="chaosLabel">0%</span><span>CHAOS</span></div>
+    <button class="copy-btn" id="copyBtn" onclick="copy()">[ COPY TO CLIPBOARD ]</button>
+  </div>
+</div>
+
+<script>
+const DEVICE = "Dominic's Echo Dot";
+const pitchMap = ['x-low','low','medium','high','x-high'];
+const rateMap  = ['x-slow','slow','medium','fast','x-fast'];
+
+const PRESETS = [
+  {
+    name:"AUCTIONEER",tag:"Speed Sell",badge:"lol",
+    text:"DO I HEAR FIVE TEN?! FIVE FIFTEEN?! TWENTY TWENTY FIVE?! COME ON DON'T LET IT GET AWAY! FIVE THIRTY, DID I HEAR?! CAN I GET A FIVE FORTY?! FIVE FIVE, IT'S A BARGAIN! FIVE SIXTY, THE PRICE IS GOING UP UP UP! WOOOHOO! OH YEAH, FIVE SEVENTY FIVE?! EIGHTY NINETY?! SIX HUNDRED?! SIX HUNDRED, DID I HEAR?! THIS IS YOUR CHANCE, FOLKS! CAN I GET A SIX TEN?! SIX FIFTEEN, ANY TAKERS?! SIX TWENTY, IT'S GETTING HOT! SIX TWENTY FIVE, DON'T LET IT SLIP AWAY! YEEHAW! WE'RE GETTING SOMEWHERE PEOPLE! SIX THIRTY, DID I HEAR?! CAN I GET A SIX FORTY?! SIX FIVE, IT'S RIDICULOUS! SIX SIXTY, THE CROWD IS GOING WILD! SEVEN HUNDRED?! SEVEN HUNDRED, IT'S A STEAL! SEVEN TEN, WHERE'S MY SEVEN TEN?! SEVEN FIFTEEN, COME ON! SEVEN TWENTY, ANYONE?! SEVEN TWENTY FIVE, THE AUCTIONEE IS LOSING IT! WOOHOO! WE'RE COOKIN' NOW! YA-HOO! EIGHT HUNDRED?! EIGHT HUNDRED, THE PRICE IS RISING LIKE A ROCKET! EIGHT TEN, DID I HEAR?! CAN I GET AN EIGHT FIFTEEN?! EIGHT TWENTY, IT'S NOW OR NEVER! EIGHT TWENTY FIVE, DON'T LET IT GET AWAY! EIGHT THIRTY, DID I HEAR?! CAN I GET AN EIGHT FORTY?! EIGHT FIVE, IT'S CRAZY TOWN! NINE HUNDRED?! NINE HUNDRED, THE FINAL STRETCH! WOOOHOO! I'M GIVING IT AWAY! YAHOO! YERHAW! WHOOPEE! ONE THOUSAND?! ONE THOUSAND, DID I HEAR?! ONE THOUSAND TEN?! ONE THOUSAND FIFTEEN?! ONE THOUSAND TWENTY?! WE'RE GOING TO INFINITY AND BEYOND! I CAN'T BELIEVE IT! YEEHAW! YAHOO! ONE THOUSAND THIRTY, ONE THOUSAND FORTY, ONE THOUSAND FIVE, ONE THOUSAND SIXTY!",
+    pitch:3,rate:4,effect:"excited",lang:"none"
+  },
+  {
+    name:"SIREN LOOP",tag:"weeoo drone",badge:"eerie",
+    text:"weeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeooweeoo",
+    pitch:3,rate:2,effect:"none",lang:"none"
+  },
+  {
+    name:"DEEP DRONE",tag:"sub bass oooo",badge:"eerie",
+    text:"uuuuuuuuuuuuooooooooooooouuuuuuuuuuuuooooooooooouuuuuuuuuuuuoooooooooooouuuuuuuuuuuu",
+    pitch:0,rate:0,effect:"drc",lang:"none"
+  },
+  {
+    name:"KAZOO GHOST",tag:"mmmeee whisper",badge:"weird",
+    text:"mmmeeeemmmeeeemmmooommmeeeemmmooommmeeeeemmmooommmeeeeemmmooommmeeeeemmm",
+    pitch:2,rate:1,effect:"whispered",lang:"none"
+  },
+  {
+    name:"ALIEN PING",tag:"ioio signal",badge:"chaos",
+    text:"ioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioioio",
+    pitch:4,rate:4,effect:"none",lang:"none"
+  },
+  {
+    name:"VOWEL SURF",tag:"aeiou cascade",badge:"weird",
+    text:"aaaeeeiiioooouuuuaaaeeeiiioooouuuuaaaeeeiiioooouuuuaaaeeeiiioooouuuuaaaeeeiiioooouuuu",
+    pitch:3,rate:2,effect:"excited",lang:"none"
+  },
+  {
+    name:"WARBLE",tag:"wawa cadence",badge:"lol",
+    text:"wawawawawawawawawawawawawawawawawawawawawawawawawawawawawawawawawawa",
+    pitch:2,rate:3,effect:"none",lang:"none"
+  },
+  {
+    name:"BUBBLE BATH",tag:"bwu bwu bwu",badge:"lol",
+    text:"bwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwubwu",
+    pitch:1,rate:2,effect:"none",lang:"none"
+  },
+  {
+    name:"SQUEAK LOOP",tag:"high eeee burst",badge:"chaos",
+    text:"eeeeeeeeeeiiiiiieeeeeeeeeeiiiiiieeeeeeeeeeiiiiiieeeeeeeeeeiiiiiieeeeeeeeeeiiiiiieeeeee",
+    pitch:4,rate:3,effect:"excited",lang:"none"
+  },
+  {
+    name:"OOO WAVE",tag:"slow ooo pulse",badge:"eerie",
+    text:"ooooooouuuuuuuooooooouuuuuuuooooooouuuuuuuooooooouuuuuuuooooooouuuuuuuooooooouuuuuuu",
+    pitch:0,rate:0,effect:"none",lang:"none"
+  },
+  {
+    name:"DOODEE DRIFT",tag:"sing-song loop",badge:"lol",
+    text:"doodeedooodeeedoodeedoooodeeedoodeedoodeedooodeeedoodeedooodeeedoodeedooodee",
+    pitch:3,rate:2,effect:"excited",lang:"none"
+  },
+  {
+    name:"GLITCH STATIC",tag:"vvvv burst",badge:"chaos",
+    text:"vvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvbvvvvvvvb",
+    pitch:2,rate:4,effect:"none",lang:"none"
+  },
+  {
+    name:"MOUTH HARP",tag:"dooodee twang",badge:"weird",
+    text:"dooodeedooodeedooodeedooodeedooodeedooodeedooodeedooodeedooodeedooodeedooodee",
+    pitch:1,rate:2,effect:"drc",lang:"none"
+  },
+  {
+    name:"CREAK SLOW",tag:"eerie lo whisper",badge:"eerie",
+    text:"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    pitch:0,rate:0,effect:"whispered",lang:"none"
+  },
+  {
+    name:"UP DOWN",tag:"woo EEE contrast",badge:"chaos",
+    text:"woooooooEEEEEEEwoooooooEEEEEEEwoooooooEEEEEEEwoooooooEEEEEEEwoooooooEEEEEEEwoooooo",
+    pitch:2,rate:1,effect:"none",lang:"none"
+  },
+  {
+    name:"DYING MODEM",tag:"vvveee glitch",badge:"chaos",
+    text:"vvvveeeeoooooovvvveeeeoooooovvvveeeeoooooovvvveeeeoooooovvvveeeeoooooovvvveeeeooooo",
+    pitch:1,rate:3,effect:"none",lang:"none"
+  },
+  {
+    name:"STUTTER FAST",tag:"ththth rapid",badge:"weird",
+    text:"thththththththththththththththththththththththththththththththththththththththth",
+    pitch:2,rate:4,effect:"none",lang:"none"
+  },
+  {
+    name:"SWAMP GAS",tag:"bwooo low pulse",badge:"eerie",
+    text:"bwooooobwooobwoooooobwooobwoooooobwooobwoooooobwooobwoooooobwooobwoooooobwooo",
+    pitch:0,rate:1,effect:"drc",lang:"none"
+  },
+  {
+    name:"YODEL CRASH",tag:"high fast yodel",badge:"lol",
+    text:"yodleyodleyodleyodleyodleyodleyodleyodleyodleyodleyodleyodleyodleyodleyodle",
+    pitch:4,rate:4,effect:"excited",lang:"none"
+  },
+  {
+    name:"CRICKET",tag:"reee reee high",badge:"weird",
+    text:"reeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereeeereee",
+    pitch:4,rate:3,effect:"none",lang:"none"
+  },
+  {
+    name:"VOID HUM",tag:"deep mmm whisper",badge:"eerie",
+    text:"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+    pitch:0,rate:0,effect:"whispered",lang:"none"
+  },
+  {
+    name:"HYPERWAVE",tag:"ooEEoo rapid",badge:"chaos",
+    text:"ooooEEEEooooEEEEooooEEEEooooEEEEooooEEEEooooEEEEooooEEEEooooEEEEooooEEEEooooEEEE",
+    pitch:4,rate:4,effect:"excited",lang:"none"
+  },
+  {
+    name:"GOOSE HONK",tag:"honnk loop",badge:"lol",
+    text:"honnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnkhonnnnk",
+    pitch:3,rate:2,effect:"excited",lang:"none"
+  },
+  {
+    name:"DEEP STUTTER",tag:"th lo slow",badge:"eerie",
+    text:"thththththththththththththththththththththththththththththththththththththth",
+    pitch:0,rate:0,effect:"drc",lang:"none"
+  },
+];
+
+function initPresets(){
+  const grid=document.getElementById('presetGrid');
+  PRESETS.forEach((p,i)=>{
+    const btn=document.createElement('button');
+    btn.className='preset-btn';
+    btn.dataset.idx=i;
+    btn.innerHTML=`<span class="pb-name">${p.name}</span><span class="pb-tag">${p.tag}</span><span class="pb-badge badge-${p.badge}">${p.badge.toUpperCase()}</span>`;
+    btn.onclick=()=>applyPreset(i,btn);
+    grid.appendChild(btn);
+  });
+}
+
+function applyPreset(i,btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const p=PRESETS[i];
+  document.getElementById('text').value=p.text;
+  document.getElementById('pitch').value=p.pitch;
+  document.getElementById('rate').value=p.rate;
+  document.getElementById('effect').value=p.effect;
+  document.getElementById('lang').value=p.lang;
+  updateCount();build();
+}
+
+function updateCount(){
+  document.getElementById('charCount').innerText=document.getElementById('text').value.length;
+}
+
+function chaosScore(){
+  const p=parseInt(document.getElementById('pitch').value);
+  const r=parseInt(document.getElementById('rate').value);
+  const e=document.getElementById('effect').value;
+  const t=document.getElementById('text').value;
+  const repeats=(t.match(/(.)\1{2,}/g)||[]).length;
+  let score=0;
+  score+=Math.abs(p-2)*12;
+  score+=Math.abs(r-2)*12;
+  if(e==='excited')score+=25;
+  if(e==='whispered')score+=15;
+  if(e==='drc')score+=10;
+  score+=Math.min(repeats*8,40);
+  if(/[A-Z]{3,}/.test(t))score+=15;
+  return Math.min(score,100);
+}
+
+function build(){
+  const txt=document.getElementById('text').value.trim();
+  if(!txt){document.getElementById('preview').innerText='Waiting for input...';return;}
+  const pVal=pitchMap[document.getElementById('pitch').value];
+  const rVal=rateMap[document.getElementById('rate').value];
+  const eff=document.getElementById('effect').value;
+  const lang=document.getElementById('lang').value;
+  document.getElementById('v-pitch').innerText=pVal;
+  document.getElementById('v-rate').innerText=rVal;
+  let ssml=txt;
+  if(pVal!=='medium'||rVal!=='medium') ssml=`<prosody pitch='${pVal}' rate='${rVal}'>${ssml}</prosody>`;
+  if(eff==='whispered') ssml=`<amazon:effect name='whispered'>${ssml}</amazon:effect>`;
+  if(eff==='excited') ssml=`<amazon:emotion name='excited' intensity='high'>${ssml}</amazon:emotion>`;
+  if(eff==='disappointed') ssml=`<amazon:emotion name='disappointed' intensity='high'>${ssml}</amazon:emotion>`;
+  if(eff==='drc') ssml=`<amazon:effect name='drc'>${ssml}</amazon:effect>`;
+  if(lang!=='none') ssml=`<lang xml:lang='${lang}'>${ssml}</lang>`;
+  const cmd=`bash alexa_remote_control.sh -d "${DEVICE}" -e speak:"<speak>${ssml}</speak>"`;
+  document.getElementById('preview').innerText=cmd;
+  const cs=chaosScore();
+  document.getElementById('chaosFill').style.width=cs+'%';
+  document.getElementById('chaosLabel').innerText=cs+'%';
+}
+
+function copy(){
+  const content=document.getElementById('preview').innerText;
+  if(content==='Waiting for input...')return;
+  const btn=document.getElementById('copyBtn');
+  navigator.clipboard.writeText(content).then(()=>{
+    btn.classList.add('did-copy');
+    btn.innerText='[ ✓ COPIED! ]';
+    setTimeout(()=>{btn.classList.remove('did-copy');btn.innerText='[ COPY TO CLIPBOARD ]';},1500);
+  });
+}
+
+initPresets();build();
+</script>
+</body>
+</html>

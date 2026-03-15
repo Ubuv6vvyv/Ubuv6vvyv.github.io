@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HALLUCINATION ENGINE v12</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap');
+body{background:#030303;color:#fff;font-family:'Inter',-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+.xf{font-family:'Archivo Black',sans-serif}
+.ctrl{background:linear-gradient(145deg,rgba(20,20,20,.98),rgba(4,4,4,.98));border-radius:16px;padding:1.2rem;border:1px solid rgba(255,0,0,.15);box-shadow:0 8px 28px -8px rgba(0,0,0,.75)}
+input[type=range]{accent-color:#f00;width:100%;height:6px;background:#1a1a1a;border-radius:10px;cursor:pointer}
+input[type=text]{background:#0d0d0d;border:1px solid #333;color:#fff;padding:.7rem;border-radius:8px;width:100%;font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:13px}
+input[type=text]:focus{outline:none;border-color:#f00;box-shadow:0 0 10px rgba(255,0,0,.25)}
+canvas{image-rendering:pixelated;max-width:100%;height:auto!important;border-radius:6px}
+.btn-r{background:linear-gradient(to right,#e00,#800);box-shadow:0 4px 16px rgba(255,0,0,.32);transition:transform .12s ease}
+.btn-r:active{transform:scale(.9)}
+.sc::-webkit-scrollbar{width:3px}.sc::-webkit-scrollbar-track{background:#0a0a0a}.sc::-webkit-scrollbar-thumb{background:#c00;border-radius:10px}
+@keyframes pr{0%,100%{box-shadow:0 0 8px rgba(255,0,0,.45)}50%{box-shadow:0 0 24px rgba(255,0,0,.85)}}
+.ra{animation:pr 1.3s infinite}
+@keyframes pw{0%,100%{opacity:1}50%{opacity:.2}}
+.wp{animation:pw .5s infinite}
+#msg{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;pointer-events:none}
+.tc:checked{right:0;border-color:#ef4444}.tc:checked+.tl{background-color:#ef4444}
+select{background:#000;color:#ddd;font-size:13px}
+optgroup{color:#666;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.1em}
+option{color:#ddd;background:#0e0e0e}
+</style>
+</head>
+<body class="p-4 min-h-screen flex flex-col items-center sc">
+<div id="msg"></div>
+
+<div id="strobeW" class="hidden w-full max-w-md mb-3 rounded-xl p-3 border border-yellow-500/50 bg-yellow-900/20">
+  <div class="text-yellow-400 text-[10px] font-black uppercase tracking-widest wp">⚠ HIGH FREQUENCY STROBE — PHOTOSENSITIVE WARNING ⚠</div>
+  <div class="text-yellow-600/80 text-[9px] mt-1 uppercase tracking-wider">Stop immediately if uncomfortable. Not safe for photosensitive individuals.</div>
+</div>
+
+<header class="w-full max-w-md mb-5 text-center">
+  <div class="inline-block bg-red-700 px-2 py-0.5 mb-1 text-[10px] font-black tracking-widest uppercase rounded">Maximum Cortical Assault</div>
+  <h1 class="text-4xl xf text-white leading-none tracking-tighter uppercase">Hallucination Engine</h1>
+  <p class="text-[10px] text-zinc-700 mt-1.5 font-mono uppercase tracking-widest">v12.0 // 36 Presets // Embedded Strobe Throughout</p>
+</header>
+
+<main class="w-full max-w-md space-y-4">
+
+  <div class="relative bg-black rounded-xl overflow-hidden border border-zinc-900">
+    <div class="flex justify-center p-2 bg-black"><canvas id="C"></canvas></div>
+    <div id="fixWarn" class="hidden absolute top-3 left-0 w-full text-center pointer-events-none">
+      <span class="bg-black/95 text-red-500 border border-red-500/60 px-3 py-1 rounded text-[10px] font-black uppercase tracking-[.13em]">Stare at red cross 30s → look at plain wall</span>
+    </div>
+    <div id="rovl" class="hidden absolute inset-0 bg-black/97 flex flex-col items-center justify-center z-50">
+      <div class="relative w-24 h-24 mb-4">
+        <svg class="w-full h-full -rotate-90">
+          <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="transparent" class="text-zinc-900"/>
+          <circle id="pcirc" cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="251.2" class="text-red-600 transition-all duration-150"/>
+        </svg>
+        <div id="ppct" class="absolute inset-0 flex items-center justify-center text-xl font-black xf">0%</div>
+      </div>
+      <p id="pstat" class="text-xs font-bold text-red-500 uppercase tracking-[.3em]">Processing</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <button onclick="togglePreview()" id="playBtn" class="btn-r py-4 rounded-xl text-white font-black xf uppercase text-sm tracking-widest">Start Live</button>
+    <button onclick="generateGIF()" class="bg-white py-4 rounded-xl text-black font-black xf uppercase text-sm tracking-widest active:scale-95 transition-transform">Render GIF</button>
+  </div>
+
+  <div class="ctrl space-y-5">
+    <div>
+      <label class="block text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-600">Preset Routine</label>
+      <select id="pSel" class="w-full border border-zinc-800/80 rounded-lg p-3 focus:border-red-700 outline-none font-bold appearance-none">
+
+        <optgroup label="── PURE STROBE ⚠ PHOTOSENSITIVE ──────">
+          <option value="s_alpha">Neural Alpha Strobe (8–15 Hz)</option>
+          <option value="s_pinwheel">Counter-Rotating Pinwheel</option>
+          <option value="s_sector">Cascading Sector Flash</option>
+          <option value="s_burst">Radial Spoke Burst</option>
+          <option value="s_rings">Sonar Ring Pulse</option>
+          <option value="s_grid">Lattice Wave Flash</option>
+          <option value="s_invert">Inversion Starburst</option>
+          <option value="s_phi">Phi Apparent Motion</option>
+        </optgroup>
+
+        <optgroup label="── PERIPHERAL DRIFT + STROBE ───────────">
+          <option value="p_snakes" selected>Rotating Snakes + Flash</option>
+          <option value="p_blaze">Blaze Shimmer + Strobe</option>
+          <option value="p_rings">Expanding MAE Rings + Pulse</option>
+          <option value="p_pinna">Pinna Zoom Spin + Flash</option>
+          <option value="p_scintillate">Scintillating Grid + Pulse</option>
+          <option value="p_ouchi">Ouchi Drift + Strobe Phase</option>
+          <option value="p_opticflow">Optic Flow + Burst</option>
+          <option value="p_fraser">Fraser-Wilcox Sawtooth</option>
+        </optgroup>
+
+        <optgroup label="── HYPNOTIC + STROBE ───────────────────">
+          <option value="h_spiral">Archimedean Spiral + Flash</option>
+          <option value="h_barber">Barber Pole + Sector Strobe</option>
+          <option value="h_tunnel">Zoom Tunnel + Ring Strobe</option>
+          <option value="h_vortex">Compound Vortex + Inversion</option>
+          <option value="h_rings">Pulse Ring Stack + Spoke Flash</option>
+          <option value="h_helix">Helix Coil Zoom + Strobe</option>
+        </optgroup>
+
+        <optgroup label="── VIBRATION &amp; FINE PATTERN ─────────">
+          <option value="v_raster">1px Raster Phase Flip (~12 Hz)</option>
+          <option value="v_hash">Opposing Diagonal Buzz</option>
+          <option value="v_moire">Rotating Moiré Beat</option>
+          <option value="v_vernier">Vernier Alignment Tremor</option>
+          <option value="v_radial">Fine Spoke Vibration Rings</option>
+          <option value="v_interference">Circular Wave Interference</option>
+        </optgroup>
+
+        <optgroup label="── SCINTILLATING &amp; ILLUSORY ──────────">
+          <option value="i_enigma">Leviant Enigma + Ring Flash</option>
+          <option value="i_neon">Neon Color Spreading + Pulse</option>
+          <option value="i_checkerwheel">Checker Twister + Inversion</option>
+          <option value="i_gridwarp">Grid Warp + Strobe Layer</option>
+        </optgroup>
+
+        <optgroup label="── GEOMETRIC DISTORTION + STROBE ────">
+          <option value="g_cafe">Café Wall + Mortar Strobe</option>
+          <option value="g_hering">Hering Radial + Flash</option>
+          <option value="g_zollner">Zöllner + Hatch Flash</option>
+        </optgroup>
+
+        <optgroup label="── OVERLOAD &amp; GLITCH ──────────────────">
+          <option value="o_checker">Checkerboard Insanity</option>
+          <option value="o_rgb">Chromatic Aberration Pulse</option>
+          <option value="o_glitch">Chunk Displacement</option>
+          <option value="o_noise">Gaussian Filth</option>
+        </optgroup>
+
+        <optgroup label="── TEXT ─────────────────────────────────">
+          <option value="text">Custom Word Burst</option>
+        </optgroup>
+
+      </select>
+      <div id="txtBox" class="mt-3 hidden">
+        <input type="text" id="txtIn" value="VOID, MAX, FLASH, GO, KILL, LIVE" placeholder="WORD, WORD, WORD">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Resolution</label><span id="resV" class="text-xs font-black text-red-600">400px</span></div>
+        <input type="range" id="resS" min="100" max="600" step="10" value="400">
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Complexity</label><span id="cmpV" class="text-xs font-black text-red-600">14</span></div>
+        <input type="range" id="cmpS" min="1" max="20" value="14">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Intensity</label><span id="intV" class="text-xs font-black text-red-600">30</span></div>
+        <input type="range" id="intS" min="1" max="50" value="30">
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-orange-500 tracking-widest">Chaos</label><span id="swpV" class="text-xs font-black text-red-600">0%</span></div>
+        <input type="range" id="swpS" min="0" max="100" value="0">
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl space-y-4">
+    <div class="flex justify-between items-center border-b border-zinc-900 pb-3">
+      <label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Timing & Output</label>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] uppercase font-bold text-zinc-500">Auto-Sync</span>
+        <div class="relative inline-block w-8 mr-2 align-middle select-none">
+          <input type="checkbox" id="aSync" checked class="tc absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-all right-0 border-red-600"/>
+          <label for="aSync" class="tl block overflow-hidden h-4 rounded-full bg-red-600 cursor-pointer"></label>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Target FPS</label><span id="fpsV" class="text-xs font-black text-white">30</span></div>
+        <input type="range" id="fpsS" min="5" max="60" value="30">
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex justify-between"><label class="text-[10px] font-bold uppercase text-zinc-600 tracking-widest">Frames</label><span id="frmV" class="text-xs font-black text-white">45</span></div>
+        <input type="range" id="frmS" min="10" max="150" value="45">
+      </div>
+    </div>
+  </div>
+
+  <div id="results" class="flex flex-col items-center gap-4 pb-12"></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<script>
+const C=document.getElementById('C'),ctx=C.getContext('2d',{alpha:false});
+const playBtn=document.getElementById('playBtn'),rovl=document.getElementById('rovl');
+const ppct=document.getElementById('ppct'),pcirc=document.getElementById('pcirc'),pstat=document.getElementById('pstat');
+const aSync=document.getElementById('aSync'),fixWarn=document.getElementById('fixWarn'),strobeW=document.getElementById('strobeW');
+const txtBox=document.getElementById('txtBox'),txtIn=document.getElementById('txtIn');
+let rafId,tick=0,spd=0,running=false;
+
+const NEEDCROSS=new Set(['p_snakes','p_blaze','p_rings','p_pinna','p_scintillate','p_ouchi','p_opticflow','p_fraser',
+  'h_spiral','h_barber','h_tunnel','h_vortex','h_rings','h_helix',
+  'v_moire','v_vernier','v_radial','v_interference',
+  'i_enigma','i_neon','i_checkerwheel','i_gridwarp',
+  'g_cafe','g_hering','g_zollner']);
+const STROBECAT=new Set(['s_alpha','s_pinwheel','s_sector','s_burst','s_rings','s_grid','s_invert','s_phi',
+  'v_raster','v_hash','o_checker']);
+
+const cfg={res:document.getElementById('resS'),fps:document.getElementById('fpsS'),frm:document.getElementById('frmS'),
+  int:document.getElementById('intS'),cmp:document.getElementById('cmpS'),swp:document.getElementById('swpS'),pre:document.getElementById('pSel')};
+
+function showMsg(t,c='bg-red-700'){
+  const el=document.createElement('div');
+  el.className=`${c} text-white px-4 py-2 rounded shadow-lg mb-2 text-xs font-bold uppercase tracking-widest transition-opacity duration-1000`;
+  el.innerText=t;document.getElementById('msg').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),1000);},2500);
+}
+function calcAT(){
+  if(!aSync.checked)return;
+  const i=+cfg.int.value,f=Math.floor(15+(i/50)*45),fr=Math.floor(f*1.5);
+  cfg.fps.value=f;cfg.frm.value=fr;
+  document.getElementById('fpsV').innerText=f;document.getElementById('frmV').innerText=fr;
+  document.getElementById('fpsV').className='text-xs font-black text-red-500';
+  document.getElementById('frmV').className='text-xs font-black text-red-500';
+}
+function killAT(){
+  if(!aSync.checked)return;aSync.checked=false;
+  document.getElementById('fpsV').className='text-xs font-black text-white';
+  document.getElementById('frmV').className='text-xs font-black text-white';
+  showMsg('Auto-Sync Off','bg-zinc-800');
+}
+aSync.onchange=()=>{if(aSync.checked)calcAT();else{document.getElementById('fpsV').className='text-xs font-black text-white';document.getElementById('frmV').className='text-xs font-black text-white';}};
+function updCanvas(){const s=+cfg.res.value;C.width=s;C.height=s;document.getElementById('resV').innerText=`${s}px`;if(!running)drawFrame();}
+function handlePreset(){
+  const p=cfg.pre.value;
+  txtBox.style.display=p==='text'?'block':'none';
+  fixWarn.classList.toggle('hidden',!NEEDCROSS.has(p));
+  strobeW.classList.toggle('hidden',!STROBECAT.has(p));
+  if(!running)drawFrame();
+}
+cfg.res.oninput=updCanvas;
+cfg.cmp.oninput=()=>document.getElementById('cmpV').innerText=cfg.cmp.value;
+cfg.swp.oninput=()=>document.getElementById('swpV').innerText=`${cfg.swp.value}%`;
+cfg.int.oninput=()=>{document.getElementById('intV').innerText=cfg.int.value;calcAT();};
+cfg.fps.oninput=()=>{killAT();document.getElementById('fpsV').innerText=cfg.fps.value;};
+cfg.frm.oninput=()=>{killAT();document.getElementById('frmV').innerText=cfg.frm.value;};
+cfg.pre.onchange=handlePreset;
+txtIn.oninput=()=>{if(!running)drawFrame();};
+function togglePreview(){running?stopPrev():startPrev();}
+function startPrev(){running=true;playBtn.innerText='Stop Live';playBtn.className='bg-zinc-800 py-4 rounded-xl text-white font-black xf uppercase text-sm tracking-widest';spd=0;tick=0;loop();}
+function stopPrev(){running=false;playBtn.innerText='Start Live';playBtn.className='btn-r py-4 rounded-xl text-white font-black xf uppercase text-sm tracking-widest';cancelAnimationFrame(rafId);}
+function loop(){if(!running)return;drawFrame();tick++;rafId=requestAnimationFrame(loop);}
+
+// ─────────────────────────────────────────────────────────────────────────────
+function drawFrame(){
+  const p=cfg.pre.value,w=C.width,h=C.height;
+  const bI=+cfg.int.value,bC=+cfg.cmp.value,sw=+cfg.swp.value/100;
+  let cC=bC,cI=bI;
+  if(sw>0){cC=Math.max(1,Math.min(20,bC+Math.sin(tick*.05)*14*sw));cI=Math.max(.1,bI+Math.cos(tick*.04)*bI*.75*sw);}
+  spd=(spd+cI/10)%1e7;
+  const s=spd,ci=Math.max(1,Math.round(cC));
+  const fps=Math.max(1,+cfg.fps.value);
+
+  // ── Core timing helpers ──────────────────────────────────────────────────
+  // hz(f) → frame index at frequency f. blink(f) → 0/1 binary strobe at f Hz.
+  // softBlink(f,duty) → smooth 0..1 pulse (sawtooth). flash(a,f) → overlay alpha.
+  const hz=f=>Math.floor(tick/Math.max(1,Math.round(fps/f)));
+  const blink=f=>hz(f)%2;
+  // True binary inversion: difference blend with solid #fff flips every pixel in the pattern.
+  // white→black, black→white. No grey wash. Both functions identical — named for readability.
+  const embedStrobe=f=>{if(!blink(f))return;ctx.save();ctx.globalCompositeOperation='difference';ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.restore();};
+  const embedInvert=f=>{if(!blink(f))return;ctx.save();ctx.globalCompositeOperation='difference';ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.restore();};
+
+  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
+
+  switch(p){
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PURE STROBE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case's_alpha':{
+    // 3-layer: full field + ring overlay + spoke overlay all at offset frequencies
+    const f=8+ci*.5;
+    ctx.fillStyle=blink(f)?'#fff':'#000';ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(5,ci*2),rw=w*1.2/rings;
+    for(let r=0;r<rings;r++){
+      ctx.beginPath();ctx.arc(0,0,(r+1)*rw,0,Math.PI*2);ctx.arc(0,0,r*rw,0,Math.PI*2,true);
+      ctx.fillStyle=hz(f*1.4+r*.2)%2?'#fff':'#000';ctx.fill();
+    }
+    const rays=Math.max(8,ci*4),ang=Math.PI*2/rays,rot=(tick/fps)*Math.PI*2;
+    for(let i=0;i<rays;i++){
+      const a=rot+i*ang;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w*1.5,a,a+ang*.5);
+      ctx.fillStyle=hz(f*2.1+i*.15)%2?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case's_pinwheel':{
+    // Outer CW + inner CCW, each independently strobing, speeds asymmetric
+    ctx.save();ctx.translate(w/2,h/2);
+    const bl=Math.max(10,ci*3+6),ang=Math.PI*2/bl,f=9+ci*.45;
+    const rotO=(tick/fps)*Math.PI*(2.8+ci*.12);
+    for(let i=0;i<bl;i++){
+      const a=rotO+i*ang;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,a,a+ang*.5);ctx.closePath();
+      ctx.fillStyle=hz(f+i*.18)%2===blink(f)?'#fff':'#000';ctx.fill();
+    }
+    ctx.rotate(-(tick/fps)*Math.PI*(5.2+ci*.22));
+    const ibl=Math.max(8,ci*2+5),iang=Math.PI*2/ibl,iR=w*.44;
+    for(let i=0;i<ibl;i++){
+      const a=i*iang;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,iR,a,a+iang*.5);ctx.closePath();
+      ctx.fillStyle=hz(f*1.55+i*.22)%2?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case's_sector':{
+    ctx.save();ctx.translate(w/2,h/2);
+    const sec=Math.max(8,ci*2+6),f=8+ci*.4;
+    const rot=(tick/fps)*Math.PI*(1.6+ci*.1);
+    for(let i=0;i<sec;i++){
+      const a1=rot+(i/sec)*Math.PI*2,a2=rot+((i+1)/sec)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,a1,a2);ctx.closePath();
+      ctx.fillStyle=hz(f+(i%4)*.65)%2?'#fff':'#000';ctx.fill();
+    }
+    // Inner counter-ring
+    ctx.rotate(-(tick/fps)*Math.PI*(3.2+ci*.18));
+    const isec=Math.max(6,ci*2+2),iR=w*.43;
+    for(let i=0;i<isec;i++){
+      const a1=(i/isec)*Math.PI*2,a2=((i+1)/isec)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,iR,a1,a2);ctx.closePath();
+      ctx.fillStyle=hz(f*1.4+(i%3)*.7)%2?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case's_burst':{
+    // Spoke arcs in multiple ring zones, each zone flashes with angular wave offset
+    const f=10+ci*.4;
+    ctx.save();ctx.translate(w/2,h/2);
+    const spokes=Math.max(16,ci*5+8),zones=Math.max(3,Math.floor(ci/3)+2);
+    const rot=(tick/fps)*Math.PI*(2.2+ci*.1);
+    for(let z=0;z<zones;z++){
+      const iR=z*(w*.47/zones),oR=(z+1)*(w*.47/zones);
+      for(let i=0;i<spokes;i++){
+        const a=rot+z*.28+(i/spokes)*Math.PI*2;
+        if(!hz(f+(i/spokes)*3.5+z*1.1)%2)continue;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a)*iR,Math.sin(a)*iR);
+        ctx.arc(0,0,oR,a,a+(Math.PI*2/spokes)*.52);
+        ctx.arc(0,0,iR,a+(Math.PI*2/spokes)*.52,a,true);
+        ctx.closePath();ctx.fillStyle='#fff';ctx.fill();
+      }
+    }
+    ctx.restore();break;
+  }
+
+  case's_rings':{
+    // Ring wave propagates outward; leading edge bright, tail decays
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(10,ci*3+4),maxR=w*.78,rw=maxR/rings,f=10+ci*.35;
+    const wave=hz(f)%rings;
+    for(let r=0;r<rings;r++){
+      const oR=(r+1)*rw,iR=r*rw;
+      const dist=((r-wave+rings)%rings);
+      const bright=Math.max(0,1-dist/(rings*.25));
+      const alt=hz(f*.6+r*.14)%2?55:0;
+      const lum=Math.min(255,alt+Math.floor(bright*255));
+      ctx.beginPath();ctx.arc(0,0,oR,0,Math.PI*2);ctx.arc(0,0,iR,0,Math.PI*2,true);
+      ctx.fillStyle=`rgb(${lum},${lum},${lum})`;ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case's_grid':{
+    // Grid cells flash by Euclidean distance from centre — circular ripple wave
+    const cs=Math.max(3,Math.floor(w/(ci*2.8+6)));
+    const f=9+ci*.45,gw=Math.ceil(w/cs),gh=Math.ceil(h/cs);
+    for(let gx=0;gx<gw;gx++)for(let gy=0;gy<gh;gy++){
+      const dist=Math.sqrt((gx-gw*.5)**2+(gy-gh*.5)**2);
+      ctx.fillStyle=hz(f+dist*.32)%2?'#fff':'#000';ctx.fillRect(gx*cs,gy*cs,cs,cs);
+    }
+    ctx.fillStyle='#000';
+    for(let x=0;x<=w;x+=cs)ctx.fillRect(x,0,1,h);
+    for(let y=0;y<=h;y+=cs)ctx.fillRect(0,y,w,1);
+    break;
+  }
+
+  case's_invert':{
+    // Full inversion on spinning starburst + concentric ring checker at 1.5× freq
+    const f=8+ci*.5,ph=blink(f);
+    ctx.fillStyle=ph?'#fff':'#000';ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    ctx.rotate((tick/fps)*Math.PI*(1.8+ci*.1));
+    const rays=Math.max(10,ci*4+4);
+    for(let i=0;i<rays;i++){
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,(i/rays)*Math.PI*2,((i+.5)/rays)*Math.PI*2);
+      ctx.fillStyle=ph?'#000':'#fff';ctx.fill();
+    }
+    // Ring layer at 1.5× — creates beating pattern with base
+    const rw=Math.max(4,w/(ci*2+4));
+    for(let r=w*1.4;r>0;r-=rw){
+      if(Math.floor(r/rw)%3!==0)continue;
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.arc(0,0,Math.max(0,r-rw*.7),0,Math.PI*2,true);
+      ctx.fillStyle=hz(f*1.5+Math.floor(r/rw)*.12)%2?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case's_phi':{
+    // Phi motion — dots alternate positions creating apparent motion (Wertheimer 1912)
+    const f=9+ci*.4;
+    const rings=Math.max(2,Math.min(5,Math.floor(ci/3)+1));
+    for(let r=0;r<rings;r++){
+      const n=Math.max(5,ci*2+r*3),rad=w*(.14+r*.13);
+      const rph=hz(f+r*.48)%2,dR=Math.max(5,w/(n*1.3));
+      ctx.fillStyle='#fff';
+      for(let i=rph;i<n;i+=2){
+        const a=(i/n)*Math.PI*2+s*.06*(r%2?1:-1);
+        ctx.beginPath();ctx.arc(w/2+Math.cos(a)*rad,h/2+Math.sin(a)*rad,dR,0,Math.PI*2);ctx.fill();
+      }
+    }
+    break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PERIPHERAL DRIFT + EMBEDDED STROBE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'p_snakes':{
+    // Kitaoka 4-color rotating snakes — PLUS hard full-field strobe at 10Hz
+    ctx.save();ctx.translate(w/2,h/2);
+    const rc=Math.min(14,Math.max(4,ci)),maxR=w*.47,rt=maxR/rc;
+    const seg=Math.max(28,ci*8+16);
+    const cCW=['#000','#555','#eee','#aaa'],cCCW=['#eee','#aaa','#000','#555'];
+    for(let r=0;r<rc;r++){
+      const iR=r*rt+.5,oR=(r+1)*rt-.5,isCW=r%2===0;
+      const cols=isCW?cCW:cCCW,angOff=s*.007*(isCW?1:-1)+r*(Math.PI/(rc*1.6));
+      for(let sg=0;sg<seg;sg++){
+        const a1=angOff+(sg/seg)*Math.PI*2,a2=angOff+((sg+1)/seg)*Math.PI*2;
+        ctx.beginPath();ctx.arc(0,0,oR,a1,a2);ctx.arc(0,0,iR,a2,a1,true);ctx.closePath();
+        ctx.fillStyle=cols[sg%4];ctx.fill();
+      }
+    }
+    ctx.restore();
+    // Embedded: periodic contrast inversion pulse reinforces motion signal
+    embedInvert(10+ci*.3);
+    break;
+  }
+
+  case'p_blaze':{
+    // Blaze jagged rays + ring strobe overlay every 9Hz
+    ctx.save();ctx.translate(w/2,h/2);
+    const rays=Math.max(36,ci*9+8),maxR=w*.68,iR=maxR*.07,rot=s*.007;
+    for(let i=0;i<rays;i++){
+      const a1=rot+(i/rays)*Math.PI*2,a2=rot+((i+1)/rays)*Math.PI*2,amid=(a1+a2)/2;
+      const jag=Math.sin(i*2.71828)*.5+.5;
+      const tipR=maxR*(.6+jag*.4),sideR=maxR*(.78+jag*.22);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a1)*iR,Math.sin(a1)*iR);
+      ctx.lineTo(Math.cos(a1)*sideR,Math.sin(a1)*sideR);
+      ctx.lineTo(Math.cos(amid)*tipR,Math.sin(amid)*tipR);
+      ctx.lineTo(Math.cos(a2)*sideR,Math.sin(a2)*sideR);
+      ctx.lineTo(Math.cos(a2)*iR,Math.sin(a2)*iR);
+      ctx.closePath();ctx.fillStyle=i%2===0?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();
+    // Concentric ring overlay strobes at 9Hz — hard-inverts every 3rd ring on beat
+    const rw=Math.max(4,w/(ci*4+8)),f=9+ci*.35,ph=blink(f);
+    if(ph){
+      ctx.save();ctx.globalCompositeOperation='difference';ctx.translate(w/2,h/2);
+      ctx.fillStyle='#fff';
+      for(let r=w*1.2;r>0;r-=rw){
+        if(Math.floor(r/rw)%3!==0)continue;
+        ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.arc(0,0,Math.max(0,r-rw*.5),0,Math.PI*2,true);ctx.fill();
+      }
+      ctx.restore();
+    }
+    break;
+  }
+
+  case'p_rings':{
+    // Expanding rings for strong MAE + strobe flash on every other ring pair
+    const rw=Math.max(2,Math.floor(w/(ci*4+10))),ph=s*24,f=10+ci*.3;
+    for(let r=w*1.5;r>0;r-=rw){
+      const alt=hz(f+Math.floor(r/(rw*4))*.22)%2?30:0;
+      const base=Math.floor((r-ph)/rw)%2===0?255:0;
+      const lum=Math.min(255,base+alt);
+      ctx.beginPath();ctx.arc(w/2,h/2,r,0,Math.PI*2);
+      ctx.fillStyle=`rgb(${lum},${lum},${lum})`;ctx.fill();
+    }
+    // Red strobe rings at 1.5× rate — cross-channel colour conflict
+    const rw2=rw*3,ph2=s*16;
+    if(blink(f*1.5)){
+      for(let r=w*1.5;r>0;r-=rw2){
+        if(Math.floor(r/rw2)%2!==0)continue;
+        ctx.beginPath();ctx.arc(w/2,h/2,r,0,Math.PI*2);
+        ctx.strokeStyle='#f00';ctx.lineWidth=Math.max(1,rw2*.3);ctx.stroke();
+      }
+    }
+    break;
+  }
+
+  case'p_pinna':{
+    // Pinna-Brelstaff + strobe brightness pulse synced to zoom cycle
+    ctx.save();ctx.translate(w/2,h/2);
+    const zm=1+Math.sin(s*.065)*.06;ctx.scale(zm,zm);
+    const rings=Math.max(3,ci),tp=Math.max(18,ci*7+10),maxR=w*.44;
+    for(let r=0;r<rings;r++){
+      const rad=((r+.5)/rings)*maxR,dir=r%2===0?1:-1,mL=(maxR/rings)*.7,mW=Math.max(2,mL*.22);
+      for(let t=0;t<tp;t++){
+        const ang=(t/tp)*Math.PI*2;
+        ctx.save();ctx.translate(Math.cos(ang)*rad,Math.sin(ang)*rad);
+        ctx.rotate(ang+Math.PI*.5*dir+Math.PI*.25*dir);
+        ctx.fillStyle='#fff';ctx.fillRect(-mW/2,-mL/2,mW,mL);ctx.restore();
+      }
+    }
+    ctx.restore();
+    // Hard inversion synced to zoom peak — difference blend, no grey wash
+    embedStrobe(11+ci*.25);break;
+  }
+
+  case'p_scintillate':{
+    // Scintillating grid — fine grid + bright dots + strobe pulse shifts dot phase
+    const sp=Math.max(9,Math.floor(w/(ci+5))),lt=Math.max(1,Math.round(sp*.2));
+    const ds=Math.max(3,lt*1.5),f=9+ci*.35,sph=blink(f);
+    ctx.fillStyle='#0d0d0d';ctx.fillRect(0,0,w,h);
+    const dx=(s*7)%sp,dy=(s*7)%sp;
+    ctx.fillStyle=sph?'#888':'#666';
+    for(let x=-sp+dx;x<w+sp;x+=sp)ctx.fillRect(x-lt/2,0,lt,h);
+    for(let y=-sp+dy;y<h+sp;y+=sp)ctx.fillRect(0,y-lt/2,w,lt);
+    // Dots alternate between white and near-white on strobe beat — maximises ghost dot flicker
+    ctx.fillStyle=sph?'#fff':'#000';
+    for(let x=-sp+dx;x<w+sp;x+=sp)for(let y=-sp+dy;y<h+sp;y+=sp){
+      ctx.beginPath();ctx.arc(x,y,ds/2,0,Math.PI*2);ctx.fill();
+    }
+    embedStrobe(f*2);break;
+  }
+
+  case'p_ouchi':{
+    // Ouchi — fine stripe width + strobe phase that swaps disc/surround orientation mid-flash
+    const sw=Math.max(1,Math.round(32/cC)),f=10+ci*.3,sph=blink(f);
+    ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.fillStyle='#fff';
+    // Surround: vertical stripes (or horizontal on strobe beat)
+    if(!sph)for(let x=0;x<w;x+=sw*2)ctx.fillRect(x,0,sw,h);
+    else for(let y=0;y<h;y+=sw*2)ctx.fillRect(0,y,w,sw);
+    const cS=w*.62,dx=Math.sin(s*.26)*(cC*2),dy=Math.cos(s*.26)*(cC*2);
+    ctx.save();ctx.beginPath();ctx.arc(w/2+dx,h/2+dy,cS/2,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.fillStyle='#fff';
+    // Disc always orthogonal to current surround — maximises orientation conflict
+    if(!sph)for(let y=0;y<h;y+=sw*2)ctx.fillRect(0,y,w,sw);
+    else for(let x=0;x<w;x+=sw*2)ctx.fillRect(x,0,sw,h);
+    ctx.restore();break;
+  }
+
+  case'p_opticflow':{
+    // Dot field flies outward + strobe flash every N frames boosts temporal contrast
+    const dc=Math.max(120,ci*60),ft=s*.034,f=8+ci*.35;
+    for(let i=0;i<dc;i++){
+      const th=(Math.sin(i*127.1)*.5+.5)*Math.PI*2,d0=Math.sin(i*311.7)*.5+.5;
+      const d=(d0+ft)%1,ps=Math.pow(d,2);
+      const x=w/2+Math.cos(th)*ps*w*.52,y=h/2+Math.sin(th)*ps*h*.52;
+      if(x<0||x>w||y<0||y>h)continue;
+      const ds=Math.max(2,ps*10),br=Math.floor(55+d*200);
+      ctx.fillStyle=`rgb(${br},${br},${br})`;ctx.fillRect(x-ds/2,y-ds/2,Math.max(ds,2),Math.max(ds,2));
+    }
+    embedStrobe(f);break;
+  }
+
+  case'p_fraser':{
+    // Fraser-Wilcox proper sawtooth: 5-step asymmetric luminance ramp drives drift
+    // Tiles march diagonally; sawtooth phase advances = apparent continuous drift
+    const cs=Math.max(5,Math.floor(w/(ci*2+5)));
+    const lums=[0,45,110,190,255],nl=lums.length,ph=Math.floor(s*.65)%nl;
+    const f=10+ci*.3;
+    for(let x=0;x<w;x+=cs)for(let y=0;y<h;y+=cs){
+      // Blink alternates between two sawtooth phases to create stronger drift conflict
+      const cph=blink(f)?ph:(ph+2)%nl;
+      const l=lums[(Math.floor(x/cs)+Math.floor(y/cs)+cph)%nl];
+      ctx.fillStyle=`rgb(${l},${l},${l})`;ctx.fillRect(x,y,cs,cs);
+    }
+    embedStrobe(f*1.4);break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // HYPNOTIC + EMBEDDED STROBE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'h_spiral':{
+    // Pixel-exact Archimedean spiral + concentric strobe rings that flash over it
+    const maxR=w*.48,turns=Math.max(2,ci),rot=s*.045;
+    const id=ctx.createImageData(w,h);const d=id.data;
+    for(let x=0;x<w;x++){
+      for(let y=0;y<h;y++){
+        const dx=x-w/2,dy=y-h/2,r=Math.sqrt(dx*dx+dy*dy);
+        if(r>maxR){const i=(y*w+x)*4;d[i+3]=255;continue;}
+        const theta=(Math.atan2(dy,dx)-rot+Math.PI*20)%(Math.PI*2);
+        const v=Math.floor((r/maxR)*turns*2+theta/Math.PI)%2===0?255:0;
+        const i=(y*w+x)*4;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;
+      }
+    }
+    ctx.putImageData(id,0,0);
+    // Ring strobe — hard-inverts rings outward over spiral at 10Hz using difference blend
+    const rw=Math.max(4,Math.floor(maxR/(ci+3))),f=10+ci*.3;
+    ctx.save();ctx.globalCompositeOperation='difference';ctx.translate(w/2,h/2);
+    ctx.fillStyle='#fff';
+    for(let r=maxR;r>0;r-=rw){
+      if(!hz(f+Math.floor(r/rw)*.22)%2)continue;
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.arc(0,0,Math.max(0,r-rw*.6),0,Math.PI*2,true);ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case'h_barber':{
+    // Barber pole aperture + sector strobe split
+    ctx.save();ctx.translate(w/2,h/2);
+    ctx.beginPath();ctx.arc(0,0,w*.47,0,Math.PI*2);ctx.clip();
+    const sw=Math.max(5,Math.floor(w/(ci*1.6+5))),scroll=(s*20)%(sw*3);
+    ctx.save();ctx.rotate(Math.PI/4);
+    for(let y=-w*2;y<w*2;y+=sw*3){
+      const yo=y+scroll-w*2;
+      ctx.fillStyle='#fff';ctx.fillRect(-w*2,yo,w*4,sw);
+      ctx.fillStyle='#bb1111';ctx.fillRect(-w*2,yo+sw,w*4,sw);
+    }
+    ctx.restore();
+    // Sector strobe inside the circle — hard-inverts alternating pie slices
+    const sec=Math.max(6,ci*2+4),sang=Math.PI*2/sec,f=10+ci*.4;
+    ctx.globalCompositeOperation='difference';
+    for(let i=0;i<sec;i+=2){
+      if(hz(f+i*.3)%2===0)continue;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w*.47,i*sang,(i+1)*sang);ctx.closePath();
+      ctx.fillStyle='#fff';ctx.fill();
+    }
+    ctx.globalCompositeOperation='source-over';
+    ctx.beginPath();ctx.arc(0,0,w*.47,0,Math.PI*2);ctx.strokeStyle='#1a1a1a';ctx.lineWidth=Math.max(4,w*.025);ctx.stroke();
+    ctx.restore();break;
+  }
+
+  case'h_tunnel':{
+    // Zoom tunnel + strobe ring highlights that pulse outward
+    ctx.save();ctx.translate(w/2,h/2);
+    const L=Math.max(10,ci*3);
+    for(let i=L;i>0;i--){
+      const pg=((i/L)+s*.028)%1,sz=(w*2.5)*Math.pow(pg,3);
+      ctx.strokeStyle=i%2===0?'#fff':'#000';
+      ctx.lineWidth=Math.max(1,sz*.12);ctx.strokeRect(-sz/2,-sz/2,sz,sz);
+    }
+    // Flash ring pulses outward over tunnel at 9Hz — binary on/off per ring
+    const f=9+ci*.4,wave=hz(f)%L;
+    ctx.save();ctx.globalCompositeOperation='difference';ctx.fillStyle='#fff';
+    for(let i=0;i<L;i++){
+      const dist=(i-wave+L)%L;if(dist>2)continue;
+      const pg=((i/L)+s*.028)%1,sz=(w*2.5)*Math.pow(pg,3);
+      ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(2,sz*.15);
+      ctx.strokeRect(-sz/2,-sz/2,sz,sz);
+    }
+    ctx.restore();break;
+  }
+
+  case'h_vortex':{
+    // Compound vortex (rotation+expansion) + hard inversion strobe every 11Hz
+    ctx.save();ctx.translate(w/2,h/2);
+    const coils=Math.max(3,ci),thick=Math.max(3,Math.floor((w/1.5)/coils)),zph=(s*9)%(thick*2);
+    ctx.rotate(-s*.07);
+    for(let r=w*1.5;r>0;r-=thick){
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);
+      ctx.fillStyle=Math.floor((r-zph)/thick)%2===0?'#fff':'#000';ctx.fill();
+    }
+    ctx.globalCompositeOperation='difference';ctx.fillStyle='#fff';
+    const slices=Math.max(8,ci*2+4);
+    for(let i=0;i<slices;i++){
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.arc(0,0,w*1.5,i*(Math.PI/slices),i*(Math.PI/slices)+(Math.PI/(slices*2)));ctx.fill();
+    }
+    ctx.globalCompositeOperation='source-over';ctx.restore();
+    embedInvert(11+ci*.25);break;
+  }
+
+  case'h_rings':{
+    // Pulsing ring stack: sine brightness wave + spoke flash at 2× ring frequency
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(10,ci*3+5),maxR=w*.48,rw=maxR/rings,f=9+ci*.4;
+    const wave=hz(f);
+    for(let r=0;r<rings;r++){
+      const pulse=Math.sin((r/rings)*Math.PI*2+wave*.42)*.5+.5;
+      const lum=Math.floor(30+pulse*225);
+      ctx.beginPath();ctx.arc(0,0,(r+1)*rw,0,Math.PI*2);ctx.arc(0,0,r*rw,0,Math.PI*2,true);
+      ctx.fillStyle=`rgb(${lum},${lum},${lum})`;ctx.fill();
+    }
+    ctx.rotate(s*.065);
+    const spokes=Math.max(16,ci*4+8),sph=blink(f*2);
+    for(let i=0;i<spokes;i++){
+      const a=(i/spokes)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,maxR,a,a+Math.PI/spokes);
+      ctx.fillStyle=sph?'#fff':'#000';ctx.fill();
+    }
+    ctx.restore();break;
+  }
+
+  case'h_helix':{
+    // Coiled helix tube zooms toward viewer + strobe — combines expansion MAE + flash
+    ctx.save();ctx.translate(w/2,h/2);
+    const turns=Math.max(3,ci),totalPts=Math.max(120,ci*40),f=10+ci*.35;
+    ctx.lineWidth=Math.max(2,w/55);
+    const rot=s*.058;
+    for(let i=0;i<totalPts;i++){
+      const t=i/totalPts,t2=(i+1)/totalPts;
+      const phase1=t*turns*Math.PI*2+rot,phase2=t2*turns*Math.PI*2+rot;
+      // Depth: closer = larger radius from centre
+      const depth1=Math.pow(t,1.6),depth2=Math.pow(t2,1.6);
+      const r1=depth1*w*.46,r2=depth2*w*.46;
+      const x1=Math.cos(phase1)*r1,y1=Math.sin(phase1)*r1;
+      const x2=Math.cos(phase2)*r2,y2=Math.sin(phase2)*r2;
+      const lum=Math.floor(60+depth1*195);
+      // Flash alternating segments at ~10Hz
+      const segFlash=hz(f+Math.floor(t*turns*4)*.2)%2;
+      ctx.strokeStyle=segFlash?`rgb(${lum},${lum},${lum})`:`rgb(${Math.floor(lum*.2)},${Math.floor(lum*.2)},${Math.floor(lum*.2)})`;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    }
+    ctx.restore();break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // VIBRATION & FINE PATTERN
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'v_raster':{
+    // 1-2px horizontal grating phase-flips at 10–18Hz; orthogonal overlay adds moiré beat
+    const f=8+ci*.9,lH=ci>=12?1:2,vPh=blink(f);
+    for(let y=0;y<h;y+=lH*2){ctx.fillStyle='#fff';ctx.fillRect(0,y+(vPh*lH),w,lH);}
+    if(ci>5){
+      ctx.save();ctx.translate(w/2,h/2);ctx.rotate(Math.PI*.5+.06);
+      for(let y=-w;y<w;y+=lH*2){
+        ctx.fillStyle=vPh===0?'#fff':'#000';
+        ctx.fillRect(-h,y+((1-vPh)*lH),h*2,lH);
+      }
+      ctx.restore();
+    }
+    break;
+  }
+
+  case'v_hash':{
+    // Two thin opposing diagonal grids oscillate in anti-phase — intersection buzz
+    const sp=Math.max(2,Math.floor(w/(ci*5+12)));
+    const f=9+ci*.7,vPh=(tick/Math.max(1,Math.round(fps/f)))*Math.PI;
+    ctx.lineWidth=Math.max(1,sp*.35);
+    ctx.globalAlpha=.65+Math.sin(vPh)*.35;ctx.strokeStyle='#fff';
+    for(let d=-w;d<w*2;d+=sp){ctx.beginPath();ctx.moveTo(d+Math.sin(vPh)*sp*.55,-h);ctx.lineTo(d+Math.sin(vPh)*sp*.55+h*2,h*2);ctx.stroke();}
+    ctx.globalAlpha=.65+Math.cos(vPh)*.35;
+    for(let d=-h;d<h*2;d+=sp){ctx.beginPath();ctx.moveTo(-w,d+Math.cos(vPh+Math.PI)*sp*.55);ctx.lineTo(w*2,d+Math.cos(vPh+Math.PI)*sp*.55+w*2);ctx.stroke();}
+    ctx.globalAlpha=1;break;
+  }
+
+  case'v_moire':{
+    // Two 1px gratings at slowly diverging angles — beat nodes sweep across frame
+    const lw=Math.max(1,Math.floor(w/(ci*9+14)));
+    ctx.save();ctx.translate(w/2,h/2);ctx.fillStyle='#fff';
+    for(let x=-w;x<w;x+=lw*2)ctx.fillRect(x,-h,lw,h*2);
+    ctx.rotate(Math.sin(s*.011)*.18+.035+ci*.005);
+    ctx.fillStyle='#fff';
+    for(let x=-w;x<w;x+=lw*2)ctx.fillRect(x,-h,lw,h*2);
+    ctx.restore();break;
+  }
+
+  case'v_vernier':{
+    // Vernier jitter: rows of 1-2px lines with alternating sub-pixel offsets; phase flips fast
+    const rows=Math.max(10,ci*4),rH=Math.max(1,Math.floor(h/rows)),lH=Math.max(1,Math.floor(rH*.45));
+    const jAmp=Math.max(3,Math.round(w*.02)),f=11+ci*.8,jCy=Math.max(2,Math.round(fps/f));
+    ctx.fillStyle='#fff';
+    for(let r=0;r<rows;r++){
+      const jDir=(r%2===0?1:-1)*(Math.floor((tick+r*jCy*.6)%(jCy*2)<jCy)?1:-1);
+      const jX=jAmp*jDir;
+      ctx.fillRect(jX,r*rH,w*.5,lH);ctx.fillRect(w*.5-jX,r*rH,w*.5,lH);
+    }
+    break;
+  }
+
+  case'v_radial':{
+    // Very thin spokes on counter-rotating rings, each spoke flickering independently
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(4,Math.floor(ci/2)+3),maxR=w*.48,f=9+ci*.5;
+    for(let r=0;r<rings;r++){
+      const rad=((r+1)/rings)*maxR;
+      const spokes=Math.max(32,ci*8+14);
+      const spokeW=Math.max(1,Math.round(Math.PI*2*rad/spokes*.25));
+      const rot=(tick/fps)*Math.PI*(r%2===0?1.5:-1.2)*(1+r*.2);
+      for(let i=0;i<spokes;i++){
+        const a=rot+(i/spokes)*Math.PI*2;
+        if(!hz(f+(r*.55)+(i%5)*.28)%2)continue;
+        ctx.fillStyle='#fff';
+        const px=Math.cos(a)*rad,py=Math.sin(a)*rad;
+        ctx.fillRect(px-spokeW/2,py-spokeW/2,Math.max(spokeW,1.5),Math.max(spokeW,1.5));
+      }
+    }
+    ctx.restore();break;
+  }
+
+  case'v_interference':{
+    // Two circular wave trains from offset centres — interference creates shimmering nodes
+    // Node positions shift with animation creating perceived vibration
+    const step=Math.max(2,Math.floor(5-ci*.15));
+    const cx1=w*.35+Math.sin(s*.04)*w*.07,cy1=h*.5,cx2=w*.65+Math.cos(s*.04)*w*.07,cy2=h*.5;
+    const f=ci*.08,ph1=s*.5,ph2=s*.52+.4;
+    for(let x=0;x<w;x+=step){
+      for(let y=0;y<h;y+=step){
+        const r1=Math.sqrt((x-cx1)**2+(y-cy1)**2);
+        const r2=Math.sqrt((x-cx2)**2+(y-cy2)**2);
+        const v1=Math.cos(r1*f-ph1),v2=Math.cos(r2*f-ph2);
+        const v=(v1+v2)*.5;
+        const lum=Math.floor(v*127+128);
+        ctx.fillStyle=`rgb(${lum},${lum},${lum})`;ctx.fillRect(x,y,step,step);
+      }
+    }
+    // Strobe flash over interference pattern at 11Hz
+    embedStrobe(11+ci*.3);break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SCINTILLATING & ILLUSORY
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'i_enigma':{
+    // Leviant's Enigma — radial background + mid-gray rings + ring strobe at 9Hz
+    ctx.save();ctx.translate(w/2,h/2);
+    const rays=Math.max(18,ci*6+10),ang=Math.PI*2/rays;
+    ctx.rotate(Math.sin(s*.48)*.02);
+    for(let i=0;i<rays;i++){
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,(i*2)*ang,(i*2+1)*ang);
+      ctx.fillStyle='#fff';ctx.fill();
+    }
+    const rt=Math.max(5,Math.floor(w/(ci*1.3+2))),f=9+ci*.3;
+    ctx.lineWidth=rt;ctx.strokeStyle='#787878';
+    for(let r=w*.15;r<w*.92;r+=w*.19){
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
+      ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
+      ctx.beginPath();ctx.arc(0,0,r-rt/2,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(0,0,r+rt/2,0,Math.PI*2);ctx.stroke();
+      ctx.lineWidth=rt;ctx.strokeStyle='#787878';
+    }
+    ctx.restore();
+    // Rings flash at 9Hz — increases perceived illusory rotation
+    embedInvert(f);break;
+  }
+
+  case'i_neon':{
+    // Neon spreading — partial arcs + white grid + hue cycle + brightness flash
+    ctx.save();ctx.translate(w/2,h/2);
+    const gn=Math.max(3,ci),cs=w/gn,arcR=cs*.38,f=8+ci*.35;
+    ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,w/150);
+    for(let i=-gn/2;i<=gn/2;i++){
+      ctx.beginPath();ctx.moveTo(i*cs,-h/2);ctx.lineTo(i*cs,h/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-w/2,i*cs);ctx.lineTo(w/2,i*cs);ctx.stroke();
+    }
+    const hue=(s*8)%360;
+    ctx.strokeStyle=`hsl(${hue},100%,${blink(f)?62:50}%)`;ctx.lineWidth=Math.max(3,w/48);
+    for(let gx=-Math.ceil(gn/2);gx<=Math.ceil(gn/2);gx++)
+      for(let gy=-Math.ceil(gn/2);gy<=Math.ceil(gn/2);gy++){
+        const cx=gx*cs,cy=gy*cs;
+        for(let sg=0;sg<4;sg++){ctx.beginPath();ctx.arc(cx,cy,arcR,sg*Math.PI*.5+.12,sg*Math.PI*.5+.38);ctx.stroke();}
+      }
+    ctx.globalAlpha=.09+blink(f)*.06;ctx.fillStyle=`hsl(${hue},100%,68%)`;
+    for(let gx=-Math.ceil(gn/2);gx<Math.ceil(gn/2);gx++)
+      for(let gy=-Math.ceil(gn/2);gy<Math.ceil(gn/2);gy++){
+        ctx.beginPath();ctx.arc((gx+.5)*cs,(gy+.5)*cs,arcR*.75,0,Math.PI*2);ctx.fill();
+      }
+    ctx.globalAlpha=1;ctx.restore();break;
+  }
+
+  case'i_checkerwheel':{
+    // Counter-rotating checker rings + hard inversion strobe every 10Hz
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(5,ci*2),slices=Math.max(18,ci*5+8),maxR=w*1.2,rw=maxR/rings,ang=Math.PI*2/slices;
+    ctx.rotate(s*.06);
+    for(let r=rings;r>0;r--)for(let i=0;i<slices;i++){
+      if((r+i)%2!==0)continue;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r*rw,i*ang,(i+1)*ang);
+      ctx.fillStyle='#fff';ctx.fill();
+    }
+    ctx.rotate(-s*.13);
+    const iRings=Math.max(3,Math.floor(rings*.5)),iSlices=slices;
+    for(let r=iRings;r>0;r--)for(let i=0;i<iSlices;i++){
+      if((r+i+1)%2!==0)continue;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r*(w*.5/iRings),i*ang,(i+1)*ang);
+      ctx.fillStyle='#fff';ctx.fill();
+    }
+    ctx.restore();
+    embedInvert(10+ci*.3);break;
+  }
+
+  case'i_gridwarp':{
+    // Flowing sine grid warp + strobe flash every 10Hz — grid pulsing+warping simultaneously
+    const gs=Math.max(7,Math.floor(w/(ci*2+5)));
+    ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1,w/280);
+    for(let y=0;y<=h+gs;y+=gs){
+      ctx.beginPath();
+      for(let x=0;x<=w;x+=2){
+        const wy=y+Math.sin(x*.014*(cC*.3)+s*.13)*(cC*5)+Math.cos(x*.008+s*.08)*(cC*2.5);
+        x===0?ctx.moveTo(x,wy):ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    for(let x=0;x<=w+gs;x+=gs){
+      ctx.beginPath();
+      for(let y=0;y<=h;y+=2){
+        const wx=x+Math.sin(y*.014*(cC*.3)+s*.14)*(cC*5)+Math.cos(y*.008+s*.1)*(cC*2.5);
+        y===0?ctx.moveTo(wx,y):ctx.lineTo(wx,y);
+      }
+      ctx.stroke();
+    }
+    embedStrobe(10+ci*.3);break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GEOMETRIC DISTORTION + STROBE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'g_cafe':{
+    // Café Wall + mortar brightness strobes at ~8Hz — strength of illusion oscillates visibly
+    const tW=Math.max(7,Math.floor(w/(ci*2+4))),mort=Math.max(1,Math.round(tW*.14)),f=8+ci*.35;
+    const rH=tW+mort;
+    // Mortar flashes between gray values — maximises convergence illusion
+    const ml=blink(f)?Math.floor(110+Math.sin(s*.06)*50):Math.floor(140+Math.sin(s*.06)*40);
+    ctx.fillStyle=`rgb(${ml},${ml},${ml})`;ctx.fillRect(0,0,w,h);
+    const sy=(s*3)%rH;
+    for(let row=-1;row<Math.ceil(h/rH)+1;row++){
+      const y=row*rH-sy,off=row%2===0?0:tW*.5;
+      for(let col=-2;col<Math.ceil(w/tW)+2;col++){
+        ctx.fillStyle=col%2===0?'#050505':'#f2f2f2';ctx.fillRect(col*tW+off,y,tW,tW);
+      }
+    }
+    break;
+  }
+
+  case'g_hering':{
+    // Hering radiating lines + red test lines + sector flash over radials
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const rc=Math.max(18,ci*8+8);
+    ctx.strokeStyle='#000';ctx.lineWidth=1;
+    for(let i=0;i<rc;i++){
+      const ang=(i/rc)*Math.PI*2+s*.008;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(ang)*w,Math.sin(ang)*w);ctx.stroke();
+    }
+    ctx.lineWidth=Math.max(3,w/36);ctx.strokeStyle='#f00';
+    const lY=h*.26;
+    ctx.beginPath();ctx.moveTo(-w*.65,-lY);ctx.lineTo(w*.65,-lY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(-w*.65,lY);ctx.lineTo(w*.65,lY);ctx.stroke();
+    // Sector inversion over radiating lines at 10Hz — hard difference blend
+    const sec=Math.max(8,ci*3+4),sang=Math.PI*2/sec,f=10+ci*.4;
+    if(blink(f)){
+      ctx.globalCompositeOperation='difference';ctx.fillStyle='#fff';
+      for(let i=0;i<sec;i+=2){ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w*1.5,i*sang,(i+1)*sang);ctx.fill();}
+      ctx.globalCompositeOperation='source-over';
+    }
+    ctx.restore();break;
+  }
+
+  case'g_zollner':{
+    // Zöllner: parallel lines appear to converge due to opposing hatch marks
+    // Hatch marks flash between two tilt angles — makes lines appear to wobble
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+    const lc=Math.max(5,ci),ls=h/(lc+1);
+    const hc=Math.max(8,ci*3+4),hL=ls*.36;
+    const f=10+ci*.4,fl=blink(f);
+    // Hatch angle alternates between two values at strobe frequency
+    const ha=fl?Math.PI*.28+ci*.008:Math.PI*.22+ci*.008;
+    ctx.lineWidth=Math.max(2,w/70);ctx.strokeStyle='#000';
+    for(let l=0;l<lc;l++){
+      const y=ls*(l+1);
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+      ctx.lineWidth=Math.max(1,w/140);
+      const hd=l%2===0?1:-1;
+      for(let hh=0;hh<hc;hh++){
+        const hx=(w/hc)*(hh+.5),a=ha*hd;
+        const dx=Math.cos(a)*hL/2,dy=Math.sin(a)*hL/2;
+        ctx.beginPath();ctx.moveTo(hx-dx,y-dy);ctx.lineTo(hx+dx,y+dy);ctx.stroke();
+      }
+      ctx.lineWidth=Math.max(2,w/70);
+    }
+    break;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // OVERLOAD & GLITCH
+  // ══════════════════════════════════════════════════════════════════════════
+
+  case'o_checker':{
+    const sz=Math.max(2,Math.floor(75/Math.max(1,cC))),tg=Math.floor(s*2.2)%2===0;
+    for(let x=0;x<w;x+=sz)for(let y=0;y<h;y+=sz)
+      if(((Math.floor(x/sz)+Math.floor(y/sz))%2===0)===tg){ctx.fillStyle='#fff';ctx.fillRect(x,y,sz,sz);}
+    break;
+  }
+
+  case'o_rgb':{
+    // Chromatic aberration with rapid oscillation and strobe pulse
+    ctx.globalCompositeOperation='lighter';
+    const oc=Math.sin(s*.55)*(cC*3);
+    ctx.fillStyle='#f00';ctx.fillRect(oc,0,w,h);
+    ctx.fillStyle='#0f0';ctx.fillRect(-oc,oc,w,h);
+    ctx.fillStyle='#00f';ctx.fillRect(0,-oc,w,h);
+    ctx.globalCompositeOperation='source-over';
+    embedStrobe(9+ci*.3);break;
+  }
+
+  case'o_glitch':{
+    ctx.fillStyle=Math.floor(s*2)%2===0?'#fff':'#000';ctx.fillRect(0,0,w,h);
+    for(let i=0;i<ci*2+6;i++){
+      ctx.fillStyle=i%3===0?'#f00':i%3===1?'#0ff':'#ff0';
+      ctx.fillRect(Math.random()*w,Math.random()*h,Math.random()*w*.5,Math.random()*14+2);
+    }
+    break;
+  }
+
+  case'o_noise':{
+    const gr=Math.max(1,Math.floor(7/Math.max(.1,cC/2))),tg=Math.floor(s*2)%2===0;
+    for(let x=0;x<w;x+=gr)for(let y=0;y<h;y+=gr)
+      if(Math.random()>(tg?.26:.74)){ctx.fillStyle='#fff';ctx.fillRect(x,y,gr,gr);}
+    break;
+  }
+
+  case'text':{
+    const raw=txtIn.value||'VOID';
+    const words=raw.split(',').map(ww=>ww.trim().toUpperCase()).filter(ww=>ww.length>0);
+    if(!words.length)words.push('VOID');
+    const word=words[Math.floor(s)%words.length],tg=Math.floor(s*2.5)%2===0;
+    ctx.fillStyle=tg?'#000':'#fff';ctx.fillRect(0,0,w,h);ctx.fillStyle=tg?'#fff':'#000';
+    ctx.font='900 100px Archivo Black,Impact,sans-serif';
+    const sc=Math.min((w*.9)/ctx.measureText(word).width,(h*.9)/75);
+    ctx.font=`900 ${100*sc}px Archivo Black,Impact,sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(word,w/2,h/2);
+    if(cC>5){
+      ctx.globalAlpha=(cC-5)/14;const of=cC*2.8;
+      ctx.fillStyle='#f00';ctx.fillText(word,w/2-of,h/2);
+      ctx.fillStyle='#0ff';ctx.fillText(word,w/2+of,h/2);
+      ctx.globalAlpha=1;
+    }
+    break;
+  }
+
+  }// end switch
+
+  // Red fixation cross for all MAE/peripheral/hypnotic presets
+  if(NEEDCROSS.has(p)){
+    const cs=Math.max(18,w*.07),ct=Math.max(3,cs*.22);
+    ctx.fillStyle='#f00';ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=10;
+    ctx.fillRect(w/2-ct/2,h/2-cs/2,ct,cs);ctx.fillRect(w/2-cs/2,h/2-ct/2,cs,ct);
+    ctx.shadowBlur=0;
+  }
+}
+
+// ─── GIF RENDERER ─────────────────────────────────────────────────────────────
+function updProg(pct){ppct.innerText=`${pct}%`;pcirc.style.strokeDashoffset=251.2-(251.2*pct/100);}
+async function generateGIF(){
+  stopPrev();rovl.classList.remove('hidden');rovl.classList.add('ra');
+  pstat.innerText='Initializing';updProg(0);
+  const fps=+cfg.fps.value,frames=+cfg.frm.value,ww=C.width,hh=C.height;
+  let wb='';
+  try{const r=await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');wb=URL.createObjectURL(new Blob([await r.text()],{type:'application/javascript'}));}
+  catch(e){wb='https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';}
+  const gif=new GIF({workers:2,quality:8,width:ww,height:hh,workerScript:wb});
+  tick=0;spd=0;pstat.innerText='Capturing Frames';
+  for(let i=0;i<frames;i++){
+    drawFrame();gif.addFrame(ctx,{copy:true,delay:1000/fps});tick++;
+    updProg(Math.round(((i+1)/frames)*50));
+    if(i%8===0)await new Promise(r=>requestAnimationFrame(r));
+  }
+  pstat.innerText='Encoding GIF';
+  gif.on('progress',p=>updProg(50+Math.round(p*50)));
+  gif.on('finished',blob=>{
+    rovl.classList.add('hidden');rovl.classList.remove('ra');
+    if(wb.startsWith('blob:'))URL.revokeObjectURL(wb);
+    const url=URL.createObjectURL(blob);
+    const wrap=document.createElement('div');
+    wrap.className='ctrl w-full flex flex-col items-center';
+    wrap.innerHTML=`
+      <div class="w-full flex justify-between items-center mb-3">
+        <span class="text-[10px] font-black text-red-600 uppercase tracking-widest">Render Complete</span>
+        <span class="text-[10px] text-zinc-600 font-mono">${(blob.size/1024/1024).toFixed(2)} MB</span>
+      </div>
+      <img src="${url}" class="rounded-lg shadow-2xl border border-zinc-900 max-w-full"/>
+      <div class="grid grid-cols-2 gap-2 w-full mt-4">
+        <a href="${url}" download="illusion_v12_${Date.now()}.gif" class="bg-red-700 text-white py-3 rounded-lg text-[10px] font-black uppercase text-center tracking-widest">Download</a>
+        <button onclick="this.closest('.ctrl').remove()" class="bg-zinc-900 text-zinc-500 py-3 rounded-lg text-[10px] font-black uppercase text-center tracking-widest">Discard</button>
+      </div>`;
+    document.getElementById('results').prepend(wrap);
+    showMsg('Render Complete','bg-green-800');startPrev();
+  });
+  gif.on('error',e=>{rovl.classList.add('hidden');showMsg('Error: '+e,'bg-red-900');startPrev();});
+  gif.render();
+}
+
+// Init
+handlePreset();calcAT();updCanvas();
+</script>
+</body>
+</html>
