@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CityLink Cams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--b:#0a0a0a;--s:#141414;--c:#111;--bc:#262626;--bh:#3a3a3a;--t:#ededed;--tm:#888;--a:#fff;}
+body{margin:0;padding:10px;font-family:'Inter',sans-serif;background:var(--b);color:var(--t);text-align:center;-webkit-font-smoothing:antialiased;}
+#st{font-size:0.75rem;color:var(--tm);margin-bottom:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;}
+h1{margin:0 0 15px;font-size:1.3rem;font-weight:600;letter-spacing:-0.5px;}
+.ctrl{background:var(--s);border:1px solid var(--bc);border-radius:12px;padding:15px;margin:0 auto 15px;max-width:320px;display:flex;flex-direction:column;gap:15px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.6);}
+.ctrl button{background:#1e1e1e;color:var(--t);border:1px solid var(--bc);padding:10px 20px;font-size:0.9rem;border-radius:8px;cursor:pointer;width:100%;font-weight:500;transition:all .2s;}
+.ctrl button:hover{background:#2a2a2a;border-color:var(--bh);color:var(--a);}
+.ctrl button:active{transform:scale(0.98);}
+.sld{width:100%;display:flex;flex-direction:column;gap:8px;text-align:left;}
+.sld label{font-size:0.8rem;color:var(--tm);display:flex;justify-content:space-between;}
+.sld span{color:var(--t);font-weight:600;}
+input[type=range]{-webkit-appearance:none;width:100%;background:transparent;}
+input[type=range]:focus{outline:none;}
+input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;cursor:pointer;background:#333;border-radius:2px;}
+input[type=range]::-webkit-slider-thumb{height:16px;width:16px;border-radius:50%;background:var(--a);cursor:pointer;-webkit-appearance:none;margin-top:-6px;box-shadow:0 0 8px rgba(0,0,0,0.8);transition:transform .1s;}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15);}
+.grd{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:800px;margin:0 auto;}
+.cb{border:1px solid var(--bc);border-radius:10px;background:var(--c);padding:6px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:transform .2s,border-color .2s;}
+.cb:hover{transform:translateY(-2px);border-color:var(--bh);}
+.cb.l{display:block;}
+.cb h3{margin:6px 0;font-size:0.75rem;color:var(--tm);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+.cb img{width:100%;height:auto;display:block;border-radius:6px;background:#1a1a1a;aspect-ratio:4/3;object-fit:cover;cursor:zoom-in;}
+#mod{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:999;align-items:center;justify-content:center;cursor:zoom-out;backdrop-filter:blur(5px);}
+#mod img{max-width:95%;max-height:95%;border-radius:8px;box-shadow:0 0 30px rgba(0,0,0,0.8);}
+</style>
+</head>
+<body>
+<div id="st">Active: 0/20 | Last Sync: --:--:--</div>
+<h1>CityLink Cameras</h1>
+<div class="ctrl">
+<button id="fr">Force Refresh Now</button>
+<div class="sld">
+<label for="rs">Refresh Interval <span><span id="idisp">10</span>s</span></label>
+<input type="range" id="rs" min="0.5" max="30" step="0.5" value="10">
+</div>
+</div>
+<div class="grd" id="cg"></div>
+<div id="mod"><img id="mimg" src="" alt="Full size"></div>
+<script>
+const base='https://cmlwebcam.transurban.com/wimages/webcam',nums=Array.from({length:20},(_,i)=>String(i+1).padStart(2,'0'));
+const cg=document.getElementById('cg'),st=document.getElementById('st'),mod=document.getElementById('mod'),mimg=document.getElementById('mimg');
+let intv=10000,tmr,act=0;
+function bld(){
+nums.forEach(n=>{
+let b=document.createElement('div'),t=document.createElement('h3'),i=document.createElement('img');
+b.className='cb';b.id='c'+n;t.textContent='CAM '+n;i.dataset.n=n;
+i.onclick=()=>{mod.style.display='flex';mimg.src=i.src;};
+i.onload=()=>{if(!b.classList.contains('l')){b.classList.add('l');act++;upd();}};
+i.onerror=()=>{if(b.classList.contains('l')){b.classList.remove('l');act--;upd();}};
+b.append(t,i);cg.append(b);
+});
+}
+mod.onclick=()=>mod.style.display='none';
+function ref(){
+let ts=Date.now();
+document.querySelectorAll('.cb img').forEach(i=>i.src=`${base}${i.dataset.n}.jpg?t=${ts}`);
+upd();
+}
+function upd(){st.textContent=`Active: ${act}/20 | Last Sync: ${new Date().toLocaleTimeString('en-AU',{hour12:false})}`;}
+function rst(){clearInterval(tmr);tmr=setInterval(ref,intv);}
+document.getElementById('fr').onclick=()=>{ref();rst();};
+document.getElementById('rs').oninput=e=>{
+let v=e.target.value;document.getElementById('idisp').textContent=v;intv=v*1000;rst();
+};
+bld();ref();rst();
+</script>
+</body>
+</html>
