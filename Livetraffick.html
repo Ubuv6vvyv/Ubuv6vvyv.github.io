@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CityLink Cams</title>
+<title>Live Traffic & Marine Cams</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -25,54 +25,108 @@ input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;cursor:po
 input[type=range]::-webkit-slider-thumb{height:16px;width:16px;border-radius:50%;background:var(--a);cursor:pointer;-webkit-appearance:none;margin-top:-6px;box-shadow:0 0 8px rgba(0,0,0,0.8);transition:transform .1s;}
 input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15);}
 .grd{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:800px;margin:0 auto;}
-.cb{border:1px solid var(--bc);border-radius:10px;background:var(--c);padding:6px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:transform .2s,border-color .2s;}
+.cb{border:1px solid var(--bc);border-radius:10px;background:var(--c);padding:6px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:transform .2s,border-color .2s;position:relative;}
 .cb:hover{transform:translateY(-2px);border-color:var(--bh);}
 .cb.l{display:block;}
-.cb h3{margin:6px 0;font-size:0.75rem;color:var(--tm);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
-.cb img{width:100%;height:auto;display:block;border-radius:6px;background:#1a1a1a;aspect-ratio:4/3;object-fit:cover;cursor:zoom-in;}
+.cb h3{margin:6px 0;font-size:0.75rem;color:var(--tm);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cb img, .cb iframe{width:100%;height:auto;display:block;border-radius:6px;background:#1a1a1a;aspect-ratio:4/3;object-fit:cover;border:none;}
+.cb img{cursor:zoom-in;}
 #mod{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:999;align-items:center;justify-content:center;cursor:zoom-out;backdrop-filter:blur(5px);}
 #mod img{max-width:95%;max-height:95%;border-radius:8px;box-shadow:0 0 30px rgba(0,0,0,0.8);}
 </style>
 </head>
 <body>
-<div id="st">Active: 0/20 | Last Sync: --:--:--</div>
-<h1>CityLink Cameras</h1>
+<div id="st">Active: 0/29 | Last Sync: --:--:--</div>
+<h1>Live Camera Grid</h1>
 <div class="ctrl">
 <button id="fr">Force Refresh Now</button>
 <div class="sld">
-<label for="rs">Refresh Interval <span><span id="idisp">1</span>s</span></label>
-<input type="range" id="rs" min="0.5" max="30" step="0.5" value="1">
+<label for="rs">Snapshot Refresh Interval <span><span id="idisp">10</span>s</span></label>
+<input type="range" id="rs" min="0.5" max="30" step="0.5" value="10">
 </div>
 </div>
 <div class="grd" id="cg"></div>
 <div id="mod"><img id="mimg" src="" alt="Full size"></div>
 <script>
-const base='https://cmlwebcam.transurban.com/wimages/webcam',nums=Array.from({length:20},(_,i)=>String(i+1).padStart(2,'0'));
-const cg=document.getElementById('cg'),st=document.getElementById('st'),mod=document.getElementById('mod'),mimg=document.getElementById('mimg');
-let intv=1000,tmr,act=0;
+const clNames = {
+  "01":"Burnley Entry","02":"Burnley Tunnel E","03":"Burnley Tunnel W","04":"Domain Tunnel E",
+  "05":"Domain Tunnel W","06":"Domain Exit","07":"Kings Way","08":"Punt Rd Ramp",
+  "09":"Punt Rd Merge","10":"Batman Ave","11":"Swan St Ramp","12":"Alexandra Ave",
+  "13":"Power St","14":"Toorak Rd","15":"Chapel St","16":"Burke Rd",
+  "17":"Glenferrie Rd","18":"Stud Rd","19":"Springvale Rd","20":"EastLink"
+};
+
+const cams = [
+  ...Array.from({length:20}, (_,i) => {
+    let n=String(i+1).padStart(2,'0');
+    return { type:'img', name:`CityLink: ${clNames[n]}`, url:`https://cmlwebcam.transurban.com/wimages/webcam${n}.jpg` };
+  }),
+  { type:'img', name:"RMYS 1 (Marina)", url:"https://www212.mangocam.com/c/rmys/img.php?w=640&h=360&auth=cm9vdDpheGlz" },
+  { type:'img', name:"RMYS 2 (Bay)", url:"https://www209.mangocam.com/c/rmys2/img.php?w=640&h=360&auth=cm9vdDpheGlz" },
+  { type:'img', name:"RMYS 3 (Pier)", url:"https://www213.mangocam.com/c/rmys3/img.php?w=640&h=360&auth=cm9vdDpheGlz" },
+  
+  { type:'yt', name:"YouTube: ", id:"NsmJg4oSDVg" },
+  { type:'yt', name:"YouTube: ", id:"0-xvuP6Caio" },
+  { type:'yt', name:"YouTube: ", id:"yLSaCBV4mXI" },
+  { type:'yt', name:"YouTube: Station Pier", id:"l_8DrACHpwY" },
+  
+  { type:'iframe', name:"RTSP.me Albert Park", url:"https://rtsp.me/embed/BsQZa96R/" },
+  { type:'img', name:"Melbourne UTC Cam", url:"https://YOUR-DOMAIN.com/images/webcam/01-20260320-070001-utc.jpg" }
+];
+
+const cg=document.getElementById('cg'), st=document.getElementById('st'), mod=document.getElementById('mod'), mimg=document.getElementById('mimg');
+let intv=10000, tmr, act=0, tot=cams.length;
+
 function bld(){
-nums.forEach(n=>{
-let b=document.createElement('div'),t=document.createElement('h3'),i=document.createElement('img');
-b.className='cb';b.id='c'+n;t.textContent='CAM '+n;i.dataset.n=n;
-i.onclick=()=>{mod.style.display='flex';mimg.src=i.src;};
-i.onload=()=>{if(!b.classList.contains('l')){b.classList.add('l');act++;upd();}};
-i.onerror=()=>{if(b.classList.contains('l')){b.classList.remove('l');act--;upd();}};
-b.append(t,i);cg.append(b);
-});
+  cams.forEach((c,i)=>{
+    let b=document.createElement('div'), t=document.createElement('h3');
+    b.className='cb'; b.id='c'+i; t.textContent=c.name;
+    
+    if(c.type === 'img'){
+      let el=document.createElement('img');
+      el.dataset.url = c.url;
+      el.onclick=()=>{mod.style.display='flex'; mimg.src=el.src;};
+      el.onload=()=>{if(!b.classList.contains('l')){b.classList.add('l'); act++; upd();}};
+      el.onerror=()=>{if(b.classList.contains('l')){b.classList.remove('l'); act--; upd();}};
+      b.append(t,el);
+    } else if(c.type === 'iframe') {
+      let el=document.createElement('iframe');
+      el.src = c.url;
+      el.setAttribute('allowfullscreen', 'true');
+      el.onload=()=>{if(!b.classList.contains('l')){b.classList.add('l'); act++; upd();}};
+      b.append(t,el);
+    } else if(c.type === 'yt') {
+      let el=document.createElement('iframe');
+      el.src = `https://www.youtube.com/embed/${c.id}?autoplay=1&mute=1`;
+      el.setAttribute('allowfullscreen', 'true');
+      el.onload=()=>{if(!b.classList.contains('l')){b.classList.add('l'); act++; upd();}};
+      b.append(t,el);
+    }
+    cg.append(b);
+  });
 }
+
 mod.onclick=()=>mod.style.display='none';
+
 function ref(){
-let ts=Date.now();
-document.querySelectorAll('.cb img').forEach(i=>i.src=`${base}${i.dataset.n}.jpg?t=${ts}`);
-upd();
+  let ts=Date.now();
+  document.querySelectorAll('.cb img').forEach(img=>{
+    let base = img.dataset.url;
+    let sep = base.includes('?') ? '&' : '?';
+    img.src = `${base}${sep}t=${ts}`;
+  });
+  upd();
 }
-function upd(){st.textContent=`Active: ${act}/20 | Last Sync: ${new Date().toLocaleTimeString('en-AU',{hour12:false})}`;}
-function rst(){clearInterval(tmr);tmr=setInterval(ref,intv);}
+
+function upd(){st.textContent=`Active: ${act}/${tot} | Last Sync: ${new Date().toLocaleTimeString('en-AU',{hour12:false})}`;}
+function rst(){clearInterval(tmr); tmr=setInterval(ref,intv);}
+
 document.getElementById('fr').onclick=()=>{ref();rst();};
 document.getElementById('rs').oninput=e=>{
-let v=e.target.value;document.getElementById('idisp').textContent=v;intv=v*1000;rst();
+  let v=e.target.value; document.getElementById('idisp').textContent=v; intv=v*1000; rst();
 };
-bld();ref();rst();
+
+bld(); ref(); rst();
 </script>
 </body>
 </html>
