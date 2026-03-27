@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SVCapture — Street View Sequence Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080a0e;--surface:#0f1117;--s2:#161b24;--s3:#1e2433;
+  --border:#252d3d;--b2:#2e3a50;
+  --cyan:#00e5ff;--orange:#ff6b35;--green:#39ff14;--purple:#c084fc;--yellow:#ffd60a;
+  --red:#ff3b3b;--text:#dde4f0;--muted:#5a6a85;--dim:#3a4560;
+  --font:'JetBrains Mono',monospace;--head:'Barlow Condensed',sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+body{display:flex;flex-direction:column}
+
+/* SCANLINE OVERLAY */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,#00000008 2px,#00000008 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+#hdr{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#logo{font-family:var(--head);font-weight:800;font-size:1.3em;letter-spacing:1px;color:var(--cyan);white-space:nowrap;text-shadow:0 0 20px #00e5ff55}
+#logo span{color:var(--orange)}
+#searchWrap{display:flex;flex:1;gap:4px}
+#searchIn{flex:1;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:6px 10px;
+  border-radius:4px;font-family:var(--font);font-size:11px;outline:none;transition:border .2s}
+#searchIn:focus{border-color:var(--cyan);box-shadow:0 0 8px #00e5ff22}
+#searchBtn{background:var(--cyan);color:#000;border:none;border-radius:4px;padding:6px 12px;
+  font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s}
+#searchBtn:hover{background:#33ecff}
+#btnLocToggle{background:var(--s2);border:1px solid var(--border);color:var(--muted);border-radius:4px;
+  padding:6px 9px;font-size:12px;cursor:pointer;transition:all .15s}
+#btnLocToggle:hover{color:var(--cyan);border-color:var(--cyan)}
+
+/* STATUS BAR */
+#status{display:flex;align-items:center;gap:8px;padding:3px 10px;background:var(--surface);
+  border-bottom:1px solid var(--border);flex-shrink:0;min-height:24px;font-size:10px}
+#sDot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:all .3s}
+#sDot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+#sDot.loading{background:var(--yellow);animation:blip .7s infinite}
+#sDot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+#sTxt{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sAddr{color:var(--cyan);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%;cursor:pointer;title:"Click to copy panoId"}
+#sPano{color:var(--dim);font-size:9px;cursor:pointer;white-space:nowrap;transition:color .2s}
+#sPano:hover{color:var(--purple)}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* MAIN */
+#main{flex:1;display:flex;overflow:hidden;position:relative}
+#sv-container{flex:1;position:relative;background:#000}
+
+/* MINIMAP */
+#minimap{position:absolute;bottom:60px;right:10px;width:140px;height:110px;border-radius:6px;
+  overflow:hidden;border:1px solid var(--border);z-index:20;cursor:pointer;
+  box-shadow:0 4px 24px #0008;transition:all .25s ease}
+#minimap:hover{width:210px;height:160px}
+#minimapDiv{width:100%;height:100%}
+#mmToggle{position:absolute;top:3px;right:3px;background:#000a;border:none;color:var(--muted);
+  border-radius:3px;padding:2px 5px;font-size:9px;cursor:pointer;z-index:21;font-family:var(--font)}
+
+/* SEQUENCE PATH OVERLAY */
+#pathCanvas{position:absolute;inset:0;pointer-events:none;z-index:15;display:none}
+
+/* LOCATIONS PANEL */
+#locPanel{position:absolute;top:0;right:0;bottom:0;width:270px;z-index:30;
+  background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;
+  transform:translateX(100%);transition:transform .25s ease}
+#locPanel.show{transform:translateX(0)}
+#locPanel h3{padding:10px 12px;font-family:var(--head);font-size:1em;font-weight:800;
+  border-bottom:1px solid var(--border);display:flex;justify-content:space-between;
+  align-items:center;position:sticky;top:0;background:var(--surface);z-index:1;
+  color:var(--cyan);letter-spacing:.5px}
+#locPanel h3 button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
+.locCat{padding:7px 12px 3px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;
+  background:var(--s2);border-bottom:1px solid var(--border)}
+.locItem{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)22;
+  transition:background .12s;font-size:11px;display:flex;justify-content:space-between;align-items:center}
+.locItem:hover{background:var(--s2)}
+.locItem:hover .locGo{opacity:1}
+.locName{color:var(--text);font-weight:700;font-size:11px}
+.locDesc{color:var(--muted);font-size:9px;margin-top:1px}
+.locGo{color:var(--cyan);font-size:10px;opacity:0;transition:opacity .15s}
+
+/* CONTROLS */
+#controls{display:flex;flex-wrap:wrap;gap:4px;padding:7px 8px;background:var(--surface);
+  border-top:1px solid var(--border);flex-shrink:0}
+.btn{border:none;border-radius:4px;padding:7px 10px;font-size:10px;font-family:var(--font);
+  cursor:pointer;font-weight:700;transition:all .12s;display:flex;align-items:center;gap:4px;
+  white-space:nowrap;letter-spacing:.3px}
+.btn:active{transform:scale(.94)}
+.btn[disabled]{opacity:.35;cursor:not-allowed;pointer-events:none}
+.c{background:var(--cyan);color:#000}.c:hover{background:#33ecff}
+.o{background:var(--orange);color:#000}.o:hover{background:#ff8a5b}
+.g{background:var(--green);color:#000}.g:hover{background:#66ff44}
+.s{background:var(--s3);color:var(--text);border:1px solid var(--border)}.s:hover{border-color:var(--cyan);color:var(--cyan)}
+.d{background:var(--red);color:#fff}
+.p{background:var(--purple);color:#000}
+.sep{width:1px;background:var(--border);margin:0 1px;align-self:stretch}
+.sm{padding:5px 7px;font-size:10px}
+
+/* SEQUENCE COUNTER BADGE */
+#seqBadge{position:absolute;top:-6px;right:-6px;background:var(--orange);color:#000;
+  border-radius:10px;padding:1px 5px;font-size:9px;font-weight:700;display:none}
+
+/* SEQ MODAL */
+#seqModal{display:none;position:fixed;inset:0;background:#000d;z-index:100;
+  align-items:flex-end;justify-content:center;backdrop-filter:blur(3px)}
+#seqModal.show{display:flex}
+#seqBox{background:var(--s2);border:1px solid var(--border);border-radius:12px 12px 0 0;
+  padding:16px;width:100%;max-width:480px;font-size:12px;
+  animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+#seqBox h3{font-family:var(--head);margin-bottom:12px;color:var(--cyan);font-size:1.2em;
+  font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fld label{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:1px}
+.fld input,.fld select{background:var(--s3);border:1px solid var(--border);color:var(--text);
+  padding:8px;border-radius:4px;font-family:var(--font);font-size:11px;outline:none;transition:border .2s}
+.fld input:focus,.fld select:focus{border-color:var(--cyan)}
+.row{display:flex;gap:8px}
+.row .fld{flex:1}
+#seqProgress{margin-top:8px;font-size:10px;color:var(--orange)}
+#seqProgBar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:5px}
+#seqProgFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--orange));width:0%;transition:width .4s}
+#seqSummary{background:var(--s3);border-radius:4px;padding:8px;font-size:10px;color:var(--muted);
+  margin-bottom:10px;border:1px solid var(--border);display:none}
+#seqSummary b{color:var(--text)}
+
+/* SEQUENCE QUEUE PANEL */
+#queuePanel{display:none;position:fixed;inset:0;z-index:90;background:#000d;
+  align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+#queuePanel.show{display:flex}
+#queueBox{background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  width:92%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+#queueBox h3{padding:12px 14px;font-family:var(--head);font-size:1.1em;font-weight:800;
+  color:var(--cyan);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#queueBox h3 button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
+#queueList{flex:1;overflow-y:auto;font-size:10px}
+.qItem{padding:7px 14px;border-bottom:1px solid var(--border)33;display:flex;gap:8px;align-items:center}
+.qNum{color:var(--dim);min-width:28px;font-size:9px}
+.qPano{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.qCoord{color:var(--cyan);font-size:9px;white-space:nowrap}
+.qDel{background:none;border:none;color:var(--dim);cursor:pointer;font-size:11px;padding:2px 4px;transition:color .15s}
+.qDel:hover{color:var(--red)}
+#queueFooter{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px}
+
+/* TOAST */
+#toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--s3);border:1px solid var(--border);border-radius:6px;padding:8px 14px;
+  font-size:11px;color:var(--text);z-index:200;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="logo">SV<span>CAP</span></div>
+  <div id="searchWrap">
+    <input id="searchIn" placeholder="Address, panoId, or Street View URL…" autocomplete="off" spellcheck="false">
+    <button id="searchBtn"><i class="fa fa-search"></i></button>
+  </div>
+  <button id="btnLocToggle" title="Locations"><i class="fa fa-map-marker-alt"></i></button>
+</div>
+
+<div id="status">
+  <div id="sDot"></div>
+  <div id="sTxt">Ready — search an address or pick a location.</div>
+  <div id="sAddr"></div>
+  <div id="sPano" title="Click to copy PanoID">—</div>
+</div>
+
+<div id="main">
+  <div id="sv-container"></div>
+
+  <div id="minimap" style="display:none">
+    <div id="minimapDiv"></div>
+    <button id="mmToggle" title="Toggle minimap">◉</button>
+  </div>
+
+  <div id="locPanel">
+    <h3>Locations <button id="locClose"><i class="fa fa-times"></i></button></h3>
+    <div id="locList"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button class="btn c" id="btnFwd"><i class="fa fa-arrow-up"></i> Fwd</button>
+  <button class="btn c" id="btnBwd"><i class="fa fa-arrow-down"></i> Back</button>
+  <button class="btn s" id="btnTL"><i class="fa fa-undo"></i> 45°</button>
+  <button class="btn s" id="btnTR"><i class="fa fa-redo"></i> 45°</button>
+  <div class="sep"></div>
+  <button class="btn s sm" id="btnRndMel"><i class="fa fa-dice"></i> Melb</button>
+  <button class="btn s sm" id="btnRndGlb"><i class="fa fa-globe"></i> Global</button>
+  <div class="sep"></div>
+  <button class="btn s sm" id="btnAddPano" title="Add current pano to manual queue"><i class="fa fa-plus"></i> Add</button>
+  <button class="btn s sm" id="btnQueue" style="position:relative">
+    <i class="fa fa-list"></i> Queue
+    <span id="seqBadge">0</span>
+  </button>
+  <div class="sep"></div>
+  <button class="btn o" id="btnSeqAuto"><i class="fa fa-film"></i> Auto Sequence</button>
+  <button class="btn g" id="btnExportQueue" disabled><i class="fa fa-download"></i> Export</button>
+</div>
+
+<!-- AUTO SEQUENCE MODAL -->
+<div id="seqModal">
+  <div id="seqBox">
+    <h3><i class="fa fa-film"></i> Auto Sequence Capture</h3>
+    <div id="seqSummary"></div>
+    <div class="row">
+      <div class="fld">
+        <label>Steps</label>
+        <input type="number" id="seqSteps" value="20" min="2" max="2000">
+      </div>
+      <div class="fld">
+        <label>Direction</label>
+        <select id="seqDir">
+          <option value="forward">Forward</option>
+          <option value="backward">Backward</option>
+          <option value="both">Both ways</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="fld">
+        <label>Zoom Level</label>
+        <select id="seqZoom">
+          <option value="1">1 — Draft (tiny)</option>
+          <option value="2">2 — Preview (fast)</option>
+          <option value="3" selected>3 — Standard</option>
+          <option value="4">4 — High Res</option>
+          <option value="5">5 — Max (very slow)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>Dedup Threshold (m)</label>
+        <input type="number" id="seqDedup" value="5" min="0" max="100" title="Min distance between panos to avoid duplicates">
+      </div>
+    </div>
+    <div class="fld">
+      <label>Output filename</label>
+      <input type="text" id="seqFilename" value="sequence" placeholder="sequence (no extension)">
+    </div>
+    <div id="seqProgress" style="display:none"></div>
+    <div id="seqProgBar" style="display:none"><div id="seqProgFill"></div></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn o" id="seqGo" style="flex:1"><i class="fa fa-play"></i> Generate &amp; Export</button>
+      <button class="btn s" id="seqAddQueue" style="flex:1" title="Capture to queue without exporting yet"><i class="fa fa-plus"></i> Add to Queue</button>
+      <button class="btn s" id="seqCancel"><i class="fa fa-times"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- QUEUE PANEL -->
+<div id="queuePanel">
+  <div id="queueBox">
+    <h3>Sequence Queue <button id="queueClose"><i class="fa fa-times"></i></button></h3>
+    <div id="queueList"></div>
+    <div id="queueFooter">
+      <button class="btn s sm" id="queueClear" style="flex:1"><i class="fa fa-trash"></i> Clear</button>
+      <button class="btn g" id="queueExport" style="flex:1"><i class="fa fa-download"></i> Export sequence.json</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDLQb7ZkPE2NufhvDOCrZzWmPsEzxJnFTE&libraries=places"></script>
+<script>
+(function(){'use strict';
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let svp, miniMap=null, miniMarker=null;
+let seqRunning=false, seqAbort=false;
+let currentZoom=3; // tracks selected zoom for export
+const queue=[]; // manual/combined sequence queue
+const SVC=new google.maps.StreetViewService();
+const GEO=new google.maps.Geocoder();
+const $=id=>document.getElementById(id);
+
+// ── LOCATIONS DATABASE ────────────────────────────────────────────────────
+const LOCATIONS=[
+  {cat:"🇦🇺 Melbourne CBD",items:[
+    {n:"Flinders Street Station",d:"Iconic intersection",lat:-37.8183,lng:144.9671},
+    {n:"Federation Square",d:"Cultural precinct",lat:-37.8180,lng:144.9691},
+    {n:"Hosier Lane",d:"Street art laneway",lat:-37.8178,lng:144.9712},
+    {n:"Swanston Street",d:"Main CBD corridor",lat:-37.8136,lng:144.9631},
+    {n:"Collins Street",d:"Paris end shopping",lat:-37.8142,lng:144.9632},
+    {n:"Bourke Street Mall",d:"Pedestrian zone",lat:-37.8143,lng:144.9650},
+    {n:"Degraves Street",d:"Coffee laneway",lat:-37.8171,lng:144.9663},
+    {n:"Queen Victoria Market",d:"Historic market",lat:-37.8075,lng:144.9570},
+    {n:"Melbourne Central",d:"Shopping arcade",lat:-37.8101,lng:144.9630},
+    {n:"Fitzroy — Brunswick St",d:"Trendy strip",lat:-37.7995,lng:144.9778},
+    {n:"St Kilda — Acland St",d:"Cafe & cake strip",lat:-37.8672,lng:144.9822},
+    {n:"Richmond — Bridge Rd",d:"Fashion & food",lat:-37.8248,lng:144.9982},
+    {n:"Southbank Promenade",d:"Riverside walk",lat:-37.8231,lng:144.9647},
+    {n:"Royal Botanic Gardens",d:"Tranquil green space",lat:-37.8304,lng:144.9800},
+    {n:"Chapel Street, Prahran",d:"Nightlife & fashion",lat:-37.8462,lng:144.9940},
+    {n:"Lygon Street, Carlton",d:"Italian restaurant row",lat:-37.7964,lng:144.9672},
+    {n:"Dandenong Ranges",d:"Mountain forest roads",lat:-37.8742,lng:145.3624},
+    {n:"Great Ocean Road — Lorne",d:"Coastal highway",lat:-38.5435,lng:143.9867},
+    {n:"Mornington Peninsula",d:"Coastal village",lat:-38.2162,lng:145.0357},
+  ]},
+  {cat:"🌏 Asia-Pacific",items:[
+    {n:"Shibuya Crossing, Tokyo",d:"World's busiest crossing",lat:35.6595,lng:139.7004},
+    {n:"Shinjuku, Tokyo",d:"Neon and nightlife",lat:35.6938,lng:139.7034},
+    {n:"Dotonbori, Osaka",d:"Street food & lights",lat:34.6687,lng:135.5013},
+    {n:"Myeong-dong, Seoul",d:"Shopping district",lat:37.5635,lng:126.9860},
+    {n:"Gangnam, Seoul",d:"K-pop & glam",lat:37.4979,lng:127.0276},
+    {n:"Causeway Bay, Hong Kong",d:"Dense urban grid",lat:22.2800,lng:114.1833},
+    {n:"Orchard Road, Singapore",d:"Shopping boulevard",lat:1.3048,lng:103.8318},
+    {n:"Jalan Jaksa, Jakarta",d:"Backpacker street",lat:-6.1875,lng:106.8308},
+    {n:"Kuta Beach, Bali",d:"Surf strip",lat:-8.7187,lng:115.1686},
+    {n:"Taipei 101, Taiwan",d:"Iconic skyline",lat:25.0338,lng:121.5646},
+    {n:"Shanghai Bund",d:"Historic waterfront",lat:31.2332,lng:121.4900},
+    {n:"Beijing — Wangfujing",d:"Commercial street",lat:39.9140,lng:116.4078},
+  ]},
+  {cat:"🇺🇸 North America",items:[
+    {n:"Times Square, NYC",d:"The crossroads",lat:40.7580,lng:-73.9855},
+    {n:"Brooklyn Bridge",d:"Iconic walkway",lat:40.7061,lng:-73.9969},
+    {n:"Hollywood Blvd, LA",d:"Walk of Fame",lat:34.1022,lng:-118.3407},
+    {n:"Rodeo Drive, Beverly Hills",d:"Luxury shopping",lat:34.0694,lng:-118.3995},
+    {n:"The Strip, Las Vegas",d:"Neon boulevard",lat:36.1189,lng:-115.1728},
+    {n:"Michigan Ave, Chicago",d:"Magnificent Mile",lat:41.8919,lng:-87.6247},
+    {n:"Market Street, San Francisco",d:"Main artery",lat:37.7749,lng:-122.4194},
+    {n:"South Beach, Miami",d:"Art Deco drive",lat:25.7907,lng:-80.1300},
+    {n:"French Quarter, New Orleans",d:"Bourbon Street",lat:29.9584,lng:-90.0644},
+    {n:"Pike Place Market, Seattle",d:"Historic market",lat:47.6085,lng:-122.3421},
+  ]},
+  {cat:"🇪🇺 Europe",items:[
+    {n:"Champs-Élysées, Paris",d:"Grand boulevard",lat:48.8698,lng:2.3078},
+    {n:"Montmartre, Paris",d:"Artistic hilltop",lat:48.8867,lng:2.3431},
+    {n:"Oxford Street, London",d:"Retail heartland",lat:51.5154,lng:-0.1422},
+    {n:"Tower Bridge, London",d:"Victorian icon",lat:51.5055,lng:-0.0754},
+    {n:"La Rambla, Barcelona",d:"Tree-lined promenade",lat:41.3797,lng:2.1749},
+    {n:"Colosseum, Rome",d:"Ancient amphitheatre",lat:41.8902,lng:12.4922},
+    {n:"Piazza Navona, Rome",d:"Baroque square",lat:41.8992,lng:12.4730},
+    {n:"Dam Square, Amsterdam",d:"City centre",lat:52.3728,lng:4.8936},
+    {n:"Prinsengracht, Amsterdam",d:"Canal ring",lat:52.3710,lng:4.8794},
+    {n:"Wenceslas Square, Prague",d:"Historic boulevard",lat:50.0813,lng:14.4279},
+    {n:"Unter den Linden, Berlin",d:"Grand boulevard",lat:52.5159,lng:13.3871},
+    {n:"Las Ramblas, Madrid",d:"Gran Via",lat:40.4168,lng:-3.7038},
+    {n:"Santorini — Oia",d:"Whitewashed cliffs",lat:36.4618,lng:25.3753},
+    {n:"Dubrovnik Old Town",d:"Walled city",lat:42.6507,lng:18.0944},
+    {n:"Hallstatt, Austria",d:"Alpine lakeside village",lat:47.5622,lng:13.6493},
+  ]},
+  {cat:"🌍 Rest of World",items:[
+    {n:"Marrakech Medina, Morocco",d:"Souks & squares",lat:31.6295,lng:-7.9811},
+    {n:"Khan el-Khalili, Cairo",d:"Historic bazaar",lat:30.0478,lng:31.2625},
+    {n:"Copacabana, Rio",d:"Beachfront boulevard",lat:-22.9714,lng:-43.1823},
+    {n:"Ipanema, Rio",d:"Chic beach strip",lat:-22.9836,lng:-43.2027},
+    {n:"Buenos Aires — Florida St",d:"Pedestrian zone",lat:-34.6037,lng:-58.3816},
+    {n:"Cape Town — Long Street",d:"Nightlife & cafes",lat:-33.9249,lng:18.4241},
+    {n:"Table Mountain Road",d:"Scenic mountain drive",lat:-33.9625,lng:18.4030},
+    {n:"Mumbai — Marine Drive",d:"Queen's Necklace",lat:18.9322,lng:72.8264},
+    {n:"Connaught Place, Delhi",d:"Central hub",lat:28.6315,lng:77.2167},
+    {n:"Hauz Khas Village, Delhi",d:"Trendy urban village",lat:28.5499,lng:77.2029},
+  ]},
+];
+
+// ── TOAST ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg,dur=2200){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+// ── STATUS ─────────────────────────────────────────────────────────────────
+function setStatus(msg,state='ok'){
+  $('sTxt').textContent=msg;
+  const d=$('sDot');d.className='';
+  if(state==='loading')d.classList.add('loading');
+  else if(state==='err')d.classList.add('err');
+  else d.classList.add('ok');
+}
+
+// ── GEOCODING ─────────────────────────────────────────────────────────────
+function reverseGeo(latlng){
+  GEO.geocode({location:latlng},(r,s)=>{
+    if(s==='OK'&&r[0])$('sAddr').textContent=r[0].formatted_address.split(',').slice(0,2).join(',');
+    else $('sAddr').textContent=`${latlng.lat().toFixed(5)},${latlng.lng().toFixed(5)}`;
+  });
+}
+
+// ── MINIMAP ───────────────────────────────────────────────────────────────
+function initMiniMap(){
+  if(miniMap)return;
+  miniMap=new google.maps.Map($('minimapDiv'),{
+    zoom:15,disableDefaultUI:true,gestureHandling:'none',
+    styles:[
+      {elementType:'geometry',stylers:[{color:'#161b24'}]},
+      {elementType:'labels.text.fill',stylers:[{color:'#5a6a85'}]},
+      {featureType:'road',elementType:'geometry',stylers:[{color:'#252d3d'}]},
+      {featureType:'road.arterial',elementType:'geometry',stylers:[{color:'#1e2433'}]},
+      {featureType:'water',elementType:'geometry',stylers:[{color:'#080a0e'}]},
+      {featureType:'poi',stylers:[{visibility:'off'}]},
+      {featureType:'transit',stylers:[{visibility:'off'}]},
+    ]
+  });
+  miniMarker=new google.maps.Marker({map:miniMap,icon:{
+    path:google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+    scale:5,fillColor:'#00e5ff',fillOpacity:1,strokeColor:'#fff',strokeWeight:1,rotation:0
+  }});
+}
+
+function updateMiniMap(latlng){
+  $('minimap').style.display='block';
+  initMiniMap();
+  miniMap.setCenter(latlng);
+  miniMarker.setPosition(latlng);
+  if(svp) miniMarker.setIcon({...miniMarker.getIcon(),rotation:svp.getPov().heading});
+}
+
+// ── MOVEMENT ─────────────────────────────────────────────────────────────
+function hdDiff(a,b){let d=Math.abs(a-b)%360;return d>180?360-d:d}
+
+function bestLink(links,targetHd){
+  if(!links||!links.length)return null;
+  let best=null,bd=999;
+  for(const lk of links){const d=hdDiff(targetHd,lk.heading);if(d<bd){bd=d;best=lk}}
+  return best;
+}
+
+function moveSV(dir){
+  const links=svp.getLinks(),hd=svp.getPov().heading;
+  const tHd=dir==='fwd'?hd:(hd+180)%360;
+  const lk=bestLink(links,tHd);
+  if(lk){
+    svp.setPano(lk.pano);
+    svp.setPov({heading:dir==='fwd'?lk.heading:(lk.heading+180)%360,pitch:0});
+  } else {
+    setStatus('No path in that direction','err');
+  }
+}
+
+function turnSV(deg){
+  const p=svp.getPov();
+  svp.setPov({heading:(p.heading+deg+360)%360,pitch:p.pitch});
+}
+
+function loadAtLatLng(ll){
+  setStatus('Searching for Street View…','loading');
+  SVC.getPanorama({location:ll,radius:150,source:'outdoor',preference:'nearest'},(data,status)=>{
+    if(status==='OK'&&data?.location?.pano){
+      svp.setPano(data.location.pano);
+      svp.setPov({heading:data.links?.[0]?.heading||0,pitch:0});
+      setStatus('Panorama loaded','ok');
+    } else {
+      setStatus('No Street View here — try nearby','err');
+    }
+  });
+}
+
+// ── RANDOM ────────────────────────────────────────────────────────────────
+const MEL={minLat:-37.845,maxLat:-37.785,minLng:144.930,maxLng:145.010};
+function rndMelb(){
+  loadAtLatLng({
+    lat:MEL.minLat+Math.random()*(MEL.maxLat-MEL.minLat),
+    lng:MEL.minLng+Math.random()*(MEL.maxLng-MEL.minLng)
+  });
+}
+function rndGlobal(){
+  const all=LOCATIONS.flatMap(c=>c.items);
+  const p=all[Math.floor(Math.random()*all.length)];
+  loadAtLatLng(p);toast(`→ ${p.n}`);
+}
+
+// ── PANO SEARCH / INPUT ───────────────────────────────────────────────────
+function parsePanoFromInput(v){
+  const m=v.match(/!1s([^!&]+)|pano=([^&]+)|\/maps\/@[^,]+,[^,]+,[^/]+\/([A-Za-z0-9_-]{22,})/);
+  return m?(m[1]||m[2]||m[3]):null;
+}
+
+function handleSearch(v){
+  v=v.trim();if(!v)return;
+  const panoId=parsePanoFromInput(v);
+  if(panoId){
+    setStatus('Loading panorama by ID…','loading');
+    SVC.getPanorama({pano:panoId},(data,status)=>{
+      if(status==='OK'){
+        svp.setPano(data.location.pano);
+        svp.setPov({heading:data.links?.[0]?.heading||0,pitch:0});
+        setStatus('Panorama loaded','ok');
+      } else { setStatus('Invalid panoId or not found','err'); }
+    });
+  } else {
+    GEO.geocode({address:v},(r,s)=>{
+      if(s==='OK'&&r[0])loadAtLatLng(r[0].geometry.location);
+      else setStatus('Address not found','err');
+    });
+  }
+}
+
+// ── QUEUE ─────────────────────────────────────────────────────────────────
+function updateBadge(){
+  $('seqBadge').textContent=queue.length;
+  $('seqBadge').style.display=queue.length?'block':'none';
+  $('btnExportQueue').disabled=queue.length===0;
+}
+
+function addCurrentToQueue(){
+  const pano=svp.getPano();
+  if(!pano){setStatus('Load a panorama first','err');return;}
+  SVC.getPanorama({pano},(data,status)=>{
+    if(status!=='OK'){setStatus('Cannot read current panorama','err');return;}
+    // avoid duplicates
+    if(queue.some(q=>q.pano_id===data.location.pano)){toast('⚠ Already in queue');return;}
+    queue.push({
+      step:queue.length+1,
+      pano_id:data.location.pano,
+      lat:data.location.latLng.lat(),
+      lng:data.location.latLng.lng(),
+      heading:svp.getPov().heading
+    });
+    updateBadge();
+    toast(`✓ Added #${queue.length} — ${data.location.pano.slice(0,14)}…`);
+  });
+}
+
+function renderQueuePanel(){
+  const list=$('queueList');list.innerHTML='';
+  if(!queue.length){list.innerHTML='<div style="padding:16px;color:var(--muted);text-align:center;font-size:11px">Queue is empty.<br>Navigate Street View and press Add.</div>';return;}
+  queue.forEach((item,i)=>{
+    const d=document.createElement('div');d.className='qItem';
+    d.innerHTML=`<span class="qNum">#${i+1}</span>
+      <span class="qPano" title="${item.pano_id}">${item.pano_id.slice(0,22)}…</span>
+      <span class="qCoord">${item.lat.toFixed(4)},${item.lng.toFixed(4)}</span>
+      <button class="qDel" data-i="${i}" title="Remove"><i class="fa fa-trash"></i></button>`;
+    list.appendChild(d);
+  });
+  list.querySelectorAll('.qDel').forEach(b=>b.onclick=()=>{
+    const i=parseInt(b.dataset.i);queue.splice(i,1);
+    queue.forEach((q,j)=>q.step=j+1);
+    updateBadge();renderQueuePanel();
+  });
+}
+
+function exportQueue(filename='sequence'){
+  if(!queue.length){toast('Queue is empty');return;}
+  const manifest={
+    zoom:currentZoom,
+    generated:new Date().toISOString(),
+    count:queue.length,
+    sequence:queue.map(q=>({...q}))
+  };
+  downloadJSON(manifest,`${filename}.json`);
+  toast(`✓ Exported ${queue.length} frames as ${filename}.json`);
+}
+
+function downloadJSON(obj,filename){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+// ── HAVERSINE DISTANCE ────────────────────────────────────────────────────
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ── AUTO SEQUENCE GENERATOR ───────────────────────────────────────────────
+async function generateSequence(steps,dir,zoom,dedup,addToQueueOnly,filename){
+  let currentPano=svp.getPano();
+  if(!currentPano){setStatus('Load a panorama first','err');return;}
+
+  seqAbort=false;seqRunning=true;
+  $('seqGo').disabled=true;$('seqAddQueue').disabled=true;
+  $('seqProgress').style.display='';$('seqProgBar').style.display='';
+  currentZoom=zoom;
+
+  let currentHeading=svp.getPov().heading;
+  const captured=[];
+  const seenPanos=new Set(queue.map(q=>q.pano_id));
+  let lastLat=null,lastLng=null;
+
+  // "both" direction: capture forward from midpoint then backward
+  const dirs=dir==='both'?['forward','backward']:['forward'];
+  const stepsPerDir=dir==='both'?Math.ceil(steps/2):steps;
+  let revPano=currentPano,revHeading=(currentHeading+180)%360;
+
+  for(const d of dirs){
+    let pano=d==='forward'?currentPano:revPano;
+    let heading=d==='forward'?currentHeading:revHeading;
+    let skip=d==='backward'; // skip first for backward (already captured as forward step 1)
+
+    for(let i=0;i<stepsPerDir;i++){
+      if(seqAbort)break;
+      $('seqProgress').textContent=`${d} — step ${i+1}/${stepsPerDir}… (${captured.length} captured)`;
+      $('seqProgFill').style.width=(((dirs.indexOf(d)*stepsPerDir+i)/(dirs.length*stepsPerDir))*100)+'%';
+
+      try{
+        const data=await new Promise((res,rej)=>{
+          SVC.getPanorama({pano},(d,s)=>s==='OK'?res(d):rej(s));
+        });
+
+        const lat=data.location.latLng.lat(),lng=data.location.latLng.lng();
+        const panoId=data.location.pano;
+
+        // dedup: skip if same pano or too close
+        const tooClose=lastLat!==null&&haversine(lastLat,lastLng,lat,lng)<dedup;
+        if(!seenPanos.has(panoId)&&!tooClose&&!skip){
+          captured.push({
+            step:queue.length+captured.length+1,
+            pano_id:panoId,lat,lng,heading
+          });
+          seenPanos.add(panoId);
+          lastLat=lat;lastLng=lng;
+        }
+        skip=false;
+
+        if(i<stepsPerDir-1){
+          const targetHd=d==='forward'?heading:(heading+180)%360;
+          const lk=bestLink(data.links,targetHd);
+          if(!lk){setStatus(`Path ended at step ${i+1}`,'err');break;}
+          // store reverse start point at step 0
+          if(d==='forward'&&i===0){revPano=lk.pano;revHeading=(lk.heading+180)%360;}
+          pano=lk.pano;
+          heading=d==='forward'?lk.heading:(lk.heading+180)%360;
+        }
+      } catch(e){
+        setStatus(`API error at step ${i+1}`,'err');break;
+      }
+    }
+  }
+
+  if(captured.length){
+    if(addToQueueOnly){
+      queue.push(...captured);
+      queue.forEach((q,i)=>q.step=i+1);
+      updateBadge();
+      toast(`✓ Added ${captured.length} frames to queue`);
+    } else {
+      // Merge with existing queue if non-empty
+      const all=[...queue,...captured];
+      all.forEach((q,i)=>q.step=i+1);
+      const manifest={zoom,generated:new Date().toISOString(),count:all.length,sequence:all};
+      downloadJSON(manifest,`${filename}.json`);
+      setStatus(`Exported ${all.length} frames as ${filename}.json`,'ok');
+      toast(`✓ ${all.length} frames → ${filename}.json`);
+    }
+  }
+
+  $('seqProgFill').style.width='100%';
+  setTimeout(()=>{
+    $('seqProgress').style.display='none';
+    $('seqProgBar').style.display='none';
+    if(!seqAbort)$('seqModal').classList.remove('show');
+  },1500);
+  $('seqGo').disabled=false;$('seqAddQueue').disabled=false;
+  seqRunning=false;
+}
+
+// ── LOCATIONS PANEL ───────────────────────────────────────────────────────
+function buildLocPanel(){
+  const list=$('locList');list.innerHTML='';
+  for(const cat of LOCATIONS){
+    const ch=document.createElement('div');ch.className='locCat';ch.textContent=cat.cat;list.appendChild(ch);
+    for(const it of cat.items){
+      const d=document.createElement('div');d.className='locItem';
+      d.innerHTML=`<div><div class="locName">${it.n}</div>${it.d?`<div class="locDesc">${it.d}</div>`:''}</div><span class="locGo">→</span>`;
+      d.onclick=()=>{loadAtLatLng(it);$('locPanel').classList.remove('show');toast(`→ ${it.n}`)};
+      list.appendChild(d);
+    }
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+function init(){
+  buildLocPanel();
+
+  svp=new google.maps.StreetViewPanorama($('sv-container'),{
+    position:{lat:-37.8183,lng:144.9671},
+    pov:{heading:200,pitch:0},zoom:0,
+    addressControl:false,linksControl:true,panControl:false,
+    enableCloseButton:false,showRoadLabels:false,
+    motionTracking:false,motionTrackingControl:false
+  });
+
+  svp.addListener('position_changed',()=>{
+    const pos=svp.getPosition();
+    if(pos){updateMiniMap(pos);reverseGeo(pos);}
+  });
+
+  svp.addListener('pov_changed',()=>{
+    const pano=svp.getPano();
+    if(pano){
+      $('sPano').textContent=pano.slice(0,16)+'…';
+      if(miniMarker)miniMarker.setIcon({...miniMarker.getIcon(),rotation:svp.getPov().heading});
+    }
+  });
+
+  svp.addListener('pano_changed',()=>{
+    const pano=svp.getPano();
+    if(pano)$('sPano').textContent=pano.slice(0,16)+'…';
+  });
+
+  // Copy panoId on click
+  $('sPano').onclick=()=>{
+    const pano=svp.getPano();if(!pano)return;
+    navigator.clipboard?.writeText(pano).then(()=>toast('PanoID copied!')).catch(()=>{});
+  };
+
+  $('searchBtn').onclick=()=>handleSearch($('searchIn').value);
+  $('searchIn').addEventListener('keydown',e=>{if(e.key==='Enter')handleSearch($('searchIn').value)});
+
+  $('btnFwd').onclick=()=>moveSV('fwd');
+  $('btnBwd').onclick=()=>moveSV('bwd');
+  $('btnTL').onclick=()=>turnSV(-45);
+  $('btnTR').onclick=()=>turnSV(45);
+  $('btnRndMel').onclick=rndMelb;
+  $('btnRndGlb').onclick=rndGlobal;
+
+  $('btnAddPano').onclick=addCurrentToQueue;
+
+  $('btnQueue').onclick=()=>{renderQueuePanel();$('queuePanel').classList.add('show')};
+  $('queueClose').onclick=()=>$('queuePanel').classList.remove('show');
+  $('queueClear').onclick=()=>{queue.length=0;updateBadge();renderQueuePanel()};
+  $('queueExport').onclick=()=>{
+    const fn=prompt('Filename (no extension):','sequence')||'sequence';
+    exportQueue(fn);$('queuePanel').classList.remove('show');
+  };
+
+  $('btnExportQueue').onclick=()=>{
+    const fn=$('seqFilename')?.value||'sequence';
+    exportQueue(fn);
+  };
+
+  $('btnSeqAuto').onclick=()=>{
+    if(seqRunning)return;
+    // Show summary of current pano
+    const pano=svp.getPano();
+    if(pano){
+      $('seqSummary').style.display='block';
+      $('seqSummary').innerHTML=`Starting from: <b>${pano.slice(0,20)}…</b><br>Queue has <b>${queue.length}</b> existing frames.`;
+    }
+    $('seqModal').classList.add('show');
+  };
+
+  $('seqGo').onclick=()=>{
+    const steps=Math.max(2,Math.min(2000,parseInt($('seqSteps').value)||20));
+    const dir=$('seqDir').value;
+    const zoom=parseInt($('seqZoom').value)||3;
+    const dedup=Math.max(0,parseFloat($('seqDedup').value)||5);
+    const filename=($('seqFilename').value.trim()||'sequence').replace(/[^a-zA-Z0-9_-]/g,'_');
+    currentZoom=zoom;
+    generateSequence(steps,dir,zoom,dedup,false,filename);
+  };
+
+  $('seqAddQueue').onclick=()=>{
+    const steps=Math.max(2,Math.min(2000,parseInt($('seqSteps').value)||20));
+    const dir=$('seqDir').value;
+    const zoom=parseInt($('seqZoom').value)||3;
+    const dedup=Math.max(0,parseFloat($('seqDedup').value)||5);
+    currentZoom=zoom;
+    generateSequence(steps,dir,zoom,dedup,true,'sequence');
+  };
+
+  $('seqCancel').onclick=()=>{seqAbort=true;seqRunning=false;$('seqModal').classList.remove('show')};
+  $('btnLocToggle').onclick=()=>$('locPanel').classList.toggle('show');
+  $('locClose').onclick=()=>$('locPanel').classList.remove('show');
+  $('mmToggle').onclick=e=>{e.stopPropagation();
+    const m=$('minimap');m.style.display=m.style.display==='none'?'block':'none'};
+
+  updateBadge();
+  setStatus('Ready — search, pick a location, or paste a panoId / Street View URL','ok');
+}
+
+window.addEventListener('load',init);
+})();
+</script>
+</body>
+</html>

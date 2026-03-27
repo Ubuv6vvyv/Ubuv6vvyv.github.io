@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>StreetView Stitcher</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0c10;--surface:#111318;--surface2:#1a1d24;--border:#2a2e38;
+  --accent:#00d4ff;--accent2:#ff6b35;--accent3:#a8ff3e;
+  --text:#e8eaf0;--muted:#6b7280;--danger:#ff4444;
+  --grad:linear-gradient(135deg,#00d4ff22,#ff6b3522);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Space Mono',monospace}
+body{display:flex;flex-direction:column}
+
+/* HEADER */
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
+#hdr h1{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1em;letter-spacing:-0.5px;white-space:nowrap;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#searchWrap{display:flex;flex:1;gap:4px;max-width:500px}
+#searchWrap input{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:6px 10px;border-radius:6px;font-family:'Space Mono',monospace;font-size:11px;outline:none}
+#searchWrap input:focus{border-color:var(--accent)}
+#searchWrap button{background:var(--accent);color:#000;border:none;border-radius:6px;padding:6px 10px;
+  font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Space Mono',monospace}
+
+/* STATUS BAR */
+#statusBar{display:flex;align-items:center;gap:8px;padding:4px 12px;background:var(--surface);
+  border-bottom:1px solid var(--border);font-size:10px;flex-shrink:0;min-height:26px}
+#statusDot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+#statusDot.loading{background:var(--accent2);animation:pulse .8s infinite}
+#statusDot.ok{background:var(--accent3)}
+#statusDot.err{background:var(--danger)}
+#statusTxt{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#addrTxt{color:var(--accent);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50%}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* MAIN AREA */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+#canvasWrap{flex:1;position:relative;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}
+#canvasWrap canvas{max-width:100%;max-height:100%;object-fit:contain;display:block}
+#loadOverlay{position:absolute;inset:0;background:#000a;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;z-index:10;display:none}
+#loadOverlay.show{display:flex}
+#loadBar{width:200px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+#loadFill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .2s}
+#loadPct{font-size:11px;color:var(--muted)}
+
+/* MINI MAP */
+#minimap{position:absolute;bottom:10px;right:10px;width:130px;height:100px;border-radius:8px;
+  overflow:hidden;border:2px solid var(--border);z-index:20;cursor:pointer;
+  box-shadow:0 4px 20px #000a;transition:all .3s}
+#minimap:hover{width:200px;height:150px}
+#minimapDiv{width:100%;height:100%}
+#minimapToggle{position:absolute;top:3px;right:3px;background:#000a;border:none;color:var(--text);
+  border-radius:4px;padding:2px 5px;font-size:9px;cursor:pointer;z-index:21}
+
+/* SEQUENCE STRIP */
+#seqStrip{display:none;flex-direction:row;gap:6px;padding:6px 10px;overflow-x:auto;
+  background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;max-height:90px}
+#seqStrip.show{display:flex}
+#seqStrip::-webkit-scrollbar{height:4px}
+#seqStrip::-webkit-scrollbar-track{background:var(--border)}
+#seqStrip::-webkit-scrollbar-thumb{background:var(--accent)}
+.seqThumb{position:relative;flex-shrink:0;cursor:pointer;border-radius:4px;overflow:hidden;
+  border:1px solid var(--border);transition:border-color .2s}
+.seqThumb:hover{border-color:var(--accent)}
+.seqThumb img{width:120px;height:67px;object-fit:cover;display:block}
+.seqThumb .seqN{position:absolute;bottom:2px;left:3px;font-size:9px;background:#000b;color:var(--accent);padding:1px 4px;border-radius:2px}
+.seqThumb .seqDel{position:absolute;top:2px;right:2px;background:#000b;border:none;color:var(--danger);
+  font-size:10px;cursor:pointer;border-radius:2px;padding:1px 4px;display:none}
+.seqThumb:hover .seqDel{display:block}
+
+/* CONTROLS */
+#controls{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;background:var(--surface);
+  border-top:1px solid var(--border);flex-shrink:0}
+.btn{border:none;border-radius:6px;padding:7px 10px;font-size:11px;font-family:'Space Mono',monospace;
+  cursor:pointer;font-weight:700;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-warning{background:var(--accent2);color:#000}
+.btn-success{background:var(--accent3);color:#000}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 8px;font-size:10px}
+.btn[disabled]{opacity:.4;cursor:not-allowed;pointer-events:none}
+.sep{width:1px;background:var(--border);margin:0 2px}
+
+/* LOCATIONS PANEL */
+#locPanel{display:none;position:absolute;top:0;right:0;bottom:0;width:260px;z-index:30;
+  background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;flex-direction:column}
+#locPanel.show{display:flex}
+#locPanel h3{padding:12px;font-family:'Syne',sans-serif;font-size:.95em;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);z-index:1}
+#locPanel h3 button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
+.locCat{padding:8px 12px 4px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.locItem{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)10;transition:background .15s;font-size:11px}
+.locItem:hover{background:var(--surface2)}
+.locItem .locName{color:var(--text);font-weight:700}
+.locItem .locDesc{color:var(--muted);font-size:10px;margin-top:2px}
+
+/* SEQ MODAL */
+#seqModal{display:none;position:fixed;inset:0;background:#000c;z-index:100;align-items:center;justify-content:center}
+#seqModal.show{display:flex}
+#seqBox{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;
+  width:90%;max-width:400px;font-size:12px}
+#seqBox h3{font-family:'Syne',sans-serif;margin-bottom:12px;color:var(--accent)}
+#seqBox label{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;color:var(--muted);font-size:10px}
+#seqBox input,#seqBox select{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:7px;border-radius:6px;font-family:'Space Mono',monospace;font-size:11px;outline:none}
+#seqBox .row{display:flex;gap:8px}
+#seqProgress{margin-top:8px;font-size:10px;color:var(--accent2)}
+#seqProgBar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px}
+#seqProgFill{height:100%;background:var(--accent2);width:0%;transition:width .3s}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>⬡ SVSTITCH</h1>
+  <div id="searchWrap">
+    <input id="searchIn" placeholder="Address, panoId, or Street View URL…" autocomplete="off">
+    <button id="searchBtn"><i class="fa fa-search"></i></button>
+  </div>
+  <button class="btn btn-secondary btn-sm" id="locToggle" title="Locations"><i class="fa fa-map-marker-alt"></i></button>
+</div>
+
+<div id="statusBar">
+  <div id="statusDot"></div>
+  <div id="statusTxt">Ready — load a panorama to begin.</div>
+  <div id="addrTxt"></div>
+</div>
+
+<div id="main">
+  <div id="canvasWrap">
+    <div id="loadOverlay">
+      <div id="loadBar"><div id="loadFill"></div></div>
+      <div id="loadPct">0%</div>
+    </div>
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px" id="emptyMsg">
+      <i class="fa fa-street-view" style="font-size:3em;margin-bottom:10px;display:block;color:var(--border)"></i>
+      Search an address or pick a location to begin
+    </div>
+  </div>
+
+  <div id="minimap" style="display:none">
+    <div id="minimapDiv"></div>
+    <button id="minimapToggle">⬡</button>
+  </div>
+
+  <!-- Locations Panel -->
+  <div id="locPanel">
+    <h3>Locations <button id="locClose"><i class="fa fa-times"></i></button></h3>
+    <div id="locList"></div>
+  </div>
+</div>
+
+<!-- Sequence Strip -->
+<div id="seqStrip"></div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="btn btn-primary" id="btnFwd"><i class="fa fa-arrow-up"></i> Forward</button>
+  <button class="btn btn-primary" id="btnBwd"><i class="fa fa-arrow-down"></i> Back</button>
+  <button class="btn btn-secondary" id="btnTurnL"><i class="fa fa-undo"></i></button>
+  <button class="btn btn-secondary" id="btnTurnR"><i class="fa fa-redo"></i></button>
+  <div class="sep"></div>
+  <button class="btn btn-secondary" id="btnRndMel"><i class="fa fa-dice"></i> Melb</button>
+  <button class="btn btn-secondary" id="btnRndGlb"><i class="fa fa-globe"></i> Global</button>
+  <div class="sep"></div>
+  <button class="btn btn-warning" id="btnCapture"><i class="fa fa-camera"></i> Capture</button>
+  <button class="btn btn-warning" id="btnSeqStart"><i class="fa fa-film"></i> Sequence</button>
+  <div class="sep"></div>
+  <button class="btn btn-secondary" id="btnDl"><i class="fa fa-download"></i></button>
+  <button class="btn btn-success" id="btnDlSeq" style="display:none"><i class="fa fa-file-archive"></i> Save Seq</button>
+  <button class="btn btn-danger btn-sm" id="btnClearSeq" style="display:none"><i class="fa fa-trash"></i></button>
+</div>
+
+<!-- Sequence Config Modal -->
+<div id="seqModal">
+  <div id="seqBox">
+    <h3><i class="fa fa-film"></i> Capture Sequence</h3>
+    <label>Steps to capture
+      <input type="number" id="seqSteps" value="10" min="2" max="50">
+    </label>
+    <label>Direction
+      <select id="seqDir">
+        <option value="forward">Forward</option>
+        <option value="backward">Backward</option>
+      </select>
+    </label>
+    <label>Zoom level
+      <select id="seqZoom">
+        <option value="2">2 — Fast (low res)</option>
+        <option value="3" selected>3 — Standard</option>
+        <option value="4">4 — High res (slow)</option>
+      </select>
+    </label>
+    <div id="seqProgress" style="display:none"></div>
+    <div id="seqProgBar" style="display:none"><div id="seqProgFill"></div></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-warning" id="seqGo" style="flex:1"><i class="fa fa-play"></i> Start</button>
+      <button class="btn btn-secondary" id="seqCancel" style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDLQb7ZkPE2NufhvDOCrZzWmPsEzxJnFTE&libraries=places"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let panoData=null, movDir=null, miniMap=null, miniMarker=null;
+let seqFrames=[], seqRunning=false, seqAbort=false;
+const SVC=new google.maps.StreetViewService();
+const GEO=new google.maps.Geocoder();
+
+// ── LOCATIONS DATABASE ────────────────────────────────────────────────────
+const LOCATIONS=[
+  {cat:"🇦🇺 Melbourne",items:[
+    {n:"Flinders Street Station",d:"Iconic city landmark",lat:-37.8183,lng:144.9671},
+    {n:"Federation Square",d:"Cultural hub",lat:-37.8180,lng:144.9691},
+    {n:"Chapel Street, South Yarra",d:"Fashion & dining strip",lat:-37.8393,lng:144.9942},
+    {n:"Fitzroy — Brunswick Street",d:"Art & cafe culture",lat:-37.7993,lng:144.9793},
+    {n:"St Kilda Esplanade",d:"Beachside promenade",lat:-37.8677,lng:144.9765},
+    {n:"Lygon Street, Carlton",d:"Melbourne's 'Little Italy'",lat:-37.7987,lng:144.9664},
+    {n:"Queen Victoria Market",d:"Historic market precinct",lat:-37.8073,lng:144.9566},
+    {n:"Degraves Street",d:"Famous laneway cafes",lat:-37.8175,lng:144.9665},
+    {n:"Southbank Promenade",d:"Riverside walkway",lat:-37.8225,lng:144.9626},
+    {n:"Hosier Lane",d:"World-famous street art",lat:-37.8178,lng:144.9712},
+  ]},
+  {cat:"🏙️ Australia",items:[
+    {n:"Sydney Opera House",d:"",lat:-33.8568,lng:151.2153},
+    {n:"Sydney Harbour Bridge",d:"",lat:-33.8523,lng:151.2108},
+    {n:"Bondi Beach",d:"Sydney's famous beach",lat:-33.8908,lng:151.2743},
+    {n:"Brisbane — South Bank",d:"",lat:-27.4774,lng:153.0218},
+    {n:"Gold Coast — Surfers Paradise",d:"",lat:-28.0022,lng:153.4301},
+    {n:"Adelaide — Rundle Mall",d:"",lat:-34.9219,lng:138.6010},
+    {n:"Perth — Hay Street Mall",d:"",lat:-31.9519,lng:115.8607},
+  ]},
+  {cat:"🌏 Asia Pacific",items:[
+    {n:"Shibuya Crossing, Tokyo",d:"World's busiest crossing",lat:35.6595,lng:139.7004},
+    {n:"Shinjuku, Tokyo",d:"Neon-lit entertainment",lat:35.6938,lng:139.7034},
+    {n:"Dotonbori, Osaka",d:"Neon food street",lat:34.6686,lng:135.5013},
+    {n:"Myeongdong, Seoul",d:"Shopping & street food",lat:37.5635,lng:126.9849},
+    {n:"Orchard Road, Singapore",d:"Premier shopping belt",lat:1.3036,lng:103.8318},
+    {n:"Times Square, Hong Kong",d:"",lat:22.2783,lng:114.1827},
+    {n:"Bund, Shanghai",d:"Historic waterfront",lat:31.2399,lng:121.4900},
+    {n:"Taipei 101",d:"Iconic skyscraper district",lat:25.0336,lng:121.5645},
+    {n:"Khao San Road, Bangkok",d:"Backpacker central",lat:13.7588,lng:100.4971},
+    {n:"Petronas Towers, KL",d:"Twin towers plaza",lat:3.1579,lng:101.7117},
+  ]},
+  {cat:"🌍 Europe",items:[
+    {n:"Champs-Élysées, Paris",d:"Grand French boulevard",lat:48.8698,lng:2.3078},
+    {n:"Eiffel Tower base",d:"",lat:48.8584,lng:2.2945},
+    {n:"Oxford Street, London",d:"Famous shopping street",lat:51.5155,lng:-0.1434},
+    {n:"Tower Bridge, London",d:"",lat:51.5055,lng:-0.0754},
+    {n:"Ramblas, Barcelona",d:"Iconic tree-lined boulevard",lat:41.3807,lng:2.1736},
+    {n:"Sagrada Família",d:"Gaudí masterpiece",lat:41.4036,lng:2.1744},
+    {n:"Piazza Navona, Rome",d:"Baroque plaza",lat:41.8989,lng:12.4731},
+    {n:"Grand Canal, Venice",d:"Waterway panorama",lat:45.4341,lng:12.3388},
+    {n:"Santorini, Oia",d:"Blue-domed village",lat:36.4618,lng:25.3753},
+    {n:"Colosseum, Rome",d:"",lat:41.8902,lng:12.4922},
+    {n:"Acropolis, Athens",d:"",lat:37.9715,lng:23.7267},
+    {n:"Stroget, Copenhagen",d:"World's longest pedestrian st.",lat:55.6770,lng:12.5697},
+    {n:"Neuschwanstein Castle",d:"Fairy tale castle, Bavaria",lat:47.5576,lng:10.7498},
+  ]},
+  {cat:"🌎 Americas",items:[
+    {n:"Times Square, New York",d:"The crossroads of the world",lat:40.7580,lng:-73.9855},
+    {n:"Brooklyn Bridge, NYC",d:"",lat:40.7061,lng:-73.9969},
+    {n:"Hollywood Blvd, LA",d:"Walk of Fame",lat:34.1016,lng:-118.3267},
+    {n:"Golden Gate Bridge",d:"San Francisco iconic bridge",lat:37.8199,lng:-122.4783},
+    {n:"Lombard Street, SF",d:"World's crookedest street",lat:37.8021,lng:-122.4189},
+    {n:"Las Vegas Strip",d:"Neon casino boulevard",lat:36.1147,lng:-115.1728},
+    {n:"South Beach, Miami",d:"Art deco oceanfront",lat:25.7826,lng:-80.1305},
+    {n:"Copacabana Beach, Rio",d:"Famous Brazilian beach",lat:-22.9714,lng:-43.1822},
+    {n:"Sugarloaf, Rio",d:"Cable car mountain",lat:-22.9489,lng:-43.1548},
+    {n:"Niagara Falls",d:"",lat:43.0799,lng:-79.0747},
+  ]},
+  {cat:"🏔️ Wonders & Unique",items:[
+    {n:"Machu Picchu",d:"Inca citadel, Peru",lat:-13.1631,lng:-72.5450},
+    {n:"Taj Mahal, Agra",d:"",lat:27.1751,lng:78.0421},
+    {n:"Great Wall, Badaling",d:"China's iconic wall",lat:40.3587,lng:116.0219},
+    {n:"Angkor Wat, Cambodia",d:"Ancient temple complex",lat:13.4125,lng:103.8670},
+    {n:"Colosseum, Rome",d:"",lat:41.8902,lng:12.4922},
+    {n:"Antelope Canyon, AZ",d:"Slot canyon narrows",lat:36.8619,lng:-111.3743},
+    {n:"Ha Long Bay, Vietnam",d:"Karst seascape",lat:20.9101,lng:107.1839},
+    {n:"Dead Sea road, Jordan",d:"Lowest road on Earth",lat:31.5595,lng:35.4732},
+    {n:"Trans-Siberian — Baikal",d:"Lake Baikal shoreline",lat:52.0,lng:104.5},
+    {n:"Route 66, Amarillo TX",d:"Classic American highway",lat:35.2220,lng:-101.8313},
+  ]},
+];
+
+// ── TILE LOADER CLASS ─────────────────────────────────────────────────────
+class PanoLoader{
+  constructor(){this.canvas=document.createElement('canvas');this.ctx=this.canvas.getContext('2d');this.onProg=null}
+  tile(id,z,x,y){
+    return new Promise((res,rej)=>{
+      const img=new Image();img.crossOrigin='Anonymous';
+      img.onload=()=>res({img,x,y});
+      img.onerror=()=>rej(new Error(`tile ${x},${y} failed`));
+      img.src=`https://cbk0.google.com/cbk?output=tile&panoid=${id}&zoom=${z}&x=${x}&y=${y}`;
+    });
+  }
+  async load(id,z=3){
+    const S=512,tx=Math.pow(2,z),ty=Math.pow(2,z-1),tot=tx*ty;let done=0;
+    this.canvas.width=tx*S;this.canvas.height=ty*S;
+    const ps=[];
+    for(let y=0;y<ty;y++)for(let x=0;x<tx;x++)
+      ps.push(this.tile(id,z,x,y).then(t=>{this.ctx.drawImage(t.img,t.x*S,t.y*S,S,S);done++;this.onProg&&this.onProg(done/tot*100)}));
+    await Promise.all(ps);
+  }
+  toDataURL(q=.88){return this.canvas.toDataURL('image/jpeg',q)}
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+function setStatus(msg,state='ok'){
+  $('statusTxt').textContent=msg;
+  const d=$('statusDot');d.className='';
+  if(state==='loading')d.classList.add('loading');
+  else if(state==='err')d.classList.add('err');
+  else d.classList.add('ok');
+}
+function setAddr(a){$('addrTxt').textContent=a||''}
+function showLoading(pct){
+  if(pct===null){$('loadOverlay').classList.remove('show');return}
+  $('loadOverlay').classList.add('show');
+  $('loadFill').style.width=pct+'%';
+  $('loadPct').textContent=Math.round(pct)+'%';
+}
+function clearCanvas(){
+  const w=$('canvasWrap');
+  w.querySelectorAll('canvas').forEach(c=>c.remove());
+  $('emptyMsg').style.display='';
+}
+
+// ── GEOCODING / ADDRESS ───────────────────────────────────────────────────
+function reverseGeo(latlng){
+  GEO.geocode({location:latlng},(r,s)=>{
+    if(s==='OK'&&r[0])setAddr(r[0].formatted_address);
+    else setAddr(`${latlng.lat().toFixed(5)},${latlng.lng().toFixed(5)}`);
+  });
+}
+
+// ── MINIMAP ───────────────────────────────────────────────────────────────
+function initMiniMap(){
+  if(miniMap)return;
+  miniMap=new google.maps.Map($('minimapDiv'),{
+    zoom:15,disableDefaultUI:true,gestureHandling:'none',
+    styles:[{elementType:'geometry',stylers:[{color:'#1a1d24'}]},
+            {elementType:'labels.text.fill',stylers:[{color:'#6b7280'}]},
+            {featureType:'road',elementType:'geometry',stylers:[{color:'#2a2e38'}]},
+            {featureType:'water',elementType:'geometry',stylers:[{color:'#0a0c10'}]}]
+  });
+  miniMarker=new google.maps.Marker({map:miniMap,icon:{path:google.maps.SymbolPath.CIRCLE,scale:6,fillColor:'#00d4ff',fillOpacity:1,strokeColor:'#fff',strokeWeight:1.5}});
+}
+function updateMiniMap(latlng){
+  $('minimap').style.display='block';
+  initMiniMap();
+  miniMap.setCenter(latlng);
+  miniMarker.setPosition(latlng);
+}
+
+// ── MOVEMENT LOGIC (IMPROVED) ─────────────────────────────────────────────
+// Heading difference accounting for wrap-around
+function hdDiff(a,b){let d=Math.abs(a-b)%360;return d>180?360-d:d}
+
+function initDir(){
+  if(!panoData)return;
+  if(panoData.links&&panoData.links.length>0){
+    // Use longest-running link (first alphabetically as fallback)
+    movDir=panoData.links[0].heading;
+  } else movDir=0;
+}
+
+// Find link closest to target heading, with optional exclusion of a pano ID
+function bestLink(targetHd,excludePano){
+  if(!panoData||!panoData.links||panoData.links.length===0)return null;
+  let best=null,bestD=999;
+  for(const lk of panoData.links){
+    if(excludePano&&lk.pano===excludePano)continue;
+    const d=hdDiff(targetHd,lk.heading);
+    if(d<bestD){bestD=d;best=lk}
+  }
+  return best;
+}
+
+// ── CORE PANO LOAD ────────────────────────────────────────────────────────
+async function loadPanoId(id,z=3){
+  setStatus(`Loading tiles…`,'loading');
+  showLoading(0);
+  const loader=new PanoLoader();
+  loader.onProg=p=>{showLoading(p);setStatus(`Loading… ${p.toFixed(0)}%`,'loading')};
+  try{
+    await loader.load(id,z);
+    showLoading(null);
+    clearCanvas();
+    $('emptyMsg').style.display='none';
+    $('canvasWrap').appendChild(loader.canvas);
+    setStatus('Panorama loaded','ok');
+    return loader;
+  }catch(e){
+    showLoading(null);
+    setStatus(`Load error: ${e.message}`,'err');
+    throw e;
+  }
+}
+
+async function fetchAndLoad(id,z=3){
+  return new Promise((res,rej)=>{
+    SVC.getPanorama({pano:id},(data,status)=>{
+      if(status==='OK'&&data?.location?.pano){
+        panoData=data;
+        if(movDir===null)initDir();
+        reverseGeo(data.location.latLng);
+        updateMiniMap(data.location.latLng);
+        loadPanoId(data.location.pano,z).then(res).catch(rej);
+      } else rej(new Error(`SVService: ${status}`));
+    });
+  });
+}
+
+function loadAtLatLng(ll,z=3,retryFn){
+  setStatus('Searching for Street View…','loading');
+  SVC.getPanorama({location:ll,radius:100,source:'outdoor'},(data,status)=>{
+    if(status==='OK'&&data?.location?.pano){
+      panoData=data;
+      movDir=null;initDir();
+      reverseGeo(data.location.latLng);
+      updateMiniMap(data.location.latLng);
+      loadPanoId(data.location.pano,z).catch(()=>{if(retryFn)retryFn()});
+    } else {
+      setStatus('No Street View found — trying nearby','err');
+      if(retryFn)retryFn();
+    }
+  });
+}
+
+// ── MOVEMENT ──────────────────────────────────────────────────────────────
+function move(dir){
+  if(!panoData){setStatus('No panorama loaded','err');return}
+  if(movDir===null)initDir();
+  const targetHd=dir==='fwd'?movDir:(movDir+180)%360;
+  const lk=bestLink(targetHd);
+  if(!lk){setStatus('No link in that direction','err');return}
+  // Update direction: when going forward, adopt link heading; backward, flip it
+  const prevDir=movDir;
+  movDir=dir==='fwd'?lk.heading:(lk.heading+180)%360;
+  fetchAndLoad(lk.pano,3).catch(e=>{
+    setStatus(e.message,'err');
+    movDir=prevDir; // Restore on fail
+  });
+}
+
+function turnBy(deg){
+  if(movDir===null)initDir();
+  movDir=(movDir+deg+360)%360;
+  setStatus(`Heading: ${movDir.toFixed(0)}°`,'ok');
+}
+
+// ── RANDOM LOCATIONS ──────────────────────────────────────────────────────
+const MEL_BOUNDS={minLat:-37.840,maxLat:-37.790,minLng:144.935,maxLng:144.995};
+function rndMelb(){
+  const ll={lat:MEL_BOUNDS.minLat+Math.random()*(MEL_BOUNDS.maxLat-MEL_BOUNDS.minLat),
+            lng:MEL_BOUNDS.minLng+Math.random()*(MEL_BOUNDS.maxLng-MEL_BOUNDS.minLng)};
+  loadAtLatLng(ll,3,rndMelb);
+}
+
+const GLOBAL_POOL=[
+  {lat:40.7580,lng:-73.9855},{lat:51.5055,lng:-0.0754},{lat:35.6595,lng:139.7004},
+  {lat:48.8584,lng:2.2945},{lat:-33.8568,lng:151.2153},{lat:41.8902,lng:12.4922},
+  {lat:-22.9714,lng:-43.1822},{lat:22.3193,lng:114.1694},{lat:25.2048,lng:55.2708},
+  {lat:1.3521,lng:103.8198},{lat:37.9715,lng:23.7267},{lat:55.7558,lng:37.6176},
+  {lat:-34.6037,lng:-58.3816},{lat:28.6139,lng:77.2090},{lat:31.2399,lng:121.4900},
+  {lat:41.3807,lng:2.1736},{lat:52.3676,lng:4.9041},{lat:47.5576,lng:10.7498},
+];
+function rndGlobal(){
+  const p=GLOBAL_POOL[Math.floor(Math.random()*GLOBAL_POOL.length)];
+  loadAtLatLng(p,3,rndGlobal);
+}
+
+// ── CAPTURE SINGLE ────────────────────────────────────────────────────────
+function captureFrame(){
+  const cv=$('canvasWrap').querySelector('canvas');
+  if(!cv){setStatus('Nothing to capture','err');return null}
+  const addr=$('addrTxt').textContent||'unknown';
+  const id=panoData?.location?.pano||'unknown';
+  const img=new Image();img.src=cv.toDataURL('image/jpeg',.88);
+  const frame={img,id,addr,ts:Date.now()};
+  seqFrames.push(frame);
+  renderStrip();
+  $('btnDlSeq').style.display='';$('btnClearSeq').style.display='';
+  setStatus(`Captured frame ${seqFrames.length}`,'ok');
+  return frame;
+}
+
+function renderStrip(){
+  const strip=$('seqStrip');
+  if(seqFrames.length===0){strip.classList.remove('show');return}
+  strip.classList.add('show');
+  strip.innerHTML='';
+  seqFrames.forEach((f,i)=>{
+    const d=document.createElement('div');d.className='seqThumb';
+    const im=document.createElement('img');im.src=f.img.src;
+    const n=document.createElement('div');n.className='seqN';n.textContent=`#${i+1}`;
+    const del=document.createElement('button');del.className='seqDel';del.innerHTML='✕';
+    del.onclick=e=>{e.stopPropagation();seqFrames.splice(i,1);renderStrip()};
+    d.onclick=()=>showFrameFull(f);
+    d.appendChild(im);d.appendChild(n);d.appendChild(del);strip.appendChild(d);
+  });
+  // auto-scroll to end
+  strip.scrollLeft=strip.scrollWidth;
+}
+
+function showFrameFull(f){
+  clearCanvas();
+  $('emptyMsg').style.display='none';
+  const img=document.createElement('canvas');
+  img.width=f.img.naturalWidth||f.img.width;
+  img.height=f.img.naturalHeight||f.img.height;
+  img.getContext('2d').drawImage(f.img,0,0);
+  $('canvasWrap').appendChild(img);
+  setAddr(f.addr);
+}
+
+// ── SEQUENCE CAPTURE ──────────────────────────────────────────────────────
+async function runSequence(steps,dir,z){
+  if(!panoData){setStatus('Load a panorama first','err');return}
+  seqAbort=false;seqRunning=true;
+  $('seqGo').disabled=true;
+  $('seqProgress').style.display='';$('seqProgBar').style.display='';
+  
+  for(let i=0;i<steps;i++){
+    if(seqAbort)break;
+    $('seqProgress').textContent=`Step ${i+1}/${steps} — capturing…`;
+    $('seqProgFill').style.width=((i/steps)*100)+'%';
+    
+    // Capture current
+    const cv=$('canvasWrap').querySelector('canvas');
+    if(cv){
+      const img=new Image();img.src=cv.toDataURL('image/jpeg',.88);
+      seqFrames.push({img,id:panoData?.location?.pano||i,addr:$('addrTxt').textContent||'',ts:Date.now()});
+      renderStrip();
+    }
+    
+    if(i<steps-1){
+      // Move
+      if(movDir===null)initDir();
+      const targetHd=dir==='fwd'?movDir:(movDir+180)%360;
+      const lk=bestLink(targetHd);
+      if(!lk){setStatus('No link — sequence stopped early','err');break}
+      movDir=dir==='fwd'?lk.heading:(lk.heading+180)%360;
+      try{await fetchAndLoad(lk.pano,z)}
+      catch(e){setStatus(`Step ${i+1} failed: ${e.message}`,'err');break}
+      // Small delay to avoid hammering API
+      await new Promise(r=>setTimeout(r,400));
+    }
+  }
+  
+  $('seqProgFill').style.width='100%';
+  $('seqProgress').textContent=`Done! ${seqFrames.length} frames captured.`;
+  setTimeout(()=>{$('seqProgress').style.display='none';$('seqProgBar').style.display='none'},2000);
+  $('btnDlSeq').style.display='';$('btnClearSeq').style.display='';
+  $('seqGo').disabled=false;
+  seqRunning=false;
+  $('seqModal').classList.remove('show');
+}
+
+// ── DOWNLOAD SEQUENCE AS ZIP ──────────────────────────────────────────────
+async function downloadSeqZip(){
+  if(seqFrames.length===0){setStatus('No frames to save','err');return}
+  setStatus(`Packaging ${seqFrames.length} frames…`,'loading');
+  const zip=new JSZip();
+  const folder=zip.folder('streetview_sequence');
+  for(let i=0;i<seqFrames.length;i++){
+    const f=seqFrames[i];
+    const b64=f.img.src.split(',')[1];
+    folder.file(`frame_${String(i+1).padStart(3,'0')}_${f.id.slice(0,8)}.jpg`,b64,{base64:true});
+  }
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`streetview_seq_${Date.now()}.zip`;
+  a.click();
+  setStatus(`Saved ${seqFrames.length} frames as ZIP`,'ok');
+}
+
+// ── URL / PANOID PARSE ────────────────────────────────────────────────────
+function parseInput(v){
+  const m=v.match(/!1s([^!]+)|pano=([^&]+)/);
+  return m?(m[1]||m[2]):v.trim();
+}
+
+// ── LOCATIONS PANEL ───────────────────────────────────────────────────────
+function buildLocPanel(){
+  const list=$('locList');list.innerHTML='';
+  for(const cat of LOCATIONS){
+    const ch=document.createElement('div');ch.className='locCat';ch.textContent=cat.cat;list.appendChild(ch);
+    for(const it of cat.items){
+      const d=document.createElement('div');d.className='locItem';
+      d.innerHTML=`<div class="locName">${it.n}</div>${it.d?`<div class="locDesc">${it.d}</div>`:''}`;
+      d.onclick=()=>{loadAtLatLng(it,3,rndGlobal);$('locPanel').classList.remove('show')};
+      list.appendChild(d);
+    }
+  }
+}
+
+// ── SEARCH HANDLER ────────────────────────────────────────────────────────
+function handleSearch(v){
+  v=v.trim();if(!v)return;
+  // Looks like a URL or panoId (has '!' or is long alphanumeric)?
+  if(v.includes('maps.google')||v.includes('!1s')||v.includes('pano=')){
+    const id=parseInput(v);
+    movDir=null;
+    fetchAndLoad(id,3).catch(e=>setStatus(e.message,'err'));
+  } else {
+    // Geocode as address
+    GEO.geocode({address:v},(r,s)=>{
+      if(s==='OK'&&r[0])loadAtLatLng(r[0].geometry.location,3);
+      else setStatus(`Geocoding failed: ${s}`,'err');
+    });
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+function init(){
+  buildLocPanel();
+
+  // Search bar
+  $('searchBtn').onclick=()=>handleSearch($('searchIn').value);
+  $('searchIn').addEventListener('keydown',e=>{if(e.key==='Enter')handleSearch($('searchIn').value)});
+  const ac=new google.maps.places.Autocomplete($('searchIn'));
+  ac.addListener('place_changed',()=>{
+    const p=ac.getPlace();
+    if(p.geometry)loadAtLatLng(p.geometry.location,3);
+    else handleSearch($('searchIn').value);
+  });
+
+  // Movement
+  $('btnFwd').onclick=()=>move('fwd');
+  $('btnBwd').onclick=()=>move('bwd');
+  $('btnTurnL').onclick=()=>turnBy(-45);
+  $('btnTurnR').onclick=()=>turnBy(45);
+
+  // Random
+  $('btnRndMel').onclick=rndMelb;
+  $('btnRndGlb').onclick=rndGlobal;
+
+  // Capture
+  $('btnCapture').onclick=captureFrame;
+  $('btnDl').onclick=()=>{
+    const cv=$('canvasWrap').querySelector('canvas');
+    if(!cv){setStatus('Nothing to download','err');return}
+    const a=document.createElement('a');
+    a.href=cv.toDataURL('image/jpeg',.92);
+    a.download=`pano_${panoData?.location?.pano||Date.now()}.jpg`;a.click();
+  };
+  $('btnSeqStart').onclick=()=>$('seqModal').classList.add('show');
+  $('seqGo').onclick=()=>{
+    const steps=Math.max(2,Math.min(50,parseInt($('seqSteps').value)||10));
+    const dir=$('seqDir').value;
+    const z=parseInt($('seqZoom').value)||3;
+    runSequence(steps,dir,z);
+  };
+  $('seqCancel').onclick=()=>{seqAbort=true;$('seqModal').classList.remove('show')};
+  $('btnDlSeq').onclick=downloadSeqZip;
+  $('btnClearSeq').onclick=()=>{
+    seqFrames=[];renderStrip();
+    $('btnDlSeq').style.display='none';$('btnClearSeq').style.display='none';
+  };
+
+  // Locations panel
+  $('locToggle').onclick=()=>$('locPanel').classList.toggle('show');
+  $('locClose').onclick=()=>$('locPanel').classList.remove('show');
+
+  // Minimap toggle
+  $('minimapToggle').onclick=e=>{e.stopPropagation();
+    const m=$('minimap');m.style.display=m.style.display==='none'?'block':'none'};
+
+  // Touch swipe on canvas for fwd/bwd
+  let tx0=null,ty0=null;
+  $('canvasWrap').addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY},{passive:true});
+  $('canvasWrap').addEventListener('touchend',e=>{
+    if(tx0===null)return;
+    const dx=e.changedTouches[0].clientX-tx0,dy=e.changedTouches[0].clientY-ty0;
+    if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>50){move(dy<0?'fwd':'bwd')}
+    else if(Math.abs(dx)>50){turnBy(dx>0?45:-45)}
+    tx0=null;ty0=null;
+  },{passive:true});
+
+  // Geolocation start
+  if(navigator.geolocation){
+    setStatus('Getting your location…','loading');
+    navigator.geolocation.getCurrentPosition(
+      pos=>loadAtLatLng({lat:pos.coords.latitude,lng:pos.coords.longitude},3,rndMelb),
+      ()=>{setStatus('Location unavailable — loading Melbourne','err');rndMelb()}
+    );
+  } else rndMelb();
+}
+
+window.addEventListener('load',init);
+})();
+</script>
+</body>
+</html>
