@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoopFactory v7: Octo-Sequencer</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<style>
+:root{--b:#050508;--p:#0f0f13;--d:#1e1e24;--c:#00ff9d;--m:#ff0055;--a:#00f2ff;--w:#e0e0e0}
+*{box-sizing:border-box;user-select:none;font-family:'Segoe UI',monospace}
+body{background:var(--b);color:var(--w);margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h1{margin:0 0 15px;background:linear-gradient(90deg,var(--c),var(--a));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;letter-spacing:1px;font-size:1.6rem;text-transform:uppercase;text-shadow:0 0 20px rgba(0,255,157,0.2)}
+
+/* LAYOUT */
+.panel{width:100%;max-width:800px;background:var(--p);border:1px solid var(--d);padding:15px;border-radius:12px;margin-bottom:15px;box-shadow:0 10px 40px rgba(0,0,0,0.6)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+
+/* RACK (8 SLOTS) */
+.rack-container{width:100%;max-width:800px;margin-bottom:15px;position:relative}
+.rack{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;height:100px}
+.slot{background:#000;border:1px solid #333;border-radius:4px;position:relative;overflow:hidden;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.slot.filled{border-color:var(--c);background:#05100a;box-shadow:inset 0 0 10px rgba(0,255,157,0.1)}
+.slot.empty:after{content:"+";font-size:1.2rem;color:#333}
+.slot canvas{width:100%;height:100%;position:absolute;opacity:0.8}
+.slot-badge{position:absolute;bottom:2px;left:2px;font-size:0.55rem;background:rgba(0,0,0,0.8);padding:1px 4px;border-radius:3px;color:#888;z-index:2}
+.del-btn{position:absolute;top:2px;right:2px;width:16px;height:16px;background:#300;color:#f55;border:0;border-radius:3px;cursor:pointer;display:none;font-weight:bold;font-size:10px;z-index:10;align-items:center;justify-content:center}
+.slot:hover .del-btn{display:flex}
+
+/* CONTROLS */
+.control-group{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid #1a1a20}
+.lbl{display:flex;justify-content:space-between;font-size:0.65rem;color:#889;margin-bottom:6px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.lbl span{color:var(--c)}
+input[type=range]{width:100%;height:4px;background:#222;appearance:none;border-radius:2px;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:12px;height:12px;background:#888;border-radius:50%;transition:0.2s;border:2px solid var(--p)}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--c);transform:scale(1.2)}
+
+/* BUTTONS */
+button{background:#18181f;color:#ccc;border:1px solid #333;padding:12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:0.7rem;transition:all .2s;text-transform:uppercase}
+button:hover{border-color:#555;color:#fff}
+button:active{transform:scale(0.98)}
+button:disabled{opacity:0.3;cursor:not-allowed}
+button.add{background:linear-gradient(135deg,#003322,#001100);color:var(--c);border-color:#004422}
+button.add:hover{box-shadow:0 0 15px rgba(0,255,157,0.2);border-color:var(--c)}
+button.fill{background:linear-gradient(135deg,#330033,#110011);color:var(--m);border-color:#440022}
+button.fill:hover{box-shadow:0 0 15px rgba(255,0,85,0.2);border-color:var(--m)}
+button.play{background:#223;color:#fff}
+button.play.active{background:var(--c);color:#000;box-shadow:0 0 20px var(--c);border-color:var(--c)}
+button.dl{color:var(--a);border-color:var(--a)}
+
+.file-wrap{position:relative;overflow:hidden}
+.file-wrap input{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer}
+#playhead{position:absolute;top:0;left:0;width:2px;height:100%;background:#fff;box-shadow:0 0 10px #fff;z-index:20;pointer-events:none;display:none}
+#status{margin-top:10px;font-size:0.7rem;color:#667;font-family:monospace}
+</style>
+</head>
+<body>
+
+<h1>LoopFactory v7</h1>
+
+<div class="panel grid">
+    <div class="file-wrap">
+        <button style="width:100%">📂 Load Audio Source</button>
+        <input type="file" id="fi" accept="audio/*">
+    </div>
+    <button id="mic">🎙️ Record Mic (5s)</button>
+</div>
+
+<div class="rack-container">
+    <div class="rack" id="rack"></div>
+    <div id="playhead"></div>
+</div>
+
+<div class="panel">
+    <div class="lbl" style="border-bottom:1px solid #333;padding-bottom:5px;margin-bottom:10px;color:#aaa">GENERATOR SETTINGS (Applied per step)</div>
+    
+    <div class="grid">
+        <div class="control-group">
+            <div class="lbl">Madness (Chaos)<span id="v-mad">50%</span></div>
+            <input type="range" id="mad" max="100" value="50">
+            
+            <div class="lbl" style="margin-top:8px">Detune Spread<span id="v-det">0</span></div>
+            <input type="range" id="det" min="0" max="100" value="20">
+
+            <div class="lbl" style="margin-top:8px">Wobble Depth<span id="v-wob">0</span></div>
+            <input type="range" id="wob" min="0" max="100" value="0">
+        </div>
+        
+        <div class="control-group">
+            <div class="lbl">Overlay (Blend)<span id="v-lap">20%</span></div>
+            <input type="range" id="lap" max="80" value="20">
+
+            <div class="lbl" style="margin-top:8px">Chop Mode<span id="v-chop">OFF</span></div>
+            <input type="range" id="chop" max="2" value="0" step="1">
+
+            <div class="lbl" style="margin-top:8px">Reverse Alternating<span id="v-alt">ON</span></div>
+            <input type="range" id="alt" max="1" value="1" step="1">
+        </div>
+    </div>
+    
+    <div class="grid" style="margin-top:10px">
+        <button id="add" class="add" disabled>+ Add Next Step</button>
+        <button id="fill" class="fill" disabled>⚡ Fill All Empty</button>
+    </div>
+</div>
+
+<div class="panel grid">
+    <div>
+        <div class="lbl">Master Speed<span id="v-spd">1.00x</span></div>
+        <input type="range" id="spd" min="0.1" max="3" step="0.01" value="1">
+    </div>
+    <div class="grid">
+        <button id="play" class="play" disabled>▶ Play Sequence</button>
+        <button id="dl" class="dl" disabled>💾 Save MP3</button>
+    </div>
+</div>
+
+<div id="status">Waiting for audio...</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const AC = window.AudioContext || window.webkitAudioContext;
+const ctx = new AC();
+
+// -- STATE --
+let rawBuffer = null;
+const TOTAL_SLOTS = 8;
+let slots = new Array(TOTAL_SLOTS).fill(null);
+let masterBuffer = null;
+let srcNode = null;
+let isPlaying = false;
+let startTime = 0;
+let playbackRate = 1;
+
+// -- MASTER CHAIN --
+const masterGain = ctx.createGain();
+const limiter = ctx.createDynamicsCompressor();
+masterGain.connect(limiter);
+limiter.connect(ctx.destination);
+
+// -- INIT UI --
+const rackEl = $('rack');
+for(let i=0; i<TOTAL_SLOTS; i++){
+    const d = document.createElement('div');
+    d.className = 'slot empty';
+    d.id = `slot-${i}`;
+    d.innerHTML = `
+        <div class="slot-badge">${i+1}</div>
+        <canvas></canvas>
+        <button class="del-btn" onclick="clearSlot(${i})">×</button>
+    `;
+    rackEl.appendChild(d);
+}
+
+// -- GENERATOR ENGINE --
+async function generateBlock(slotIndex) {
+    if(!rawBuffer) return null;
+    
+    // Settings
+    const madness = parseInt($('mad').value) / 100;
+    const detuneSpread = parseInt($('det').value); // 0-100
+    const wobbleAmt = parseInt($('wob').value) / 100; // 0-1
+    const alternate = $('alt').value == 1;
+    const chopMode = parseInt($('chop').value); 
+    
+    // --- PROGRESSION LOGIC ---
+    // Scale factor (0.0 to 1.0 based on slot position)
+    const progress = slotIndex / (TOTAL_SLOTS - 1);
+    
+    // 1. SPEED: Ramps from 1.0 to (1.0 + Madness)
+    const pSpeed = 1 + (progress * madness * 0.4); 
+    
+    // 2. DETUNE: Ramps up based on Spread + Random Madness
+    // Base spread pulls pitch apart, madness adds random jitter
+    const spreadCents = progress * detuneSpread * 50; 
+    const randomJitter = (Math.random() * madness * 200) - (madness * 100);
+    // Alternate polarity for stereo width feeling if we were panning (visual only here)
+    const pDetune = (slotIndex % 2 === 0 ? spreadCents : -spreadCents) + randomJitter;
+
+    // 3. REVERSE: If Alt is ON, every even slot (human 2,4,6,8) is reversed
+    const isReverse = alternate && (slotIndex % 2 !== 0);
+    
+    // --- OFFLINE RENDER ---
+    const dur = rawBuffer.duration;
+    // Add time for tails if needed
+    const offline = new OfflineAudioContext(2, dur * 44100, 44100);
+    
+    // Buffer Direction
+    let bufferToUse = rawBuffer;
+    if(isReverse) bufferToUse = cloneReverse(rawBuffer, offline);
+    
+    const src = offline.createBufferSource();
+    src.buffer = bufferToUse;
+    src.playbackRate.value = pSpeed;
+    src.detune.value = pDetune;
+    
+    // Create Chain
+    let node = src;
+
+    // A. WOBBLE (Pitch Bend LFO)
+    if(wobbleAmt > 0){
+        // We use a gain node to modulate detune
+        const lfo = offline.createOscillator();
+        lfo.frequency.value = 2 + (progress * 5); // Wobble gets faster in later slots
+        const lfoGain = offline.createGain();
+        lfoGain.gain.value = wobbleAmt * 300; // Depth in cents
+        lfo.connect(lfoGain);
+        lfoGain.connect(src.detune);
+        lfo.start();
+    }
+
+    // B. CHOPPER
+    if(chopMode > 0) {
+        const chopGain = offline.createGain();
+        const osc = offline.createOscillator();
+        osc.type = 'square';
+        osc.frequency.value = chopMode === 1 ? 6 : 3; // 6Hz or 3Hz
+        const oscAmp = offline.createGain();
+        oscAmp.gain.value = 10000; 
+        osc.connect(oscAmp);
+        oscAmp.connect(chopGain.gain);
+        osc.start();
+        node.connect(chopGain);
+        node = chopGain;
+    }
+
+    // C. PROGRESSIVE FILTER (Spectral Tilt)
+    // Slot 0 = Neutral, Slot 7 = Brighter (Highpass) or Darker? 
+    // Let's make it brighter to cut through
+    if(madness > 0.1){
+        const filt = offline.createBiquadFilter();
+        filt.type = "lowshelf";
+        filt.frequency.value = 200 + (progress * 1000);
+        filt.gain.value = -10 * progress; // Reduce bass progressively
+        node.connect(filt);
+        node = filt;
+    }
+
+    // D. ENVELOPE (Fade In/Out)
+    const fade = offline.createGain();
+    fade.gain.setValueAtTime(0, 0);
+    fade.gain.linearRampToValueAtTime(1, 0.02);
+    fade.gain.setValueAtTime(1, dur - 0.02);
+    fade.gain.linearRampToValueAtTime(0, dur);
+    
+    node.connect(fade);
+    fade.connect(offline.destination);
+    
+    src.start();
+    return await offline.startRendering();
+}
+
+function cloneReverse(buffer, ctx) {
+    const res = ctx.createBuffer(2, buffer.length, buffer.sampleRate);
+    for(let c=0; c<2; c++){
+        const d = buffer.getChannelData(c);
+        const n = res.getChannelData(c);
+        for(let i=0; i<d.length; i++) n[i] = d[d.length - 1 - i];
+    }
+    return res;
+}
+
+// -- SEQUENCE BUILDER --
+function updateMasterSequence() {
+    const activeBlocks = slots.filter(b => b !== null);
+    if(activeBlocks.length === 0) {
+        masterBuffer = null;
+        $('play').disabled = true;
+        $('dl').disabled = true;
+        return;
+    }
+
+    const overlapPct = parseInt($('lap').value) / 100;
+    let offsets = [];
+    let cursor = 0;
+    
+    activeBlocks.forEach(b => {
+        offsets.push(cursor);
+        // Step forward by (Length - Overlap)
+        // If overlap is 80%, we only step forward 20%
+        const step = b.length * (1 - overlapPct);
+        cursor += Math.floor(step);
+    });
+
+    const lastBlock = activeBlocks[activeBlocks.length-1];
+    const totalSamples = offsets[offsets.length-1] + lastBlock.length;
+    
+    masterBuffer = ctx.createBuffer(2, totalSamples, 44100);
+    
+    for(let i=0; i<activeBlocks.length; i++){
+        const b = activeBlocks[i];
+        const start = offsets[i];
+        for(let c=0; c<2; c++){
+            const mData = masterBuffer.getChannelData(c);
+            const bData = b.getChannelData(c);
+            for(let j=0; j<bData.length; j++){
+                if(start + j < mData.length) mData[start + j] += bData[j];
+            }
+        }
+    }
+    
+    $('play').disabled = false;
+    $('dl').disabled = false;
+    if(isPlaying) play(true);
+}
+
+// -- UI ACTIONS --
+$('add').onclick = async () => {
+    const idx = slots.findIndex(s => s === null);
+    if(idx === -1) return $('status').innerText = "Rack Full!";
+    $('status').innerText = `Generating Slot ${idx+1}...`;
+    const buf = await generateBlock(idx);
+    slots[idx] = buf;
+    drawSlot(idx, buf);
+    updateMasterSequence();
+    $('status').innerText = "Slot Added.";
+};
+
+$('fill').onclick = async () => {
+    $('fill').disabled = true;
+    $('status').innerText = "Generating 8 Steps...";
+    for(let i=0; i<TOTAL_SLOTS; i++){
+        if(slots[i] === null) {
+            const buf = await generateBlock(i);
+            slots[i] = buf;
+            drawSlot(i, buf);
+        }
+    }
+    updateMasterSequence();
+    $('fill').disabled = false;
+    $('status').innerText = "Sequence Ready.";
+};
+
+window.clearSlot = (idx) => {
+    slots.splice(idx, 1);
+    slots.push(null);
+    for(let i=0; i<TOTAL_SLOTS; i++) drawSlot(i, slots[i]);
+    updateMasterSequence();
+};
+
+// -- PLAYBACK --
+$('play').onclick = () => isPlaying ? stop() : play();
+
+function play(hotSwap = false) {
+    if(!masterBuffer) return;
+    if(ctx.state === 'suspended') ctx.resume();
+    
+    if(srcNode) { srcNode.stop(); srcNode.disconnect(); }
+    
+    let offset = 0;
+    if(hotSwap && startTime > 0) {
+        const now = ctx.currentTime;
+        const dur = masterBuffer.duration / playbackRate;
+        const passed = now - startTime;
+        offset = (passed % dur) * playbackRate;
+        startTime = now - (passed % dur);
+    } else {
+        startTime = ctx.currentTime;
+    }
+    
+    srcNode = ctx.createBufferSource();
+    srcNode.buffer = masterBuffer;
+    srcNode.loop = true;
+    srcNode.playbackRate.value = playbackRate;
+    srcNode.connect(masterGain);
+    srcNode.start(0, offset);
+    
+    isPlaying = true;
+    $('play').innerText = " STOP";
+    $('play').classList.add('active');
+    requestAnimationFrame(anim);
+}
+
+function stop() {
+    if(srcNode) srcNode.stop();
+    isPlaying = false;
+    $('play').innerText = "▶ PLAY SEQUENCE";
+    $('play').classList.remove('active');
+    $('playhead').style.display = 'none';
+}
+
+function anim() {
+    if(!isPlaying) return;
+    requestAnimationFrame(anim);
+    
+    const ph = $('playhead');
+    ph.style.display = 'block';
+    const dur = masterBuffer.duration / playbackRate;
+    const now = ctx.currentTime;
+    const pct = ((now - startTime) % dur) / dur;
+    
+    // Viz Logic
+    const filledCount = slots.filter(s=>s).length;
+    if(filledCount===0) return;
+    const slotW = rackEl.offsetWidth / TOTAL_SLOTS;
+    ph.style.left = (pct * (slotW * filledCount)) + 'px';
+}
+
+// -- UTILS --
+function drawSlot(idx, buf) {
+    const el = $(`slot-${idx}`);
+    const cv = el.querySelector('canvas');
+    const cx = cv.getContext('2d');
+    cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
+    cx.clearRect(0,0,cv.width,cv.height);
+    
+    if(!buf) { el.className = 'slot empty'; return; }
+    
+    el.className = 'slot filled';
+    const d = buf.getChannelData(0);
+    const step = Math.ceil(d.length/cv.width);
+    const h = cv.height/2;
+    cx.beginPath(); cx.strokeStyle='#00ff9d';
+    for(let i=0; i<cv.width; i++){
+        let max=0; for(let j=0; j<step; j++) max=Math.max(max, Math.abs(d[i*step+j]||0));
+        cx.moveTo(i, h-max*h); cx.lineTo(i, h+max*h);
+    }
+    cx.stroke();
+}
+
+// -- INPUTS --
+$('fi').onchange = async e => {
+    if(e.target.files[0]){
+        const ab = await e.target.files[0].arrayBuffer();
+        rawBuffer = await ctx.decodeAudioData(ab);
+        $('status').innerText="Audio Loaded."; $('add').disabled=false; $('fill').disabled=false;
+    }
+};
+$('mic').onclick = async () => {
+    const s = await navigator.mediaDevices.getUserMedia({audio:1});
+    const r = new MediaRecorder(s);
+    const c=[]; r.ondataavailable=e=>c.push(e.data);
+    r.onstop=async()=>{
+        rawBuffer = await ctx.decodeAudioData(await(new Blob(c)).arrayBuffer());
+        $('status').innerText="Mic Loaded."; $('add').disabled=false; $('fill').disabled=false;
+    };
+    r.start(); $('mic').innerText=" REC..."; setTimeout(()=>r.stop(),5000);
+};
+$('dl').onclick = () => {
+    if(!masterBuffer) return;
+    const btn = $('dl'); btn.innerText="Encoding...";
+    setTimeout(()=>{
+        const enc = new lamejs.Mp3Encoder(2, 44100, 128);
+        const l = masterBuffer.getChannelData(0), r=masterBuffer.getChannelData(1);
+        const sL=new Int16Array(l.length), sR=new Int16Array(r.length);
+        for(let i=0;i<l.length;i++){
+            sL[i]=l[i]<0?l[i]*0x8000:l[i]*0x7FFF; sR[i]=r[i]<0?r[i]*0x8000:r[i]*0x7FFF;
+        }
+        const mp3=[]; const bs=1152;
+        for(let i=0;i<sL.length;i+=bs){
+            const b=enc.encodeBuffer(sL.subarray(i,i+bs), sR.subarray(i,i+bs));
+            if(b.length)mp3.push(b);
+        }
+        mp3.push(enc.flush());
+        const u=URL.createObjectURL(new Blob(mp3,{type:'audio/mp3'}));
+        const a=document.createElement('a'); a.href=u; a.download='octo_sequence.mp3'; a.click();
+        btn.innerText="💾 Save MP3";
+    },50);
+};
+
+// UI Value Updates
+$('mad').oninput=e=>$('v-mad').innerText=e.target.value+'%';
+$('det').oninput=e=>$('v-det').innerText=e.target.value;
+$('wob').oninput=e=>$('v-wob').innerText=e.target.value;
+$('lap').oninput=e=>$('v-lap').innerText=e.target.value+'%';
+$('chop').oninput=e=>$('v-chop').innerText=['OFF','FAST','SLOW'][e.target.value];
+$('alt').oninput=e=>$('v-alt').innerText=e.target.value==1?'ON':'OFF';
+$('spd').oninput=e=>{
+    playbackRate=parseFloat(e.target.value);
+    $('v-spd').innerText=playbackRate.toFixed(2)+'x';
+    if(srcNode)srcNode.playbackRate.value=playbackRate;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WarpTape v2 | Warm & Bouncy</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<style>
+    :root {
+        --bg: #1e1e24;
+        --panel: #2b2b36;
+        --accent: #ffae00; /* Amber/Gold for warmth */
+        --accent2: #00ff9d; /* Mint for bounce */
+        --text: #f0f0f0;
+        --knob-bg: #18181f;
+    }
+    * { box-sizing: border-box; user-select: none; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+    
+    h1 {
+        margin: 0 0 20px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        background: linear-gradient(135deg, var(--accent), #ff6600);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2.2rem;
+        text-transform: uppercase;
+    }
+
+    /* MACHINE CASE */
+    .machine {
+        background: var(--panel);
+        border: 1px solid #3a3a45;
+        border-radius: 24px;
+        padding: 30px;
+        width: 100%;
+        max-width: 650px;
+        box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    /* VISUALIZER */
+    .screen {
+        background: #111;
+        border-radius: 16px;
+        height: 140px;
+        position: relative;
+        overflow: hidden;
+        border: 2px solid #333;
+        box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    
+    /* FILE DROP */
+    .file-drop {
+        position: relative; background: #222; border: 2px dashed #444;
+        border-radius: 12px; text-align: center; padding: 15px;
+        transition: 0.3s; cursor: pointer; color: #888; font-weight: 600;
+    }
+    .file-drop:hover { border-color: var(--accent); color: #fff; background: #2a2a30; }
+    .file-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+    /* CONTROLS LAYOUT */
+    .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .group {
+        background: rgba(0,0,0,0.2);
+        padding: 18px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .group-title {
+        font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
+        color: #888; margin-bottom: 15px; font-weight: 700;
+        border-bottom: 1px solid #444; padding-bottom: 8px;
+    }
+
+    /* FADERS */
+    .fader { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+    .fader label { font-size: 0.85rem; font-weight: 600; display: flex; justify-content: space-between; color: #ccc; }
+    .fader label span { color: var(--accent); font-family: monospace; font-size: 0.9rem; }
+    
+    input[type=range] {
+        -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+        width: 100%; height: 8px; background: var(--knob-bg); border-radius: 4px; border: 1px solid #333;
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; height: 18px; width: 18px;
+        border-radius: 50%; background: #ddd; margin-top: -6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.6); transition: transform 0.1s; border: 2px solid #222;
+    }
+    input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.1); background: var(--accent); }
+
+    /* TOGGLES */
+    .toggles { display: flex; gap: 12px; margin-top: 15px; }
+    .toggle-btn {
+        flex: 1; padding: 10px; font-size: 0.75rem; background: #222; 
+        border: 1px solid #444; color: #999; border-radius: 8px; cursor: pointer;
+        font-weight: 700; text-transform: uppercase; transition: all 0.2s;
+    }
+    .toggle-btn.active { background: var(--accent); color: #111; border-color: var(--accent); box-shadow: 0 0 15px rgba(255, 174, 0, 0.4); }
+    .toggle-btn.active.mut { background: var(--accent2); border-color: var(--accent2); box-shadow: 0 0 15px rgba(0, 255, 157, 0.4); }
+
+    /* BIG BUTTONS */
+    .actions { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-top: 10px; }
+    .big-btn {
+        padding: 18px; border-radius: 12px; border: none; font-weight: 800; font-size: 0.9rem;
+        cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+        transition: transform 0.1s, filter 0.2s; color: #111;
+    }
+    .big-btn:active { transform: scale(0.97); }
+    .btn-play { background: #e0e0e0; }
+    .btn-play.playing { background: var(--accent); box-shadow: 0 0 25px rgba(255, 174, 0, 0.5); }
+    .btn-rec { background: #333; color: #fff; border: 1px solid #555; }
+    .btn-rec.recording { background: #ff4444; color: #fff; border-color: #ff4444; animation: pulse 1.5s infinite; }
+
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    #status { text-align: center; font-size: 0.8rem; color: #777; font-family: monospace; margin-top: 15px; }
+</style>
+</head>
+<body>
+
+    <h1>WarpTape v2</h1>
+
+    <div class="machine">
+        
+        <div class="screen">
+            <canvas id="viz"></canvas>
+        </div>
+
+        <div class="file-drop" id="dropZone">
+            📂 DRAG AUDIO HERE or CLICK TO LOAD
+            <input type="file" id="fi" accept="audio/*">
+        </div>
+
+        <div class="controls">
+            
+            <div class="group">
+                <div class="group-title">Motion & Warp</div>
+                
+                <div class="fader">
+                    <label>Slow Bend (Wobble) <span id="val-wob">0%</span></label>
+                    <input type="range" id="wobble" min="0" max="100" value="0">
+                </div>
+                
+                <div class="fader">
+                    <label>Tape Age (Flutter) <span id="val-flut">0%</span></label>
+                    <input type="range" id="flutter" min="0" max="100" value="0">
+                </div>
+
+                <div class="fader">
+                    <label>Bounce (Sidechain) <span id="val-bounce">0%</span></label>
+                    <input type="range" id="bounce" min="0" max="100" value="0">
+                </div>
+
+                <div class="toggles">
+                    <button class="toggle-btn" id="btn-rev">↺ Reverse</button>
+                    <button class="toggle-btn mut" id="btn-mut">✨ Auto-Mutate</button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-title">Color & Vibe</div>
+
+                <div class="fader">
+                    <label>Play Speed <span id="val-speed">1.00x</span></label>
+                    <input type="range" id="speed" min="0.2" max="1.5" step="0.01" value="1.0">
+                </div>
+
+                <div class="fader">
+                    <label>Warmth (Tube Sat) <span id="val-warm">0%</span></label>
+                    <input type="range" id="warm" min="0" max="100" value="0">
+                </div>
+
+                <div class="fader">
+                    <label>Filter (Smooth) <span id="val-filt">OPEN</span></label>
+                    <input type="range" id="filt" min="0" max="100" value="100">
+                </div>
+                
+                <div class="fader">
+                    <label>Space (Echo) <span id="val-echo">0%</span></label>
+                    <input type="range" id="echo" min="0" max="60" value="0">
+                </div>
+            </div>
+
+        </div>
+
+        <div class="actions">
+            <button id="play" class="big-btn btn-play" disabled>▶ PLAY LOOP</button>
+            <button id="rec" class="big-btn btn-rec" disabled>● REC MP3</button>
+        </div>
+
+        <div id="status">Ready for audio...</div>
+    </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const AC = window.AudioContext || window.webkitAudioContext;
+const ctx = new AC();
+
+// NODES
+let srcNode = null;
+const masterGain = ctx.createGain();
+const analyser = ctx.createAnalyser();
+analyser.fftSize = 2048;
+analyser.smoothingTimeConstant = 0.85;
+
+// -- 1. PITCH FX --
+const wobbleLFO = ctx.createOscillator();
+const wobbleGain = ctx.createGain();
+wobbleLFO.frequency.value = 1.5; // Slow
+wobbleGain.gain.value = 0;
+wobbleLFO.start();
+
+const flutterLFO = ctx.createOscillator();
+const flutterGain = ctx.createGain();
+flutterLFO.frequency.value = 12; // Fast tape jitter
+flutterGain.gain.value = 0;
+flutterLFO.start();
+
+// -- 2. VOLUME FX (BOUNCE) --
+const bounceLFO = ctx.createOscillator();
+const bounceDepth = ctx.createGain();
+const bounceNode = ctx.createGain(); // The actual VCA
+bounceLFO.frequency.value = 2; // Default BPM-ish
+bounceLFO.type = 'sine';
+bounceLFO.start();
+// Wiring: LFO -> Depth -> GainNode.gain
+// Note: We need to offset it so it pumps downwards from 1.0
+// Standard Web Audio LFO goes -1 to 1.
+// We want gain to go from 1.0 down to (1.0 - Depth).
+
+// -- 3. COLOR FX --
+const filterNode = ctx.createBiquadFilter();
+filterNode.type = "lowpass";
+filterNode.frequency.value = 20000;
+filterNode.Q.value = 0.5; // Gentle slope
+
+const warmthNode = ctx.createWaveShaper();
+function makeSoftClipCurve(amount) {
+    // Soft Clipping (Warmth) instead of Hard Distortion
+    const k = amount; // 0 to 100 roughly
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n_samples; ++i) {
+        let x = i * 2 / n_samples - 1;
+        // Soft tanh-like curve
+        // x = x * (1 + k/10) to boost input gain
+        // then clamp cleanly
+        if(k < 1) { curve[i] = x; continue; }
+        
+        let boost = 1 + (k * 0.1); 
+        let val = x * boost;
+        
+        // Simple Soft Clip: x / (1 + |x|)
+        // Or atan for smoother tube feel
+        curve[i] = (2 / Math.PI) * Math.atan(val);
+    }
+    return curve;
+}
+warmthNode.curve = makeSoftClipCurve(0);
+
+// -- 4. SPACE FX --
+const delayNode = ctx.createDelay();
+const feedback = ctx.createGain();
+const delayWet = ctx.createGain();
+delayNode.delayTime.value = 0.35;
+feedback.gain.value = 0.4;
+
+// STATE
+let audioBuffer = null;
+let isPlaying = false;
+let isRecording = false;
+let isReverse = false;
+let isMutate = false;
+let mp3Encoder, recorderNode, mp3Data = [];
+
+// CANVAS
+const canvas = $('viz');
+const cc = canvas.getContext('2d');
+
+// --- ENGINE ---
+
+async function loadAudio(file) {
+    $('status').innerText = "Loading Audio...";
+    const ab = await file.arrayBuffer();
+    audioBuffer = await ctx.decodeAudioData(ab);
+    $('status').innerText = "Loaded. Ready to play.";
+    $('play').disabled = false;
+    $('play').innerText = "▶ PLAY LOOP";
+    drawStaticWave();
+}
+
+function play() {
+    if (ctx.state === 'suspended') ctx.resume();
+    if (srcNode) { srcNode.stop(); srcNode.disconnect(); }
+
+    srcNode = ctx.createBufferSource();
+    srcNode.buffer = isReverse ? reverseBuffer(audioBuffer) : audioBuffer;
+    srcNode.loop = true;
+    srcNode.playbackRate.value = $('speed').value;
+
+    // Pitch Modulation
+    // Connect both LFOs to src.detune
+    wobbleLFO.connect(wobbleGain);
+    wobbleGain.connect(srcNode.detune);
+    
+    flutterLFO.connect(flutterGain);
+    flutterGain.connect(srcNode.detune);
+
+    // Audio Chain:
+    // Source -> Bounce -> Filter -> Warmth -> Master
+    //                                      -> Delay -> Master
+    
+    // 1. Bounce (VCA)
+    srcNode.connect(bounceNode);
+    // Modulate Bounce Gain
+    // To get pumping: Gain = 1 - (Depth * (0.5 * (LFO + 1))) 
+    // This is complex to wire purely with nodes.
+    // Simplified: Just connect LFO to Gain. Gain will oscillate centered at Gain.value.
+    // If Gain.value is 1, and LFO is +/- 0.5, Gain goes 0.5 to 1.5. clipping.
+    // Better: Connect LFO to a GainNode (Depth), then to bounceNode.gain.
+    // Set bounceNode.gain.value = 1.
+    // If we want ducking, we need inverted LFO? 
+    // Let's rely on the JS loop for "Mutate" to handle simple automation, 
+    // but for audio-rate bounce, let's use the LFO properly:
+    // We'll set bounceNode.gain to 0.7 (makeup gain) and let LFO wobble it.
+    
+    bounceLFO.connect(bounceDepth);
+    bounceDepth.connect(bounceNode.gain);
+
+    // 2. Filter & Warmth
+    bounceNode.connect(filterNode);
+    filterNode.connect(warmthNode);
+    
+    // 3. Delay Send
+    warmthNode.connect(delayNode);
+    delayNode.connect(feedback);
+    feedback.connect(delayNode);
+    delayNode.connect(delayWet);
+    delayWet.connect(masterGain);
+
+    // 4. Dry Path
+    warmthNode.connect(masterGain);
+
+    // Output
+    masterGain.connect(analyser);
+    masterGain.connect(ctx.destination);
+
+    // Recording Tap
+    setupRecorder();
+
+    srcNode.start();
+    isPlaying = true;
+    $('play').classList.add('playing');
+    $('play').innerText = "⏹ STOP";
+    $('rec').disabled = false;
+
+    if(isMutate) startMutator();
+    drawLiveViz();
+}
+
+function stop() {
+    if (srcNode) srcNode.stop();
+    isPlaying = false;
+    $('play').classList.remove('playing');
+    $('play').innerText = "▶ PLAY LOOP";
+    stopMutator();
+}
+
+function reverseBuffer(buf) {
+    const c = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let i=0; i<buf.numberOfChannels; i++){
+        const d = buf.getChannelData(i);
+        const n = c.getChannelData(i);
+        for(let j=0; j<buf.length; j++) n[j] = d[buf.length-1-j];
+    }
+    return c;
+}
+
+// --- MUTATOR (AUTO-PILOT) ---
+let mutInterval;
+function startMutator() {
+    clearInterval(mutInterval);
+    mutInterval = setInterval(() => {
+        if(!isPlaying) return;
+        
+        // Gentle drifting of parameters
+        const drift = (id, amount) => {
+            const el = $(id);
+            let v = parseFloat(el.value);
+            // Random walk
+            v += (Math.random() * amount * 2) - amount;
+            // Bounce off walls
+            if(v > parseFloat(el.max)) v -= amount*2;
+            if(v < parseFloat(el.min)) v += amount*2;
+            el.value = v;
+            el.dispatchEvent(new Event('input'));
+        };
+
+        if(Math.random() > 0.6) drift('wobble', 2);
+        if(Math.random() > 0.6) drift('flutter', 2);
+        if(Math.random() > 0.7) drift('filt', 5);
+        if(Math.random() > 0.8) drift('bounce', 2);
+        
+        $('status').innerText = "✨ Auto-adjusting vibes...";
+    }, 2000); // Every 2 seconds
+}
+function stopMutator() { clearInterval(mutInterval); }
+
+// --- RECORDING ---
+function setupRecorder() {
+    // Only init if we are about to record? 
+    // We can leave the node connected but inactive.
+}
+
+$('rec').onclick = () => {
+    if(isRecording) {
+        // FINISH
+        isRecording = false;
+        $('rec').innerText = "● REC MP3";
+        $('rec').classList.remove('recording');
+        recorderNode.disconnect();
+        
+        const blob = new Blob(mp3Data, {type: 'audio/mp3'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'warptape_vibe.mp3';
+        a.click();
+    } else {
+        // START
+        isRecording = true;
+        $('rec').innerText = "■ STOP REC";
+        $('rec').classList.add('recording');
+        mp3Data = [];
+        mp3Encoder = new lamejs.Mp3Encoder(2, 44100, 128);
+        
+        recorderNode = ctx.createScriptProcessor(4096, 2, 2);
+        recorderNode.onaudioprocess = e => {
+            if(!isRecording) return;
+            const l = e.inputBuffer.getChannelData(0);
+            const r = e.inputBuffer.getChannelData(1);
+            // Float to Int16
+            const sL = new Int16Array(l.length);
+            const sR = new Int16Array(r.length);
+            for(let i=0; i<l.length; i++){
+                sL[i] = l[i]<0 ? l[i]*0x8000 : l[i]*0x7FFF;
+                sR[i] = r[i]<0 ? r[i]*0x8000 : r[i]*0x7FFF;
+            }
+            const mp3 = mp3Encoder.encodeBuffer(sL, sR);
+            if(mp3.length > 0) mp3Data.push(mp3);
+        };
+        masterGain.connect(recorderNode);
+        recorderNode.connect(ctx.destination);
+    }
+};
+
+// --- UI HANDLERS ---
+$('fi').onchange = e => { if(e.target.files[0]) loadAudio(e.target.files[0]); };
+$('play').onclick = () => isPlaying ? stop() : play();
+
+// PARAMS
+$('wobble').oninput = e => {
+    const v = e.target.value;
+    $('val-wob').innerText = v + '%';
+    wobbleGain.gain.value = v * 2; // Cents
+    wobbleLFO.frequency.value = 1 + (v/50);
+};
+
+$('flutter').oninput = e => {
+    const v = e.target.value;
+    $('val-flut').innerText = v + '%';
+    flutterGain.gain.value = v * 0.5; // Subtle
+    flutterLFO.frequency.value = 10 + (v/10);
+};
+
+$('bounce').oninput = e => {
+    const v = e.target.value;
+    $('val-bounce').innerText = v + '%';
+    // Mapping 0-100 to Gain modulation depth
+    // At 0: Gain is 1. Depth is 0.
+    // At 100: Gain oscillates 1.0 to 0.0.
+    bounceDepth.gain.value = (v/100) * 0.4; // +/- 0.4 gain
+    bounceNode.gain.value = 1.0 - ((v/100)*0.2); // Lower base volume slightly as bounce increases
+    bounceLFO.frequency.value = 2 + (v/20); // Faster bounce at higher intensity
+};
+
+$('warm').oninput = e => {
+    const v = e.target.value;
+    $('val-warm').innerText = v + '%';
+    warmthNode.curve = makeSoftClipCurve(v/2); // Reduce intensity range
+};
+
+$('filt').oninput = e => {
+    const v = e.target.value;
+    // Map 0-100 to 200Hz - 20000Hz (Log)
+    // 0 = Dark (Closed), 100 = Open
+    if(v >= 95) {
+        $('val-filt').innerText = "OPEN";
+        filterNode.frequency.value = 20000;
+    } else {
+        $('val-filt').innerText = v + '%';
+        const freq = 200 * Math.pow(100, v/100);
+        filterNode.frequency.value = freq;
+    }
+};
+
+$('echo').oninput = e => {
+    $('val-echo').innerText = e.target.value + '%';
+    delayWet.gain.value = e.target.value / 100;
+};
+
+$('speed').oninput = e => {
+    $('val-speed').innerText = parseFloat(e.target.value).toFixed(2)+'x';
+    if(srcNode) srcNode.playbackRate.value = e.target.value;
+};
+
+$('btn-rev').onclick = () => {
+    isReverse = !isReverse;
+    $('btn-rev').classList.toggle('active');
+    if(isPlaying) play(); // Restart
+};
+
+$('btn-mut').onclick = () => {
+    isMutate = !isMutate;
+    $('btn-mut').classList.toggle('active');
+    if(isMutate) startMutator(); else stopMutator();
+};
+
+// --- VISUALS ---
+function drawStaticWave() {
+    if(!audioBuffer) return;
+    canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+    cc.clearRect(0,0,canvas.width,canvas.height);
+    const data = audioBuffer.getChannelData(0);
+    const step = Math.ceil(data.length / canvas.width);
+    const h = canvas.height / 2;
+    cc.beginPath(); cc.strokeStyle = '#555';
+    for(let i=0; i<canvas.width; i++){
+        let max = 0;
+        for(let j=0; j<step; j++) max = Math.max(max, Math.abs(data[i*step+j]));
+        cc.moveTo(i, h - max*h); cc.lineTo(i, h + max*h);
+    }
+    cc.stroke();
+}
+
+function drawLiveViz() {
+    if(!isPlaying) return;
+    requestAnimationFrame(drawLiveViz);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(data);
+    
+    // Fade out old frame
+    cc.fillStyle = 'rgba(17,17,17,0.3)';
+    cc.fillRect(0,0,canvas.width,canvas.height);
+    
+    cc.lineWidth = 2;
+    cc.strokeStyle = '#ffae00'; // Warm Amber
+    cc.beginPath();
+    
+    const slice = canvas.width / data.length;
+    let x = 0;
+    for(let i=0; i<data.length; i++){
+        const v = data[i]/128.0;
+        const y = v * canvas.height/2;
+        i===0 ? cc.moveTo(x,y) : cc.lineTo(x,y);
+        x += slice;
+    }
+    cc.stroke();
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Text Wrangler Pro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:9px/1.2 monospace;padding:4px;background:#f5f5f5;color:#222;padding-bottom:20px}
+input[type="file"],textarea,button,select,input[type="text"],input[type="number"]{font:9px monospace;width:100%;margin:2px 0;padding:3px;background:#fff;color:#222;border:1px solid #666}
+button{cursor:pointer}
+button:active{background:#ddd}
+.btn-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:2px;margin:2px 0}
+#output{white-space:pre-wrap;word-break:break-word;margin-top:4px;max-height:50vh;overflow-y:auto;border:1px solid #666;padding:3px;font-size:8px;background:#fff}
+h3{font-size:9px;margin:4px 0 2px;color:#000;font-weight:bold}
+.modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid #666;padding:8px;z-index:999;max-width:90%;max-height:80vh;overflow-y:auto}
+.modal.show{display:block}
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:998}
+.overlay.show{display:block}
+label{font-size:8px;display:block;margin-top:4px}
+textarea{resize:vertical;min-height:60px}
+.row{display:flex;gap:4px;align-items:center}
+</style>
+</head>
+<body>
+<input type="file" id="file" accept=".txt">
+<textarea id="input" rows="3" placeholder="Paste text or load file..."></textarea>
+<div class="btn-group">
+<button onclick="load()">LOAD</button>
+<button onclick="useOutput()">USE OUTPUT</button>
+<button onclick="clr()">CLEAR</button>
+<button onclick="save()">SAVE</button>
+</div>
+
+<h3>⚡ SORT & PATTERN DETECTION</h3>
+<div class="btn-group">
+<button onclick="run('sortLines')">A→Z</button>
+<button onclick="run('sortLinesRev')">Z→A</button>
+<button onclick="run('sortLen')">Length</button>
+<button onclick="run('sortComplex')">Complexity</button>
+<button onclick="run('sortNum')">Numeric</button>
+<button onclick="run('sortDomain')">Domain</button>
+<button onclick="run('sortLastWord')">Last Word</button>
+<button onclick="run('sortRandom')">Random</button>
+<button onclick="run('sortVowels')">Vowel%</button>
+<button onclick="run('sortDigits')">Digit#</button>
+<button onclick="run('sortUnique')">Unique Ch</button>
+<button onclick="run('sortCaps')">Capitals</button>
+<button onclick="run('sortWhite')">Whitespace</button>
+<button onclick="run('sortEntropy')">Entropy</button>
+<button onclick="run('sortPattern')">Pattern</button>
+<button onclick="run('sortAlphaNum')">AlphaNum</button>
+<button onclick="run('sortSpecial')">Special Ch</button>
+<button onclick="run('sortWordCount')">Word Count</button>
+<button onclick="run('sortFirstNum')">1st Number</button>
+<button onclick="run('sortHasNum')">Has Number</button>
+<button onclick="run('sortByPrefix')">Prefix</button>
+<button onclick="run('sortBySuffix')">Suffix</button>
+<button onclick="run('sortWordsInLines')">Words in Lines</button>
+<button onclick="run('sortWordsInParas')">Words in Paras</button>
+</div>
+
+<h3>🔍 ANALYZE & EXTRACT</h3>
+<div class="btn-group">
+<button onclick="run('topWords')">Top Words</button>
+<button onclick="run('uniqueWords')">Unique Words</button>
+<button onclick="run('stats')">Stats</button>
+<button onclick="run('histogram')">Histogram</button>
+<button onclick="run('uniqueCount')">Unique+Count</button>
+<button onclick="run('entropy')">Entropy</button>
+<button onclick="showModal('ngram')">N-grams</button>
+<button onclick="run('readability')">Readability</button>
+<button onclick="run('extractEmails')">📧 Emails</button>
+<button onclick="run('extractUrls')">🔗 URLs</button>
+<button onclick="run('extractPhones')">📱 Phones</button>
+<button onclick="run('extractIPs')">🌐 IPs</button>
+<button onclick="run('extractDates')">📅 Dates</button>
+<button onclick="run('extractCodes')">🔑 Codes</button>
+<button onclick="run('extractHashes')"># Hashes</button>
+<button onclick="run('extractLogistics')">📦 Logistics</button>
+<button onclick="run('extractKeys')">🔑 API Keys</button>
+<button onclick="run('extractAll')">Extract All</button>
+<button onclick="showModal('extractLines')">Find Lines</button>
+<button onclick="run('patterns')">Patterns</button>
+</div>
+
+<h3>🛠️ TRANSFORM</h3>
+<div class="btn-group">
+<button onclick="run('dedupe')">Dedupe</button>
+<button onclick="run('dedupeSort')">Dedupe+Sort</button>
+<button onclick="run('reverse')">Reverse</button>
+<button onclick="run('removeEmpty')">No Empty</button>
+<button onclick="run('removeSpecial')">No Special</button>
+<button onclick="run('removeNums')">No Numbers</button>
+<button onclick="run('extractNums')">Only Nums</button>
+<button onclick="run('upper')">UPPER</button>
+<button onclick="run('lower')">lower</button>
+<button onclick="run('title')">Title</button>
+<button onclick="run('sentence')">Sentence</button>
+<button onclick="run('numberLines')">Number</button>
+<button onclick="run('shuffle')">Shuffle</button>
+<button onclick="run('wordCount')">Word Count</button>
+<button onclick="run('rot13')">ROT13</button>
+<button onclick="run('leet')">1337</button>
+<button onclick="run('sortChars')">Sort Chars</button>
+<button onclick="run('removeDupeChars')">No Dupe Ch</button>
+<button onclick="run('reverseWords')">Rev Words</button>
+<button onclick="run('reverseLines')">Rev Lines</button>
+<button onclick="run('urlDecode')">URL Decode</button>
+<button onclick="run('urlEncode')">URL Encode</button>
+<button onclick="run('htmlUnescape')">HTML Unescape</button>
+<button onclick="run('htmlEscape')">HTML Escape</button>
+<button onclick="showModal('removeWords')">Remove Words</button>
+<button onclick="showModal('deleteLines')">Delete Lines</button>
+<button onclick="showModalAlways('findReplace')">Find & Replace</button>
+<button onclick="showModalAlways('replaceChars')">Replace Chars</button>
+<button onclick="run('wrapFix')">Wrap Fix</button>
+<button onclick="run('extractBetween')">Extract Between</button>
+<button onclick="run('splitByDelim')">Split by Delim</button>
+<button onclick="run('joinLines')">Join Lines</button>
+<button onclick="run('addPrefix')">Add Prefix</button>
+<button onclick="run('addSuffix')">Add Suffix</button>
+<button onclick="run('keepOnlyAlpha')">Only Letters</button>
+<button onclick="run('keepOnlyAlphaNum')">Only Alphanumeric</button>
+<button onclick="run('removeDiacritics')">Remove Accents</button>
+<button onclick="run('toSlug')">To Slug</button>
+<button onclick="run('csvToJson')">CSV→JSON</button>
+<button onclick="run('jsonToCsv')">JSON→CSV</button>
+<button onclick="run('base64Encode')">Base64 Encode</button>
+<button onclick="run('base64Decode')">Base64 Decode</button>
+</div>
+
+<h3>⎵ WHITESPACE</h3>
+<div class="btn-group">
+<button onclick="run('normWS')">Normalize</button>
+<button onclick="run('normBreaks')">Norm Breaks</button>
+<button onclick="run('space2nl')">Space→NL</button>
+<button onclick="run('nl2space')">NL→Space</button>
+<button onclick="run('tab2space')">Tab→Space</button>
+<button onclick="run('space2tab')">Space→Tab</button>
+<button onclick="run('trimLines')">Trim</button>
+<button onclick="run('collapseSpace')">Collapse</button>
+</div>
+
+<div id="output">Ready. Load text to begin.</div>
+<div class="overlay" id="overlay" onclick="closeModals()"></div>
+
+<div class="modal" id="ngramModal">
+<h3>N-GRAM ANALYZER</h3>
+<label>N-gram size:</label><input type="number" id="ngramSize" value="2" min="1" max="10">
+<label>Max results:</label><input type="number" id="ngramLimit" value="50" min="1" max="500">
+<div class="btn-group" style="margin-top:6px">
+<button onclick="generateNgrams()">Generate</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="removeWordsModal">
+<h3>REMOVE WORDS/PHRASES</h3>
+<textarea id="removeList" rows="8" placeholder="word1&#10;phrase to remove&#10;another word"></textarea>
+<label><input type="checkbox" id="caseSens"> Case sensitive</label>
+<div class="btn-group" style="margin-top:6px">
+<button onclick="removeWords()">Remove</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="extractLinesModal">
+<h3>EXTRACT LINES CONTAINING</h3>
+<textarea id="extractList" rows="8" placeholder="pattern1&#10;pattern2"></textarea>
+<label><input type="checkbox" id="extractCase"> Case sensitive</label>
+<div class="btn-group" style="margin-top:6px">
+<button onclick="extractLines()">Extract</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="deleteLinesModal">
+<h3>DELETE LINES CONTAINING</h3>
+<textarea id="deleteList" rows="8" placeholder="spam&#10;unwanted"></textarea>
+<label><input type="checkbox" id="deleteCase"> Case sensitive</label>
+<div class="btn-group" style="margin-top:6px">
+<button onclick="deleteLines()">Delete</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="findReplaceModal">
+<h3>FIND & REPLACE</h3>
+<label>Find:</label><input type="text" id="findText">
+<label>Replace:</label><input type="text" id="replaceText">
+<div class="row" style="margin-top:4px">
+<label><input type="checkbox" id="findRegex"> Regex</label>
+<label><input type="checkbox" id="findCase"> Case Sens</label>
+<label><input type="checkbox" id="findWholeWord"> Whole Word</label>
+</div>
+<div class="btn-group" style="margin-top:6px">
+<button onclick="findReplace()">Run</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<div class="modal" id="replaceCharsModal">
+<h3>BULK CHAR REPLACEMENT</h3>
+<p style="font-size:8px;margin-bottom:4px">Format: find=replace (one per line)</p>
+<textarea id="charReplacements" rows="8" placeholder="a=4&#10;b=8&#10; =_"></textarea>
+<div class="btn-group" style="margin-top:6px">
+<button onclick="replaceChars()">Run</button><button onclick="closeModals()">Cancel</button>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let txt='',o=$('output'),inp=$('input');
+
+$('file').onchange=e=>{
+const f=e.target.files[0];
+if(f&&f.size<100e6){const r=new FileReader();r.onload=ev=>inp.value=ev.target.result;r.readAsText(f);}
+else alert('File too large (max 100MB)');
+};
+
+const clr=()=>{inp.value='';txt='';o.textContent='Ready. Load text to begin.';$('file').value=''};
+const load=()=>{txt=inp.value;o.textContent=txt?`✓ Loaded ${txt.length} chars, ${getLines().length} lines`:'No text loaded'};
+const useOutput=()=>{const c=o.textContent;if(!c||c.startsWith('Ready')||c.startsWith('✓')||c.startsWith('No')){alert('No output to use');return}inp.value=c;txt=c;o.textContent=`✓ Output loaded as input (${c.length} chars)`};
+
+const save=()=>{
+const c=o.textContent;
+if(!c||c.startsWith('Ready')||c.startsWith('✓')||c.startsWith('No')){alert('No output to save');return}
+const a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([c],{type:'text/plain'}));
+a.download=`output_${Date.now()}.txt`;
+a.click();
+};
+
+const getWords=()=>txt.toLowerCase().match(/\b[\w']+\b/g)||[];
+const getLines=()=>txt.split('\n').filter(l=>l.trim());
+const showModal=id=>{if(!txt){o.textContent='⚠ Load text first';return}$('overlay').classList.add('show');$(id+'Modal').classList.add('show')};
+const showModalAlways=id=>{$('overlay').classList.add('show');$(id+'Modal').classList.add('show')};
+const closeModals=()=>{$('overlay').classList.remove('show');document.querySelectorAll('.modal').forEach(m=>m.classList.remove('show'))};
+
+const ops={
+sortLines:()=>getLines().sort().join('\n'),
+sortLinesRev:()=>getLines().sort().reverse().join('\n'),
+sortLen:()=>getLines().sort((a,b)=>a.length-b.length||a.localeCompare(b)).join('\n'),
+sortComplex:()=>{
+const calc=s=>(s.length)+((s.match(/[A-Z]/g)||[]).length*2)+((s.match(/[^a-zA-Z0-9\s]/g)||[]).length*3)+((s.match(/\b\w{8,}\b/g)||[]).length*5)+(new Set(s.match(/\b\w+\b/g)||[]).size*2);
+return getLines().sort((a,b)=>calc(b)-calc(a)).join('\n');
+},
+sortNum:()=>{const ex=s=>{const m=s.match(/\d+\.?\d*/);return m?parseFloat(m[0]):Infinity};return getLines().sort((a,b)=>ex(a)-ex(b)).join('\n');},
+sortDomain:()=>{const ex=s=>{const m=s.match(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);return m?m[1]:''};return getLines().sort((a,b)=>ex(a).localeCompare(ex(b))||a.localeCompare(b)).join('\n');},
+sortLastWord:()=>{const lw=s=>{const w=s.match(/\b\w+\b/g);return w?w[w.length-1].toLowerCase():''};return getLines().sort((a,b)=>lw(a).localeCompare(lw(b))).join('\n');},
+sortRandom:()=>getLines().sort(()=>Math.random()-0.5).join('\n'),
+sortVowels:()=>{const vp=s=>{const t=s.replace(/\s/g,'').length;return t?(s.match(/[aeiouAEIOU]/g)||[]).length/t:0};return getLines().sort((a,b)=>vp(b)-vp(a)).join('\n');},
+sortDigits:()=>{const dc=s=>(s.match(/\d/g)||[]).length;return getLines().sort((a,b)=>dc(b)-dc(a)||a.localeCompare(b)).join('\n');},
+sortUnique:()=>{const uc=s=>new Set(s.toLowerCase().replace(/\s/g,'')).size;return getLines().sort((a,b)=>uc(b)-uc(a)||a.localeCompare(b)).join('\n');},
+sortCaps:()=>{const cc=s=>(s.match(/[A-Z]/g)||[]).length;return getLines().sort((a,b)=>cc(b)-cc(a)||a.localeCompare(b)).join('\n');},
+sortWhite:()=>{const wc=s=>(s.match(/\s/g)||[]).length;return getLines().sort((a,b)=>wc(b)-wc(a)||a.localeCompare(b)).join('\n');},
+sortEntropy:()=>{
+const ce=s=>{if(!s.length)return 0;const m={};for(let i=0;i<s.length;i++)m[s[i]]=(m[s[i]]||0)+1;let e=0;Object.values(m).forEach(c=>{const p=c/s.length;e-=p*Math.log2(p)});return e;};
+return getLines().sort((a,b)=>ce(b)-ce(a)).join('\n');
+},
+sortPattern:()=>{
+const gp=s=>s.replace(/[a-z]/g,'a').replace(/[A-Z]/g,'A').replace(/\d/g,'0').replace(/\s/g,'_').replace(/[^aA0_]/g,'*');
+return getLines().sort((a,b)=>gp(a).localeCompare(gp(b))||a.localeCompare(b)).join('\n');
+},
+sortAlphaNum:()=>{const an=s=>(s.match(/[a-zA-Z0-9]/g)||[]).length;return getLines().sort((a,b)=>an(b)-an(a)||a.localeCompare(b)).join('\n');},
+sortSpecial:()=>{const sc=s=>(s.match(/[^a-zA-Z0-9\s]/g)||[]).length;return getLines().sort((a,b)=>sc(b)-sc(a)||a.localeCompare(b)).join('\n');},
+sortWordCount:()=>{const wc=s=>(s.match(/\b\w+\b/g)||[]).length;return getLines().sort((a,b)=>wc(b)-wc(a)||a.localeCompare(b)).join('\n');},
+sortFirstNum:()=>{const fn=s=>{const m=s.match(/\d+/);return m?parseInt(m[0]):Infinity};return getLines().sort((a,b)=>fn(a)-fn(b)).join('\n');},
+sortHasNum:()=>getLines().sort((a,b)=>(b.match(/\d/)?1:0)-(a.match(/\d/)?1:0)||a.localeCompare(b)).join('\n'),
+sortByPrefix:()=>{const pf=s=>s.substring(0,3).toLowerCase();return getLines().sort((a,b)=>pf(a).localeCompare(pf(b))||a.localeCompare(b)).join('\n');},
+sortBySuffix:()=>{const sf=s=>s.substring(s.length-3).toLowerCase();return getLines().sort((a,b)=>sf(a).localeCompare(sf(b))||a.localeCompare(b)).join('\n');},
+sortWordsInLines:()=>txt.split('\n').map(l=>{const w=l.match(/\b[\w']+\b/g)||[],nw=l.match(/[^\w'\s]+/g)||[];return w.sort().join(' ')+(nw.length?' '+nw.join(' '):'')}).join('\n'),
+sortWordsInParas:()=>txt.split(/\n\s*\n/).map(p=>{const w=p.match(/\b[\w']+\b/g)||[],nw=p.match(/[^\w'\s]+/g)||[];return w.sort().join(' ')+(nw.length?' '+nw.join(' '):'')}).join('\n\n'),
+topWords:()=>{const m={};getWords().forEach(x=>m[x]=(m[x]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,100).map(([w,c])=>`${c.toString().padStart(6)} ${w}`).join('\n');},
+uniqueWords:()=>{const u=[...new Set(getWords())].sort();return `UNIQUE: ${u.length}\n\n${u.join('\n')}`;},
+stats:()=>{const w=getWords(),wl=w.map(x=>x.length),sum=wl.reduce((a,b)=>a+b,0);return `Chars: ${txt.length}\nWords: ${w.length}\nUnique: ${new Set(w).size}\nSentences: ${txt.split(/[.!?]+/).filter(x=>x.trim()).length}\nAvg word: ${(sum/wl.length||0).toFixed(2)}\nMax word: ${Math.max(...wl,0)}\nLines: ${getLines().length}`;},
+histogram:()=>{
+const m={};getLines().forEach(l=>m[l]=(m[l]||0)+1);const s=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,100);
+return 'LINE FREQUENCY HISTOGRAM\n\n'+s.map(([l,c])=>`${c.toString().padStart(4)} ${'█'.repeat(Math.ceil((c/(s[0]?s[0][1]:1))*30))} ${l.length>50?l.substring(0,50)+'...':l}`).join('\n');
+},
+uniqueCount:()=>{const m={};getLines().forEach(l=>m[l]=(m[l]||0)+1);return `UNIQUE LINES WITH COUNTS\n\n`+Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([l,c])=>`${c.toString().padStart(6)}x  ${l}`).join('\n');},
+entropy:()=>{const m={},l=txt.length;for(let i=0;i<l;i++)m[txt[i]]=(m[txt[i]]||0)+1;let e=0;Object.values(m).forEach(c=>{const p=c/l;e-=p*Math.log2(p)});return `Entropy: ${e.toFixed(4)} bits/char\nUnique chars: ${Object.keys(m).length}\nTotal chars: ${l}`;},
+readability:()=>{
+const w=getWords().slice(0,5000),s=txt.split(/[.!?]+/).filter(x=>x.trim()).length;
+const syl=wd=>{wd=wd.toLowerCase().replace(/[^a-z]/g,'');if(wd.length<=3)return 1;wd=wd.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/,'');return(wd.match(/[aeiouy]{1,2}/g)||[]).length||1;};
+const ts=w.reduce((a,b)=>a+syl(b),0),aw=w.length/s||0,as=ts/w.length||0,fk=206.835-1.015*aw-84.6*as;
+return `Flesch: ${fk.toFixed(1)}\nGrade: ${(0.39*aw+11.8*as-15.59).toFixed(1)}\nAvg words/sent: ${aw.toFixed(1)}\nAvg syl/word: ${as.toFixed(2)}`;
+},
+extractEmails:()=>{const e=[...new Set(txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g)||[])];return e.length?`EMAILS (${e.length})\n\n${e.join('\n')}`:'No emails found';},
+extractUrls:()=>{const u=[...new Set(txt.match(/https?:\/\/[^\s<>"]+/g)||[])];return u.length?`URLS (${u.length})\n\n${u.join('\n')}`:'No URLs found';},
+extractPhones:()=>{
+const p=[/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g,/\(\d{3}\)\s?\d{3}[-.\s]?\d{4}/g,/\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g],ph=[];
+p.forEach(r=>ph.push(...(txt.match(r)||[])));const u=[...new Set(ph)];return u.length?`PHONES (${u.length})\n\n${u.join('\n')}`:'No phones found';
+},
+extractIPs:()=>{const ip=[...new Set(txt.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)||[])];return ip.length?`IPs (${ip.length})\n\n${ip.join('\n')}`:'No IPs found';},
+extractDates:()=>{
+const d=[/\b\d{4}-\d{2}-\d{2}\b/g,/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/gi],dt=[];
+d.forEach(r=>dt.push(...(txt.match(r)||[])));const u=[...new Set(dt)];return u.length?`DATES (${u.length})\n\n${u.join('\n')}`:'No dates found';
+},
+extractCodes:()=>{
+const c=[/\b[A-Z0-9]{4,}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)*\b/g,/\b[A-Z]{3,}[0-9]{3,}\b/g,/\b[0-9]{3,}[A-Z]{3,}\b/g],cd=[];
+c.forEach(r=>cd.push(...(txt.match(r)||[])));const u=[...new Set(cd)];return u.length?`CODES (${u.length})\n\n${u.join('\n')}`:'No codes found';
+},
+extractHashes:()=>{
+const h=[/\b[A-Fa-f0-9]{32}\b/g,/\b[A-Fa-f0-9]{40}\b/g,/\b[A-Fa-f0-9]{64}\b/g],hs=[];
+h.forEach(r=>hs.push(...(txt.match(r)||[])));const u=[...new Set(hs)];return u.length?`HASHES (${u.length})\n\n${u.join('\n')}`:'No hashes found';
+},
+extractLogistics:()=>{
+const p={'CONTAINER':{r:/\b[A-Z]{4}\d{7}\b/g},'AWB':{r:/\b\d{3}-?\d{8}\b/g},'BOL':{r:/\b[A-Z]{3,4}\d{6,10}\b/g},'PRO':{r:/\b\d{3}-\d{7}\b/g},'TRACK':{r:/\b1Z[A-Z0-9]{16}\b/g},'PO':{r:/\bPO[-#\s]?(\d{4,10})\b/gi}};
+let out='LOGISTICS\n\n',f=0;Object.entries(p).forEach(([k,{r}])=>{const m=[...new Set(txt.match(r)||[])];if(m.length){out+=`${k} (${m.length})\n${m.slice(0,20).join('\n')}\n\n`;f+=m.length}});return f?out:'No patterns';
+},
+extractKeys:()=>{
+const p={'GOOG':/\bAIza[0-9A-Za-z_-]{35}\b/g,'AWS':/\bAKIA[0-9A-Z]{16}\b/g,'GH':/\bghp_[0-9a-zA-Z]{36}\b/g,'STRIPE':/\b(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/g,'JWT':/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g};
+let out='KEYS\n\n',f=0;Object.entries(p).forEach(([k,r])=>{const m=[...new Set(txt.match(r)||[])];if(m.length){out+=`${k} (${m.length})\n${m.slice(0,10).join('\n')}\n\n`;f+=m.length}});return f?out:'No keys';
+},
+extractAll:()=>{
+const p={'EMAIL':/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,'URL':/https?:\/\/[^\s<>"]+/g,'IP':/\b(?:\d{1,3}\.){3}\d{1,3}\b/g};
+let out='EXTRACT ALL\n\n';Object.entries(p).forEach(([k,r])=>{const u=[...new Set(txt.match(r)||[])];if(u.length)out+=`${k} (${u.length})\n${u.slice(0,50).join('\n')}\n\n`});return out;
+},
+patterns:()=>{
+const m={};getLines().forEach(l=>m[l.replace(/[a-z]/g,'a').replace(/[A-Z]/g,'A').replace(/\d/g,'0').replace(/\s/g,'_').replace(/[^aA0_]/g,'*')]=(m[l]||0)+1);
+return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,50).map(([p,c])=>`${c.toString().padStart(4)} ${p}`).join('\n');
+},
+dedupe:()=>[...new Set(getLines())].join('\n'),
+dedupeSort:()=>[...new Set(getLines())].sort().join('\n'),
+reverse:()=>txt.split('').reverse().join(''),
+removeEmpty:()=>txt.split('\n').filter(l=>l.trim()).join('\n'),
+removeSpecial:()=>txt.replace(/[^a-zA-Z0-9\s]/g,''),
+removeNums:()=>txt.replace(/\d+/g,''),
+extractNums:()=>(txt.match(/\d+\.?\d*/g)||[]).join('\n'),
+upper:()=>txt.toUpperCase(),
+lower:()=>txt.toLowerCase(),
+title:()=>txt.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),
+sentence:()=>txt.toLowerCase().replace(/(^\w|[.!?]\s+\w)/g,c=>c.toUpperCase()),
+numberLines:()=>txt.split('\n').map((l,i)=>`${i+1}. ${l}`).join('\n'),
+shuffle:()=>{const ln=txt.split('\n');for(let i=ln.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ln[i],ln[j]]=[ln[j],ln[i]]}return ln.join('\n')},
+wordCount:()=>txt.split('\n').map((l,i)=>`${String(i+1).padStart(4)} [${(l.match(/\b\w+\b/g)||[]).length}] ${l.substring(0,60)}`).join('\n'),
+rot13:()=>txt.replace(/[a-zA-Z]/g,c=>String.fromCharCode((c<='Z'?90:122)>=(c=c.charCodeAt(0)+13)?c:c-26)),
+leet:()=>{const m={'a':'4','e':'3','i':'1','o':'0','s':'5','t':'7','l':'1'};return txt.split('').map(c=>m[c.toLowerCase()]||c).join('')},
+sortChars:()=>getLines().map(l=>l.split('').sort().join('')).join('\n'),
+removeDupeChars:()=>txt.replace(/(.)\1+/g,'$1'),
+reverseWords:()=>getLines().map(l=>l.split(/\s+/).reverse().join(' ')).join('\n'),
+reverseLines:()=>txt.split('\n').reverse().join('\n'),
+wrapFix:()=>txt.replace(/\n(?=[a-z])/g,' ').replace(/ +/g,' ').replace(/\n{3,}/g,'\n\n'),
+urlDecode:()=>{try{return decodeURIComponent(txt)}catch(e){return 'Error: Invalid URL'}},
+urlEncode:()=>encodeURIComponent(txt),
+htmlUnescape:()=>txt.replace(/&(?:amp|lt|gt|quot|#39|apos);/g,e=>({'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&#39;':"'",'&apos;':"'"}[e])),
+htmlEscape:()=>txt.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+extractBetween:()=>{const s=prompt('Start:','['),e=prompt('End:',']');if(!s||!e)return txt;const m=txt.match(new RegExp(`\\${s}(.*?)\\${e}`,'gs'))||[];return m.length?m.map(x=>x.slice(s.length,-e.length)).join('\n'):'No matches';},
+splitByDelim:()=>{const d=prompt('Delim:','');return d===null?txt:d?txt.split(d).join('\n'):txt.split(/\s+/).join('\n')},
+joinLines:()=>{const d=prompt('Join with:','');return d===null?txt:getLines().join(d||' ')},
+addPrefix:()=>{const p=prompt('Prefix:','> ');return p===null?txt:txt.split('\n').map(l=>p+l).join('\n')},
+addSuffix:()=>{const s=prompt('Suffix:',' <');return s===null?txt:txt.split('\n').map(l=>l+s).join('\n')},
+keepOnlyAlpha:()=>txt.replace(/[^a-zA-Z\s\n]/g,''),
+keepOnlyAlphaNum:()=>txt.replace(/[^a-zA-Z0-9\s\n]/g,''),
+removeDiacritics:()=>txt.normalize('NFD').replace(/[\u0300-\u036f]/g,''),
+toSlug:()=>txt.toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/[\s-]+/g,'-'),
+csvToJson:()=>{try{const l=txt.split('\n').filter(x=>x.trim());if(!l.length)return'No data';const h=l[0].split(',').map(x=>x.trim());return JSON.stringify(l.slice(1).map(x=>{const v=x.split(',');const o={};h.forEach((k,i)=>o[k]=v[i]?.trim()||'');return o}),null,2)}catch(e){return e.message}},
+jsonToCsv:()=>{try{const d=JSON.parse(txt);if(!Array.isArray(d))return'Err: Not array';const h=Object.keys(d[0]);return [h.join(','),...d.map(o=>h.map(k=>o[k]||'').join(','))].join('\n')}catch(e){return e.message}},
+base64Encode:()=>{try{return btoa(unescape(encodeURIComponent(txt)))}catch(e){return e.message}},
+base64Decode:()=>{try{return decodeURIComponent(escape(atob(txt.trim())))}catch(e){return e.message}},
+normWS:()=>txt.replace(/\r/g,'').replace(/\t/g,'    ').replace(/ +/g,' ').replace(/\n{3,}/g,'\n\n').replace(/^ +| +$/gm,''),
+normBreaks:()=>txt.replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n'),
+space2nl:()=>txt.replace(/ +/g,'\n'),
+nl2space:()=>txt.replace(/\n+/g,' ').replace(/ +/g,' ').trim(),
+tab2space:()=>txt.replace(/\t/g,'    '),
+space2tab:()=>txt.replace(/    /g,'\t').replace(/  /g,'\t'),
+trimLines:()=>txt.split('\n').map(l=>l.trim()).join('\n'),
+collapseSpace:()=>txt.replace(/\s+/g,' ')
+};
+
+const run=op=>{if(!txt){o.textContent='⚠ Load text first';return}try{o.textContent=ops[op]()}catch(e){o.textContent=`Error: ${e.message}`}};
+
+const generateNgrams=()=>{
+const n=parseInt($('ngramSize').value)||2,lim=parseInt($('ngramLimit').value)||50;
+if(n<1||n>10){alert('N 1-10');return}
+const w=getWords().slice(0,1e4),m={};
+for(let i=0;i<=w.length-n;i++)m[w.slice(i,i+n).join(' ')]=(m[w.slice(i,i+n).join(' ')]||0)+1;
+o.textContent=`${n}-GRAMS\n\n`+Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,lim).map(([g,c])=>`${c.toString().padStart(6)} ${g}`).join('\n');
+closeModals();
+};
+
+const removeWords=()=>{
+const l=$('removeList').value.split('\n').filter(x=>x.trim()),cs=$('caseSens').checked;
+if(!txt||!l.length){alert('Need input');return}
+let r=txt;l.forEach(t=>r=r.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),cs?'g':'gi'),''));
+o.textContent=r;closeModals();
+};
+
+const extractLines=()=>{
+const l=$('extractList').value.split('\n').filter(x=>x.trim()),cs=$('extractCase').checked,m=[];
+if(!txt||!l.length){alert('Need input');return}
+txt.split('\n').forEach(line=>{if(l.some(t=>cs?line.includes(t):line.toLowerCase().includes(t.toLowerCase())))m.push(line)});
+o.textContent=m.length?m.join('\n'):'No matches';closeModals();
+};
+
+const deleteLines=()=>{
+const l=$('deleteList').value.split('\n').filter(x=>x.trim()),cs=$('deleteCase').checked,k=[];
+if(!txt||!l.length){alert('Need input');return}
+txt.split('\n').forEach(line=>{if(!l.some(t=>cs?line.includes(t):line.toLowerCase().includes(t.toLowerCase())))k.push(line)});
+o.textContent=k.join('\n');closeModals();
+};
+
+const findReplace=()=>{
+const f=$('findText').value,r=$('replaceText').value,reg=$('findRegex').checked,cs=$('findCase').checked,ww=$('findWholeWord').checked;
+if(!txt||!f){alert('Need text/find');return}
+try{
+let p=reg?f:f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+if(ww&&!reg)p='\\b'+p+'\\b';
+o.textContent=txt.replace(new RegExp(p,cs?'g':'gi'),r);
+}catch(e){alert(e.message)}
+closeModals();
+};
+
+const replaceChars=()=>{
+const l=$('charReplacements').value.split('\n').filter(x=>x.trim());
+if(!txt||!l.length){alert('Need input');return}
+let r=txt;
+l.forEach(row=>{
+const p=row.split('=');
+if(p.length===2)r=r.replace(new RegExp(p[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'),p[1]);
+});
+o.textContent=r;closeModals();
+};
+</script>
+</body>
+</html>

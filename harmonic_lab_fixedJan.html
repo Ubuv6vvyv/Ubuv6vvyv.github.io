@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Harmonic Lab Pro | Enhanced</title>
+<style>
+:root{--bg:#050507;--panel:#0f0f12;--border:#1e1e24;--cyan:#00f2ff;--magenta:#ff00ff;--amber:#ffaa00;--text:#fff;--text-dim:#555566}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:10px;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+header{width:100%;max-width:600px;display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+h1{font-size:.7rem;text-transform:uppercase;letter-spacing:5px;margin:0;color:var(--text-dim)}
+.toolbar{width:100%;max-width:600px;background:var(--panel);border:1px solid var(--border);padding:8px;border-radius:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.action-row{grid-column:span 2;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.viz-box{width:100%;max-width:600px;height:70px;background:#000;border-radius:14px;border:1px solid var(--border);margin-bottom:15px;position:relative;cursor:pointer;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,0,0,.8)}
+canvas{width:100%;height:100%}
+.time-hint{position:absolute;bottom:6px;left:10px;font-size:.6rem;font-family:monospace;color:var(--cyan);pointer-events:none}
+.rack{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;width:100%;max-width:850px}
+.module{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 15px rgba(0,0,0,.3)}
+.module h3{font-size:.55rem;text-transform:uppercase;letter-spacing:2px;margin:0;color:var(--text-dim);border-bottom:1px solid #1a1a20;padding-bottom:6px}
+.control{display:flex;flex-direction:column;gap:4px}
+.label-row{display:flex;justify-content:space-between;align-items:center;font-size:.65rem;font-weight:600}
+.label-row label{color:#888}
+.label-row span{font-family:monospace;color:var(--cyan)}
+input[type=range]{width:100%;height:4px;background:#1a1a20;border-radius:2px;appearance:none}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;background:#f0f0f0;border-radius:50%;cursor:pointer;border:3px solid var(--panel);box-shadow:0 0 5px rgba(0,0,0,.5)}
+button{background:#16161c;color:#fff;border:1px solid #2d2d35;padding:10px;border-radius:8px;font-size:.65rem;font-weight:800;cursor:pointer;transition:all .2s}
+button:active{transform:scale(.96);background:#222}
+button.active{background:var(--cyan);color:#000;border-color:var(--cyan)}
+button.danger{color:#f55;border-color:#311}
+button:disabled{opacity:.2}
+.file-input{position:relative;overflow:hidden}
+.file-input input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer}
+.status-footer{font-size:.6rem;color:var(--text-dim);text-align:center;margin-top:15px}
+</style>
+</head>
+<body>
+<header>
+<h1>Harmonic Lab Pro</h1>
+<div id="v-rate-total" style="font-size:.6rem;color:var(--cyan);font-family:monospace">1.000x Speed</div>
+</header>
+<div class="toolbar">
+<div class="file-input">
+<button style="width:100%">📂 Load</button>
+<input type="file" id="audioInput" accept="audio/*">
+</div>
+<button id="micBtn">🎙️ Mic (5s)</button>
+<div class="action-row">
+<button id="playBtn" disabled>▶ Play</button>
+<button id="resetBtn" class="danger">↺ Reset All</button>
+<button id="stopBtn" disabled>⏹ Stop</button>
+</div>
+</div>
+<div class="viz-box" id="vizBox">
+<canvas id="viz"></canvas>
+<div class="time-hint" id="timeCode">00:00 / 00:00</div>
+</div>
+<div class="rack">
+<div class="module">
+<h3>Engine Tuning</h3>
+<div class="control"><div class="label-row"><label>Playback Speed</label><span id="v-rate">1.0x</span></div>
+<input type="range" id="rate" min=".05" max="4" step=".01" value="1" data-def="1"></div>
+<div class="control"><div class="label-row"><label>Speed Trim</label><span id="v-fRate">±0.000</span></div>
+<input type="range" id="fRate" min="-.5" max=".5" step=".001" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Pitch Bend</label><span id="v-bend">0c</span></div>
+<input type="range" id="bend" min="-2400" max="2400" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Fine Detune</label><span id="v-fDetune">0c</span></div>
+<input type="range" id="fDetune" min="-200" max="200" step="1" value="0" data-def="0"></div>
+</div>
+<div class="module">
+<h3>Modulation</h3>
+<div class="control"><div class="label-row"><label>Wobble Speed</label><span id="v-fmRate">3Hz</span></div>
+<input type="range" id="fmRate" min=".1" max="500" step="1" value="3" data-def="3"></div>
+<div class="control"><div class="label-row"><label>Wobble Depth</label><span id="v-fm">0</span></div>
+<input type="range" id="fm" min="0" max="500" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Tremolo Speed</label><span id="v-amRate">2Hz</span></div>
+<input type="range" id="amRate" min=".1" max="550" step="1" value="2" data-def="2"></div>
+<div class="control"><div class="label-row"><label>Tremolo Depth</label><span id="v-am">0%</span></div>
+<input type="range" id="am" min="0" max="500" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Harmonizer</label><span id="v-ring">0%</span></div>
+<input type="range" id="ring" min="0" max="100" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Harmonic Tone</label><span id="v-ringFreq">80Hz</span></div>
+<input type="range" id="ringFreq" min="20" max="1800" value="80" data-def="80"></div>
+</div>
+<div class="module">
+<h3>Robot Tone</h3>
+<div class="control"><div class="label-row"><label>Robot Strength</label><span id="v-metal">0%</span></div>
+<input type="range" id="metal" min="0" max="100" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Bass Boost</label><span id="v-bass">0dB</span></div>
+<input type="range" id="bass" min="0" max="18" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Treble Cut</label><span id="v-treble">0dB</span></div>
+<input type="range" id="treble" min="0" max="-18" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Vowel Shift</label><span id="v-vow">0%</span></div>
+<input type="range" id="vow" min="0" max="100" step="1" value="0" data-def="0"></div>
+</div>
+<div class="module">
+<h3>Space Effects</h3>
+<div class="control"><div class="label-row"><label>Chorus</label><span id="v-cld">0%</span></div>
+<input type="range" id="cld" min="0" max="100" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Spectral Tilt</label><span id="v-tilt">0.0</span></div>
+<input type="range" id="tilt" min="-3" max="3" step=".1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Stereo Width</label><span id="v-width">0%</span></div>
+<input type="range" id="width" min="0" max="100" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Echo</label><span id="v-echo">0%</span></div>
+<input type="range" id="echo" min="0" max="100" step="1" value="0" data-def="0"></div>
+<div class="control"><div class="label-row"><label>Reverb</label><span id="v-verb">0%</span></div>
+<input type="range" id="verb" min="0" max="100" step="1" value="0" data-def="0"></div>
+</div>
+<div class="module">
+<h3>Output</h3>
+<div class="control"><div class="label-row"><label>Master Volume</label><span id="v-gain">100%</span></div>
+<input type="range" id="gain" min="0" max="200" step="1" value="100" data-def="100"></div>
+<div class="control"><div class="label-row"><label>Auto Limiter</label><span id="v-limit">ON</span></div>
+<input type="range" id="limit" min="0" max="1" step="1" value="1" data-def="1"></div>
+</div>
+</div>
+<div class="status-footer" id="v-status">System Ready. Load audio to begin.</div>
+<script>
+const $=id=>document.getElementById(id),aC=new(window.AudioContext||window.webkitAudioContext)(),mk=(t,f)=>{const o=aC.createOscillator();o.type=t;o.frequency.value=f;o.start();return o},mg=v=>{const g=aC.createGain();g.gain.value=v;return g},mf=(t,f,q)=>{const b=aC.createBiquadFilter();b.type=t;b.frequency.value=f;if(q)b.Q.value=q;return b};
+let src=null,sN=null,play=0,off=0,last=0;
+const fmO=mk('sine',3),fmG=mg(0),fmBP=mf('bandpass',800,1),amO=mk('sine',2),amG=mg(0),rO=mk('sine',80),rG=mg(0),mO1=mk('sine',120),mO2=mk('sine',240),mO3=mk('sine',360),mG1=mg(0),bass=mf('lowshelf',200),treb=mf('highshelf',4000),vF1=mf('bandpass',400,6),vF2=mf('bandpass',1100,6),vowM=mg(0),cD=aC.createDelay(.1),cF=mg(0),cM=mg(0),cLP=mf('lowpass',12000,.7),tL=mf('lowshelf',600),tH=mf('highshelf',2500),spl=aC.createChannelSplitter(2),wD=aC.createDelay(.1),mer=aC.createChannelMerger(2),echo=aC.createDelay(1),eFb=mg(.3),eM=mg(0),eLP=mf('lowpass',8000),verb=aC.createConvolver(),vbM=mg(0),mG=mg(1),lim=aC.createDynamicsCompressor(),an=aC.createAnalyser(),mix=mg(1),aa=mf('lowpass',20000,.5);
+fmO.connect(fmG);fmG.connect(fmBP);amO.connect(amG);rO.connect(rG);mO1.connect(mG1);mO2.connect(mG1);mO3.connect(mG1);
+echo.delayTime.value=.4;cD.delayTime.value=.03;wD.delayTime.value=0;an.fftSize=2048;an.smoothingTimeConstant=.9;lim.threshold.value=-0.5;lim.knee.value=8;lim.ratio.value=20;lim.attack.value=.001;lim.release.value=.15;
+const rL=aC.sampleRate*2.5,rB=aC.createBuffer(2,rL,aC.sampleRate);
+for(let i=0;i<2;i++){const d=rB.getChannelData(i);for(let j=0;j<rL;j++){const dc=Math.pow(1-j/rL,2.5),er=j<rL*.05?Math.random()*.3:0;d[j]=(Math.random()*2-1)*dc*.7+er}}
+verb.buffer=rB;
+echo.connect(eLP);eLP.connect(eFb);eFb.connect(echo);cD.connect(cLP);cLP.connect(cF);cF.connect(cD);
+mix.connect(aa);aa.connect(bass);bass.connect(treb);treb.connect(tL);tL.connect(tH);tH.connect(spl);spl.connect(mer,0,0);spl.connect(wD,1);wD.connect(mer,0,1);mer.connect(mG);mer.connect(echo);echo.connect(eM);eM.connect(mG);mer.connect(verb);verb.connect(vbM);vbM.connect(mG);mG.connect(lim);lim.connect(an);an.connect(aC.destination);
+const g=i=>parseFloat($(i).value),rp=(p,v,t=.015)=>{p.cancelScheduledValues(aC.currentTime);p.linearRampToValueAtTime(v,aC.currentTime+t)},sy=()=>{if(!sN)return;const ts=Math.max(.05,g('rate')+g('fRate')),td=g('bend')+g('fDetune');rp(sN.playbackRate,ts);rp(sN.detune,td);$('v-rate-total').innerText=ts.toFixed(3)+"x Speed"};
+const ct={
+rate:()=>{$('v-rate').innerText=g('rate').toFixed(2)+'x';sy()},
+fRate:()=>{$('v-fRate').innerText=(g('fRate')>=0?'+':'')+g('fRate').toFixed(3);sy()},
+bend:()=>{$('v-bend').innerText=g('bend')+'c';sy()},
+fDetune:()=>{$('v-fDetune').innerText=g('fDetune')+'c';sy()},
+fmRate:()=>{rp(fmO.frequency,g('fmRate'));$('v-fmRate').innerText=g('fmRate').toFixed(1)+'Hz'},
+fm:()=>{const d=g('fm')/100;rp(fmG.gain,d*400);$('v-fm').innerText=g('fm')},
+amRate:()=>{rp(amO.frequency,g('amRate'));$('v-amRate').innerText=g('amRate').toFixed(1)+'Hz'},
+am:()=>{const d=g('am')/100;rp(amG.gain,d*.95);$('v-am').innerText=g('am')+'%'},
+ring:()=>{const d=g('ring')/100;rp(rG.gain,d*.7);$('v-ring').innerText=g('ring')+'%'},
+ringFreq:()=>{rp(rO.frequency,g('ringFreq'));$('v-ringFreq').innerText=g('ringFreq')+'Hz'},
+metal:()=>{const d=g('metal')/100;rp(mG1.gain,d*.15);$('v-metal').innerText=g('metal')+'%'},
+bass:()=>{rp(bass.gain,g('bass'));$('v-bass').innerText=g('bass')+'dB'},
+treble:()=>{rp(treb.gain,g('treble'));$('v-treble').innerText=g('treble')+'dB'},
+vow:()=>{const m=g('vow')/100;rp(vowM.gain,m*.5);rp(vF1.frequency,300+m*350);rp(vF2.frequency,900+m*700);$('v-vow').innerText=g('vow')+'%'},
+cld:()=>{const m=g('cld')/100;rp(cF.gain,m*.4);rp(cM.gain,m*.5);$('v-cld').innerText=g('cld')+'%'},
+tilt:()=>{const v=g('tilt');rp(tL.gain,-v*15);rp(tH.gain,v*15);$('v-tilt').innerText=v.toFixed(1)},
+width:()=>{rp(wD.delayTime,g('width')/100*.04);$('v-width').innerText=g('width')+'%'},
+echo:()=>{rp(eM.gain,g('echo')/100*.7);$('v-echo').innerText=g('echo')+'%'},
+verb:()=>{rp(vbM.gain,g('verb')/100*.6);$('v-verb').innerText=g('verb')+'%'},
+gain:()=>{rp(mG.gain,g('gain')/100);$('v-gain').innerText=g('gain')+'%'},
+limit:()=>{const on=g('limit')===1;lim.threshold.value=on?-0.5:0;lim.ratio.value=on?20:1;$('v-limit').innerText=on?'ON':'OFF'}
+};
+Object.keys(ct).forEach(k=>$(k).oninput=ct[k]);
+const st=()=>{if(sN){sN.stop();sN.disconnect();sN=null}play=0;$('playBtn').innerText="▶ PLAY";$('playBtn').classList.remove('active')},
+start=()=>{if(!src)return;if(aC.state==='suspended')aC.resume();sN=aC.createBufferSource();sN.buffer=src;sN.loop=1;const fmM=aC.createGain(),amBase=mg(1),amMod=mg(1),rBase=mg(1),rMod=mg(1),mBase=mg(1),mMod=mg(1);fmBP.connect(fmM.gain);amG.connect(amMod.gain);rG.connect(rMod.gain);mG1.connect(mMod.gain);sN.connect(fmM);fmM.connect(amBase);amBase.connect(amMod);amMod.connect(rBase);sN.connect(rMod);rMod.connect(rBase);rBase.connect(mBase);sN.connect(mMod);mMod.connect(mBase);mBase.connect(mix);mBase.connect(vF1);mBase.connect(vF2);vF1.connect(vowM);vF2.connect(vowM);vowM.connect(mix);mBase.connect(cD);cD.connect(cM);cM.connect(mix);sy();sN.start(0,off%src.duration);last=aC.currentTime;play=1;$('playBtn').innerText="⏹ STOP";$('playBtn').classList.add('active');$('stopBtn').disabled=0;draw()};
+$('playBtn').onclick=()=>{if(play){off+=(aC.currentTime-last)*(g('rate')+g('fRate'));st()}else start()};
+$('stopBtn').onclick=()=>{st();off=0};
+$('resetBtn').onclick=()=>{document.querySelectorAll('input[type="range"]').forEach(i=>{i.value=i.getAttribute('data-def');i.dispatchEvent(new Event('input'))});$('v-status').innerText="Engine Clean. Total Bypass."};
+$('audioInput').onchange=async e=>{if(!e.target.files[0])return;try{src=await aC.decodeAudioData(await e.target.files[0].arrayBuffer());$('playBtn').disabled=0;$('v-status').innerText="File Ready: "+e.target.files[0].name;off=0}catch(er){$('v-status').innerText="Error loading file"}};
+$('micBtn').onclick=async()=>{try{const b=$('micBtn');b.innerText="REC...";const s=await navigator.mediaDevices.getUserMedia({audio:1}),r=new MediaRecorder(s),c=[];r.ondataavailable=ev=>c.push(ev.data);r.onstop=async()=>{src=await aC.decodeAudioData(await(new Blob(c)).arrayBuffer());$('playBtn').disabled=0;$('v-status').innerText="Mic recording loaded";b.innerText="🎙️ Mic (5s)";s.getTracks().forEach(t=>t.stop())};r.start();setTimeout(()=>r.state==='recording'&&r.stop(),5e3)}catch(er){$('v-status').innerText="Mic access denied";$('micBtn').innerText="🎙️ Mic (5s)"}};
+$('vizBox').onclick=e=>{if(!src)return;const r=e.currentTarget.getBoundingClientRect(),p=(e.clientX-r.left)/r.width;off=p*src.duration;if(play){st();start()}else draw()};
+const cv=$('viz'),cc=cv.getContext('2d');cv.width=cv.offsetWidth*(window.devicePixelRatio||1);cv.height=cv.offsetHeight*(window.devicePixelRatio||1);
+function draw(){if(!src)return;if(play)requestAnimationFrame(draw);const d=new Uint8Array(an.frequencyBinCount);an.getByteTimeDomainData(d);cc.fillStyle='#000';cc.fillRect(0,0,cv.width,cv.height);cc.lineWidth=2;cc.strokeStyle='#00f2ff';cc.beginPath();const st=cv.width/d.length;for(let i=0;i<d.length;i++){const y=d[i]/128*cv.height/2;i===0?cc.moveTo(i*st,y):cc.lineTo(i*st,y)}cc.stroke();const sp=g('rate')+g('fRate'),nw=play?(off+(aC.currentTime-last)*sp):off,tt=src.duration,ps=(nw%tt)/tt,cM=Math.floor(nw%tt/60),cS=Math.floor(nw%tt%60),tM=Math.floor(tt/60),tS=Math.floor(tt%60);$('timeCode').innerText=`${cM}:${cS.toString().padStart(2,'0')} / ${tM}:${tS.toString().padStart(2,'0')}`;cc.strokeStyle='#ffaa00';cc.lineWidth=3;cc.beginPath();cc.moveTo(ps*cv.width,0);cc.lineTo(ps*cv.width,cv.height);cc.stroke()}
+Object.keys(ct).forEach(k=>ct[k]());draw();
+</script>
+</body>
+</html>

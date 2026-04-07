@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Audio Mixer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --border: #333;
+            --accent: #2196f3;
+            --handle: #ffeb3b;
+            --text: #fff;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .header {
+            padding: 10px 15px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .btn:hover { filter: brightness(1.1); }
+        .btn:disabled { background: #444; cursor: not-allowed; }
+        .btn.stop { background: #f44336; }
+        .checkbox-wrapper { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+        input[type="file"] { display: none; }
+
+        /* TIMELINE */
+        #timeline-scroll {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: #000;
+        }
+        
+        #timeline-content {
+            position: relative;
+            min-height: 100%;
+            /* Ensure playhead has room */
+            padding-right: 500px; 
+        }
+
+        #ruler {
+            height: 20px;
+            background: #222;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            border-bottom: 1px solid #444;
+        }
+
+        #playhead {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px; background: red;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+        }
+
+        /* TRACKS */
+        .track-row {
+            display: flex;
+            height: 110px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            position: relative;
+        }
+
+        .track-controls {
+            width: 220px;
+            min-width: 220px;
+            background: #252525;
+            border-right: 1px solid var(--border);
+            padding: 8px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: sticky;
+            left: 0;
+            z-index: 30;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+        }
+
+        .track-title { font-size: 11px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .control-row { display: flex; gap: 5px; margin-top: auto; }
+        .mini-btn { flex: 1; background: #444; border: none; color: #ddd; font-size: 10px; padding: 4px; cursor: pointer; border-radius: 2px; }
+        .mini-btn:hover { background: #555; }
+
+        .track-lane {
+            flex: 1;
+            position: relative;
+            background: repeating-linear-gradient(90deg, #111 0px, #111 49px, #222 50px);
+        }
+
+        /* CLIP & HANDLES */
+        .clip {
+            position: absolute;
+            top: 10px; bottom: 10px;
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            cursor: grab;
+            overflow: hidden; /* Crops the inner canvas */
+            touch-action: none;
+        }
+        .clip:active { cursor: grabbing; background: rgba(33, 150, 243, 0.5); }
+
+        .clip-canvas-wrapper {
+            position: absolute;
+            top: 0; bottom: 0;
+            pointer-events: none;
+        }
+        
+        canvas { display: block; height: 100%; }
+
+        .handle {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 10px;
+            background: rgba(255, 235, 59, 0.5);
+            cursor: ew-resize;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .handle:hover { background: var(--handle); }
+        .handle-l { left: 0; border-right: 1px solid #fff; }
+        .handle-r { right: 0; border-left: 1px solid #fff; }
+        .handle::after { content: '||'; font-size: 8px; color: #000; }
+
+        /* LOADING */
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; align-items: center; justify-content: center; z-index: 999;
+            flex-direction: column;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #555; border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <div class="spinner"></div>
+    <div style="margin-top:10px">Processing...</div>
+</div>
+
+<div class="header">
+    <label class="btn">
+        + Add Audio
+        <input type="file" id="fileInput" multiple accept="audio/*">
+    </label>
+    <button class="btn" id="playBtn">▶ Play</button>
+    <button class="btn stop" id="stopBtn" disabled>■ Stop</button>
+    
+    <label class="checkbox-wrapper">
+        <input type="checkbox" id="loopCheckbox"> Loop
+    </label>
+
+    <button class="btn" id="exportBtn" style="margin-left: auto;">💾 Export MP3</button>
+</div>
+
+<div id="timeline-scroll">
+    <div id="timeline-content">
+        <div id="ruler"></div>
+        <div id="playhead"></div>
+        <div id="tracks-container"></div>
+    </div>
+</div>
+
+<script>
+    /* --- CONFIG --- */
+    const PX_PER_SEC = 50; 
+    const CONTROLS_WIDTH = 220;
+
+    /* --- STATE --- */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let tracks = []; 
+    // Track structure: 
+    // { id, buffer, name, volume, startTime (sec), trimStart (sec), trimDuration (sec), dom: { row, clip, canvasWrap } }
+    
+    let isPlaying = false;
+    let playStartTime = 0;
+    let loopTimer = null;
+    let animationFrame = null;
+
+    /* --- DOM --- */
+    const tracksContainer = document.getElementById('tracks-container');
+    const playhead = document.getElementById('playhead');
+    const timelineScroll = document.getElementById('timeline-scroll');
+    const timelineContent = document.getElementById('timeline-content');
+    const loopCheckbox = document.getElementById('loopCheckbox');
+
+    /* --- INITIALIZATION --- */
+    document.getElementById('fileInput').addEventListener('change', handleFiles);
+    document.getElementById('playBtn').addEventListener('click', () => startPlayback());
+    document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+    document.getElementById('exportBtn').addEventListener('click', exportMix);
+
+    function toggleLoader(show, msg) {
+        const el = document.getElementById('overlay');
+        el.style.display = show ? 'flex' : 'none';
+        if(msg) el.lastElementChild.innerText = msg;
+    }
+
+    /* --- FILE HANDLING --- */
+    async function handleFiles(e) {
+        const files = Array.from(e.target.files);
+        if(!files.length) return;
+        if(isPlaying) stopPlayback();
+        toggleLoader(true, "Decoding...");
+
+        for(let file of files) {
+            try {
+                const ab = await file.arrayBuffer();
+                const buffer = await audioCtx.decodeAudioData(ab);
+                createTrack(buffer, file.name);
+            } catch(err) {
+                console.error(err);
+                alert("Error loading " + file.name);
+            }
+        }
+        toggleLoader(false);
+        e.target.value = '';
+    }
+
+    /* --- TRACK CREATION --- */
+    function createTrack(buffer, name, presetState = null) {
+        const id = Math.random().toString(36).substr(2, 9);
+        const duration = buffer.duration;
+
+        // Default state or cloned state
+        const state = presetState ? { ...presetState, id } : {
+            id,
+            buffer,
+            name,
+            volume: 1.0,
+            startTime: 0,
+            trimStart: 0,
+            trimDuration: duration,
+            fullDuration: duration
+        };
+
+        // DOM: Row
+        const row = document.createElement('div');
+        row.className = 'track-row';
+
+        // DOM: Controls
+        const controls = document.createElement('div');
+        controls.className = 'track-controls';
+        
+        // Volume
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range';
+        volSlider.min = 0; volSlider.max = 1.2; volSlider.step = 0.05; volSlider.value = state.volume;
+        volSlider.oninput = (e) => state.volume = parseFloat(e.target.value);
+
+        // Buttons
+        const btnRow = document.createElement('div');
+        btnRow.className = 'control-row';
+        
+        const btnDup = document.createElement('button');
+        btnDup.className = 'mini-btn';
+        btnDup.innerText = 'Duplicate';
+        btnDup.onclick = () => duplicateTrack(state);
+
+        const btnFill = document.createElement('button');
+        btnFill.className = 'mini-btn';
+        btnFill.innerText = 'Fill Loop';
+        btnFill.onclick = () => fillLoop(state);
+
+        const btnRemove = document.createElement('button');
+        btnRemove.className = 'mini-btn';
+        btnRemove.innerText = '🗑';
+        btnRemove.style.flex = '0';
+        btnRemove.onclick = () => {
+            row.remove();
+            tracks = tracks.filter(t => t.id !== id);
+        };
+
+        btnRow.append(btnDup, btnFill, btnRemove);
+        
+        const title = document.createElement('div');
+        title.className = 'track-title';
+        title.innerText = name;
+
+        controls.append(title, volSlider, btnRow);
+
+        // DOM: Lane & Clip
+        const lane = document.createElement('div');
+        lane.className = 'track-lane';
+
+        const clip = document.createElement('div');
+        clip.className = 'clip';
+        
+        const canvasWrap = document.createElement('div');
+        canvasWrap.className = 'clip-canvas-wrapper';
+        
+        // Canvas
+        const canvas = document.createElement('canvas');
+        canvas.height = 80;
+        // Canvas width is total audio duration
+        canvas.width = state.fullDuration * PX_PER_SEC; 
+        drawWaveform(buffer, canvas);
+        canvasWrap.appendChild(canvas);
+
+        // Handles
+        const handleL = document.createElement('div');
+        handleL.className = 'handle handle-l';
+        const handleR = document.createElement('div');
+        handleR.className = 'handle handle-r';
+
+        clip.append(canvasWrap, handleL, handleR);
+        lane.appendChild(clip);
+        row.append(controls, lane);
+        tracksContainer.appendChild(row);
+
+        state.dom = { row, clip, canvasWrap };
+        tracks.push(state);
+
+        // Setup Interactions
+        updateClipVisuals(state);
+        setupDrag(clip, state);
+        setupCrop(handleL, state, 'left');
+        setupCrop(handleR, state, 'right');
+    }
+
+    /* --- LOGIC: DUPLICATION & FILL --- */
+    function duplicateTrack(originalState) {
+        // Clone places immediately after the original
+        const newStart = originalState.startTime + originalState.trimDuration;
+        
+        const newState = {
+            ...originalState,
+            startTime: newStart,
+            // Keep the same crop settings
+            trimStart: originalState.trimStart,
+            trimDuration: originalState.trimDuration,
+            fullDuration: originalState.fullDuration
+        };
+        createTrack(originalState.buffer, originalState.name, newState);
+    }
+
+    function fillLoop(originalState) {
+        // Find project end
+        let maxTime = 0;
+        tracks.forEach(t => {
+            const end = t.startTime + t.trimDuration;
+            if(end > maxTime) maxTime = end;
+        });
+
+        if(maxTime <= (originalState.startTime + originalState.trimDuration)) {
+            alert("No other tracks extend beyond this one. Add longer audio first.");
+            return;
+        }
+
+        let cursor = originalState.startTime + originalState.trimDuration;
+        const width = originalState.trimDuration;
+
+        while (cursor < maxTime) {
+            // Check if we have room for at least a tiny slice, or full clip?
+            // Simple approach: add full clips until we pass maxTime
+            const newState = {
+                ...originalState,
+                startTime: cursor,
+                trimStart: originalState.trimStart,
+                trimDuration: originalState.trimDuration,
+                fullDuration: originalState.fullDuration
+            };
+            createTrack(originalState.buffer, originalState.name, newState);
+            cursor += width;
+        }
+    }
+
+    /* --- VISUALS --- */
+    function updateClipVisuals(track) {
+        const { clip, canvasWrap } = track.dom;
+        
+        // Position on Timeline
+        clip.style.left = (track.startTime * PX_PER_SEC) + 'px';
+        
+        // Width of Clip (Visible duration)
+        clip.style.width = (track.trimDuration * PX_PER_SEC) + 'px';
+
+        // Position of Inner Canvas (Shift left to hide trimmed start)
+        // Canvas is absolute width based on full audio. 
+        // If we trim 5s from start, we shift canvas -5s worth of pixels.
+        canvasWrap.style.transform = `translateX(-${track.trimStart * PX_PER_SEC}px)`;
+        
+        updateTimelineSize();
+    }
+
+    function updateTimelineSize() {
+        let max = 0;
+        tracks.forEach(t => {
+            const end = (t.startTime + t.trimDuration) * PX_PER_SEC;
+            if(end > max) max = end;
+        });
+        // Add padding
+        timelineContent.style.width = (max + 800) + 'px';
+    }
+
+    function drawWaveform(buffer, canvas) {
+        const ctx = canvas.getContext('2d');
+        const data = buffer.getChannelData(0);
+        const step = Math.ceil(data.length / canvas.width);
+        const amp = canvas.height / 2;
+        ctx.fillStyle = '#2196f3';
+        
+        for (let i = 0; i < canvas.width; i++) {
+            let min = 1.0, max = -1.0;
+            for (let j = 0; j < step; j++) {
+                const val = data[(i * step) + j];
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+            ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+        }
+    }
+
+    /* --- INTERACTION: DRAG & CROP --- */
+    function setupDrag(el, track) {
+        el.addEventListener('pointerdown', e => {
+            if(e.target.classList.contains('handle')) return; // Ignore handles
+            e.preventDefault();
+            el.setPointerCapture(e.pointerId);
+            const startX = e.clientX;
+            const startLeft = track.startTime * PX_PER_SEC;
+
+            const onMove = (ev) => {
+                const dx = ev.clientX - startX;
+                let newLeft = startLeft + dx;
+                if(newLeft < 0) newLeft = 0;
+                track.startTime = newLeft / PX_PER_SEC;
+                updateClipVisuals(track);
+            };
+
+            const onUp = (ev) => {
+                el.releasePointerCapture(ev.pointerId);
+                el.removeEventListener('pointermove', onMove);
+                el.removeEventListener('pointerup', onUp);
+            };
+
+            el.addEventListener('pointermove', onMove);
+            el.addEventListener('pointerup', onUp);
+        });
+    }
+
+    function setupCrop(handle, track, type) {
+        handle.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            e.stopPropagation(); // Don't trigger drag
+            handle.setPointerCapture(e.pointerId);
+            
+            const startX = e.clientX;
+            const initTrimStart = track.trimStart;
+            const initTrimDur = track.trimDuration;
+            const initStartTime = track.startTime;
+
+            const onMove = (ev) => {
+                const dxPx = ev.clientX - startX;
+                const dxSec = dxPx / PX_PER_SEC;
+
+                if (type === 'left') {
+                    // Moving left handle right increases trimStart, decreases duration
+                    // Moving left handle left decreases trimStart, increases duration
+                    let newTrimStart = initTrimStart + dxSec;
+                    
+                    // Constraints
+                    if(newTrimStart < 0) newTrimStart = 0;
+                    if(newTrimStart > (initTrimStart + initTrimDur - 0.1)) newTrimStart = initTrimStart + initTrimDur - 0.1;
+
+                    track.trimStart = newTrimStart;
+                    track.trimDuration = initTrimDur - (newTrimStart - initTrimStart);
+                    
+                    // Visually, the clip start time moves right as we crop
+                    track.startTime = initStartTime + (newTrimStart - initTrimStart);
+                    
+                } else {
+                    // Right handle
+                    let newTrimDur = initTrimDur + dxSec;
+                    
+                    // Constraints
+                    if(newTrimDur < 0.1) newTrimDur = 0.1;
+                    // Cannot extend past actual file end
+                    if((initTrimStart + newTrimDur) > track.fullDuration) {
+                        newTrimDur = track.fullDuration - initTrimStart;
+                    }
+
+                    track.trimDuration = newTrimDur;
+                }
+                updateClipVisuals(track);
+            };
+
+            const onUp = (ev) => {
+                handle.releasePointerCapture(ev.pointerId);
+                handle.removeEventListener('pointermove', onMove);
+                handle.removeEventListener('pointerup', onUp);
+            };
+
+            handle.addEventListener('pointermove', onMove);
+            handle.addEventListener('pointerup', onUp);
+        });
+    }
+
+    /* --- PLAYBACK ENGINE --- */
+    function startPlayback(offset = 0) {
+        if(tracks.length === 0) return;
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        if(isPlaying) stopPlayback();
+
+        isPlaying = true;
+        document.getElementById('playBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+
+        playStartTime = audioCtx.currentTime - offset;
+
+        // 1. Calculate Project Duration
+        let maxDur = 0;
+        tracks.forEach(t => {
+            const end = t.startTime + t.trimDuration;
+            if(end > maxDur) maxDur = end;
+        });
+
+        // 2. Schedule Nodes
+        tracks.forEach(t => {
+            const source = audioCtx.createBufferSource();
+            source.buffer = t.buffer;
+            
+            const gain = audioCtx.createGain();
+            gain.gain.value = t.volume;
+
+            source.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            // Logic:
+            // The track should start at `t.startTime` relative to `playStartTime`.
+            // We need to play the segment of audio from `t.trimStart` for `t.trimDuration`.
+            
+            const when = playStartTime + t.startTime;
+            
+            // If we are starting from middle (offset > 0) [Future proofing, currently offset is 0]
+            // For now, simple start:
+            if(when >= audioCtx.currentTime) {
+                source.start(when, t.trimStart, t.trimDuration);
+            } else {
+                // If the track should have already started, we need to jump in
+                // (This handles complex pause/resume logic, but for simple "Play" we usually start at 0)
+                // For this simple tool, we assume start from 0 always.
+            }
+            
+            t.sourceNode = source;
+            t.gainNode = gain;
+        });
+
+        // 3. Animation & Looping
+        const loopEnabled = loopCheckbox.checked;
+        const totalMs = maxDur * 1000;
+
+        playhead.style.display = 'block';
+
+        const tick = () => {
+            if(!isPlaying) return;
+            const now = audioCtx.currentTime;
+            const elapsed = now - playStartTime;
+
+            // Update Playhead Visual
+            const x = CONTROLS_WIDTH + (elapsed * PX_PER_SEC);
+            playhead.style.left = x + 'px';
+
+            // Check End
+            if (elapsed >= maxDur) {
+                if (loopEnabled) {
+                    stopPlayback(true); // Stop but don't reset UI fully
+                    startPlayback(0);   // Restart immediately
+                } else {
+                    stopPlayback();
+                }
+                return;
+            }
+            animationFrame = requestAnimationFrame(tick);
+        };
+        animationFrame = requestAnimationFrame(tick);
+    }
+
+    function stopPlayback(isLooping = false) {
+        tracks.forEach(t => {
+            if(t.sourceNode) {
+                try { t.sourceNode.stop(); } catch(e){}
+                t.sourceNode.disconnect();
+                t.gainNode.disconnect();
+                t.sourceNode = null;
+            }
+        });
+        
+        cancelAnimationFrame(animationFrame);
+        isPlaying = false;
+        
+        if (!isLooping) {
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            playhead.style.display = 'none';
+        }
+    }
+
+    /* --- EXPORT --- */
+    async function exportMix() {
+        if(!tracks.length) return;
+        if(isPlaying) stopPlayback();
+        toggleLoader(true, "Rendering Mix...");
+
+        let maxDur = 0;
+        tracks.forEach(t => {
+            const end = t.startTime + t.trimDuration;
+            if(end > maxDur) maxDur = end;
+        });
+
+        const offlineCtx = new OfflineAudioContext(2, maxDur * 44100, 44100);
+        
+        tracks.forEach(t => {
+            const src = offlineCtx.createBufferSource();
+            src.buffer = t.buffer;
+            const gain = offlineCtx.createGain();
+            gain.gain.value = t.volume;
+            src.connect(gain);
+            gain.connect(offlineCtx.destination);
+            src.start(t.startTime, t.trimStart, t.trimDuration);
+        });
+
+        const rendered = await offlineCtx.startRendering();
+        
+        toggleLoader(true, "Encoding MP3...");
+        setTimeout(() => {
+            const mp3Blob = encodeMp3(rendered);
+            const url = URL.createObjectURL(mp3Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'mix_export.mp3';
+            a.click();
+            toggleLoader(false);
+        }, 100);
+    }
+
+    function encodeMp3(buffer) {
+        const channels = 2;
+        const mp3enc = new lamejs.Mp3Encoder(channels, buffer.sampleRate, 128);
+        const left = buffer.getChannelData(0);
+        const right = buffer.getChannelData(1);
+        
+        // Convert Float32 to Int16
+        const l = new Int16Array(left.length);
+        const r = new Int16Array(right.length);
+        for(let i=0; i<left.length; i++) {
+            l[i] = left[i] < 0 ? left[i]*0x8000 : left[i]*0x7FFF;
+            r[i] = right[i] < 0 ? right[i]*0x8000 : right[i]*0x7FFF;
+        }
+
+        const mp3Data = [];
+        const blockSize = 1152;
+        for(let i=0; i<l.length; i+=blockSize) {
+            const lc = l.subarray(i, i+blockSize);
+            const rc = r.subarray(i, i+blockSize);
+            const b = mp3enc.encodeBuffer(lc, rc);
+            if(b.length > 0) mp3Data.push(b);
+        }
+        const b = mp3enc.flush();
+        if(b.length > 0) mp3Data.push(b);
+
+        return new Blob(mp3Data, {type: 'audio/mp3'});
+    }
+</script>
+</body>
+</html>
