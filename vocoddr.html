@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Voice Modulator</title>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<style>
+:root{
+  --p:#6C63FF;--p2:#4B44CC;--bg:#0d0d14;--s:#13131f;--s2:#1c1c2e;
+  --tx:#e8e6ff;--tx2:#9896b8;--bdr:#2a2840;
+  --alien:#00ffcc;--robot:#ff4466;--bass:#ff9900;--voc:#cc44ff;
+  --tele:#44aaff;--vib:#ffdd00;--ring:#ff6699;--hell:#ff3300;
+  --choir:#88ffcc;--warm:#ffaa44;--crystal:#44ddff;--tape:#dd8844;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;padding:12px}
+h1{text-align:center;font-size:1.3rem;font-weight:700;letter-spacing:.05em;padding:14px 0 16px;background:linear-gradient(135deg,#6C63FF,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.panel{background:var(--s);border:1px solid var(--bdr);border-radius:14px;padding:16px;margin-bottom:14px}
+.pt{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tx2);margin-bottom:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sc{flex:1;min-width:130px}
+.sh{display:flex;justify-content:space-between;font-size:.75rem;color:var(--tx2);margin-bottom:5px}
+.sv{font-weight:700;color:var(--tx)}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--bdr);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--p);cursor:pointer;border:2px solid var(--bg)}
+input[type=range]:disabled{opacity:.35;cursor:not-allowed}
+button,select{padding:10px 14px;font-size:.85rem;border-radius:8px;border:1px solid var(--bdr);cursor:pointer;background:var(--s2);color:var(--tx);font-weight:600;transition:all .15s}
+button:hover:not(:disabled){background:var(--p);border-color:var(--p)}
+button.danger{border-color:#e74c3c;color:#e74c3c}
+button.danger:hover:not(:disabled){background:#e74c3c;color:#fff}
+button.dl{border-color:#2ecc71;color:#2ecc71}
+button.dl:hover:not(:disabled){background:#2ecc71;color:#000}
+button:disabled,select:disabled{opacity:.35;cursor:not-allowed}
+select{flex:1}
+select option{background:#1c1c2e}
+#file-label{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;font-size:.85rem;border-radius:8px;border:1px solid var(--p);cursor:pointer;background:var(--s2);color:var(--p);font-weight:600;transition:all .15s}
+#file-label:hover{background:var(--p);color:#fff}
+#file-input{display:none}
+#waveform{margin:12px 0 0;border-radius:8px;overflow:hidden;background:#0a0a12;border:1px solid var(--bdr)}
+.effect-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ef{padding:9px 10px;border-radius:8px;border:1px solid var(--bdr);cursor:pointer;font-size:.8rem;font-weight:700;text-align:center;transition:all .15s;background:var(--s2);color:var(--tx2);letter-spacing:.02em}
+.ef:hover{border-color:var(--p);color:var(--tx)}
+.ef.active{color:#fff;border-color:transparent}
+.ef[data-e=none].active{background:var(--p)}
+.ef[data-e=alien].active{background:#006644;border-color:var(--alien);color:var(--alien)}
+.ef[data-e=robot].active{background:#440011;border-color:var(--robot);color:var(--robot)}
+.ef[data-e=vocoder].active{background:#330044;border-color:var(--voc);color:var(--voc)}
+.ef[data-e=bass].active{background:#331a00;border-color:var(--bass);color:var(--bass)}
+.ef[data-e=ring].active{background:#330022;border-color:var(--ring);color:var(--ring)}
+.ef[data-e=telephone].active{background:#002244;border-color:var(--tele);color:var(--tele)}
+.ef[data-e=vibrato].active{background:#333300;border-color:var(--vib);color:var(--vib)}
+.ef[data-e=helium].active{background:#330000;border-color:var(--hell);color:var(--hell)}
+.ef[data-e=choir].active{background:#003322;border-color:var(--choir);color:var(--choir)}
+.ef[data-e=warmth].active{background:#332200;border-color:var(--warm);color:var(--warm)}
+.ef[data-e=crystal].active{background:#002233;border-color:var(--crystal);color:var(--crystal)}
+.ef[data-e=tape].active{background:#331800;border-color:var(--tape);color:var(--tape)}
+#status{font-size:.75rem;color:var(--tx2);text-align:center;padding:4px 0;min-height:18px;transition:color .3s}
+#status.ok{color:#2ecc71}
+#status.err{color:#e74c3c}
+#status.busy{color:var(--bass)}
+</style>
+</head>
+<body>
+<h1>Voice Modulator</h1>
+
+<audio id="ae" style="display:none" crossorigin="anonymous"></audio>
+
+<div class="panel">
+  <div class="pt">Load Audio</div>
+  <div class="row">
+    <label id="file-label" for="file-input">&#9654; Choose File</label>
+    <input type="file" id="file-input" accept="audio/*">
+    <button id="pp" class="primary" disabled>Play / Pause</button>
+  </div>
+  <div id="waveform"></div>
+</div>
+
+<div class="panel">
+  <div class="pt">Playback Controls</div>
+  <div class="row">
+    <div class="sc">
+      <div class="sh"><span>Speed</span><span class="sv" id="spv">1.0×</span></div>
+      <input type="range" id="sp" min="0.25" max="3.0" step="0.05" value="1.0" disabled>
+    </div>
+    <div class="sc">
+      <div class="sh"><span>Pitch Shift</span><span class="sv" id="piv">0.00</span></div>
+      <input type="range" id="pi" min="-2.0" max="2.0" step="0.05" value="0" disabled>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="pt">Effect</div>
+  <div class="effect-grid">
+    <div class="ef active" data-e="none">None</div>
+    <div class="ef" data-e="robot">&#129302; Robot</div>
+    <div class="ef" data-e="vocoder">&#127908; Vocoder</div>
+    <div class="ef" data-e="alien">&#128125; Alien</div>
+    <div class="ef" data-e="bass">&#128266; Deep Bass</div>
+    <div class="ef" data-e="ring">&#128280; Ring Mod</div>
+    <div class="ef" data-e="telephone">&#128222; Telephone</div>
+    <div class="ef" data-e="vibrato">&#127908; Vibrato</div>
+    <div class="ef" data-e="helium">&#127744; Helium</div>
+    <div class="ef" data-e="choir">&#127925; Choir</div>
+    <div class="ef" data-e="warmth">&#128293; Warmth</div>
+    <div class="ef" data-e="crystal">&#128142; Crystal</div>
+    <div class="ef" data-e="tape">&#127908; Tape Warp</div>
+  </div>
+  <div class="row" style="margin-bottom:12px">
+    <div class="sc">
+      <div class="sh"><span>Intensity</span><span class="sv" id="inv">50%</span></div>
+      <input type="range" id="it" min="0" max="1" step="0.01" value="0.5" disabled>
+    </div>
+  </div>
+  <div class="row">
+    <button id="rb" class="danger" disabled>Reset All</button>
+    <button id="dlb" class="dl" disabled>&#8595; Download MP3</button>
+  </div>
+  <div id="status"></div>
+</div>
+
+<script>
+/* =====================================================================
+   JUNGLE PITCH SHIFTER — preserved structure, smoothed out parameters
+   ===================================================================== */
+function mkFadeBuf(ctx,active,fade){
+  var sr=ctx.sampleRate,l1=active*sr,l2=(active-2*fade)*sr,len=l1+l2,
+      buf=ctx.createBuffer(1,len,sr),p=buf.getChannelData(0),fl=fade*sr,fi2=l1-fl;
+  for(var i=0;i<l1;i++){
+    p[i]= i<fl ? Math.sqrt(i/fl) : i>=fi2 ? Math.sqrt(1-(i-fi2)/fl) : 1;
+  }
+  return buf;
+}
+function mkDelayBuf(ctx,active,fade,up){
+  var sr=ctx.sampleRate,l1=active*sr,l2=(active-2*fade)*sr,len=l1+l2,
+      buf=ctx.createBuffer(1,len,sr),p=buf.getChannelData(0);
+  for(var i=0;i<l1;i++) p[i]=up?(l1-i)/l1:i/l1;
+  return buf;
+}
+function Jungle(ctx){
+  var BT=0.12,FT=0.06,DT=0.12;
+  var inp=ctx.createGain(),out=ctx.createGain();
+  this.input=inp; this.output=out;
+  var sDB=mkDelayBuf(ctx,BT,FT,false),sUB=mkDelayBuf(ctx,BT,FT,true),fB=mkFadeBuf(ctx,BT,FT);
+  var m1=ctx.createBufferSource(),m2=ctx.createBufferSource(),
+      m3=ctx.createBufferSource(),m4=ctx.createBufferSource();
+  m1.buffer=sDB;m2.buffer=sDB;m3.buffer=sUB;m4.buffer=sUB;
+  [m1,m2,m3,m4].forEach(function(m){m.loop=true});
+  var m1g=ctx.createGain(),m2g=ctx.createGain(),m3g=ctx.createGain(),m4g=ctx.createGain();
+  m3g.gain.value=0;m4g.gain.value=0;
+  m1.connect(m1g);m2.connect(m2g);m3.connect(m3g);m4.connect(m4g);
+  var mg1=ctx.createGain(),mg2=ctx.createGain();
+  var d1=ctx.createDelay(1.0),d2=ctx.createDelay(1.0);
+  [m1g,m3g].forEach(function(g){g.connect(mg1)});
+  [m2g,m4g].forEach(function(g){g.connect(mg2)});
+  mg1.connect(d1.delayTime);mg2.connect(d2.delayTime);
+  var f1=ctx.createBufferSource(),f2=ctx.createBufferSource();
+  f1.buffer=fB;f2.buffer=fB;f1.loop=true;f2.loop=true;
+  var mix1=ctx.createGain(),mix2=ctx.createGain();
+  mix1.gain.value=0;mix2.gain.value=0;
+  f1.connect(mix1.gain);f2.connect(mix2.gain);
+  inp.connect(d1);inp.connect(d2);
+  d1.connect(mix1);d2.connect(mix2);
+  mix1.connect(out);mix2.connect(out);
+  var t=ctx.currentTime+0.05,t2=t+BT-FT;
+  [m1,m2,m3,m4,f1,f2].forEach(function(n,i){n.start(i<4?((i%2===0)?t:t2):(i===4?t:t2))});
+  this._DT=DT;
+  this.setPitchOffset=function(v){
+    var up=v>0,abs=Math.abs(v);
+    m1g.gain.setTargetAtTime(up?0:1, ctx.currentTime, 0.05);
+    m2g.gain.setTargetAtTime(up?0:1, ctx.currentTime, 0.05);
+    m3g.gain.setTargetAtTime(up?1:0, ctx.currentTime, 0.05);
+    m4g.gain.setTargetAtTime(up?1:0, ctx.currentTime, 0.05);
+    mg1.gain.setTargetAtTime(0.5*DT*abs, ctx.currentTime, 0.05);
+    mg2.gain.setTargetAtTime(0.5*DT*abs, ctx.currentTime, 0.05);
+  };
+}
+
+/* =====================================================================
+   EFFECT BUILDERS & UTILS
+   Fixed Gain staging to avoid digital clipping and muddy overlaps
+   ===================================================================== */
+
+// Improved saturation curve (tames volume spikes)
+function sat(ctx,drive){
+  var ws=ctx.createWaveShaper(),n=1024,c=new Float32Array(n);
+  var d = Math.max(drive, 0.01);
+  for(var i=0;i<n;i++){
+    var x = (i * 2 / n) - 1;
+    // Compressive mapping
+    c[i]= Math.tanh(x*d) / Math.tanh(d);
+  }
+  ws.curve=c;
+  return ws;
+}
+
+// Smooth transition for live updates
+function applyNow(ctx, param, v){
+  if (!param) return;
+  param.cancelScheduledValues(ctx.currentTime);
+  param.setTargetAtTime(v, ctx.currentTime, 0.015);
+}
+
+var FX={
+  robot:function(ctx){
+    /* Fixed: Comb filter + Square wave ring mod for classic Cylon/Dalek tones */
+    var inp=ctx.createGain(),out=ctx.createGain(),dry=ctx.createGain(),wet=ctx.createGain();
+    
+    // Metallic comb delay (very short delay with feedback)
+    var delay = ctx.createDelay(); delay.delayTime.value = 0.005; // 5ms
+    var fb = ctx.createGain(); fb.gain.value = 0.7;
+    inp.connect(delay); delay.connect(fb); fb.connect(delay);
+    
+    var merge = ctx.createGain(); merge.gain.value = 0.8;
+    inp.connect(merge); delay.connect(merge);
+
+    // Ring modulation (Square wave provides distinct robotic harmonics)
+    var ringOsc=ctx.createOscillator();ringOsc.type='square';ringOsc.frequency.value=45;
+    var ring=ctx.createGain();ring.gain.value=0;
+    ringOsc.connect(ring.gain);
+    
+    // Safety clipper
+    var postSat = sat(ctx, 2);
+
+    merge.connect(ring); ring.connect(postSat); postSat.connect(wet);
+    inp.connect(dry); dry.connect(out); wet.connect(out);
+    
+    ringOsc.start(); wet.gain.value=0; dry.gain.value=1;
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, ring.gain, v); // FIXED: ring.gain.gain removed
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+    },cleanup:function(){ringOsc.stop()}};
+  },
+
+  vocoder:function(ctx){
+    /* Fixed: Added envelope booster so carrier actually becomes audible */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var freqs=[150,300,600,900,1200,1800,2600,3500,5000,7000];
+    
+    // Rich carrier signal
+    var carrier=ctx.createOscillator();carrier.type='sawtooth';carrier.frequency.value=110;
+    var carDrive=sat(ctx,2);carrier.connect(carDrive);
+    var carGain=ctx.createGain();carGain.gain.value=1.5;carDrive.connect(carGain);
+    
+    var preG = ctx.createGain(); preG.gain.value = 1.0;
+    inp.connect(preG);
+
+    freqs.forEach(function(f){
+      var bpSig=ctx.createBiquadFilter();bpSig.type='bandpass';bpSig.frequency.value=f;bpSig.Q.value=5;
+      var bpCar=ctx.createBiquadFilter();bpCar.type='bandpass';bpCar.frequency.value=f;bpCar.Q.value=5;
+      
+      // Absolute value rectifier
+      var rect=ctx.createWaveShaper();
+      var rc=new Float32Array(512);for(var i=0;i<512;i++)rc[i]=Math.abs((i/256)-1);
+      rect.curve=rc;
+      
+      var envF=ctx.createBiquadFilter();envF.type='lowpass';envF.frequency.value=40;
+      
+      // FIX: Multiply envelope so VCA actually opens
+      var envBoost = ctx.createGain(); envBoost.gain.value = 6; 
+      var vca=ctx.createGain();vca.gain.value=0;
+      
+      preG.connect(bpSig); bpSig.connect(rect); rect.connect(envF); envF.connect(envBoost); envBoost.connect(vca.gain);
+      carGain.connect(bpCar); bpCar.connect(vca); vca.connect(wet);
+    });
+    
+    carrier.start();
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, wet.gain, v*1.2); 
+      applyNow(ctx, dry.gain, 1-v);
+    },cleanup:function(){carrier.stop()}};
+  },
+
+  alien:function(ctx){
+    /* Fixed: Properly shortened delays for comb-filter flange rather than messy echoes */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var del1=ctx.createDelay(1);del1.delayTime.value=0.003; // 3ms
+    var del2=ctx.createDelay(1);del2.delayTime.value=0.001; // 1ms
+    var fb=ctx.createGain();fb.gain.value=0.75;
+    
+    var lfo1=ctx.createOscillator();lfo1.type='sine';lfo1.frequency.value=0.2;
+    var lfo1g=ctx.createGain();lfo1g.gain.value=0.002;
+    var lfo2=ctx.createOscillator();lfo2.type='sine';lfo2.frequency.value=4;
+    var lfo2g=ctx.createGain();lfo2g.gain.value=0.001;
+    
+    lfo1.connect(lfo1g);lfo1g.connect(del1.delayTime);
+    lfo2.connect(lfo2g);lfo2g.connect(del2.delayTime);
+    
+    inp.connect(del1);del1.connect(del2);del2.connect(fb);fb.connect(del1);
+    del2.connect(wet);
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    
+    lfo1.start();lfo2.start();wet.gain.value=0;dry.gain.value=1;
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, lfo1g.gain, v*0.003); 
+      applyNow(ctx, lfo2g.gain, v*0.002);
+      applyNow(ctx, fb.gain, v*0.85);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+    },cleanup:function(){lfo1.stop();lfo2.stop()}};
+  },
+
+  bass:function(ctx){
+    /* Fixed: Removed the +18dB peaking EQ that was blowing up the audio stream */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    
+    var sub=ctx.createBiquadFilter();sub.type='lowshelf';sub.frequency.value=120;sub.gain.value=6;
+    var warmth=ctx.createBiquadFilter();warmth.type='lowshelf';warmth.frequency.value=300;warmth.gain.value=3;
+    var softClip = sat(ctx, 3);
+    
+    inp.connect(dry);dry.connect(out);
+    inp.connect(sub);sub.connect(warmth);warmth.connect(softClip);softClip.connect(wet);wet.connect(out);
+    wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, sub.gain, v*10); 
+      applyNow(ctx, warmth.gain, v*5);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-(v*0.5)); // Blend in some dry for articulation
+    },cleanup:function(){}};
+  },
+
+  ring:function(ctx){
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var osc1=ctx.createOscillator();osc1.type='sine';osc1.frequency.value=500;
+    var osc2=ctx.createOscillator();osc2.type='sine';osc2.frequency.value=750;
+    var r1=ctx.createGain();r1.gain.value=0;
+    var r2=ctx.createGain();r2.gain.value=0;
+    osc1.connect(r1.gain);osc2.connect(r2.gain);
+    inp.connect(r1);inp.connect(r2);
+    
+    var merge=ctx.createGain();merge.gain.value=0.8;
+    r1.connect(merge);r2.connect(merge);
+    merge.connect(wet);
+    
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    osc1.start();osc2.start();wet.gain.value=0;dry.gain.value=1;
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, r1.gain, v); // FIXED
+      applyNow(ctx, r2.gain, v*0.7); // FIXED
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+      osc1.frequency.setTargetAtTime(100+v*600, ctx.currentTime, 0.05);
+      osc2.frequency.setTargetAtTime(200+v*800, ctx.currentTime, 0.05);
+    },cleanup:function(){osc1.stop();osc2.stop()}};
+  },
+
+  telephone:function(ctx){
+    /* Fixed: Corrected filter bands and reduced distortion from 18 to 4 */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var hpf=ctx.createBiquadFilter();hpf.type='highpass';hpf.frequency.value=400;hpf.Q.value=1.5;
+    var lpf=ctx.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=2800;lpf.Q.value=1.5;
+    
+    var clip=sat(ctx, 4);
+    var amNoise=ctx.createOscillator();amNoise.type='sawtooth';amNoise.frequency.value=60;
+    var noiseG=ctx.createGain();noiseG.gain.value=0;
+    amNoise.connect(noiseG);
+    
+    var merge = ctx.createGain(); merge.gain.value = 1.0;
+    inp.connect(hpf);hpf.connect(lpf);lpf.connect(clip);clip.connect(merge);
+    noiseG.connect(merge);merge.connect(wet);
+    
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    amNoise.start();wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+      applyNow(ctx, noiseG.gain, v*0.03);
+      lpf.frequency.setTargetAtTime(3000-v*1000, ctx.currentTime, 0.05);
+      hpf.frequency.setTargetAtTime(200+v*300, ctx.currentTime, 0.05);
+    },cleanup:function(){amNoise.stop()}};
+  },
+
+  vibrato:function(ctx){
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var taps=[
+      {dt:0.025,rate:4.8,depth:0.015},
+      {dt:0.034,rate:5.3,depth:0.012},
+      {dt:0.019,rate:3.9,depth:0.014},
+      {dt:0.045,rate:6.1,depth:0.010}
+    ];
+    var oscs=taps.map(function(t){
+      var del=ctx.createDelay(1);del.delayTime.value=t.dt;
+      var osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=t.rate;
+      var og=ctx.createGain();og.gain.value=0;
+      osc.connect(og);og.connect(del.delayTime);
+      inp.connect(del);del.connect(wet);osc.start();
+      return{og,base:t.depth};
+    });
+    inp.connect(dry);dry.connect(out);wet.connect(out);wet.gain.value=0;dry.gain.value=1;
+    return{input:inp,output:out,setIntensity:function(v){
+      oscs.forEach(function(o){applyNow(ctx, o.og.gain, o.base*v*3)});
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-(v*0.5));
+    },cleanup:function(){oscs.forEach(function(o){o.og.gain.cancelScheduledValues(0)})}};
+  },
+
+  helium:function(ctx){
+    /* Fixed: Removed the extremely volatile +16 peaking EQs */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var hshelf=ctx.createBiquadFilter();hshelf.type='highshelf';hshelf.frequency.value=2000;hshelf.gain.value=6;
+    var lcut=ctx.createBiquadFilter();lcut.type='highpass';lcut.frequency.value=300;
+    
+    inp.connect(lcut);lcut.connect(hshelf);hshelf.connect(wet);
+    inp.connect(dry);dry.connect(out);wet.connect(out);wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, hshelf.gain, v*8);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+    },cleanup:function(){}};
+  },
+
+  choir:function(ctx){
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var taps=[
+      {dt:0.020,rate:1.9,depth:0.008},{dt:0.033,rate:2.4,depth:0.010},
+      {dt:0.047,rate:1.5,depth:0.007},{dt:0.058,rate:3.0,depth:0.009},
+      {dt:0.071,rate:2.1,depth:0.008},{dt:0.088,rate:1.7,depth:0.006}
+    ];
+    var ap1=ctx.createBiquadFilter();ap1.type='allpass';ap1.frequency.value=500;
+    var ap2=ctx.createBiquadFilter();ap2.type='allpass';ap2.frequency.value=1200;
+    var ap3=ctx.createBiquadFilter();ap3.type='allpass';ap3.frequency.value=2400;
+    
+    var oscs=taps.map(function(t){
+      var del=ctx.createDelay(1);del.delayTime.value=t.dt;
+      var osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=t.rate;
+      var og=ctx.createGain();og.gain.value=0;
+      osc.connect(og);og.connect(del.delayTime);
+      inp.connect(del);del.connect(ap1);osc.start();
+      return{og,base:t.depth};
+    });
+    
+    ap1.connect(ap2);ap2.connect(ap3);ap3.connect(wet);
+    inp.connect(dry);dry.connect(out);wet.connect(out);wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      oscs.forEach(function(o){applyNow(ctx, o.og.gain, o.base*v*3)});
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-(v*0.5));
+    },cleanup:function(){}};
+  },
+
+  warmth:function(ctx){
+    /* Fixed: Pre-drive gain pushes harder into tube shape for pronounced warmth */
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    
+    var preG = ctx.createGain(); preG.gain.value = 1.0;
+    var subShelf=ctx.createBiquadFilter();subShelf.type='lowshelf';subShelf.frequency.value=200;subShelf.gain.value=3;
+    var airCut=ctx.createBiquadFilter();airCut.type='highshelf';airCut.frequency.value=7000;airCut.gain.value=-2;
+    
+    var tube1=ctx.createWaveShaper();
+    (function(){var n=512,c=new Float32Array(n);
+      for(var i=0;i<n;i++){var x=(i/256)-1;c[i]=Math.tanh(x*2.5)*(1-0.05*x*x)}
+      tube1.curve=c})();
+      
+    var postGain = ctx.createGain(); postGain.gain.value = 1.2;
+
+    inp.connect(preG);preG.connect(tube1);tube1.connect(subShelf);subShelf.connect(airCut);airCut.connect(postGain);postGain.connect(wet);
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, preG.gain, 1 + (v * 1.5)); // Increase input drive to trigger more saturation
+      applyNow(ctx, subShelf.gain, v*6);
+      applyNow(ctx, airCut.gain, v*-5);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-(v*0.2)); 
+    },cleanup:function(){}};
+  },
+
+  crystal:function(ctx){
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var hpf=ctx.createBiquadFilter();hpf.type='highpass';hpf.frequency.value=3500;
+    var excDrive=ctx.createGain();excDrive.gain.value=3;
+    var excSat=sat(ctx,3);
+    var exMix=ctx.createGain();exMix.gain.value=0.4;
+    
+    var air=ctx.createBiquadFilter();air.type='highshelf';air.frequency.value=6000;air.gain.value=6;
+    
+    var shimDel=ctx.createDelay(1);shimDel.delayTime.value=0.036;
+    var shimOsc=ctx.createOscillator();shimOsc.type='sine';shimOsc.frequency.value=5.5;
+    var shimG=ctx.createGain();shimG.gain.value=0.004;
+    shimOsc.connect(shimG);shimG.connect(shimDel.delayTime);
+    
+    inp.connect(air);air.connect(wet);
+    inp.connect(hpf);hpf.connect(excDrive);excDrive.connect(excSat);excSat.connect(exMix);exMix.connect(wet);
+    inp.connect(shimDel);shimDel.connect(wet);
+    
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    shimOsc.start();wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, air.gain, v*8); 
+      applyNow(ctx, exMix.gain, v*0.5);
+      applyNow(ctx, shimG.gain, v*0.006);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-(v*0.2));
+    },cleanup:function(){shimOsc.stop()}};
+  },
+
+  tape:function(ctx){
+    var inp=ctx.createGain(),out=ctx.createGain(),wet=ctx.createGain(),dry=ctx.createGain();
+    var wowDel=ctx.createDelay(1);wowDel.delayTime.value=0.015;
+    var wow=ctx.createOscillator();wow.type='sine';wow.frequency.value=0.5;
+    var wowG=ctx.createGain();wowG.gain.value=0;
+    wow.connect(wowG);wowG.connect(wowDel.delayTime);
+    
+    var flDel=ctx.createDelay(1);flDel.delayTime.value=0.005;
+    var flutter=ctx.createOscillator();flutter.type='triangle';flutter.frequency.value=9;
+    var flG=ctx.createGain();flG.gain.value=0;
+    flutter.connect(flG);flG.connect(flDel.delayTime);
+    
+    var tapeSat=ctx.createWaveShaper();
+    (function(){var n=512,c=new Float32Array(n);
+      for(var i=0;i<n;i++){var x=(i/256)-1;c[i]=Math.tanh(x*1.5)*(0.95+0.05*Math.sin(x*Math.PI))}
+      tapeSat.curve=c})();
+      
+    var hfRoll=ctx.createBiquadFilter();hfRoll.type='lowpass';hfRoll.frequency.value=10000;
+    var subG=ctx.createBiquadFilter();subG.type='lowshelf';subG.frequency.value=200;subG.gain.value=2;
+    
+    inp.connect(wowDel);wowDel.connect(flDel);flDel.connect(tapeSat);tapeSat.connect(hfRoll);hfRoll.connect(subG);subG.connect(wet);
+    inp.connect(dry);dry.connect(out);wet.connect(out);
+    
+    wow.start();flutter.start();wet.gain.value=0;dry.gain.value=1;
+    
+    return{input:inp,output:out,setIntensity:function(v){
+      applyNow(ctx, wowG.gain, v*0.015);
+      applyNow(ctx, flG.gain, v*0.004);
+      hfRoll.frequency.setTargetAtTime(12000-v*5000, ctx.currentTime, 0.05);
+      applyNow(ctx, subG.gain, v*4);
+      applyNow(ctx, wet.gain, v); 
+      applyNow(ctx, dry.gain, 1-v);
+    },cleanup:function(){wow.stop();flutter.stop()}};
+  }
+};
+
+/* =====================================================================
+   MAIN APP
+   ===================================================================== */
+var ae=document.getElementById('ae'),
+    fi=document.getElementById('file-input'),
+    pp=document.getElementById('pp'),
+    sp=document.getElementById('sp'),spv=document.getElementById('spv'),
+    pi=document.getElementById('pi'),piv=document.getElementById('piv'),
+    it=document.getElementById('it'),inv=document.getElementById('inv'),
+    rb=document.getElementById('rb'),dlb=document.getElementById('dlb'),
+    stat=document.getElementById('status');
+
+var ctx=null,src=null,pitch=null,master=null,masterComp=null,curFX=null,curFXName='none',blobURL=null;
+var controls=[pp,sp,pi,it,rb,dlb];
+
+var ws=WaveSurfer.create({
+  container:'#waveform',media:ae,
+  waveColor:'#4B44CC',progressColor:'#6C63FF',cursorColor:'#c084fc',
+  barWidth:2,barRadius:2,responsive:true,height:70
+});
+
+function setStatus(msg,cls){stat.textContent=msg;stat.className=cls||''}
+
+function initCtx(){
+  if(ctx)return;
+  var AC=window.AudioContext||window.webkitAudioContext;
+  ctx=new AC();
+  src=ctx.createMediaElementSource(ae);
+  pitch=new Jungle(ctx);
+  master=ctx.createGain();
+  
+  // Master Limiter to prevent clipping globally
+  masterComp=ctx.createDynamicsCompressor();
+  masterComp.threshold.value = -2;
+  masterComp.knee.value = 0;
+  masterComp.ratio.value = 20;
+  masterComp.attack.value = 0.005;
+  masterComp.release.value = 0.05;
+
+  route();
+}
+
+function route(){
+  if(!ctx)return;
+  try{pitch.output.disconnect()}catch(e){}
+  if(curFX)try{curFX.output.disconnect()}catch(e){}
+  src.disconnect();
+  
+  src.connect(pitch.input);
+  if(curFX){
+      pitch.output.connect(curFX.input);
+      curFX.output.connect(master);
+  } else {
+      pitch.output.connect(master);
+  }
+  
+  master.connect(masterComp);
+  masterComp.connect(ctx.destination);
+}
+
+function setFX(name){
+  if(curFX){try{curFX.cleanup()}catch(e){}curFX=null}
+  curFXName=name;
+  if(name!=='none'&&FX[name]){
+    curFX=FX[name](ctx);
+    var v=parseFloat(it.value);
+    curFX.setIntensity(v);
+    setTimeout(function(){if(curFX)curFX.setIntensity(v)},20);
+  }
+  route();
+  document.querySelectorAll('.ef').forEach(function(el){
+    el.classList.toggle('active',el.dataset.e===name);
+  });
+}
+
+fi.addEventListener('change',function(e){
+  var f=e.target.files[0];if(!f)return;
+  if(blobURL)URL.revokeObjectURL(blobURL);
+  blobURL=URL.createObjectURL(f);
+  ae.src=blobURL;
+  controls.forEach(function(c){c.disabled=false});
+  document.querySelectorAll('input[type=range]').forEach(function(c){c.disabled=false});
+  setStatus('File loaded: '+f.name,'ok');
+});
+
+pp.addEventListener('click',function(){
+  initCtx();
+  if(ctx.state==='suspended')ctx.resume();
+  ws.playPause();
+});
+
+sp.addEventListener('input',function(){
+  ae.playbackRate=parseFloat(this.value);
+  spv.textContent=parseFloat(this.value).toFixed(2)+'×';
+});
+
+pi.addEventListener('input',function(){
+  initCtx();
+  pitch.setPitchOffset(parseFloat(this.value));
+  piv.textContent=parseFloat(this.value).toFixed(2);
+});
+
+it.addEventListener('input',function(){
+  var v=parseFloat(this.value);
+  inv.textContent=Math.round(v*100)+'%';
+  if(curFX)curFX.setIntensity(v);
+});
+
+document.querySelectorAll('.ef').forEach(function(el){
+  el.addEventListener('click',function(){
+    if(!ctx&&el.dataset.e!=='none'){initCtx()}
+    else if(!ctx)return;
+    setFX(el.dataset.e);
+  });
+});
+
+rb.addEventListener('click',function(){
+  sp.value=1;pi.value=0;it.value=0.5;
+  spv.textContent='1.00×';piv.textContent='0.00';inv.textContent='50%';
+  ae.playbackRate=1;
+  if(pitch)pitch.setPitchOffset(0);
+  if(curFX){try{curFX.cleanup()}catch(e){}curFX=null;curFXName='none'}
+  route();
+  document.querySelectorAll('.ef').forEach(function(el){
+    el.classList.toggle('active',el.dataset.e==='none');
+  });
+  setStatus('Reset','ok');
+});
+
+/* =====================================================================
+   MP3 DOWNLOAD via OfflineAudioContext + lamejs
+   ===================================================================== */
+var lameLoaded=false;
+function loadLame(cb){
+  if(lameLoaded){cb();return}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+  s.onload=function(){lameLoaded=true;cb()};
+  s.onerror=function(){setStatus('Failed to load MP3 encoder','err')};
+  document.head.appendChild(s);
+}
+
+dlb.addEventListener('click',function(){
+  if(!blobURL){setStatus('No audio loaded','err');return}
+  setStatus('Encoding — please wait…','busy');
+  dlb.disabled=true;
+  loadLame(function(){
+    fetch(blobURL)
+      .then(function(r){return r.arrayBuffer()})
+      .then(function(ab){
+        var decCtx=new (window.AudioContext||window.webkitAudioContext)();
+        return decCtx.decodeAudioData(ab).then(function(decoded){
+          decCtx.close();
+          var sr=decoded.sampleRate;
+          var dur=decoded.duration;
+          // Apply speed to duration calculation
+          var speed = parseFloat(sp.value);
+          var oCtx=new OfflineAudioContext(2,Math.ceil((dur/speed)*sr),sr);
+
+          var offSrc=oCtx.createBufferSource();
+          offSrc.buffer=decoded;
+          offSrc.playbackRate.value=speed;
+
+          var offPitch=new Jungle(oCtx);
+          offPitch.setPitchOffset(parseFloat(pi.value));
+
+          var offMaster=oCtx.createGain();
+          
+          // Add limiting compressor to Offline Render as well
+          var offComp=oCtx.createDynamicsCompressor();
+          offComp.threshold.value = -2;
+          offComp.knee.value = 0;
+          offComp.ratio.value = 20;
+          offComp.attack.value = 0.005;
+          offComp.release.value = 0.05;
+
+          var offFX=null;
+          if(curFXName!=='none'&&FX[curFXName]){
+            offFX=FX[curFXName](oCtx);
+            offFX.setIntensity(parseFloat(it.value));
+          }
+
+          offSrc.connect(offPitch.input);
+          if(offFX){
+            offPitch.output.connect(offFX.input);
+            offFX.output.connect(offMaster);
+          }else{
+            offPitch.output.connect(offMaster);
+          }
+          
+          offMaster.connect(offComp);
+          offComp.connect(oCtx.destination);
+          offSrc.start(0);
+
+          return oCtx.startRendering();
+        });
+      })
+      .then(function(rendered){
+        var left=rendered.getChannelData(0);
+        var right=rendered.numberOfChannels>1?rendered.getChannelData(1):left;
+        var sr=rendered.sampleRate;
+        var mp3enc=new lamejs.Mp3Encoder(2,sr,128);
+        var CHUNK=1152;
+        var mp3Data=[];
+        function f32toI16(f32){
+          var i16=new Int16Array(f32.length);
+          for(var i=0;i<f32.length;i++)i16[i]=Math.max(-32768,Math.min(32767,f32[i]*32767));
+          return i16;
+        }
+        var L=f32toI16(left),R=f32toI16(right);
+        for(var i=0;i<L.length;i+=CHUNK){
+          var lb=L.subarray(i,i+CHUNK),rb=R.subarray(i,i+CHUNK);
+          var mp3buf=mp3enc.encodeBuffer(lb,rb);
+          if(mp3buf.length>0)mp3Data.push(new Int8Array(mp3buf));
+        }
+        var flush=mp3enc.flush();
+        if(flush.length>0)mp3Data.push(new Int8Array(flush));
+        var blob=new Blob(mp3Data,{type:'audio/mp3'});
+        var url=URL.createObjectURL(blob);
+        var a=document.createElement('a');
+        a.href=url;a.download='modulated_audio.mp3';a.click();
+        setTimeout(function(){URL.revokeObjectURL(url)},5000);
+        setStatus('Download ready!','ok');
+        dlb.disabled=false;
+      })
+      .catch(function(e){
+        setStatus('Error: '+e.message,'err');
+        dlb.disabled=false;
+      });
+  });
+});
+</script>
+</body>
+</html>

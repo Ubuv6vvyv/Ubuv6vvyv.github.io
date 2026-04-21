@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Advanced Shape Detector Pro (Automated)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root { --acc: #00ffe7; --acc2: #ff3e6c; --bg: #0a0a0a; --panel: rgba(15, 15, 15, 0.9); }
+  
+  body {
+    background: var(--bg); font-family: 'Share Tech Mono', monospace; color: #fff;
+    height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
+  }
+
+  /* LOADING SCREEN */
+  #loader {
+    position: fixed; inset: 0; background: #000; z-index: 999;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px;
+  }
+  .title { font-family: 'Orbitron', sans-serif; font-size: 2rem; font-weight: 700; color: var(--acc); letter-spacing: 4px; text-shadow: 0 0 20px rgba(0,255,231,0.4); }
+  .spinner { border: 2px solid rgba(0,255,231,0.2); border-top-color: var(--acc); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MAIN VIEWFINDER */
+  #viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
+  video { display: none; }
+  #canvasOut { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #canvasSrc { display: none; }
+
+  /* TOP HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0; padding: 10px 15px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; z-index: 10;
+    background: linear-gradient(rgba(0,0,0,0.8), transparent); pointer-events: none;
+  }
+  .hud-badge { background: rgba(0,255,231,0.1); border: 1px solid rgba(0,255,231,0.3); padding: 4px 10px; border-radius: 3px; font-size: 0.75rem; color: var(--acc); }
+  .hud-stats { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; flex: 1; }
+  .stat-box { background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 3px; border-left: 2px solid; font-size: 0.65rem; color: #ccc; }
+  .s-tri { border-color: #ffd60a; } .s-sq { border-color: #00ffe7; } .s-circ { border-color: #bf5af2; } .s-poly { border-color: #ff9f0a; }
+  .stat-val { font-size: 0.8rem; font-weight: bold; color: #fff; margin-left: 5px; }
+
+  /* BOTTOM CONTROL PANEL */
+  #panel {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+    background: linear-gradient(transparent, rgba(0,0,0,0.95) 15%);
+    padding: 15px; display: flex; flex-direction: column; gap: 14px;
+  }
+  
+  .slider-group { display: flex; flex-direction: column; gap: 6px; }
+  .slider-label { display: flex; justify-content: space-between; font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .slider-label span { color: var(--acc); font-weight: bold; }
+  
+  input[type=range] { width: 100%; height: 4px; background: #333; border-radius: 2px; outline: none; -webkit-appearance: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--acc); cursor: pointer; border: 2px solid #000; }
+  input.secondary-range::-webkit-slider-thumb { background: var(--acc2); }
+  .secondary-label span { color: var(--acc2); }
+
+  .actions { display: flex; gap: 10px; margin-top: 5px; }
+  button {
+    flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; color: #aaa;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; cursor: pointer; border-radius: 3px; transition: 0.2s;
+  }
+  button:active { transform: scale(0.95); }
+  button.primary { background: rgba(0,255,231,0.1); border-color: var(--acc); color: var(--acc); font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+  button.primary:active { background: var(--acc); color: #000; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="title">VISION CORE</div>
+  <div class="spinner"></div>
+  <div style="font-size: 0.7rem; color: #666; letter-spacing: 2px;" id="loadText">LOADING OPENCV.JS...</div>
+</div>
+
+<div id="viewport">
+  <video id="vid" playsinline muted autoplay></video>
+  <canvas id="canvasSrc"></canvas>
+  <canvas id="canvasOut"></canvas>
+  
+  <div id="hud">
+    <div class="hud-badge" id="fps">-- FPS</div>
+    <div class="hud-stats">
+      <div class="stat-box s-tri">TRI<span class="stat-val" id="c-tri">0</span></div>
+      <div class="stat-box s-sq">QUAD<span class="stat-val" id="c-sq">0</span></div>
+      <div class="stat-box s-circ">CIRC<span class="stat-val" id="c-circ">0</span></div>
+      <div class="stat-box s-poly">POLY<span class="stat-val" id="c-poly">0</span></div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div id="controls" style="display: flex; flex-direction: column; gap: 12px;">
+      
+      <div class="slider-group">
+        <div class="slider-label">Edge Sensitivity <span id="v-sens">70%</span></div>
+        <input type="range" id="sensitivity" min="1" max="100" value="70" oninput="document.getElementById('v-sens').textContent = this.value + '%'">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label secondary-label">Shape Strictness <span id="v-strict">65%</span></div>
+        <input type="range" class="secondary-range" id="strictness" min="1" max="100" value="65" oninput="document.getElementById('v-strict').textContent = this.value + '%'">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label" style="color: #666;">Ignore Sizes Under <span id="v-minArea" style="color: #aaa;">500 px</span></div>
+        <input type="range" id="minArea" min="50" max="5000" value="500" step="50" style="background: #222;" oninput="document.getElementById('v-minArea').textContent = this.value + ' px'">
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button onclick="flipCamera()">⇄ FLIP CAM</button>
+      <button onclick="toggleDetails()" id="btnDetails">▣ HIDE UI</button>
+      <button class="primary" onclick="snapshot()">◎ SNAPSHOT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const vid = document.getElementById('vid');
+  const canvasSrc = document.getElementById('canvasSrc');
+  const canvasOut = document.getElementById('canvasOut');
+  const ctxSrc = canvasSrc.getContext('2d', { willReadFrequently: true });
+  const ctxOut = canvasOut.getContext('2d');
+
+  let stream = null;
+  let facingMode = 'environment';
+  let isRunning = false;
+  let showDetails = true;
+  
+  let CV = {};
+  let lastTime = 0;
+  let frameCount = 0;
+
+  // Helper function to map a value from one range to another
+  function mapRange(val, inMin, inMax, outMin, outMax) {
+    return (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+  }
+
+  async function startCamera() {
+    if (stream) { stream.getTracks().forEach(track => track.stop()); }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      vid.srcObject = stream;
+      await vid.play();
+      
+      canvasSrc.width = canvasOut.width = vid.videoWidth;
+      canvasSrc.height = canvasOut.height = vid.videoHeight;
+      document.getElementById('loader').style.display = 'none';
+      
+      if (!isRunning) {
+        initOpenCVMatrices();
+        isRunning = true;
+        requestAnimationFrame(processFrame);
+      }
+    } catch (err) { alert("Camera error: " + err.message); }
+  }
+
+  function flipCamera() { facingMode = facingMode === 'environment' ? 'user' : 'environment'; startCamera(); }
+
+  function toggleDetails() {
+    showDetails = !showDetails;
+    document.getElementById('btnDetails').textContent = showDetails ? "▣ HIDE UI" : "□ SHOW UI";
+    document.getElementById('controls').style.display = showDetails ? 'flex' : 'none';
+    document.getElementById('hud').style.display = showDetails ? 'flex' : 'none';
+  }
+
+  function snapshot() {
+    const link = document.createElement('a');
+    link.download = `shape_auto_${Date.now()}.png`;
+    link.href = canvasOut.toDataURL('image/png');
+    link.click();
+  }
+
+  function initOpenCVMatrices() {
+    const w = canvasSrc.width, h = canvasSrc.height;
+    CV.src = new cv.Mat(h, w, cv.CV_8UC4);
+    CV.gray = new cv.Mat(h, w, cv.CV_8UC1);
+    CV.blur = new cv.Mat(h, w, cv.CV_8UC1);
+    CV.edges = new cv.Mat(h, w, cv.CV_8UC1);
+    CV.contours = new cv.MatVector();
+    CV.hierarchy = new cv.Mat();
+  }
+
+  function rgbToHex(r, g, b) {
+    return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+  }
+
+  function processFrame(timestamp) {
+    if (!isRunning) return;
+    requestAnimationFrame(processFrame);
+    if (vid.readyState < 2 || vid.videoWidth === 0) return;
+
+    frameCount++;
+    if (timestamp - lastTime >= 1000) {
+      document.getElementById('fps').textContent = frameCount + " FPS";
+      frameCount = 0; lastTime = timestamp;
+    }
+
+    ctxSrc.drawImage(vid, 0, 0, canvasSrc.width, canvasSrc.height);
+    const imgData = ctxSrc.getImageData(0, 0, canvasSrc.width, canvasSrc.height);
+    CV.src.data.set(imgData.data);
+
+    // --- SMART SLIDER LOGIC ---
+    let uiSens = parseFloat(document.getElementById('sensitivity').value);
+    let uiStrict = parseFloat(document.getElementById('strictness').value);
+    let minA = parseInt(document.getElementById('minArea').value);
+
+    // Sensitivity maps to Canny Low (100% sens = 15 threshold, 1% sens = 120 threshold)
+    let cannyL = mapRange(uiSens, 1, 100, 120, 15);
+    let cannyH = cannyL * 2.5; // Auto-calculate the high threshold
+
+    // Strictness maps to Epsilon and Circularity
+    // 100% strict = 0.015 eps (hug curves tight) and 0.90 circ (must be perfect circle)
+    // 1% strict = 0.08 eps (smooth aggressively) and 0.65 circ (accept wobbly circles)
+    let epsMult = mapRange(uiStrict, 1, 100, 0.08, 0.015);
+    let circThresh = mapRange(uiStrict, 1, 100, 0.65, 0.90);
+    // -------------------------
+
+    let gc = []; const trk = (mat) => { gc.push(mat); return mat; };
+
+    try {
+      cv.cvtColor(CV.src, CV.gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(CV.gray, CV.blur, new cv.Size(5, 5), 0);
+      cv.Canny(CV.blur, CV.edges, cannyL, cannyH, 3, false);
+      
+      let kernel = trk(cv.Mat.ones(3, 3, cv.CV_8U));
+      cv.dilate(CV.edges, CV.edges, kernel, new cv.Point(-1, -1), 1);
+      cv.findContours(CV.edges, CV.contours, CV.hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      let output = trk(CV.src.clone());
+      let counts = { tri: 0, sq: 0, circ: 0, poly: 0 };
+
+      for (let i = 0; i < CV.contours.size(); i++) {
+        let contour = trk(CV.contours.get(i));
+        let area = cv.contourArea(contour);
+
+        if (area < minA || area > (canvasSrc.width * canvasSrc.height * 0.9)) continue;
+
+        let perimeter = cv.arcLength(contour, true);
+        let circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+        
+        let shapeName = "UNKNOWN";
+        let color = new cv.Scalar(255, 255, 255, 255);
+
+        if (circularity > circThresh) {
+          shapeName = "CIRCLE";
+          color = new cv.Scalar(191, 95, 242, 255);
+          counts.circ++;
+        } 
+        else {
+          let approx = trk(new cv.Mat());
+          cv.approxPolyDP(contour, approx, epsMult * perimeter, true);
+          let vertices = approx.rows;
+          
+          if (vertices === 3) {
+            shapeName = "TRIANGLE";
+            color = new cv.Scalar(255, 214, 10, 255);
+            counts.tri++;
+          } else if (vertices === 4) {
+            if (cv.isContourConvex(approx)) {
+              let rect = cv.boundingRect(approx);
+              let aspectRatio = rect.width / rect.height;
+              if (aspectRatio >= 0.85 && aspectRatio <= 1.15) {
+                shapeName = "SQUARE"; color = new cv.Scalar(0, 255, 231, 255);
+              } else {
+                shapeName = "RECTANGLE"; color = new cv.Scalar(0, 200, 100, 255);
+              }
+              counts.sq++;
+            } else {
+              shapeName = "IRREGULAR 4"; color = new cv.Scalar(255, 159, 10, 255);
+              counts.poly++;
+            }
+          } else if (vertices === 5) {
+            shapeName = "PENTAGON"; color = new cv.Scalar(255, 0, 100, 255); counts.poly++;
+          } else if (vertices === 6) {
+            shapeName = "HEXAGON"; color = new cv.Scalar(0, 150, 255, 255); counts.poly++;
+          } else {
+            shapeName = "POLY-" + vertices; color = new cv.Scalar(255, 159, 10, 255); counts.poly++;
+          }
+        }
+
+        cv.drawContours(output, CV.contours, i, color, 3);
+
+        let M = cv.moments(contour);
+        if (M.m00 !== 0) {
+          let cx = Math.round(M.m10 / M.m00);
+          let cy = Math.round(M.m01 / M.m00);
+          
+          cv.circle(output, new cv.Point(cx, cy), 4, color, -1);
+          
+          if (showDetails) {
+            let centerPixelIdx = (cy * canvasSrc.width + cx) * 4;
+            let r = imgData.data[centerPixelIdx];
+            let g = imgData.data[centerPixelIdx + 1];
+            let b = imgData.data[centerPixelIdx + 2];
+            let hexColor = rgbToHex(r, g, b);
+
+            let txtOffset = cy - 20;
+            
+            cv.putText(output, shapeName, new cv.Point(cx - 30, txtOffset), cv.FONT_HERSHEY_SIMPLEX, 0.6, new cv.Scalar(0, 0, 0, 255), 4);
+            cv.putText(output, shapeName, new cv.Point(cx - 30, txtOffset), cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 1);
+            
+            let dataTxt = `${Math.round(area)}px | ${hexColor}`;
+            cv.putText(output, dataTxt, new cv.Point(cx - 30, cy + 20), cv.FONT_HERSHEY_SIMPLEX, 0.4, new cv.Scalar(0, 0, 0, 255), 3);
+            cv.putText(output, dataTxt, new cv.Point(cx - 30, cy + 20), cv.FONT_HERSHEY_SIMPLEX, 0.4, new cv.Scalar(255, 255, 255, 255), 1);
+          }
+        }
+      }
+
+      document.getElementById('c-tri').textContent = counts.tri;
+      document.getElementById('c-sq').textContent = counts.sq;
+      document.getElementById('c-circ').textContent = counts.circ;
+      document.getElementById('c-poly').textContent = counts.poly;
+
+      ctxOut.putImageData(new ImageData(new Uint8ClampedArray(output.data), output.cols, output.rows), 0, 0);
+
+    } catch (e) { console.warn("Processing Error:", e); } 
+    finally { gc.forEach(mat => { if (mat && !mat.isDeleted()) mat.delete(); }); }
+  }
+
+  const script = document.createElement('script');
+  script.src = "https://docs.opencv.org/4.8.0/opencv.js";
+  script.async = true;
+  script.onload = () => {
+    const checkReady = setInterval(() => {
+      if (typeof cv !== 'undefined' && typeof cv.Mat !== 'undefined') {
+        clearInterval(checkReady);
+        document.getElementById('loadText').textContent = "INITIALIZING CAMERA...";
+        startCamera();
+      }
+    }, 100);
+  };
+  document.body.appendChild(script);
+
+</script>
+</body>
+</html>
