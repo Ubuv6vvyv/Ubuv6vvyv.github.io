@@ -1046,55 +1046,6 @@ class PassiveVoiceAnalyzer {
     }
 }
 // --- 9. BURSTINESS (Mathematical Variance) ---
-class BurstinessAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const sentences = Utils.splitSentences(this.text);
-        if (sentences.length < 4) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient data" };
-        
-        // Remove very short fragments (like headers) to get true prose statistics
-        const validSentences = sentences.filter(s => s.trim().split(/\s+/).length > 4);
-        if (validSentences.length < 3) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient prose" };
-
-        const lengths = validSentences.map(s => s.trim().split(/\s+/).length);
-        const stdDev = Utils.calculateStdDev(lengths);
-        const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-        
-        // Coefficient of Variation (CV)
-        const cv = stdDev / mean;
-        
-        let score = 0;
-        let matches = [];
-        
-        // AI outputs (especially GPT-3.5/4) have a "rhythm" that is mathematically uniform.
-        // Humans are chaotic.
-        if (cv < 0.28) {
-            score = 85; 
-            matches.push({ 
-                type: "Low Variance", 
-                snippet: "Sentence length is mathematically uniform", 
-                context: `CV Score: ${cv.toFixed(2)} (Robotic Rhythm)`, 
-                weight: "high" 
-            });
-        } else if (cv > 0.45) {
-            score = 0; // Human
-            matches.push({ 
-                type: "High Variance", 
-                snippet: "Natural sentence length variation", 
-                context: `CV Score: ${cv.toFixed(2)} (Human Rhythm)`, 
-                weight: "low" 
-            });
-        }
-        
-        return { 
-            name: "Burstiness (Variance)", 
-            score, 
-            matches, 
-            summary: cv < 0.3 ? "Mechanical uniformity detected" : "Natural variance detected", 
-            details: { cv } 
-        };
-    }
-}
 
 // --- 10. REFUSAL & GUARDRAILS ---
 class RefusalAnalyzer {
