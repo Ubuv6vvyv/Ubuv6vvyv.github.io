@@ -432,1040 +432,655 @@ overflow: auto;
 
 };
 
-     const Utils = {
-    htmlToText: e => {
-        // Advanced cleaning: normalizes non-breaking spaces, zero-width spaces, 
-        // and strips invisible unicode characters often left by AI copy-pastes.
-        const t = document.createElement("div");
-        t.innerHTML = e;
-        let text = t.textContent || t.innerText || "";
-        return text
-            .replace(/[\u200B-\u200D\uFEFF]/g, "") // Remove zero-width chars
-            .replace(/\u00A0/g, " ") // Replace non-breaking space
-            .replace(/\s+/g, " ")
-            .trim();
-    },
-    countWords: e => e.trim().split(/\s+/).filter(Boolean).length,
-    escapeHtml: e => {
-        const t = document.createElement("div");
-        t.textContent = e;
-        return t.innerHTML;
-    },
-    splitSentences: e => {
-        // Robust splitting that ignores common abbreviations (Mr., Dr., U.S., etc.) 
-        // to prevent false positives in Burstiness analysis.
-        if (!e) return [];
-        return e.match(/[^.!?]+(?:[.!?](?!['"]?\s|$)[^.!?]*)*[.!?]?['"]?(?=\s|$)/g) || [];
-    },
-    extractEmojis: e => [...e.matchAll(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu)].map(e => e[0]),
-    calculateStdDev: (lengths) => {
-        if (!lengths.length) return 0;
-        const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-        const variance = lengths.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / lengths.length;
-        return Math.sqrt(variance);
-    },
-    extractSnippet: (fullText, matchText, index, contextLength = 60, className = "match-highlight") => {
-        const start = Math.max(0, index - contextLength);
-        const end = Math.min(fullText.length, index + matchText.length + contextLength);
-        let prefix = fullText.substring(start, index);
-        let suffix = fullText.substring(index + matchText.length, end);
-        
-        if (start > 0) prefix = "..." + prefix;
-        if (end < fullText.length) suffix = suffix + "...";
-        
-        return `${Utils.escapeHtml(prefix)}<span class="${className}">${Utils.escapeHtml(matchText)}</span>${Utils.escapeHtml(suffix)}`;
-    }
-};
 
-class WeightedScorer {
-    constructor() {
-        this.totalWeight = 0;
-        this.weightedScore = 0;
-        this.findings = [];
-        this.criticalFlag = false; // "Kill switch" for obvious refusals
-    }
-    
-    add(score, weightLabel, type = "medium") {
-        const weight = PatternConfig.weights[weightLabel] || 1;
-        
-        // If a critical pattern (like "As an AI") is found, we flag it.
-        if (weightLabel === 'critical' && score > 0) {
-            this.criticalFlag = true;
+        const Utils = {
+            htmlToText: e => {
+                const t = document.createElement("div");
+                t.innerHTML = e;
+                return t.textContent || t.innerText || "";
+            },
+            countWords: e => e.trim().split(/\s+/).filter(Boolean).length,
+            escapeHtml: e => {
+                const t = document.createElement("div");
+                t.textContent = e;
+                return t.innerHTML;
+            },
+            splitSentences: e => e.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [],
+            extractEmojis: e => [...e.matchAll(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu)].map(e => e[0]),
+            calculateStdDev: e => {
+                if (!e.length) return 0;
+                const t = e.reduce((e, t) => e + t, 0) / e.length;
+                return Math.sqrt(e.map(e => Math.pow(e - t, 2)).reduce((e, t) => e + t, 0) / e.length);
+            },
+            extractSnippet: (fullText, matchText, index, contextLength = 50, className = "match-highlight") => {
+                const start = Math.max(0, index - contextLength);
+                const end = Math.min(fullText.length, index + matchText.length + contextLength);
+                let prefix = fullText.substring(start, index);
+                let suffix = fullText.substring(index + matchText.length, end);
+                if (start > 0) prefix = "..." + prefix;
+                if (end < fullText.length) suffix = suffix + "...";
+                return `${Utils.escapeHtml(prefix)}<span class="${className}">${Utils.escapeHtml(matchText)}</span>${Utils.escapeHtml(suffix)}`;
+            }
+        };
+
+        class WeightedScorer {
+            constructor() {
+                this.totalWeight = 0;
+                this.weightedScore = 0;
+                this.findings = [];
+            }
+            add(score, weightLabel, type = "medium") {
+                const weight = PatternConfig.weights[weightLabel] || 1;
+                this.weightedScore += score * weight;
+                this.totalWeight += weight;
+                this.findings.push({ score, weight, type });
+            }
+            getScore() {
+                return this.totalWeight > 0 ? Math.min(100, this.weightedScore / this.totalWeight) : 0;
+            }
+            getDetails() {
+                return {
+                    raw: this.weightedScore,
+                    totalWeight: this.totalWeight,
+                    normalized: this.getScore(),
+                    findingsCount: this.findings.length
+                };
+            }
         }
 
-        this.weightedScore += score * weight;
-        this.totalWeight += weight;
-        this.findings.push({ score, weight, type });
-    }
+        // --- 1. LEXICON ANALYZER ---
+        class GPTLexiconAnalyzer {
+            constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                let totalHits = 0;
+                PatternConfig.gptLexicon.forEach(phrase => {
+                    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        totalHits++;
+                        if (matches.length < 15) {
+                            matches.push({
+                                type: "Lexicon",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "Common AI Vocabulary",
+                                weight: "high"
+                            });
+                        }
+                    }
+                });
+                const density = totalHits / (this.wordCount || 1);
+                if (density > 0.03) scorer.add(100, "critical");
+                else if (density > 0.015) scorer.add(60, "high");
+                else if (density > 0.005) scorer.add(30, "medium");
+                return { name: "Vocabulary Patterns", score: scorer.getScore(), matches, summary: `${totalHits} specific AI words detected`, details: scorer.getDetails() };
+            }
+        }
 
-    getScore() {
-        if (this.criticalFlag) return 99; // Force max score for critical fails
-        if (this.totalWeight === 0) return 0;
-        return Math.min(100, this.weightedScore / this.totalWeight);
-    }
+        // --- 2. EMOJI FORENSICS ---
+        class EmojiAnalyzer {
+            constructor(text) { this.text = text; this.emojis = Utils.extractEmojis(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                if (this.emojis.length === 0) return { name: "Emoji Analysis", score: 0, matches: [], summary: "No emojis detected" };
+                
+                // 1. Check for placement (End of sentence only)
+                let endOnlyCount = 0;
+                let midSentenceCount = 0;
+                const sentences = Utils.splitSentences(this.text);
+                sentences.forEach(s => {
+                    if (PatternConfig.emojiPatterns.endOnly.test(s)) endOnlyCount++;
+                    if (PatternConfig.emojiPatterns.midSentence.test(s)) midSentenceCount++;
+                });
 
-    getDetails() {
-        return {
-            raw: this.weightedScore,
-            totalWeight: this.totalWeight,
-            normalized: this.getScore(),
-            findingsCount: this.findings.length
-        };
-    }
-}
-
-// --- 1. DEEP LEXICON ANALYZER ---
-class GPTLexiconAnalyzer {
-    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        let totalHits = 0;
-        
-        // Sort by length (desc) to catch multi-word phrases before single words
-        const sortedLexicon = [...PatternConfig.gptLexicon].sort((a, b) => b.length - a.length);
-
-        sortedLexicon.forEach(phrase => {
-            const regex = new RegExp(`\\b${phrase}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                totalHits++;
-                // Limit visual clutter in results, but count everything
-                if (matches.length < 15) {
+                if (endOnlyCount > 2 && midSentenceCount === 0) {
+                    scorer.add(50, "high");
                     matches.push({
-                        type: "AI Lexicon",
-                        snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                        context: "High-probability LLM token",
+                        type: "Placement",
+                        snippet: "Detected emojis exclusively at end of sentences",
+                        context: "Robotic placement pattern",
                         weight: "high"
                     });
                 }
-            }
-        });
 
-        const density = totalHits / (this.wordCount || 1);
-        
-        // Logic: AI tends to hover between 1.5% and 4% density of these specific words.
-        // Humans are usually < 1%.
-        if (density > 0.035) scorer.add(100, "critical"); // Extremely high density
-        else if (density > 0.02) scorer.add(75, "high");
-        else if (density > 0.01) scorer.add(40, "medium");
-        else if (totalHits > 2) scorer.add(10, "low");
-
-        return { 
-            name: "Vocabulary Patterns", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: `${totalHits} AI-typical words detected (Density: ${(density*100).toFixed(2)}%)`, 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 2. EMOJI FORENSICS ---
-class EmojiAnalyzer {
-    constructor(text) { this.text = text; this.emojis = Utils.extractEmojis(text); }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        
-        if (this.emojis.length === 0) return { name: "Emoji Analysis", score: 0, matches: [], summary: "No emojis detected" };
-        
-        // A. Robotic Placement (End of sentence only)
-        // AI often treats emojis as punctuation, placing them after the period.
-        let endOnlyCount = 0;
-        let midSentenceCount = 0;
-        const sentences = Utils.splitSentences(this.text);
-        
-        sentences.forEach(s => {
-            if (PatternConfig.emojiPatterns.endOnly.test(s)) endOnlyCount++;
-            if (PatternConfig.emojiPatterns.midSentence.test(s)) midSentenceCount++;
-        });
-
-        if (endOnlyCount > 0 && midSentenceCount === 0) {
-            scorer.add(75, "high");
-            matches.push({
-                type: "Placement Logic",
-                snippet: "Emojis found exclusively at end of sentences",
-                context: "Robotic placement pattern",
-                weight: "high"
-            });
-        }
-
-        // B. The "Corporate Cheer" check
-        let corpCount = 0;
-        const uniqueEmojis = [...new Set(this.emojis)];
-        uniqueEmojis.forEach(e => {
-            if (PatternConfig.corporateEmojis.includes(e)) {
-                corpCount++;
-                matches.push({
-                    type: "Corporate/AI Tone",
-                    snippet: `Detected usage of ${e}`,
-                    context: "Common AI 'Helpfulness' Emojis",
-                    weight: "medium"
+                // 2. Corporate Emoji Check
+                let corpCount = 0;
+                this.emojis.forEach(e => {
+                    if (PatternConfig.corporateEmojis.includes(e)) corpCount++;
                 });
-            }
-        });
-        
-        if (corpCount > 1) scorer.add(50 + (corpCount * 5), "medium");
-
-        return { 
-            name: "Emoji Forensics", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: `${this.emojis.length} emojis analyzed. Placement style: ${endOnlyCount > midSentenceCount ? "Robotic" : "Natural"}`, 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 3. STRUCTURAL RIGIDITY & THE "SANDWICH" ---
-class StructuralRigidityAnalyzer {
-    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        // A. The "Sentence -> List -> Sentence" Sandwich
-        // Check for: Colon at end of line -> Bullet points -> Transition word
-        const colonMatches = this.text.match(/:\s*(\n|$)/g) || [];
-        const bullets = (this.text.match(PatternConfig.structural.bulletDensity) || []).length;
-        
-        if (colonMatches.length > 0 && bullets > 2) {
-            matches.push({
-                type: "Structure",
-                snippet: "Introductory sentence ending in colon followed by list",
-                context: "The 'AI Sandwich' Structure",
-                weight: "high"
-            });
-            scorer.add(80, "high");
-        }
-
-        // B. Bullet Density
-        if (bullets > 0) {
-            const ratio = bullets / (this.wordCount / 20); // Normalized
-            if (ratio > 0.25) {
-                scorer.add(70, "high");
-                matches.push({
-                    type: "Formatting",
-                    snippet: `Found ${bullets} list items relative to text length`,
-                    context: "Excessive Structuring",
-                    weight: "high"
-                });
-            }
-        }
-
-        // C. Markdown Artifacts (**Text**:)
-        // This is a "smoking gun" for copy-pasted ChatGPT content
-        let boldColonMatch;
-        let bcCount = 0;
-        while((boldColonMatch = PatternConfig.structural.boldColon.exec(this.text)) !== null) {
-            bcCount++;
-            if(bcCount <= 3) {
-                matches.push({
-                    type: "Markdown Artifact",
-                    snippet: Utils.extractSnippet(this.text, boldColonMatch[0], boldColonMatch.index),
-                    context: "Bolded header pattern (**Title**:)",
-                    weight: "critical"
-                });
-            }
-        }
-        if(bcCount > 0) scorer.add(100, "critical");
-
-        return { 
-            name: "Structural Rigidity", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: bcCount > 0 ? "Markdown artifacts detected" : "Analyzed lists and formatting", 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 4. PUNCTUATION VECTORS ---
-class PunctuationAnalyzer {
-    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        // --- A. Em-Dash (—) vs double-hyphen / spaced hyphen ---
-        const emDashes = (this.text.match(/—/g) || []).length;
-        const doubleHyphens = (this.text.match(/--/g) || []).length;
-        const spacedHyphens = (this.text.match(/ - /g) || []).length;
-        if (emDashes > 1 && doubleHyphens === 0 && spacedHyphens === 0) {
-            scorer.add(40, "low");
-            matches.push({ type: "Em-Dash Precision", snippet: `${emDashes}× proper em-dashes (—), zero informal dashes`, context: "Humans type -- or ' - ', AI outputs —", weight: "low" });
-        }
-
-        // --- B. Curly/Smart quotes vs straight quotes ---
-        // AI outputs from text editors often keep straight, but raw LLM output uses typographic
-        const smartQuotes = (this.text.match(/[\u2018\u2019\u201C\u201D]/g) || []).length;
-        const straightQuotes = (this.text.match(/["']/g) || []).length;
-        if (smartQuotes > 2 && straightQuotes < smartQuotes) {
-            scorer.add(30, "low");
-            matches.push({ type: "Typographic Quotes", snippet: `${smartQuotes} smart/curly quotes detected`, context: "AI text-generation often outputs typographic quotes", weight: "low" });
-        }
-
-        // --- C. Oxford Comma consistency ---
-        const oxford = (this.text.match(/,\s+(?:and|or)\s+\w/gi) || []).length;
-        const noOxford = (this.text.match(/\b\w+,\s+\w+\s+(?:and|or)\s+\w/gi) || []).length;
-        if (oxford > 3 && noOxford === 0) {
-            scorer.add(20, "low");
-            matches.push({ type: "Oxford Comma Lock", snippet: `${oxford} serial commas, zero omissions`, context: "100% grammatical consistency — algorithmic", weight: "low" });
-        }
-
-        // --- D. Colon overuse (AI loves colons to introduce lists/elaborations) ---
-        const colons = (this.text.match(/:\s/g) || []).length;
-        const colonDensity = colons / (this.wordCount / 100);
-        if (colonDensity > 2.5) {
-            scorer.add(55, "medium");
-            matches.push({ type: "Colon Overuse", snippet: `${colons} colons per ${this.wordCount} words (${colonDensity.toFixed(1)}/100)`, context: "AI introduces every elaboration with a colon", weight: "medium" });
-        }
-
-        // --- E. Semicolon absence (AI rarely uses semicolons; humans use them inconsistently) ---
-        const semicolons = (this.text.match(/;/g) || []).length;
-        if (this.wordCount > 200 && semicolons === 0 && colons > 3) {
-            scorer.add(25, "low");
-            matches.push({ type: "Semicolon Absence", snippet: `0 semicolons in ${this.wordCount}-word text`, context: "AI prefers periods and colons over semicolons", weight: "low" });
-        }
-
-        // --- F. Ellipsis style (...) vs (…) ---
-        const unicodeEllipsis = (this.text.match(/…/g) || []).length;
-        const triDot = (this.text.match(/\.\.\./g) || []).length;
-        if (unicodeEllipsis > 0 && triDot === 0) {
-            scorer.add(20, "low");
-            matches.push({ type: "Unicode Ellipsis", snippet: `${unicodeEllipsis}× unicode ellipsis (…) with no typed (...)`, context: "Typographic precision signals LLM origin", weight: "low" });
-        }
-
-        // --- G. Sentence-ending punctuation variety ---
-        const exclamations = (this.text.match(/!/g) || []).length;
-        const questions = (this.text.match(/\?/g) || []).length;
-        const periods = (this.text.match(/\./g) || []).length;
-        const totalEndPunct = exclamations + questions + periods;
-        if (totalEndPunct > 5) {
-            const exclamRatio = exclamations / totalEndPunct;
-            const questionRatio = questions / totalEndPunct;
-            // AI avoids exclamations in formal mode; uses them formulaically in casual
-            if (exclamRatio === 0 && this.wordCount > 150) {
-                scorer.add(20, "low");
-                matches.push({ type: "Zero Exclamations", snippet: `No exclamation marks in ${this.wordCount} words`, context: "Formal AI prose avoids emotional punctuation", weight: "low" });
-            }
-            // AI almost never uses rhetorical questions in expository text
-            if (questionRatio === 0 && this.wordCount > 200) {
-                scorer.add(15, "low");
-                matches.push({ type: "Zero Questions", snippet: `No question marks — entirely declarative`, context: "Humans use rhetorical questions; AI states", weight: "low" });
-            }
-        }
-
-        // --- H. Parenthetical density (AI overuses parentheticals for "helpful context") ---
-        const parens = (this.text.match(/\([^)]{5,60}\)/g) || []).length;
-        const parenDensity = parens / (this.wordCount / 100);
-        if (parenDensity > 1.5) {
-            scorer.add(35, "medium");
-            matches.push({ type: "Parenthetical Overuse", snippet: `${parens} parenthetical asides detected`, context: "AI adds clarifying asides mechanically", weight: "medium" });
-        }
-
-        return {
-            name: "Punctuation Vectors",
-            score: Math.min(100, scorer.getScore()),
-            matches,
-            summary: `Em-dashes: ${emDashes}, Colons: ${colons}, Parentheticals: ${parens}`,
-            details: { emDashes, colons, semicolons, parens, totalWeight: scorer.totalWeight }
-        };
-    }
-}
-// --- 5. BINARY RHETORIC PATTERNS ---
-class BurstinessAnalyzer {
-    constructor(text) { this.text = text; }
-
-    _ttr(words) {
-        if (!words.length) return 1;
-        return new Set(words.map(w => w.toLowerCase())).size / words.length;
-    }
-
-    _avgWordLength(words) {
-        if (!words.length) return 0;
-        return words.reduce((a, b) => a + b.length, 0) / words.length;
-    }
-
-    analyze() {
-        const allSentences = Utils.splitSentences(this.text);
-        if (allSentences.length < 4) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient data", details: {} };
-
-        const validSentences = allSentences.filter(s => s.trim().split(/\s+/).length > 3);
-        if (validSentences.length < 3) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient prose", details: {} };
-
-        const lengths = validSentences.map(s => s.trim().split(/\s+/).length);
-        const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-        const stdDev = Utils.calculateStdDev(lengths);
-        const cv = stdDev / (mean || 1);
-
-        // --- A. Sentence length uniformity ---
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        if (cv < 0.22) {
-            scorer.add(92, "high");
-            matches.push({ type: "Robotic Rhythm", snippet: `Mean sentence length: ${mean.toFixed(1)} words, StdDev: ${stdDev.toFixed(1)}`, context: `CV: ${cv.toFixed(3)} — extreme uniformity`, weight: "high" });
-        } else if (cv < 0.32) {
-            scorer.add(65, "medium");
-            matches.push({ type: "Uniform Rhythm", snippet: `Mean: ${mean.toFixed(1)} words, StdDev: ${stdDev.toFixed(1)}`, context: `CV: ${cv.toFixed(3)} — low variance`, weight: "medium" });
-        } else if (cv > 0.55) {
-            scorer.add(0, "low"); // human chaos
-            matches.push({ type: "Natural Variance", snippet: `CV: ${cv.toFixed(3)} — strong human signal`, context: "Irregular cadence", weight: "low" });
-        }
-
-        // --- B. AI Medium-Sentence Trap (8-18 words is AI's comfort zone) ---
-        const midRange = lengths.filter(l => l >= 8 && l <= 18).length;
-        const midRatio = midRange / lengths.length;
-        if (midRatio > 0.78) {
-            scorer.add(70, "medium");
-            matches.push({ type: "Medium-Sentence Trap", snippet: `${(midRatio*100).toFixed(0)}% of sentences are 8–18 words`, context: "AI optimizes for 'readable' sentence length", weight: "medium" });
-        }
-
-        // --- C. Paragraph-level rhythm (AI paragraphs are uniform in sentence count) ---
-        const paragraphs = this.text.split(/\n\s*\n/).filter(p => p.trim().length > 40);
-        if (paragraphs.length >= 3) {
-            const paraSentCounts = paragraphs.map(p => (Utils.splitSentences(p) || []).filter(s => s.trim().split(/\s+/).length > 3).length);
-            const paraLengths = paragraphs.map(p => p.trim().split(/\s+/).length);
-            const paraCV = Utils.calculateStdDev(paraLengths) / (paraLengths.reduce((a,b)=>a+b,0)/paraLengths.length || 1);
-            const sentCV = Utils.calculateStdDev(paraSentCounts) / (paraSentCounts.reduce((a,b)=>a+b,0)/paraSentCounts.length || 1);
-            if (paraCV < 0.25 && paragraphs.length >= 3) {
-                scorer.add(75, "high");
-                matches.push({ type: "Paragraph Uniformity", snippet: `${paragraphs.length} paragraphs with suspiciously uniform length`, context: `Para CV: ${paraCV.toFixed(3)} — AI structures paragraphs like blocks`, weight: "high" });
-            }
-            if (sentCV < 0.2 && paraSentCounts.length >= 3) {
-                scorer.add(60, "medium");
-                matches.push({ type: "Sentence-Count Uniformity", snippet: `Each paragraph averages ~${(paraSentCounts.reduce((a,b)=>a+b,0)/paraSentCounts.length).toFixed(1)} sentences`, context: "AI allocates equal 'thought' per paragraph", weight: "medium" });
-            }
-        }
-
-        // --- D. Lexical Diversity (Type-Token Ratio) ---
-        const allWords = this.text.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
-        if (allWords.length > 50) {
-            // Sliding window TTR (more reliable than global TTR for long texts)
-            const windowSize = Math.min(50, allWords.length);
-            const windows = [];
-            for (let i = 0; i <= allWords.length - windowSize; i += Math.floor(windowSize / 2)) {
-                windows.push(this._ttr(allWords.slice(i, i + windowSize)));
-            }
-            const avgTTR = windows.reduce((a, b) => a + b, 0) / windows.length;
-            // AI tends to hover in a very tight TTR band (0.55-0.72) — too consistent
-            const ttrCV = Utils.calculateStdDev(windows) / (avgTTR || 1);
-            if (ttrCV < 0.04 && windows.length > 3) {
-                scorer.add(65, "medium");
-                matches.push({ type: "Lexical Repetition", snippet: `Vocabulary diversity is suspiciously consistent`, context: `TTR: ${avgTTR.toFixed(3)}, variance: ${ttrCV.toFixed(4)}`, weight: "medium" });
-            }
-            // Human writing has low TTR in very short texts and high in long; AI stays flat
-            if (avgTTR > 0.54 && avgTTR < 0.73 && allWords.length > 150) {
-                scorer.add(30, "low");
-                matches.push({ type: "TTR Band", snippet: `Type-Token Ratio: ${avgTTR.toFixed(3)}`, context: "Within AI's typical vocabulary band", weight: "low" });
-            }
-        }
-
-        // --- E. Opening word diversity (AI loves to start with "The", "This", "It", "One") ---
-        const openingWords = validSentences.map(s => s.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g,''));
-        const openingFreq = {};
-        openingWords.forEach(w => openingFreq[w] = (openingFreq[w] || 0) + 1);
-        const topOpener = Math.max(...Object.values(openingFreq));
-        const aiOpeners = ['the','this','it','one','by','these','when','while','in','as','for'];
-        const aiOpenCount = openingWords.filter(w => aiOpeners.includes(w)).length;
-        const aiOpenRatio = aiOpenCount / (openingWords.length || 1);
-        if (topOpener / validSentences.length > 0.2) {
-            scorer.add(55, "medium");
-            const topWord = Object.entries(openingFreq).sort((a,b)=>b[1]-a[1])[0];
-            matches.push({ type: "Opener Repetition", snippet: `"${topWord[0]}" starts ${topWord[1]}/${validSentences.length} sentences`, context: "Repetitive sentence openers", weight: "medium" });
-        }
-        if (aiOpenRatio > 0.6) {
-            scorer.add(45, "low");
-            matches.push({ type: "Passive Openers", snippet: `${(aiOpenRatio*100).toFixed(0)}% of sentences start with impersonal words`, context: "The/This/It/One — AI depersonalization", weight: "low" });
-        }
-
-        // --- F. Paragraph opener patterns (AI uses transition words to start paragraphs) ---
-        const paragraphOpeners = this.text.split(/\n\s*\n/).map(p => p.trim().split(/\s+/)[0]?.toLowerCase()).filter(Boolean);
-        const transitionOpeners = ['furthermore','additionally','moreover','however','conversely','similarly','notably','ultimately','consequently','therefore','thus','hence','overall','finally','in'];
-        const transOpenCount = paragraphOpeners.filter(w => transitionOpeners.includes(w)).length;
-        if (transOpenCount >= 2) {
-            scorer.add(60 + transOpenCount * 10, "high");
-            matches.push({ type: "Paragraph Transitions", snippet: `${transOpenCount} paragraphs begin with transition words`, context: "AI stitches paragraphs with logical connectors", weight: "high" });
-        }
-
-        return {
-            name: "Burstiness (Variance)",
-            score: Math.min(100, scorer.getScore()),
-            matches,
-            summary: cv < 0.32 ? `Mechanical uniformity detected (CV: ${cv.toFixed(2)}, midRatio: ${(midRatio*100).toFixed(0)}%)` : `Natural variance (CV: ${cv.toFixed(2)})`,
-            details: { cv, mean, stdDev, midRatio, totalWeight: scorer.totalWeight }
-        };
-    }
-}
-// --- 6. ANAPHORA & REPETITION ---
-class RepetitionAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        const sentences = Utils.splitSentences(this.text);
-        
-        // Check for consecutive sentences starting with the same word (Anaphora)
-        // AI tends to do this in "list-like" prose paragraphs.
-        for (let i = 1; i < sentences.length; i++) {
-            const s1 = sentences[i-1].trim();
-            const s2 = sentences[i].trim();
-            if (s1.length < 10 || s2.length < 10) continue; // Skip fragments
-
-            const w1 = s1.split(" ")[0].toLowerCase();
-            const w2 = s2.split(" ")[0].toLowerCase();
-            
-            const stopwords = ['the', 'a', 'an', 'in', 'on', 'it', 'if'];
-            
-            if (w1 === w2 && w1.length > 2 && !stopwords.includes(w1)) {
-                matches.push({
-                    type: "Anaphora",
-                    snippet: `...${s1.substring(0, 30)}... <br> ...<span class="match-highlight">${s2.substring(0, 30)}</span>...`,
-                    context: "Consecutive sentence starts",
-                    weight: "medium"
-                });
-            }
-        }
-        
-        if (matches.length > 1) scorer.add(70, "high");
-        else if (matches.length === 1) scorer.add(30, "medium");
-
-        return { 
-            name: "Repetitive Structures", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: matches.length ? "Repetitive sentence starts detected" : "Natural variance", 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 7. VAGUE AUTHORITY ---
-class VagueAuthorityAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        
-        // "Experts suggest...", "It is widely believed..."
-        PatternConfig.vagueAuthority.forEach(phrase => {
-            const regex = new RegExp(`\\b${phrase}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                matches.push({
-                    type: "Vague Authority",
-                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                    context: "Uncited claim attribution",
-                    weight: "high"
-                });
-            }
-        });
-        
-        if (matches.length > 0) scorer.add(60 + (matches.length * 10), "high");
-        
-        return { 
-            name: "Vague Authority", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: matches.length ? "Detected uncited authority claims" : "No vague sourcing", 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 8. PASSIVE VOICE VECTORS ---
-class PassiveVoiceAnalyzer {
-    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        // --- A. Classic passive voice (expanded past participle list) ---
-        const beVerbs = 'am|is|are|was|were|be|been|being|get|gets|got|gotten';
-        const pastParts = 'shown|seen|made|found|done|said|held|kept|observed|considered|understood|known|believed|thought|used|called|given|taken|needed|required|expected|considered|discussed|described|analyzed|examined|reviewed|evaluated|assessed|highlighted|noted|mentioned|stated|reported|suggested|indicated|demonstrated|confirmed|established|recognized|acknowledged|accepted|proposed|recommended|identified|determined|defined|characterized|classified|categorized|organized|structured|developed|created|designed|built|implemented|deployed|applied|conducted|performed|carried|achieved|completed|accomplished|produced|generated|provided|offered|presented|introduced|launched|released|published|updated|improved|enhanced|optimized|reduced|increased|expanded|extended|added|included|excluded|removed|replaced|changed|modified|adjusted|adapted|integrated|combined|merged|connected|linked|associated|related|attributed|assigned|allocated|distributed|shared|transferred|converted|transformed|translated|interpreted|explained|clarified|justified|supported|validated|verified|confirmed|approved|authorized|certified|licensed|regulated|controlled|monitored|tracked|measured|calculated|estimated|predicted|projected|forecasted|planned|scheduled|arranged|organized|managed|directed|led|guided|supported|facilitated|enabled|empowered|encouraged|motivated|inspired|influenced|affected|impacted|shaped|defined|determined|driven|caused|produced|triggered|initiated|started|continued|maintained|sustained|preserved|protected|secured|ensured';
-
-        const passiveRegex = new RegExp(`\\b(${beVerbs})\\s+(\\w+ly\\s+)?(${pastParts})\\b`, 'gi');
-        let passiveCount = 0;
-        let match;
-        while ((match = passiveRegex.exec(this.text)) !== null) {
-            passiveCount++;
-            if (matches.length < 5) {
-                matches.push({ type: "Passive Voice", snippet: Utils.extractSnippet(this.text, match[0], match.index), context: "Agent-less construction", weight: "low" });
-            }
-        }
-
-        // --- B. Nominalization detection (turning verbs into nouns — AI loves this) ---
-        // "the implementation of" instead of "implementing", "the achievement of" vs "achieving"
-        const nomSuffixes = /\bthe\s+\w+(?:tion|sion|ment|ance|ence|ity|ness|ism|al)\s+of\b/gi;
-        const nomMatches = this.text.match(nomSuffixes) || [];
-        nomMatches.slice(0,5).forEach(m => {
-            matches.push({ type: "Nominalization", snippet: `...${m}...`, context: "Verb converted to noun phrase", weight: "medium" });
-        });
-
-        // --- C. Agentless passive markers (things "being done" with no subject) ---
-        const agentlessRegex = /\b(it (?:has been|was|is|can be|should be|must be|will be|may be))\s+\w+(ed|en)\b/gi;
-        let agentlessCount = 0;
-        while ((match = agentlessRegex.exec(this.text)) !== null) {
-            agentlessCount++;
-            if (agentlessCount <= 3) {
-                matches.push({ type: "Agentless Passive", snippet: Utils.extractSnippet(this.text, match[0], match.index), context: '"It has been..." — AI dodges attribution', weight: "high" });
-            }
-        }
-
-        // --- D. Impersonal "one" usage ---
-        const impersonalOne = (this.text.match(/\bone\s+(?:can|could|should|must|might|may|will|would|has to|is able to)\b/gi) || []).length;
-        if (impersonalOne > 0) {
-            matches.push({ type: "Impersonal 'One'", snippet: `Used ${impersonalOne}× ("one can", "one should", etc.)`, context: "AI formality / depersonalization", weight: "medium" });
-        }
-
-        // Score aggregation
-        const passiveRatio = passiveCount / (this.wordCount || 1);
-        if (passiveRatio > 0.06) scorer.add(75, "high");
-        else if (passiveRatio > 0.04) scorer.add(50, "medium");
-        else if (passiveRatio > 0.02) scorer.add(25, "low");
-
-        if (nomMatches.length > 3) scorer.add(70, "high");
-        else if (nomMatches.length > 1) scorer.add(40, "medium");
-
-        if (agentlessCount > 2) scorer.add(80, "high");
-        else if (agentlessCount > 0) scorer.add(40, "medium");
-
-        if (impersonalOne > 1) scorer.add(50, "medium");
-
-        const totalInstances = passiveCount + nomMatches.length + agentlessCount + impersonalOne;
-
-        return {
-            name: "Passive & Nominalization",
-            score: Math.min(100, scorer.getScore()),
-            matches,
-            summary: `Passive: ${passiveCount} (${(passiveRatio*100).toFixed(1)}%), Nominalizations: ${nomMatches.length}, Agentless: ${agentlessCount}`,
-            details: { passiveCount, passiveRatio, nomCount: nomMatches.length, agentlessCount, totalWeight: scorer.totalWeight }
-        };
-    }
-}
-// --- 9. BURSTINESS (Mathematical Variance) ---
-
-// --- 10. REFUSAL & GUARDRAILS ---
-class RefusalAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        
-        PatternConfig.refusalHeaders.forEach(phrase => {
-            if(this.text.toLowerCase().includes(phrase.toLowerCase())) {
-                matches.push({ 
-                    type: "AI Guardrail", 
-                    snippet: phrase, 
-                    context: "Standard LLM refusal/apology", 
-                    weight: "critical" 
-                });
-                scorer.add(100, "critical");
-            }
-        });
-        
-        return { 
-            name: "AI Guardrails", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: matches.length ? "AI Safety signature found" : "No refusals found", 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 11. TRANSITION OVERLOAD ---
-class TransitionAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-        let count = 0;
-        
-        // "Furthermore", "In conclusion", "Conversely"
-        PatternConfig.transitionOverload.forEach(phrase => {
-            const regex = new RegExp(`\\b${phrase}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                count++;
-                if (matches.length < 8) {
-                    matches.push({ 
-                        type: "Coherence Marker", 
-                        snippet: Utils.extractSnippet(this.text, match[0], match.index), 
-                        context: "Forced logical bridging", 
-                        weight: "medium" 
+                if (corpCount > 2) {
+                    scorer.add(40, "medium");
+                    matches.push({
+                        type: "Corporate Style",
+                        snippet: `Detected ${corpCount} corporate emojis (🚀, ✨, etc)`,
+                        context: "Linked to AI 'helpful' tone",
+                        weight: "medium"
                     });
                 }
+
+                return { name: "Emoji Forensics", score: scorer.getScore(), matches, summary: `${this.emojis.length} emojis analyzed`, details: scorer.getDetails() };
             }
-        });
-        
-        // Humans use transitions, but AI uses them *constantly* to maintain flow.
-        if (count > 6) scorer.add(90, "high");
-        else if (count > 3) scorer.add(60, "medium");
-        
-        return { 
-            name: "Transition Overload", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: count > 3 ? "Abnormal transition density" : "Natural flow", 
-            details: scorer.getDetails() 
-        };
-    }
-}
+        }
 
-// --- 12. COGNITIVE LOAD (Academic/Hedging/FalseBalance) ---
-class CognitiveLoadAnalyzer {
-    constructor(text) { 
-        this.text = text; 
-        this.wordCount = Utils.countWords(text);
-    }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
+        // --- 3. STRUCTURAL RIGIDITY ---
+        class StructuralRigidityAnalyzer {
+            constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
 
-        const categories = [
-            { id: 'academicCosplay', label: 'Pseudo-Academic', weight: 'high', list: PatternConfig.academicCosplay },
-            { id: 'hedgingLanguage', label: 'Excessive Hedging', weight: 'medium', list: PatternConfig.hedgingLanguage },
-            { id: 'falseBalance', label: 'False Balance', weight: 'high', list: PatternConfig.falseBalance }
-        ];
+                // 1. Bullet Density
+                const bullets = (this.text.match(PatternConfig.structural.bulletDensity) || []).length;
+                if (bullets > 0 && (bullets / this.wordCount > 0.3)) {
+                    scorer.add(60, "high");
+                    matches.push({
+                        type: "List Density",
+                        snippet: "Text contains excessive bulleted lists (>30%)",
+                        context: "AI preference for structuring",
+                        weight: "high"
+                    });
+                }
 
-        let totalHits = 0;
+                // 2. Oxford Comma (Strict adherence)
+                const oxford = (this.text.match(/,\s+and\s+/gi) || []).length;
+                const noOxford = (this.text.match(/\s+and\s+(?!,)/gi) || []).length;
+                if (oxford > 3 && noOxford === 0) {
+                    scorer.add(40, "medium");
+                    matches.push({
+                        type: "Oxford Comma",
+                        snippet: "100% Oxford comma usage detected",
+                        context: "AI strictly adheres to grammar rules",
+                        weight: "medium"
+                    });
+                }
 
-        categories.forEach(cat => {
-            cat.list.forEach(phrase => {
-                const regex = new RegExp(`\\b${phrase}\\b`, "gi");
-                let match;
-                while ((match = regex.exec(this.text)) !== null) {
-                    totalHits++;
-                    if (matches.length < 15) {
+                // 3. Markdown Artifacts (**Text**:)
+                let boldColonMatch;
+                const boldColonRegex = /\*\*([A-Z][^*:]{1,40})\*\*:/g;
+                let bcCount = 0;
+                while((boldColonMatch = boldColonRegex.exec(this.text)) !== null) {
+                    bcCount++;
+                    if(bcCount <= 3) {
                         matches.push({
-                            type: cat.label,
-                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                            context: "Artificial Nuance / Safety",
-                            weight: cat.weight
+                            type: "Markdown Artifact",
+                            snippet: Utils.extractSnippet(this.text, boldColonMatch[0], boldColonMatch.index),
+                            context: "Standard GPT teaching pattern",
+                            weight: "high"
                         });
                     }
                 }
-            });
-        });
+                if(bcCount > 0) scorer.add(70, "high");
 
-        const density = totalHits / (this.wordCount || 1);
-        
-        if (density > 0.03) scorer.add(90, "high");
-        else if (density > 0.015) scorer.add(60, "medium");
-        else if (totalHits > 2) scorer.add(30, "low");
-
-        return { 
-            name: "Cognitive Load", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: totalHits > 0 ? `${totalHits} instances of artificial complexity` : "Natural tone complexity", 
-            details: scorer.getDetails() 
-        };
-    }
-}
-
-// --- 13. CORPORATE SPEAK & COMPOUND ADJECTIVES ---
-class CorporateSpeakAnalyzer {
-    constructor(text) { 
-        this.text = text; 
-    }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        // 1. Buzzwords
-        PatternConfig.buzzwordClusters.forEach(phrase => {
-            if (this.text.toLowerCase().includes(phrase.toLowerCase())) {
-                matches.push({
-                    type: "Buzzword Cluster",
-                    snippet: `...${phrase}...`,
-                    context: "High-probability LLM Cluster",
-                    weight: "critical"
-                });
-                scorer.add(100, "critical");
+                return { name: "Structural Rigidity", score: scorer.getScore(), matches, summary: "Structural patterns analyzed", details: scorer.getDetails() };
             }
-        });
+        }
 
-        // 2. Process Verbs ("Leverage", "Utilize")
-        let verbCount = 0;
-        PatternConfig.processVerbs.forEach(word => {
-            const regex = new RegExp(`\\b${word}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                verbCount++;
-                if (matches.length < 10) {
+        // --- 4. PUNCTUATION VECTORS ---
+        class PunctuationAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                // 1. Em-Dash vs Double Hyphen
+                const emDashes = (this.text.match(/—/g) || []).length;
+                const doubleHyphens = (this.text.match(/--/g) || []).length;
+                
+                // AI almost always uses Em-Dashes (—). Humans often type (--)
+                if (emDashes > 3 && doubleHyphens === 0) {
+                    scorer.add(30, "low");
                     matches.push({
-                        type: "Process Verb",
-                        snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                        context: "Corporate/Consultant Tone",
+                        type: "Punctuation Perfection",
+                        snippet: "Uses proper Em-Dashes (—) exclusively",
+                        context: "Mechanical formatting",
                         weight: "low"
                     });
                 }
-            }
-        });
 
-        // 3. Compound Adjectives ("Ever-evolving", "Fast-paced")
-        let compoundCount = 0;
-        PatternConfig.compoundAdjectives.forEach(word => {
-            const regex = new RegExp(`\\b${word}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                compoundCount++;
-                matches.push({
-                    type: "Compound Adjective",
-                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                    context: "Hyphenated AI Descriptor",
-                    weight: "medium"
+                return { name: "Punctuation Vectors", score: scorer.getScore(), matches, summary: "Punctuation consistency check", details: scorer.getDetails() };
+            }
+        }
+
+        // --- 5. BINARY PATTERN ANALYZER ---
+        class BinaryPatternAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                // Regex for "Not only/just/merely ... but/also ..."
+                const regex = /not (?:only|just|merely)[\s\S]{1,60}?(?:but|also)/gi;
+                let match;
+                while ((match = regex.exec(this.text)) !== null) {
+                    matches.push({
+                        type: "Binary Structure",
+                        snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                        context: "'Not just X, but Y' pattern",
+                        weight: "medium"
+                    });
+                }
+                if (matches.length > 0) scorer.add(40 + (matches.length * 10), "medium");
+
+                return { name: "Binary Rhetoric Patterns", score: scorer.getScore(), matches, summary: matches.length ? "Detected binary sentence structures" : "None detected", details: scorer.getDetails() };
+            }
+        }
+
+        // --- 6. ANAPHORA & REPETITION ---
+        class RepetitionAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                const sentences = Utils.splitSentences(this.text);
+                for (let i = 1; i < sentences.length; i++) {
+                    const prev = sentences[i-1].trim().split(" ")[0].toLowerCase();
+                    const curr = sentences[i].trim().split(" ")[0].toLowerCase();
+                    const stopwords = ['the', 'a', 'an', 'in', 'on', 'it'];
+                    if (prev === curr && prev.length > 2 && !stopwords.includes(prev)) {
+                        matches.push({
+                            type: "Anaphora",
+                            snippet: `...${sentences[i-1].substring(0, 30)}... <br> ...<span class="match-highlight">${sentences[i].substring(0, 20)}</span>...`,
+                            context: "Consecutive sentence starts",
+                            weight: "medium"
+                        });
+                    }
+                }
+                if (matches.length > 1) scorer.add(60, "medium");
+                return { name: "Repetitive Structures", score: scorer.getScore(), matches, summary: matches.length ? "Repetitive sentence starts" : "Variance looks natural", details: scorer.getDetails() };
+            }
+        }
+
+        // --- 7. VAGUE AUTHORITY ---
+        class VagueAuthorityAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                PatternConfig.vagueAuthority.forEach(phrase => {
+                    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        matches.push({
+                            type: "Vague Authority",
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Uncited claim attribution",
+                            weight: "high"
+                        });
+                    }
                 });
+                if (matches.length > 0) scorer.add(60, "high");
+                return { name: "Vague Authority Claims", score: scorer.getScore(), matches, summary: matches.length ? "Uncited authority detected" : "No vague sourcing", details: scorer.getDetails() };
             }
-        });
+        }
 
-        if (verbCount > 5) scorer.add(50, "medium");
-        if (compoundCount > 2) scorer.add(50, "medium");
+        // --- 8. PASSIVE VOICE ---
+        class PassiveVoiceAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                const regex = /\b(am|is|are|was|were|be|been|being)\s+(\w+ed|shown|seen|made|found|done|said|held|kept)\b/gi;
+                let match;
+                let count = 0;
+                while ((match = regex.exec(this.text)) !== null) {
+                    count++;
+                    if(matches.length < 5) {
+                        matches.push({
+                            type: "Passive Construction",
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Passive voice",
+                            weight: "low"
+                        });
+                    }
+                }
+                const ratio = count / (Utils.countWords(this.text) || 1);
+                if (ratio > 0.04) scorer.add(60, "medium");
+                return { name: "Passive Voice", score: scorer.getScore(), matches, summary: `${(ratio*100).toFixed(1)}% passive sentences`, details: scorer.getDetails() };
+            }
+        }
 
-        return { 
-            name: "Corporate Speak", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: matches.length ? "Detected 'Consultant' persona / Hyphenation" : "No corporate jargon", 
-            details: scorer.getDetails() 
-        };
-    }
-}
+        // --- 9. BURSTINESS ---
+        class BurstinessAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const sentences = Utils.splitSentences(this.text);
+                if (sentences.length < 3) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient data" };
+                const lengths = sentences.map(s => s.trim().split(/\s+/).length);
+                const stdDev = Utils.calculateStdDev(lengths);
+                const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+                const cv = stdDev / mean;
+                let score = 0;
+                let matches = [];
+                if (cv < 0.25) {
+                    score = 80;
+                    matches.push({ type: "Low Variance", snippet: "Sentence lengths are unnaturally uniform", context: `CV Score: ${cv.toFixed(2)} (Robotic)`, weight: "high" });
+                } else if (cv > 0.5) {
+                    score = -20;
+                    matches.push({ type: "High Variance", snippet: "Sentence lengths vary significantly", context: `CV Score: ${cv.toFixed(2)} (Human)`, weight: "bonus" });
+                }
+                return { name: "Burstiness (Variance)", score, matches, summary: cv < 0.3 ? "Mechanical uniformity" : "Natural variance", details: { cv } };
+            }
+        }
 
-// --- 14. META FILLER & LIST INTRODUCERS ---
-class MetaFillerAnalyzer {
-    constructor(text) { this.text = text; }
-    analyze() {
-        const scorer = new WeightedScorer();
-        const matches = [];
-
-        const fillers = [
-            ...PatternConfig.metaCommentary.map(p => ({ p, type: "Meta-Commentary" })),
-            ...PatternConfig.listIntroducers.map(p => ({ p, type: "List Introducer" }))
-        ];
-
-        let count = 0;
-        fillers.forEach(item => {
-            const regex = new RegExp(`\\b${item.p}\\b`, "gi");
-            let match;
-            while ((match = regex.exec(this.text)) !== null) {
-                count++;
-                matches.push({
-                    type: item.type,
-                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
-                    context: "Structural padding",
-                    weight: "medium"
+        // --- 10. REFUSAL ---
+        class RefusalAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                PatternConfig.refusalHeaders.forEach(phrase => {
+                    if(new RegExp(phrase, "i").test(this.text)) {
+                        matches.push({ type: "AI Refusal", snippet: phrase, context: "Standard LLM refusal", weight: "critical" });
+                        scorer.add(100, "critical");
+                    }
                 });
+                return { name: "AI Guardrails", score: scorer.getScore(), matches, summary: matches.length ? "AI Safety signature found" : "No refusals found", details: scorer.getDetails() };
             }
-        });
+        }
 
-        if (count > 2) scorer.add(50 + (count * 10), "high");
+        // --- 11. TRANSITION OVERLOAD ---
+        class TransitionAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                let count = 0;
+                PatternConfig.transitionOverload.forEach(phrase => {
+                    const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        count++;
+                        if (matches.length < 8) {
+                            matches.push({ type: "Coherence Marker", snippet: Utils.extractSnippet(this.text, match[0], match.index), context: "Forced logical bridging", weight: "medium" });
+                        }
+                    }
+                });
+                if (count > 5) scorer.add(80, "high");
+                else if (count > 2) scorer.add(40, "medium");
+                return { name: "Transition Overload", score: scorer.getScore(), matches, summary: count > 3 ? "Abnormal transition density" : "Natural flow", details: scorer.getDetails() };
+            }
+        }
 
-        return { 
-            name: "Structural Filler", 
-            score: scorer.getScore(), 
-            matches, 
-            summary: count > 0 ? "Detected structural padding" : "Concise structure", 
-            details: scorer.getDetails() 
-        };
-    }
-}
+        // --- 12. NEW: COGNITIVE LOAD ANALYZER (Academic/Hedging/FalseBalance) ---
+        class CognitiveLoadAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
 
-// --- RENDERER ---
-class ResultRenderer {
-    constructor() {
-        this.container = document.getElementById("modules-container");
-        this.scoreCircle = document.getElementById("score-circle");
-        this.scoreText = document.getElementById("score-text");
-        this.keyIndicators = document.getElementById("key-indicators");
-    }
-    
-    updateTotalScore(score) {
-        this.scoreText.innerText = `${score}%`;
-        let color, label;
-        if (score > 80) { color = "#ef4444"; label = "Likely AI-Generated"; }
-        else if (score > 50) { color = "#f97316"; label = "Mixed Signals / Edited"; }
-        else { color = "#22c55e"; label = "Likely Human-Written"; }
-        
-        this.scoreCircle.style.setProperty("--score-percent", `${score}%`);
-        this.scoreCircle.style.setProperty("--score-color", color);
-        this.scoreText.style.color = color;
-        
-        const confidenceEl = document.getElementById("confidence-text");
-        confidenceEl.innerText = label;
-        confidenceEl.style.color = color;
-    }
-    
-    renderModule(data) {
-        // Only show modules that found something, or had a high score
-        if (data.matches.length === 0 && data.score < 20) return;
-        
-        const wrapper = document.createElement("div");
-        wrapper.className = "border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm";
-        
-        const headerColor = data.score > 50 ? "bg-red-50" : (data.score > 0 ? "bg-orange-50" : "bg-green-50");
-        const textColor = data.score > 50 ? "text-red-700" : (data.score > 0 ? "text-orange-700" : "text-green-700");
-        const barColor = data.score > 50 ? "bg-red-500" : "bg-green-500";
+                const categories = [
+                    { id: 'academicCosplay', label: 'Pseudo-Academic', weight: 'high', list: PatternConfig.academicCosplay },
+                    { id: 'hedgingLanguage', label: 'Excessive Hedging', weight: 'medium', list: PatternConfig.hedgingLanguage },
+                    { id: 'falseBalance', label: 'False Balance', weight: 'high', list: PatternConfig.falseBalance }
+                ];
 
-        const itemsHtml = data.matches.map(m => `
-            <div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">${m.type}</span>
-                    <span class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-600">${m.context}</span>
-                </div>
-                <div class="snippet-box p-2 rounded text-slate-700 bg-slate-50">${m.snippet}</div>
-            </div>
-        `).join("");
+                let totalHits = 0;
 
-        wrapper.innerHTML = `
-            <div class="category-header p-4 flex justify-between items-center ${headerColor}" onclick="this.nextElementSibling.classList.toggle('open')">
-                <div class="flex items-center gap-3">
-                    <div class="w-1.5 h-8 rounded-full ${barColor}"></div>
-                    <div>
-                        <h3 class="font-bold text-slate-800">${data.name}</h3>
-                        <p class="text-xs text-slate-500">${data.matches.length} findings</p>
+                categories.forEach(cat => {
+                    cat.list.forEach(phrase => {
+                        const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                        let match;
+                        while ((match = regex.exec(this.text)) !== null) {
+                            totalHits++;
+                            if (matches.length < 15) {
+                                matches.push({
+                                    type: cat.label,
+                                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                    context: "Artificial Nuance/Complexity",
+                                    weight: cat.weight
+                                });
+                            }
+                        }
+                    });
+                });
+
+                // Scoring Logic: Academic language in non-academic contexts is a strong signal
+                const density = totalHits / (this.wordCount || 1);
+                
+                if (density > 0.02) scorer.add(85, "high");
+                else if (density > 0.01) scorer.add(50, "medium");
+                else if (totalHits > 2) scorer.add(20, "low");
+
+                return { 
+                    name: "Cognitive Load", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: totalHits > 0 ? `${totalHits} instances of artificial complexity` : "Natural tone complexity", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- 13. NEW: CORPORATE SPEAK ANALYZER (Buzzwords/Process Verbs) ---
+        class CorporateSpeakAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                // Buzzwords are critical indicators of LLM training data bias
+                PatternConfig.buzzwordClusters.forEach(phrase => {
+                    if (this.text.toLowerCase().includes(phrase.toLowerCase())) {
+                        matches.push({
+                            type: "Buzzword Cluster",
+                            snippet: `...${phrase}...`,
+                            context: "High-probability LLM Cluster",
+                            weight: "critical"
+                        });
+                        scorer.add(100, "critical");
+                    }
+                });
+
+                // Process verbs (utilize, leverage) are common, but high density indicates AI
+                let verbCount = 0;
+                PatternConfig.processVerbs.forEach(word => {
+                    const regex = new RegExp(`\\b${word}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        verbCount++;
+                        if (matches.length < 10) {
+                            matches.push({
+                                type: "Process Verb",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "Corporate/Consultant Tone",
+                                weight: "low"
+                            });
+                        }
+                    }
+                });
+
+                if (verbCount > 5) scorer.add(60, "medium");
+
+                return { 
+                    name: "Corporate Speak", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: matches.length ? "Detected 'Consultant' persona" : "No corporate jargon", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- 14. NEW: META FILLER ANALYZER (Meta Commentary/List Introducers) ---
+        class MetaFillerAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                const fillers = [
+                    ...PatternConfig.metaCommentary.map(p => ({ p, type: "Meta-Commentary" })),
+                    ...PatternConfig.listIntroducers.map(p => ({ p, type: "List Introducer" }))
+                ];
+
+                let count = 0;
+                fillers.forEach(item => {
+                    const regex = new RegExp(`\\b${item.p}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        count++;
+                        matches.push({
+                            type: item.type,
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Structural padding",
+                            weight: "medium"
+                        });
+                    }
+                });
+
+                if (count > 2) scorer.add(40 + (count * 10), "high");
+
+                return { 
+                    name: "Structural Filler", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: count > 0 ? "Detected structural padding phrases" : "Concise structure", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- RENDERER ---
+        class ResultRenderer {
+            constructor() {
+                this.container = document.getElementById("modules-container");
+                this.scoreCircle = document.getElementById("score-circle");
+                this.scoreText = document.getElementById("score-text");
+                this.keyIndicators = document.getElementById("key-indicators");
+            }
+            updateTotalScore(score) {
+                this.scoreText.innerText = `${score}%`;
+                let color, label;
+                if (score > 80) { color = "#ef4444"; label = "Likely AI-Generated"; }
+                else if (score > 50) { color = "#f97316"; label = "Mixed Signals / Edited"; }
+                else { color = "#22c55e"; label = "Likely Human-Written"; }
+                this.scoreCircle.style.setProperty("--score-percent", `${score}%`);
+                this.scoreCircle.style.setProperty("--score-color", color);
+                this.scoreText.style.color = color;
+                document.getElementById("confidence-text").innerText = label;
+                document.getElementById("confidence-text").style.color = color;
+            }
+            renderModule(data) {
+                if (data.matches.length === 0 && data.score < 20) return;
+                const wrapper = document.createElement("div");
+                wrapper.className = "border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm";
+                const headerColor = data.score > 50 ? "bg-red-50" : (data.score > 0 ? "bg-orange-50" : "bg-green-50");
+                const textColor = data.score > 50 ? "text-red-700" : (data.score > 0 ? "text-orange-700" : "text-green-700");
+                const itemsHtml = data.matches.map(m => `
+                    <div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">${m.type}</span>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-600">${m.context}</span>
+                        </div>
+                        <div class="snippet-box p-2 rounded text-slate-700 bg-slate-50">${m.snippet}</div>
                     </div>
-                </div>
-                <span class="font-bold text-lg ${textColor}">${Math.round(data.score)}%</span>
-            </div>
-            <div class="category-content bg-white ${data.score > 70 ? 'open' : ''}">
-                <p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${data.summary}</p>
-                <div class="max-h-96 overflow-y-auto">${itemsHtml}</div>
-            </div>
-        `;
-        
-        this.container.appendChild(wrapper);
-        
-        // Add to "Key Indicators" list if it's a strong signal
-        if (data.score > 60 || data.matches.some(m => m.weight === 'critical')) {
-            const li = document.createElement("li");
-            li.className = "text-sm text-slate-600 border-l-2 border-red-400 pl-2 mb-2";
-            li.innerHTML = `<strong>${data.name}:</strong> ${data.summary}`;
-            this.keyIndicators.appendChild(li);
-        }
-    }
-    
-    clear() {
-        this.container.innerHTML = "";
-        this.keyIndicators.innerHTML = "";
-        document.getElementById("results-area").classList.add("hidden");
-        this.scoreCircle.style.setProperty("--score-percent", "0%");
-        this.scoreText.innerText = "0%";
-    }
-    
-    show() { document.getElementById("results-area").classList.remove("hidden"); }
-}
-
-// --- APP CONTROLLER ---
-class App {
-    constructor() {
-        this.editor = document.getElementById("editor");
-        this.analyzeBtn = document.getElementById("analyze-btn");
-        this.clearBtn = document.getElementById("clear-btn");
-        this.wordCountEl = document.getElementById("word-count");
-        this.renderer = new ResultRenderer();
-        this.bindEvents();
-    }
-    
-    bindEvents() {
-        this.editor.addEventListener("input", () => {
-            const text = Utils.htmlToText(this.editor.innerHTML);
-            const words = Utils.countWords(text);
-            this.wordCountEl.innerText = `${words} words`;
-            
-            if (words >= PatternConfig.thresholds.minWords) {
-                this.analyzeBtn.disabled = false;
-                this.analyzeBtn.classList.remove("opacity-50", "cursor-not-allowed");
-            } else {
-                this.analyzeBtn.disabled = true;
-                this.analyzeBtn.classList.add("opacity-50", "cursor-not-allowed");
+                `).join("");
+                wrapper.innerHTML = `
+                    <div class="category-header p-4 flex justify-between items-center ${headerColor}" onclick="this.nextElementSibling.classList.toggle('open')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-1.5 h-8 rounded-full ${data.score > 50 ? 'bg-red-500' : 'bg-green-500'}"></div>
+                            <div>
+                                <h3 class="font-bold text-slate-800">${data.name}</h3>
+                                <p class="text-xs text-slate-500">${data.matches.length} findings</p>
+                            </div>
+                        </div>
+                        <span class="font-bold text-lg ${textColor}">${Math.round(data.score)}%</span>
+                    </div>
+                    <div class="category-content bg-white">
+                        <p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${data.summary}</p>
+                        <div class="max-h-96 overflow-y-auto">${itemsHtml}</div>
+                    </div>
+                `;
+                this.container.appendChild(wrapper);
+                if (data.score > 60 || data.matches.some(m => m.weight === 'critical')) {
+                    const li = document.createElement("li");
+                    li.className = "text-sm text-slate-600 border-l-2 border-red-400 pl-2";
+                    li.innerHTML = `<strong>${data.name}:</strong> ${data.summary}`;
+                    this.keyIndicators.appendChild(li);
+                }
             }
-        });
-        
-        this.clearBtn.addEventListener("click", () => {
-            this.editor.innerHTML = "";
-            this.renderer.clear();
-            this.wordCountEl.innerText = "0 words";
-            this.analyzeBtn.disabled = true;
-        });
-        
-        this.analyzeBtn.addEventListener("click", () => this.runAnalysis());
-    }
-    
-    runAnalysis() {
-        this.renderer.clear();
-        const rawHtml = this.editor.innerHTML;
-        const text = Utils.htmlToText(rawHtml);
-        
-        const analyzers = [
-            new RefusalAnalyzer(text),
-            new GPTLexiconAnalyzer(text),
-            new TransitionAnalyzer(text),
-            new VagueAuthorityAnalyzer(text),
-            new RepetitionAnalyzer(text),
-            new PassiveVoiceAnalyzer(text),
-            new BurstinessAnalyzer(text),
-            new EmojiAnalyzer(text),
-            new StructuralRigidityAnalyzer(text),
-            new PunctuationAnalyzer(text),
-            new BinaryPatternAnalyzer(text),
-            new CognitiveLoadAnalyzer(text),
-            new CorporateSpeakAnalyzer(text),
-            new MetaFillerAnalyzer(text)
-        ];
-        
-        // WITH THIS:
-const totalScorer = new WeightedScorer();
-
-// Module importance tiers for final aggregation
-const moduleTiers = {
-    "AI Guardrails": "critical",
-    "Structural Rigidity": "critical",
-    "Corporate Speak": "high",
-    "Vocabulary Patterns": "high",
-    "Transition Overload": "high",
-    "Burstiness (Variance)": "high",
-    "Cognitive Load": "medium",
-    "Vague Authority": "medium",
-    "Structural Filler": "medium",
-    "Passive & Nominalization": "medium",
-    "Repetitive Structures": "medium",
-    "Binary Rhetoric": "low",
-    "Punctuation Vectors": "low",
-    "Emoji Forensics": "low",
-};
-
-const results = analyzers.map(a => {
-    const res = a.analyze();
-    const tier = moduleTiers[res.name] || "medium";
-    // Only include modules that have actual findings (avoids noise from zero-match modules)
-    if (res.score > 0 || (res.details && res.details.totalWeight > 0)) {
-        totalScorer.add(res.score, tier);
-    }
-    return res;
-});
-        // Render results to UI
-        results.forEach(res => this.renderer.renderModule(res));
-
-        let finalScore = totalScorer.getScore();
-        
-        // Final sanity check: If text is too short, cap detection confidence to avoid false positives.
-        if (Utils.countWords(text) < 40 && finalScore > 0) {
-            // Keep the score but the UI will show "Mixed Signals" naturally via the renderer logic
-            // Optionally could dampen here: finalScore *= 0.8;
+            clear() {
+                this.container.innerHTML = "";
+                this.keyIndicators.innerHTML = "";
+                document.getElementById("results-area").classList.add("hidden");
+                this.scoreCircle.style.setProperty("--score-percent", "0%");
+                this.scoreText.innerText = "0%";
+            }
+            show() { document.getElementById("results-area").classList.remove("hidden"); }
         }
 
-        this.renderer.updateTotalScore(Math.round(finalScore));
-        this.renderer.show();
-    }
-}
+        // --- APP ---
+        class App {
+            constructor() {
+                this.editor = document.getElementById("editor");
+                this.analyzeBtn = document.getElementById("analyze-btn");
+                this.clearBtn = document.getElementById("clear-btn");
+                this.wordCountEl = document.getElementById("word-count");
+                this.renderer = new ResultRenderer();
+                this.bindEvents();
+            }
+            bindEvents() {
+                this.editor.addEventListener("input", () => {
+                    const text = Utils.htmlToText(this.editor.innerHTML);
+                    const words = Utils.countWords(text);
+                    this.wordCountEl.innerText = `${words} words`;
+                    this.analyzeBtn.disabled = words < PatternConfig.thresholds.minWords;
+                    if(words >= PatternConfig.thresholds.minWords) this.analyzeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+                    else this.analyzeBtn.classList.add("opacity-50", "cursor-not-allowed");
+                });
+                this.clearBtn.addEventListener("click", () => {
+                    this.editor.innerHTML = "";
+                    this.renderer.clear();
+                    this.wordCountEl.innerText = "0 words";
+                    this.analyzeBtn.disabled = true;
+                });
+                this.analyzeBtn.addEventListener("click", () => this.runAnalysis());
+            }
+            runAnalysis() {
+                this.renderer.clear();
+                const rawHtml = this.editor.innerHTML;
+                const text = Utils.htmlToText(rawHtml);
+                const analyzers = [
+                    new RefusalAnalyzer(text),
+                    new GPTLexiconAnalyzer(text),
+                    new TransitionAnalyzer(text),
+                    new VagueAuthorityAnalyzer(text),
+                    new RepetitionAnalyzer(text),
+                    new PassiveVoiceAnalyzer(text),
+                    new BurstinessAnalyzer(text),
+                    new EmojiAnalyzer(text),
+                    new StructuralRigidityAnalyzer(text),
+                    new PunctuationAnalyzer(text),
+                    new BinaryPatternAnalyzer(text),
+                    // NEW INTEGRATIONS
+                    new CognitiveLoadAnalyzer(text),
+                    new CorporateSpeakAnalyzer(text),
+                    new MetaFillerAnalyzer(text)
+                ];
+                const results = analyzers.map(a => a.analyze());
+                const totalScorer = new WeightedScorer();
+                results.forEach(res => {
+                    this.renderer.renderModule(res);
+                    if (res.details && res.details.totalWeight > 0) {
+                        const weight = res.matches.some(m => m.weight === 'critical') ? 'critical' : 'medium';
+                        totalScorer.add(res.score, weight);
+                    }
+                });
+                let finalScore = totalScorer.getScore();
+                if (Utils.countWords(text) < 50) finalScore = Math.min(finalScore, 85);
+                this.renderer.updateTotalScore(Math.round(finalScore));
+                this.renderer.show();
+            }
+        }
+        document.addEventListener("DOMContentLoaded", () => new App());
 
-document.addEventListener("DOMContentLoaded", () => new App());
-   
-            </script>
+    </script>
 </body>
 </html>
