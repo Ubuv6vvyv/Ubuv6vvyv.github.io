@@ -619,30 +619,97 @@ overflow: auto;
 
         // --- 4. PUNCTUATION VECTORS ---
         class PunctuationAnalyzer {
-            constructor(text) { this.text = text; }
-            analyze() {
-                const scorer = new WeightedScorer();
-                const matches = [];
+    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+    analyze() {
+        const scorer = new WeightedScorer();
+        const matches = [];
 
-                // 1. Em-Dash vs Double Hyphen
-                const emDashes = (this.text.match(/—/g) || []).length;
-                const doubleHyphens = (this.text.match(/--/g) || []).length;
-                
-                // AI almost always uses Em-Dashes (—). Humans often type (--)
-                if (emDashes > 3 && doubleHyphens === 0) {
-                    scorer.add(30, "low");
-                    matches.push({
-                        type: "Punctuation Perfection",
-                        snippet: "Uses proper Em-Dashes (—) exclusively",
-                        context: "Mechanical formatting",
-                        weight: "low"
-                    });
-                }
+        // --- A. Em-Dash (—) vs double-hyphen / spaced hyphen ---
+        const emDashes = (this.text.match(/—/g) || []).length;
+        const doubleHyphens = (this.text.match(/--/g) || []).length;
+        const spacedHyphens = (this.text.match(/ - /g) || []).length;
+        if (emDashes > 1 && doubleHyphens === 0 && spacedHyphens === 0) {
+            scorer.add(40, "low");
+            matches.push({ type: "Em-Dash Precision", snippet: `${emDashes}× proper em-dashes (—), zero informal dashes`, context: "Humans type -- or ' - ', AI outputs —", weight: "low" });
+        }
 
-                return { name: "Punctuation Vectors", score: scorer.getScore(), matches, summary: "Punctuation consistency check", details: scorer.getDetails() };
+        // --- B. Curly/Smart quotes vs straight quotes ---
+        // AI outputs from text editors often keep straight, but raw LLM output uses typographic
+        const smartQuotes = (this.text.match(/[\u2018\u2019\u201C\u201D]/g) || []).length;
+        const straightQuotes = (this.text.match(/["']/g) || []).length;
+        if (smartQuotes > 2 && straightQuotes < smartQuotes) {
+            scorer.add(30, "low");
+            matches.push({ type: "Typographic Quotes", snippet: `${smartQuotes} smart/curly quotes detected`, context: "AI text-generation often outputs typographic quotes", weight: "low" });
+        }
+
+        // --- C. Oxford Comma consistency ---
+        const oxford = (this.text.match(/,\s+(?:and|or)\s+\w/gi) || []).length;
+        const noOxford = (this.text.match(/\b\w+,\s+\w+\s+(?:and|or)\s+\w/gi) || []).length;
+        if (oxford > 3 && noOxford === 0) {
+            scorer.add(20, "low");
+            matches.push({ type: "Oxford Comma Lock", snippet: `${oxford} serial commas, zero omissions`, context: "100% grammatical consistency — algorithmic", weight: "low" });
+        }
+
+        // --- D. Colon overuse (AI loves colons to introduce lists/elaborations) ---
+        const colons = (this.text.match(/:\s/g) || []).length;
+        const colonDensity = colons / (this.wordCount / 100);
+        if (colonDensity > 2.5) {
+            scorer.add(55, "medium");
+            matches.push({ type: "Colon Overuse", snippet: `${colons} colons per ${this.wordCount} words (${colonDensity.toFixed(1)}/100)`, context: "AI introduces every elaboration with a colon", weight: "medium" });
+        }
+
+        // --- E. Semicolon absence (AI rarely uses semicolons; humans use them inconsistently) ---
+        const semicolons = (this.text.match(/;/g) || []).length;
+        if (this.wordCount > 200 && semicolons === 0 && colons > 3) {
+            scorer.add(25, "low");
+            matches.push({ type: "Semicolon Absence", snippet: `0 semicolons in ${this.wordCount}-word text`, context: "AI prefers periods and colons over semicolons", weight: "low" });
+        }
+
+        // --- F. Ellipsis style (...) vs (…) ---
+        const unicodeEllipsis = (this.text.match(/…/g) || []).length;
+        const triDot = (this.text.match(/\.\.\./g) || []).length;
+        if (unicodeEllipsis > 0 && triDot === 0) {
+            scorer.add(20, "low");
+            matches.push({ type: "Unicode Ellipsis", snippet: `${unicodeEllipsis}× unicode ellipsis (…) with no typed (...)`, context: "Typographic precision signals LLM origin", weight: "low" });
+        }
+
+        // --- G. Sentence-ending punctuation variety ---
+        const exclamations = (this.text.match(/!/g) || []).length;
+        const questions = (this.text.match(/\?/g) || []).length;
+        const periods = (this.text.match(/\./g) || []).length;
+        const totalEndPunct = exclamations + questions + periods;
+        if (totalEndPunct > 5) {
+            const exclamRatio = exclamations / totalEndPunct;
+            const questionRatio = questions / totalEndPunct;
+            // AI avoids exclamations in formal mode; uses them formulaically in casual
+            if (exclamRatio === 0 && this.wordCount > 150) {
+                scorer.add(20, "low");
+                matches.push({ type: "Zero Exclamations", snippet: `No exclamation marks in ${this.wordCount} words`, context: "Formal AI prose avoids emotional punctuation", weight: "low" });
+            }
+            // AI almost never uses rhetorical questions in expository text
+            if (questionRatio === 0 && this.wordCount > 200) {
+                scorer.add(15, "low");
+                matches.push({ type: "Zero Questions", snippet: `No question marks — entirely declarative`, context: "Humans use rhetorical questions; AI states", weight: "low" });
             }
         }
 
+        // --- H. Parenthetical density (AI overuses parentheticals for "helpful context") ---
+        const parens = (this.text.match(/\([^)]{5,60}\)/g) || []).length;
+        const parenDensity = parens / (this.wordCount / 100);
+        if (parenDensity > 1.5) {
+            scorer.add(35, "medium");
+            matches.push({ type: "Parenthetical Overuse", snippet: `${parens} parenthetical asides detected`, context: "AI adds clarifying asides mechanically", weight: "medium" });
+        }
+
+        return {
+            name: "Punctuation Vectors",
+            score: Math.min(100, scorer.getScore()),
+            matches,
+            summary: `Em-dashes: ${emDashes}, Colons: ${colons}, Parentheticals: ${parens}`,
+            details: { emDashes, colons, semicolons, parens, totalWeight: scorer.totalWeight }
+        };
+    }
+}
         // --- 5. BINARY PATTERN ANALYZER ---
         class BinaryPatternAnalyzer {
             constructor(text) { this.text = text; }
