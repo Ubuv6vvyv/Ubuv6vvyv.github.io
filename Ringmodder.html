@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ring Mod FX Processor</title>
+<style>
+:root{--bg:#0a0a0f;--srf:#141420;--srf2:#1c1c2c;--acc:#a06bff;--acc2:#ff6bb5;--grn:#3dffa0;--dim:#555577;--txt:#e8e8f8;--sub:#8888aa;--brd:#252538}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:10px}
+.wrap{max-width:900px;margin:0 auto}
+h1{text-align:center;font-size:1em;letter-spacing:4px;text-transform:uppercase;color:var(--acc);padding:14px 0 10px;font-weight:600}
+#dz{border:1.5px dashed var(--brd);border-radius:10px;padding:22px 16px;text-align:center;cursor:pointer;transition:.25s;margin-bottom:10px;background:rgba(160,107,255,.04)}
+#dz.over,#dz:hover{background:rgba(160,107,255,.1);border-color:var(--acc)}
+#dz .dzl{color:var(--sub);font-size:.9em;pointer-events:none}
+#dz .dzl strong{color:var(--acc)}
+#dzf{color:var(--grn);font-size:.85em;margin-top:4px;font-weight:600;display:none}
+#fi{display:none}
+#wf{width:100%;height:70px;background:#080810;border-radius:8px;margin-bottom:10px;border:1px solid var(--brd);overflow:hidden}
+.transport{display:grid;grid-template-columns:2fr 1fr 2fr;gap:8px;margin-bottom:12px}
+.tbtn{border:none;border-radius:7px;padding:11px 8px;font-size:.78em;font-weight:700;cursor:pointer;transition:.18s;text-transform:uppercase;letter-spacing:.5px}
+.tbtn:disabled{opacity:.3;cursor:not-allowed}
+#bplay{background:var(--acc);color:#fff}
+#bplay:not(:disabled):hover{background:#b87fff}
+#breset{background:var(--srf2);color:var(--sub);border:1px solid var(--brd)}
+#breset:not(:disabled):hover{color:var(--txt);border-color:var(--acc)}
+#brender{background:var(--grn);color:#000}
+#brender:not(:disabled):hover{background:#5fffc0}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.pb{flex:1;min-width:70px;padding:8px 6px;font-size:.7em;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:var(--srf);color:var(--dim);border:1px solid var(--brd);border-radius:6px;cursor:pointer;transition:.18s}
+.pb:hover{color:var(--acc);border-color:var(--acc)}
+.pb.active{color:var(--acc);border-color:var(--acc);background:rgba(160,107,255,.1)}
+.macro-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.macro{background:var(--srf);border:1px solid var(--brd);border-radius:9px;padding:10px 8px;text-align:center;transition:.18s}
+.macro.on{border-color:var(--acc);background:rgba(160,107,255,.08)}
+.macro-name{font-size:.62em;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--sub);margin-bottom:4px}
+.macro.on .macro-name{color:var(--acc)}
+.macro-val{font-size:1.25em;font-weight:700;color:var(--txt);margin-bottom:4px}
+.macro input[type=range]{width:100%;accent-color:var(--acc)}
+.macro-hint{font-size:.58em;color:var(--dim);margin-top:3px;line-height:1.3}
+.mod{background:var(--srf);border:1px solid var(--brd);border-radius:9px;padding:12px;margin-bottom:9px}
+.mhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--brd)}
+.mtitle{font-size:.75em;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--acc)}
+.mwet{display:flex;align-items:center;gap:7px;font-size:.72em;color:var(--sub)}
+.mwet input{width:90px;accent-color:var(--acc2)}
+.mwet span{color:var(--acc2);font-weight:700;min-width:32px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ci{display:flex;flex-direction:column;gap:4px}
+.cl{display:flex;justify-content:space-between;font-size:.72em}
+.cl .nm{color:var(--sub);font-weight:600}
+.cl .vl{color:var(--txt);font-weight:700}
+input[type=range]{width:100%;accent-color:var(--acc);height:20px;cursor:pointer}
+select{width:100%;padding:5px 6px;background:var(--bg);color:var(--acc);border:1px solid var(--brd);border-radius:5px;font-size:.78em;font-weight:700;outline:none;cursor:pointer}
+.hint{font-size:.62em;color:var(--dim);line-height:1.4;margin-top:1px}
+.vu-wrap{display:flex;gap:2px;height:6px;margin-bottom:10px;border-radius:4px;overflow:hidden}
+.vu-bar{flex:1;background:var(--brd);border-radius:1px;transition:background .04s}
+#status{text-align:center;font-size:.8em;font-weight:600;color:var(--grn);min-height:16px;margin-top:8px;letter-spacing:.3px}
+@media(max-width:600px){.macro-row{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:380px){.grid3{grid-template-columns:1fr}}
+</style>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+<div class="wrap">
+<h1>&#9672; Ring Mod FX Processor</h1>
+
+<div id="dz">
+  <div class="dzl">Drop a track here or <strong>tap to load audio</strong></div>
+  <div id="dzf"></div>
+  <input type="file" id="fi" accept="audio/*">
+</div>
+
+<div id="wf"></div>
+<div class="vu-wrap" id="vu"></div>
+
+<div class="transport">
+  <button class="tbtn" id="bplay" disabled>&#9654; Play</button>
+  <button class="tbtn" id="breset" disabled>&#8635; Reset</button>
+  <button class="tbtn" id="brender" disabled>&#11015; Render</button>
+</div>
+
+<div class="presets">
+  <button class="pb" data-p="warm">Warm Robot</button>
+  <button class="pb" data-p="vowel">Vowel Drag</button>
+  <button class="pb" data-p="smooth">Smooth Daft</button>
+  <button class="pb" data-p="deep">Deep Metal</button>
+  <button class="pb" data-p="pulse">Pulse EDM</button>
+  <button class="pb" data-p="alien">Alien</button>
+</div>
+
+<div class="macro-row">
+  <div class="macro" id="mac-robot">
+    <div class="macro-name">Robot</div>
+    <div class="macro-val" id="mv-robot">0%</div>
+    <input type="range" id="ms-robot" min="0" max="1" value="0" step=".01" disabled>
+    <div class="macro-hint">Ring mod intensity</div>
+  </div>
+  <div class="macro" id="mac-warmth">
+    <div class="macro-name">Warmth</div>
+    <div class="macro-val" id="mv-warmth">0%</div>
+    <input type="range" id="ms-warmth" min="0" max="1" value="0" step=".01" disabled>
+    <div class="macro-hint">Soft saturation</div>
+  </div>
+  <div class="macro" id="mac-vowel">
+    <div class="macro-name">Vowel</div>
+    <div class="macro-val" id="mv-vowel">0%</div>
+    <input type="range" id="ms-vowel" min="0" max="1" value="0" step=".01" disabled>
+    <div class="macro-hint">Formant sweep</div>
+  </div>
+  <div class="macro" id="mac-pulse">
+    <div class="macro-name">Pulse</div>
+    <div class="macro-val" id="mv-pulse">0%</div>
+    <input type="range" id="ms-pulse" min="0" max="1" value="0" step=".01" disabled>
+    <div class="macro-hint">AM throb depth</div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd">
+    <div class="mtitle">&#9899; Ring Modulator</div>
+    <div class="mwet">Wet <input type="range" id="s-rmmix" min="0" max="1" value="0" step=".01" disabled><span id="v-rmmix">0%</span></div>
+  </div>
+  <div class="grid3">
+    <div class="ci">
+      <div class="cl"><span class="nm">Waveform</span></div>
+      <select id="s-rmwave" disabled>
+        <option value="sine" selected>Sine — smooth / warm</option>
+        <option value="triangle">Triangle — hollow / soft</option>
+        <option value="square">Square — dalek / harsh</option>
+        <option value="sawtooth">Sawtooth — gritty / brass</option>
+      </select>
+      <div class="hint">Sine = warmest. Square = most robotic.</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Carrier Frequency</span><span class="vl" id="v-rmfreq">60 Hz</span></div>
+      <input type="range" id="s-rmfreq" min="10" max="1200" value="60" step="1" disabled>
+      <div class="hint">20–80 warm rumble &middot; 100–300 metallic &middot; 300+ alien</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Fine Tune (beat)</span><span class="vl" id="v-rmfine">+0.0 Hz</span></div>
+      <input type="range" id="s-rmfine" min="-20" max="20" value="0" step=".1" disabled>
+      <div class="hint">Slight detuning creates organic pulsing/beating</div>
+    </div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd">
+    <div class="mtitle">&#9675; Formant / Vowel Filter</div>
+    <div class="mwet">Wet <input type="range" id="s-fmix" min="0" max="1" value="0" step=".01" disabled><span id="v-fmix">0%</span></div>
+  </div>
+  <div class="grid3">
+    <div class="ci">
+      <div class="cl"><span class="nm">Frequency</span><span class="vl" id="v-ffreq">500 Hz</span></div>
+      <input type="range" id="s-ffreq" min="80" max="3500" value="500" step="5" disabled>
+      <div class="hint">80–300 chest &middot; 400–900 mid vowel &middot; 1k–3k bright</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Resonance Q</span><span class="vl" id="v-fq">2.0</span></div>
+      <input type="range" id="s-fq" min="0.3" max="18" value="2" step=".1" disabled>
+      <div class="hint">Higher = more pronounced vowel character</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">LFO Sweep Rate</span><span class="vl" id="v-flfo">0.00 Hz</span></div>
+      <input type="range" id="s-flfo" min="0" max="4" value="0" step=".01" disabled>
+      <div class="hint">Slow = vowel dragging / talking motion</div>
+    </div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd">
+    <div class="mtitle">&#126; Vibration (AM / FM)</div>
+    <div class="mwet">Wet <input type="range" id="s-vibmix" min="0" max="1" value="0" step=".01" disabled><span id="v-vibmix">0%</span></div>
+  </div>
+  <div class="grid3">
+    <div class="ci">
+      <div class="cl"><span class="nm">Tremolo Rate</span><span class="vl" id="v-amrate">4 Hz</span></div>
+      <input type="range" id="s-amrate" min="0.1" max="30" value="4" step=".1" disabled>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Tremolo Depth (AM)</span><span class="vl" id="v-amdepth">0%</span></div>
+      <input type="range" id="s-amdepth" min="0" max="1" value="0" step=".01" disabled>
+      <div class="hint">Volume pulsing / throbbing</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Vibrato Depth (FM)</span><span class="vl" id="v-fmdepth">0%</span></div>
+      <input type="range" id="s-fmdepth" min="0" max="1" value="0" step=".01" disabled>
+      <div class="hint">Pitch warble / wobble</div>
+    </div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd">
+    <div class="mtitle">&#9672; Warmth &amp; Saturation</div>
+    <div class="mwet">Wet <input type="range" id="s-distmix" min="0" max="1" value="0" step=".01" disabled><span id="v-distmix">0%</span></div>
+  </div>
+  <div class="grid3">
+    <div class="ci">
+      <div class="cl"><span class="nm">Saturation</span><span class="vl" id="v-dist">0%</span></div>
+      <input type="range" id="s-dist" min="0" max=".7" value="0" step=".01" disabled>
+      <div class="hint">Soft tube-like harmonic warmth</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Low Shelf Boost</span><span class="vl" id="v-loshelf">0 dB</span></div>
+      <input type="range" id="s-loshelf" min="-6" max="12" value="0" step=".5" disabled>
+      <div class="hint">Add body and bass warmth</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">High Roll-off</span><span class="vl" id="v-hiroll">18 kHz</span></div>
+      <input type="range" id="s-hiroll" min="2000" max="18000" value="18000" step="100" disabled>
+      <div class="hint">Soften and darken the top end</div>
+    </div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd"><div class="mtitle">&#9675; Space &amp; Width</div></div>
+  <div class="grid3">
+    <div class="ci">
+      <div class="cl"><span class="nm">Reverb Decay</span><span class="vl" id="v-rvb">1.5s</span></div>
+      <input type="range" id="s-rvb" min="0.3" max="8" value="1.5" step=".1" disabled>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Reverb Mix</span><span class="vl" id="v-rvbmix">0%</span></div>
+      <input type="range" id="s-rvbmix" min="0" max=".7" value="0" step=".01" disabled>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Chorus Width</span><span class="vl" id="v-chorus">0%</span></div>
+      <input type="range" id="s-chorus" min="0" max="1" value="0" step=".01" disabled>
+      <div class="hint">Stereo thickness / shimmer</div>
+    </div>
+  </div>
+</div>
+
+<div class="mod">
+  <div class="mhd"><div class="mtitle">&#8853; Output</div></div>
+  <div class="grid2">
+    <div class="ci">
+      <div class="cl"><span class="nm">Master Volume</span><span class="vl" id="v-gain">100%</span></div>
+      <input type="range" id="s-gain" min="0" max="3" value="1" step=".05" disabled>
+      <div class="hint">Boost if FX are reducing overall volume</div>
+    </div>
+    <div class="ci">
+      <div class="cl"><span class="nm">Playback Speed</span><span class="vl" id="v-tempo">1.00x</span></div>
+      <input type="range" id="s-tempo" min="0.5" max="1.5" value="1" step=".01" disabled>
+    </div>
+  </div>
+</div>
+
+<div id="status"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const dz=$('dz'),fi=$('fi'),dzf=$('dzf');
+const bplay=$('bplay'),breset=$('breset'),brender=$('brender'),statusEl=$('status');
+
+const S={
+  rmmix:$('s-rmmix'),rmwave:$('s-rmwave'),rmfreq:$('s-rmfreq'),rmfine:$('s-rmfine'),
+  fmix:$('s-fmix'),ffreq:$('s-ffreq'),fq:$('s-fq'),flfo:$('s-flfo'),
+  vibmix:$('s-vibmix'),amrate:$('s-amrate'),amdepth:$('s-amdepth'),fmdepth:$('s-fmdepth'),
+  distmix:$('s-distmix'),dist:$('s-dist'),loshelf:$('s-loshelf'),hiroll:$('s-hiroll'),
+  rvb:$('s-rvb'),rvbmix:$('s-rvbmix'),chorus:$('s-chorus'),
+  gain:$('s-gain'),tempo:$('s-tempo')
+};
+const V={
+  rmmix:$('v-rmmix'),rmfreq:$('v-rmfreq'),rmfine:$('v-rmfine'),
+  fmix:$('v-fmix'),ffreq:$('v-ffreq'),fq:$('v-fq'),flfo:$('v-flfo'),
+  vibmix:$('v-vibmix'),amrate:$('v-amrate'),amdepth:$('v-amdepth'),fmdepth:$('v-fmdepth'),
+  distmix:$('v-distmix'),dist:$('v-dist'),loshelf:$('v-loshelf'),hiroll:$('v-hiroll'),
+  rvb:$('v-rvb'),rvbmix:$('v-rvbmix'),chorus:$('v-chorus'),
+  gain:$('v-gain'),tempo:$('v-tempo')
+};
+
+const PRESETS={
+  warm:{rmmix:.42,rmwave:'sine',rmfreq:55,rmfine:1.2,fmix:.32,ffreq:420,fq:2.5,flfo:.18,vibmix:.28,amrate:3.5,amdepth:.1,fmdepth:.06,distmix:.38,dist:.18,loshelf:3,hiroll:12000,rvbmix:.12,rvb:1.8,chorus:.25,gain:1.3,tempo:1},
+  vowel:{rmmix:.32,rmwave:'sine',rmfreq:80,rmfine:0,fmix:.68,ffreq:600,fq:5,flfo:.8,vibmix:.22,amrate:2,amdepth:.07,fmdepth:.1,distmix:.18,dist:.08,loshelf:1,hiroll:14000,rvbmix:.14,rvb:2,chorus:.2,gain:1.2,tempo:1},
+  smooth:{rmmix:.48,rmwave:'triangle',rmfreq:120,rmfine:3,fmix:.38,ffreq:900,fq:3,flfo:.3,vibmix:.28,amrate:5,amdepth:.1,fmdepth:.08,distmix:.42,dist:.28,loshelf:2,hiroll:13000,rvbmix:.2,rvb:1.5,chorus:.5,gain:1.4,tempo:1},
+  deep:{rmmix:.62,rmwave:'sine',rmfreq:28,rmfine:.5,fmix:.28,ffreq:280,fq:4,flfo:.1,vibmix:.18,amrate:2.5,amdepth:.14,fmdepth:.04,distmix:.32,dist:.22,loshelf:5,hiroll:10000,rvbmix:.24,rvb:3,chorus:.15,gain:1.6,tempo:1},
+  pulse:{rmmix:.52,rmwave:'sine',rmfreq:95,rmfine:2,fmix:.42,ffreq:700,fq:3.5,flfo:.5,vibmix:.58,amrate:8,amdepth:.38,fmdepth:.12,distmix:.28,dist:.14,loshelf:0,hiroll:15000,rvbmix:.1,rvb:1.2,chorus:.35,gain:1.3,tempo:1},
+  alien:{rmmix:.78,rmwave:'triangle',rmfreq:180,rmfine:6,fmix:.58,ffreq:1400,fq:7,flfo:1.5,vibmix:.48,amrate:12,amdepth:.28,fmdepth:.24,distmix:.32,dist:.24,loshelf:-2,hiroll:11000,rvbmix:.17,rvb:2.5,chorus:.4,gain:1.4,tempo:1}
+};
+
+const DEFAULTS={rmmix:0,rmwave:'sine',rmfreq:60,rmfine:0,fmix:0,ffreq:500,fq:2,flfo:0,vibmix:0,amrate:4,amdepth:0,fmdepth:0,distmix:0,dist:0,loshelf:0,hiroll:18000,rvbmix:0,rvb:1.5,chorus:0,gain:1,tempo:1};
+
+let ws,audioEl=new Audio(),ready=false,nativeSrc=null,isRender=false;
+let rmOsc,rmGain,rmCF,amTrem,fmVib,vibCF,formFilter,formLFO,formCF;
+let distNode,warmGain,loShelf,hiLPF,distCF,reverb,chorus,masterGain,analyser;
+let vuBars=[],vuRaf;
+
+const vuWrap=$('vu');
+for(let i=0;i<24;i++){const b=document.createElement('div');b.className='vu-bar';vuWrap.appendChild(b);vuBars.push(b)}
+
+ws=WaveSurfer.create({container:'#wf',waveColor:'#a06bff',progressColor:'#3dffa0',cursorColor:'#fff',barWidth:2,height:70,media:audioEl});
+ws.on('play',()=>{bplay.innerHTML='&#9646;&#9646; Pause';startVU()});
+ws.on('pause',()=>{bplay.innerHTML='&#9654; Play';stopVU()});
+ws.on('finish',()=>{bplay.innerHTML='&#9654; Play';stopVU()});
+
+dz.addEventListener('click',()=>fi.click());
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0])});
+fi.addEventListener('change',e=>e.target.files[0]&&loadFile(e.target.files[0]));
+
+function loadFile(f){
+  if(!f.type.startsWith('audio/')){alert('Audio files only');return}
+  ws.load(URL.createObjectURL(f));
+  dzf.textContent='&#9834; '+f.name;dzf.style.display='block';
+  ws.once('ready',()=>{bplay.disabled=false;setStatus('Loaded — press Play to start processing',4000);ws.setPlaybackRate(+S.tempo.value)});
+}
+
+async function getRaw(){
+  try{const r=Tone.getContext().rawContext;if(r&&r.audioWorklet!==undefined)return r}catch(e){}
+  try{const r=Tone.context._context;if(r)return r}catch(e){}
+  return Tone.context;
+}
+
+async function initTone(){
+  if(ready)return;
+  await Tone.start();
+  const raw=await getRaw();
+  if(!nativeSrc)nativeSrc=raw.createMediaElementSource(audioEl);
+  const src=new Tone.Gain(1);
+  Tone.connect(nativeSrc,src);
+
+  analyser=raw.createAnalyser();
+  analyser.fftSize=256;
+
+  // EQ / warmth chain
+  loShelf=new Tone.Filter({type:'lowshelf',frequency:200,gain:+S.loshelf.value});
+  hiLPF=new Tone.Filter({type:'lowpass',frequency:+S.hiroll.value,rolloff:-12});
+  warmGain=new Tone.Gain(1.15);
+  distNode=new Tone.Distortion({distortion:+S.dist.value,oversample:'2x'});
+  distCF=new Tone.CrossFade(+S.distmix.value);
+
+  // Ring mod (parallel crossfade)
+  rmOsc=new Tone.Oscillator({type:S.rmwave.value,frequency:+S.rmfreq.value}).start();
+  rmGain=new Tone.Gain(0);
+  rmCF=new Tone.CrossFade(+S.rmmix.value);
+
+  // Formant filter + LFO sweep (parallel crossfade)
+  formFilter=new Tone.Filter({type:'bandpass',frequency:+S.ffreq.value,Q:+S.fq.value});
+  formLFO=new Tone.LFO({frequency:Math.max(0.001,+S.flfo.value),min:+S.ffreq.value*.5,max:+S.ffreq.value*2}).start();
+  formLFO.connect(formFilter.frequency);
+  formCF=new Tone.CrossFade(+S.fmix.value);
+
+  // AM tremolo + FM vibrato (parallel crossfade)
+  amTrem=new Tone.Tremolo({frequency:+S.amrate.value,depth:+S.amdepth.value}).start();
+  fmVib=new Tone.Vibrato({maxDelay:0.012,frequency:5,depth:+S.fmdepth.value});
+  vibCF=new Tone.CrossFade(+S.vibmix.value);
+
+  // Space
+  reverb=new Tone.Reverb({decay:+S.rvb.value,wet:+S.rvbmix.value,preDelay:0.02});
+  await reverb.ready;
+  chorus=new Tone.Chorus({frequency:0.8,delayTime:4,depth:0.35,wet:+S.chorus.value}).start();
+
+  masterGain=new Tone.Gain(+S.gain.value);
+
+  // ── SIGNAL ROUTING (all effects in parallel crossfades — dry signal always preserved) ──
+  // src → loShelf → hiLPF
+  //   → distCF.a (dry)  distCF.b (saturated via warmGain→distNode)
+  // distCF → rmCF.a (dry)  rmCF.b (ring-modded via rmGain)
+  // rmCF → formCF.a (dry)  formCF.b (formant filtered)
+  // formCF → vibCF.a (dry)  vibCF.b (tremolo+vibrato)
+  // vibCF → reverb → chorus → masterGain → analyser → destination
+
+  src.connect(loShelf);loShelf.connect(hiLPF);
+  hiLPF.connect(distCF.a);hiLPF.connect(warmGain);warmGain.connect(distNode);distNode.connect(distCF.b);
+  distCF.connect(rmCF.a);distCF.connect(rmGain);rmOsc.connect(rmGain.gain);rmGain.connect(rmCF.b);
+  rmCF.connect(formCF.a);rmCF.connect(formFilter);formFilter.connect(formCF.b);
+  formCF.connect(vibCF.a);formCF.connect(fmVib);fmVib.connect(amTrem);amTrem.connect(vibCF.b);
+  vibCF.connect(reverb);reverb.connect(chorus);chorus.connect(masterGain);
+
+  // Connect to both analyser and destination
+  const destNode=Tone.getDestination();
+  masterGain.connect(destNode);
+  const rawOut=masterGain.output||masterGain;
+  try{rawOut.connect(analyser)}catch(e){}
+
+  ready=true;
+}
+
+function startVU(){
+  if(!analyser)return;
+  const data=new Uint8Array(analyser.frequencyBinCount);
+  function tick(){
+    analyser.getByteFrequencyData(data);
+    const avg=data.reduce((a,b)=>a+b,0)/data.length/255;
+    const lvl=Math.pow(avg,.6);
+    vuBars.forEach((b,i)=>{
+      const lit=lvl>(i/vuBars.length);
+      b.style.background=lit?(i>20?'#ff4466':i>15?'#ffaa00':'#3dffa0'):'';
+    });
+    vuRaf=requestAnimationFrame(tick);
+  }
+  tick();
+}
+function stopVU(){cancelAnimationFrame(vuRaf);vuBars.forEach(b=>b.style.background='')}
+
+bplay.addEventListener('click',async()=>{
+  try{
+    if(!ready){
+      setStatus('Starting audio engine...');
+      await initTone();
+      enableAll();
+      setStatus('Ready — all wet controls start at 0%, use presets or turn them up!',5500);
+    }else if(Tone.context.state!=='running')await Tone.start();
+    ws.playPause();
+  }catch(e){console.error(e);setStatus('Error: '+e.message)}
+});
+
+function enableAll(){
+  Object.values(S).forEach(e=>{if(e)e.disabled=false});
+  [$('ms-robot'),$('ms-warmth'),$('ms-vowel'),$('ms-pulse')].forEach(e=>{if(e)e.disabled=false});
+  breset.disabled=false;brender.disabled=false;
+}
+
+const pct=v=>Math.round(v*100)+'%';
+const hz=v=>v>=1000?(v/1000).toFixed(1)+' kHz':Math.round(v)+' Hz';
+
+S.rmmix.oninput=e=>{V.rmmix.textContent=pct(e.target.value);if(rmCF)rmCF.fade.value=+e.target.value};
+S.rmwave.onchange=e=>{if(rmOsc)rmOsc.type=e.target.value};
+S.rmfreq.oninput=e=>{
+  V.rmfreq.textContent=hz(e.target.value);
+  const fine=parseFloat(S.rmfine.value);
+  if(rmOsc)rmOsc.frequency.value=+e.target.value+fine;
+  if(formLFO){formLFO.min=+e.target.value*.5;formLFO.max=+e.target.value*2}
+};
+S.rmfine.oninput=e=>{
+  V.rmfine.textContent=(+e.target.value>=0?'+':'')+parseFloat(e.target.value).toFixed(1)+' Hz';
+  if(rmOsc)rmOsc.frequency.value=parseFloat(S.rmfreq.value)+(+e.target.value);
+};
+S.fmix.oninput=e=>{V.fmix.textContent=pct(e.target.value);if(formCF)formCF.fade.value=+e.target.value};
+S.ffreq.oninput=e=>{
+  V.ffreq.textContent=hz(e.target.value);
+  if(formFilter)formFilter.frequency.value=+e.target.value;
+  if(formLFO){formLFO.min=+e.target.value*.5;formLFO.max=+e.target.value*2}
+};
+S.fq.oninput=e=>{V.fq.textContent=(+e.target.value).toFixed(1);if(formFilter)formFilter.Q.value=+e.target.value};
+S.flfo.oninput=e=>{V.flfo.textContent=(+e.target.value).toFixed(2)+' Hz';if(formLFO)formLFO.frequency.value=Math.max(0.001,+e.target.value)};
+S.vibmix.oninput=e=>{V.vibmix.textContent=pct(e.target.value);if(vibCF)vibCF.fade.value=+e.target.value};
+S.amrate.oninput=e=>{V.amrate.textContent=e.target.value+' Hz';if(amTrem)amTrem.frequency.value=+e.target.value};
+S.amdepth.oninput=e=>{V.amdepth.textContent=pct(e.target.value);if(amTrem)amTrem.depth.value=+e.target.value};
+S.fmdepth.oninput=e=>{V.fmdepth.textContent=pct(e.target.value);if(fmVib)fmVib.depth.value=+e.target.value};
+S.distmix.oninput=e=>{V.distmix.textContent=pct(e.target.value);if(distCF)distCF.fade.value=+e.target.value};
+S.dist.oninput=e=>{V.dist.textContent=pct(e.target.value);if(distNode)distNode.distortion=+e.target.value};
+S.loshelf.oninput=e=>{V.loshelf.textContent=(+e.target.value>0?'+':'')+e.target.value+' dB';if(loShelf)loShelf.gain.value=+e.target.value};
+S.hiroll.oninput=e=>{V.hiroll.textContent=hz(e.target.value);if(hiLPF)hiLPF.frequency.value=+e.target.value};
+S.rvb.oninput=e=>{V.rvb.textContent=e.target.value+'s';if(reverb)reverb.decay=+e.target.value};
+S.rvbmix.oninput=e=>{V.rvbmix.textContent=pct(e.target.value);if(reverb)reverb.wet.value=+e.target.value};
+S.chorus.oninput=e=>{V.chorus.textContent=pct(e.target.value);if(chorus)chorus.wet.value=+e.target.value};
+S.gain.oninput=e=>{V.gain.textContent=pct(e.target.value);if(masterGain)masterGain.gain.value=+e.target.value};
+S.tempo.oninput=e=>{V.tempo.textContent=(+e.target.value).toFixed(2)+'x';ws.setPlaybackRate(+e.target.value)};
+
+// Macro knobs — each simultaneously drives related parameters
+function macroUpdate(id,v,pairs){
+  $('mv-'+id).textContent=pct(v);
+  $('mac-'+id).classList.toggle('on',v>0);
+  pairs.forEach(([key,val])=>{
+    const el=$('s-'+key);if(el){el.value=val;el.dispatchEvent(new Event('input'))}
+  });
+}
+$('ms-robot').oninput=e=>{
+  const v=+e.target.value;
+  macroUpdate('robot',v,[['rmmix',v*.82],['fmix',v*.28],['distmix',v*.22]]);
+};
+$('ms-warmth').oninput=e=>{
+  const v=+e.target.value;
+  macroUpdate('warmth',v,[['distmix',v*.5],['dist',v*.2],['loshelf',v*5],['hiroll',18000-(v*7000)]]);
+};
+$('ms-vowel').oninput=e=>{
+  const v=+e.target.value;
+  macroUpdate('vowel',v,[['fmix',v*.72],['flfo',v*1.2],['fq',2+v*5]]);
+};
+$('ms-pulse').oninput=e=>{
+  const v=+e.target.value;
+  macroUpdate('pulse',v,[['vibmix',v*.6],['amdepth',v*.5],['fmdepth',v*.2]]);
+};
+
+// Presets
+document.querySelectorAll('.pb').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.pb').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const p=PRESETS[btn.dataset.p];if(!p)return;
+    // Reset macros first
+    ['ms-robot','ms-warmth','ms-vowel','ms-pulse'].forEach(id=>{const e=$(id);if(e){e.value=0;e.dispatchEvent(new Event('input'))}});
+    Object.entries(p).forEach(([k,v])=>{
+      const el=$('s-'+k);if(!el)return;
+      el.value=v;el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input'));
+    });
+    setStatus('Preset: '+btn.textContent,2500);
+  });
+});
+
+// Reset
+breset.addEventListener('click',()=>{
+  document.querySelectorAll('.pb').forEach(b=>b.classList.remove('active'));
+  ['ms-robot','ms-warmth','ms-vowel','ms-pulse'].forEach(id=>{const e=$(id);if(e){e.value=0;e.dispatchEvent(new Event('input'))}});
+  Object.entries(DEFAULTS).forEach(([k,v])=>{
+    const el=$('s-'+k);if(!el)return;
+    el.value=v;el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input'));
+  });
+  setStatus('Reset to neutral',2000);
+});
+
+// Render
+brender.addEventListener('click',async()=>{
+  if(isRender||!ready)return;
+  isRender=true;
+  await Tone.start();
+  brender.textContent='● REC...';
+  [brender,bplay,breset,...Object.values(S),$('ms-robot'),$('ms-warmth'),$('ms-vowel'),$('ms-pulse')].forEach(e=>{if(e)e.disabled=true});
+  setStatus('Recording — will auto-download on finish...');
+
+  const raw=await getRaw();
+  const dest=raw.createMediaStreamDestination();
+  // Connect master output to recording destination
+  try{masterGain.connect(dest)}catch(e){Tone.connect(masterGain,dest)}
+
+  const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+  const mr=new MediaRecorder(dest.stream,{mimeType:mime});
+  const chunks=[];
+  mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data)};
+  mr.onstop=()=>{
+    try{masterGain.disconnect(dest)}catch(e){}
+    const blob=new Blob(chunks,{type:mime});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download='ringmod_processed.webm';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(a.href)},300);
+    isRender=false;brender.textContent='&#11015; Render';
+    enableAll();setStatus('Done! File downloaded.',3500);
+  };
+
+  ws.seekTo(0);mr.start();ws.play();
+  ws.once('finish',()=>{if(isRender)setTimeout(()=>mr.stop(),500)});
+});
+
+function setStatus(msg,ms){
+  statusEl.textContent=msg;
+  if(ms)setTimeout(()=>{if(statusEl.textContent===msg)statusEl.textContent=''},ms);
+}
+</script>
+</body>
+</html>

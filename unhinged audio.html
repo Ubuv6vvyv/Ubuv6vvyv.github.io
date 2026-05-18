@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Acoustic Stress Tester Pro</title>
+<style>
+:root{--bg:#050505;--panel:#111;--prim:#0f0;--sec:#f05;--tri:#0cf;--harm:#b0f;--txt:#eee}
+*{box-sizing:border-box}
+body{font-family:sans-serif;background:#000;color:var(--txt);display:flex;justify-content:center;margin:0;padding:10px;min-height:100vh}
+#app{width:100%;max-width:440px;background:var(--panel);border-radius:8px;padding:15px;box-shadow:0 0 20px rgba(255,255,255,0.05);padding-bottom:40px}
+
+/* CONTROLS */
+.ctrl-bar{display:flex;gap:10px;margin-bottom:15px;position:sticky;top:0;z-index:10;background:var(--panel);padding-bottom:10px;border-bottom:1px solid #222}
+button.main{flex:1;padding:15px;font-size:14px;font-weight:900;border:none;border-radius:4px;cursor:pointer;text-transform:uppercase;transition:all 0.1s}
+#btn-on{background:#222;color:#666;border:2px solid #333}
+#btn-on.active{background:var(--prim);color:#000;border-color:var(--prim);box-shadow:0 0 15px var(--prim)}
+#btn-kill{background:#fff;color:#000;font-weight:900}
+
+/* SECTIONS */
+.section{background:#0a0a0a;padding:12px;margin-bottom:10px;border-radius:6px;border-left:4px solid #333}
+.section.tone{border-color:var(--prim)}
+.section.harm{border-color:var(--harm)}
+.section.clash{border-color:var(--sec)}
+.section.move{border-color:var(--tri)}
+
+h2{margin:0 0 10px 0;font-size:12px;text-transform:uppercase;color:#888;display:flex;justify-content:space-between;letter-spacing:1px}
+.val{color:#fff;font-family:monospace;font-weight:bold}
+
+label{display:block;font-size:11px;margin-bottom:4px;color:#ccc;font-weight:700;text-transform:uppercase;margin-top:8px}
+input[type=range]{width:100%;height:25px;cursor:pointer;background:transparent;-webkit-appearance:none}
+input[type=range]::-webkit-slider-runnable-track{background:#333;height:4px;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;margin-top:-6px;background:#ddd;height:16px;width:16px;border-radius:50%;box-shadow:0 0 5px #fff}
+
+/* WAVE SELECTOR */
+.waves{display:flex;gap:2px;margin-bottom:10px}
+.wave-btn{flex:1;padding:10px 5px;font-size:10px;background:#222;color:#666;border:none;cursor:pointer;font-weight:bold}
+.wave-btn.active{background:var(--tri);color:#000;box-shadow:0 0 10px var(--tri)}
+
+/* VOL BAR */
+.vol-box{background:#1a1a1a;padding:8px 12px;border-radius:4px;margin-bottom:15px;display:flex;align-items:center;gap:10px}
+.vol-box label{margin:0;color:var(--prim)}
+
+/* PRESETS */
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:15px}
+.p-btn{padding:10px 2px;font-size:10px;background:#161616;color:#888;border:1px solid #222;cursor:pointer;font-weight:bold}
+.p-btn:hover{background:#333;color:#fff;border-color:#555}
+.p-btn.extreme{color:var(--sec);border-color:#411}
+.p-btn.harm{color:var(--harm);border-color:#314}
+
+</style>
+</head>
+<body>
+<div id="app">
+    <div class="ctrl-bar">
+        <button id="btn-on" class="main">⚡ ACTIVATE</button>
+        <button id="btn-kill" class="main">🔇 STOP</button>
+    </div>
+
+    <div class="vol-box">
+        <label>VOLUME</label>
+        <input type="range" id="sl-vol" min="0" max="1" step="0.01" value="0.5">
+    </div>
+
+    <div class="section tone">
+        <h2>1. The Source <span id="val-freq" class="val"></span></h2>
+        <div class="waves">
+            <button class="wave-btn active" data-w="sawtooth">SAW</button>
+            <button class="wave-btn" data-w="square">SQUARE</button>
+            <button class="wave-btn" data-w="sine">SINE</button>
+            <button class="wave-btn" data-w="triangle">TRI</button>
+        </div>
+        <label>Frequency (Uncapped to 24kHz)</label>
+        <input type="range" id="sl-freq" min="20" max="24000" step="1" value="1000">
+        
+        <label>Static Ear Balance (L / R)</label>
+        <input type="range" id="sl-pan" min="-1" max="1" step="0.1" value="0">
+    </div>
+
+    <div class="section harm">
+        <h2>2. Harmonic Phase Layer <span id="val-harm" class="val"></span></h2>
+        <label>Fade In (Harmony Mix)</label>
+        <input type="range" id="sl-hmix" min="0" max="1" step="0.01" value="0">
+        
+        <label>Harmonic Drift (Push in/out of harmony)</label>
+        <input type="range" id="sl-hdrift" min="-100" max="100" step="1" value="0">
+    </div>
+
+    <div class="section clash">
+        <h2>3. Dissonance Engine <span id="val-clash" class="val"></span></h2>
+        
+        <label>Dissonance Mix (Pure vs Detuned)</label>
+        <input type="range" id="sl-mix" min="0" max="1" step="0.01" value="0.5">
+
+        <label>Extreme Beating (Cents)</label>
+        <input type="range" id="sl-detune" min="0" max="2400" step="1" value="0">
+        
+        <label>Extreme FM Screech (Sidebands)</label>
+        <input type="range" id="sl-screech" min="0" max="10000" step="10" value="0">
+    </div>
+
+    <div class="section move">
+        <h2>4. Psychoacoustic Movement <span id="val-move" class="val"></span></h2>
+        
+        <label>Buzz / AM Chop (Audio Rate)</label>
+        <input type="range" id="sl-buzz" min="0" max="200" step="1" value="0">
+        
+        <label>Vibrato / Pitch Bend Hz</label>
+        <input type="range" id="sl-wobble" min="0" max="50" step="0.1" value="0">
+        
+        <label>Spatial Disorientation (Auto-Pan Hz)</label>
+        <input type="range" id="sl-autopan" min="0" max="30" step="0.1" value="0">
+    </div>
+
+    <div class="presets">
+        <button class="p-btn harm" data-p="unison">UNISON</button>
+        <button class="p-btn harm" data-p="phase">PHASING</button>
+        <button class="p-btn harm" data-p="beat">BEATING</button>
+        <button class="p-btn harm" data-p="sick">SEASICK</button>
+
+        <button class="p-btn" data-p="drill">DRILL</button>
+        <button class="p-btn" data-p="mosq">MOSQUITO</button>
+        <button class="p-btn" data-p="nails">NAILS</button>
+        <button class="p-btn" data-p="alarm">ALARM</button>
+        
+        <button class="p-btn extreme" data-p="binaural">BINAURAL</button>
+        <button class="p-btn extreme" data-p="vertigo">VERTIGO</button>
+        <button class="p-btn extreme" data-p="machinery">MACHINE</button>
+        <button class="p-btn extreme" data-p="glitch">GLITCH</button>
+        <button class="p-btn extreme" data-p="phantom">PHANTOM</button>
+        <button class="p-btn extreme" data-p="stress">STRESS</button>
+        <button class="p-btn extreme" data-p="dogwhistle">DOG WHSL</button>
+        <button class="p-btn extreme" data-p="pierce">PIERCE</button>
+    </div>
+</div>
+
+<script>
+let ctx = null;
+let mainOsc, secOsc, harmOsc; 
+let mainGain, secGain, harmGain; 
+let fmGain; 
+let amGain, amLfo; 
+let vibGain, vibLfo; 
+let panner, panLfo, panAmp; 
+let masterGain;
+let isPlaying = false;
+let currentWave = 'sawtooth';
+
+function initAudio() {
+    if(ctx) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    ctx = new AudioCtx({latencyHint: 'interactive'});
+
+    // Master Volume
+    masterGain = ctx.createGain();
+    masterGain.gain.value = parseFloat(document.getElementById('sl-vol').value);
+    
+    // Spatial Panner
+    panner = ctx.createStereoPanner();
+    masterGain.connect(panner);
+    panner.connect(ctx.destination);
+
+    // Auto-Pan LFO
+    panLfo = ctx.createOscillator();
+    panAmp = ctx.createGain();
+    panLfo.connect(panAmp);
+    panAmp.connect(panner.pan);
+    panLfo.start();
+
+    // AM Buzz
+    amGain = ctx.createGain();
+    amGain.connect(masterGain);
+    
+    amLfo = ctx.createOscillator();
+    amLfo.connect(amGain.gain);
+    amLfo.start();
+
+    // Oscillators
+    mainOsc = ctx.createOscillator();
+    secOsc = ctx.createOscillator();   // Dissonance layer
+    harmOsc = ctx.createOscillator();  // Harmony layer
+    
+    // Vibrato (Affects Main, Sec, and Harm)
+    vibLfo = ctx.createOscillator();
+    vibGain = ctx.createGain();
+    vibLfo.connect(vibGain);
+    vibGain.connect(mainOsc.frequency);
+    vibGain.connect(secOsc.frequency);
+    vibGain.connect(harmOsc.frequency);
+    vibLfo.start();
+
+    // FM Screech (Affects Main)
+    fmGain = ctx.createGain();
+    secOsc.connect(fmGain);
+    fmGain.connect(mainOsc.frequency);
+
+    // Mixers
+    mainGain = ctx.createGain();
+    secGain = ctx.createGain();
+    harmGain = ctx.createGain();
+
+    mainOsc.connect(mainGain);
+    secOsc.connect(secGain);
+    harmOsc.connect(harmGain);
+
+    mainGain.connect(amGain);
+    secGain.connect(amGain);
+    harmGain.connect(amGain);
+
+    mainOsc.type = currentWave;
+    secOsc.type = currentWave;
+    harmOsc.type = currentWave;
+
+    mainOsc.start();
+    secOsc.start();
+    harmOsc.start();
+}
+
+function updateSound() {
+    if(!ctx) return;
+    const t = ctx.currentTime;
+    const ramp = 0.05;
+
+    // MASTER VOL
+    const vol = parseFloat(document.getElementById('sl-vol').value);
+    masterGain.gain.setTargetAtTime(vol, t, ramp);
+
+    // 1. FREQUENCY & PAN
+    const freq = parseFloat(document.getElementById('sl-freq').value);
+    document.getElementById('val-freq').innerText = freq + " Hz";
+    mainOsc.frequency.setTargetAtTime(freq, t, ramp);
+
+    const staticPan = parseFloat(document.getElementById('sl-pan').value);
+    panner.pan.setTargetAtTime(staticPan, t, ramp);
+
+    // 2. HARMONIC PHASE LAYER
+    const hMix = parseFloat(document.getElementById('sl-hmix').value);
+    const hDrift = parseFloat(document.getElementById('sl-hdrift').value);
+    
+    harmOsc.frequency.setTargetAtTime(freq, t, ramp); // Anchored to root
+    harmOsc.detune.setTargetAtTime(hDrift, t, ramp);  // Pushed in/out
+    harmGain.gain.setTargetAtTime(hMix, t, ramp);
+    
+    document.getElementById('val-harm').innerText = (hMix > 0) ? hDrift + "c" : "OFF";
+
+    // 3. DISSONANCE & FM
+    const detune = parseFloat(document.getElementById('sl-detune').value);
+    const screech = parseFloat(document.getElementById('sl-screech').value);
+    
+    document.getElementById('val-clash').innerText = detune + "c | FM:" + screech;
+
+    if(screech > 50) {
+        secOsc.frequency.setTargetAtTime(freq * 3.14159, t, ramp); // Inharmonic
+    } else {
+        secOsc.frequency.setTargetAtTime(freq, t, ramp);
+    }
+    secOsc.detune.setTargetAtTime(detune, t, ramp);
+    fmGain.gain.setTargetAtTime(screech, t, ramp);
+
+    const mix = parseFloat(document.getElementById('sl-mix').value);
+    // Lower base volume slightly to prevent clipping since we have 3 oscillators
+    mainGain.gain.setTargetAtTime((1 - mix) * 0.8, t, ramp);
+    secGain.gain.setTargetAtTime(mix * 0.8, t, ramp);
+
+    // 4. MOVEMENT
+    const buzz = parseFloat(document.getElementById('sl-buzz').value);
+    amLfo.frequency.setTargetAtTime(buzz, t, ramp);
+    amGain.gain.setTargetAtTime(buzz > 0 ? 0.6 : 1.0, t, ramp);
+
+    const wob = parseFloat(document.getElementById('sl-wobble').value);
+    vibLfo.frequency.setTargetAtTime(wob, t, ramp);
+    vibGain.gain.setTargetAtTime(wob > 0 ? 400 : 0, t, ramp); 
+
+    const autoPan = parseFloat(document.getElementById('sl-autopan').value);
+    panLfo.frequency.setTargetAtTime(autoPan, t, ramp);
+    panAmp.gain.setTargetAtTime(autoPan > 0 ? 1 : 0, t, ramp);
+
+    document.getElementById('val-move').innerText = (buzz+wob+autoPan > 0) ? "ACTIVE" : "STILL";
+}
+
+function toggle(on) {
+    if(on) {
+        initAudio();
+        if(ctx.state === 'suspended') ctx.resume();
+        const vol = parseFloat(document.getElementById('sl-vol').value);
+        masterGain.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
+        document.getElementById('btn-on').classList.add('active');
+        isPlaying = true;
+        updateSound();
+    } else {
+        if(masterGain) masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        document.getElementById('btn-on').classList.remove('active');
+        isPlaying = false;
+    }
+}
+
+// EVENTS
+document.querySelectorAll('input[type=range]').forEach(sl => sl.addEventListener('input', updateSound));
+document.getElementById('btn-on').addEventListener('click', () => toggle(true));
+document.getElementById('btn-kill').addEventListener('click', () => toggle(false));
+
+document.querySelectorAll('.wave-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if(!ctx) initAudio();
+        document.querySelectorAll('.wave-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentWave = btn.getAttribute('data-w');
+        if(mainOsc) mainOsc.type = currentWave;
+        if(secOsc) secOsc.type = currentWave;
+        if(harmOsc) harmOsc.type = currentWave;
+    });
+});
+
+const presets = {
+    // Harmony Demos
+    unison:   {f:440,  pan:0, hmix:0.8, hdrift:0,   mix:0,   det:0,   scr:0,    buz:0,   wob:0,   apan:0,   w:'sawtooth'},
+    phase:    {f:220,  pan:0, hmix:0.8, hdrift:2,   mix:0,   det:0,   scr:0,    buz:0,   wob:0,   apan:0,   w:'square'},
+    beat:     {f:800,  pan:0, hmix:0.8, hdrift:15,  mix:0,   det:0,   scr:0,    buz:0,   wob:0,   apan:0,   w:'sine'},
+    sick:     {f:1000, pan:0, hmix:0.8, hdrift:40,  mix:0,   det:0,   scr:0,    buz:0,   wob:0.5, apan:0,   w:'sawtooth'},
+
+    // Original
+    drill:    {f:5000, pan:0, hmix:0,   hdrift:0,   mix:0.5, det:0,   scr:4000, buz:0,   wob:0,   apan:0,   w:'sawtooth'},
+    mosq:     {f:8000, pan:0, hmix:0,   hdrift:0,   mix:0.2, det:100, scr:0,    buz:120, wob:8,   apan:0,   w:'sawtooth'},
+    nails:    {f:9000, pan:0, hmix:0,   hdrift:0,   mix:0.8, det:500, scr:6000, buz:0,   wob:0,   apan:0,   w:'sawtooth'},
+    alarm:    {f:2500, pan:0, hmix:0.5, hdrift:0,   mix:0.5, det:0,   scr:0,    buz:15,  wob:0,   apan:0,   w:'square'},
+    
+    // Extreme 
+    binaural:  {f:250,  pan:0, hmix:0,   hdrift:0,   mix:0.5, det:15,  scr:0,    buz:0,   wob:0,   apan:0,   w:'sine'},     
+    vertigo:   {f:400,  pan:0, hmix:0.5, hdrift:-5,  mix:0.5, det:50,  scr:0,    buz:0,   wob:0.5, apan:0.5, w:'triangle'}, 
+    machinery: {f:80,   pan:0, hmix:0,   hdrift:0,   mix:0.7, det:150, scr:3000, buz:60,  wob:0,   apan:0,   w:'square'},   
+    glitch:    {f:3000, pan:0, hmix:0.5, hdrift:50,  mix:0.6, det:0,   scr:9000, buz:180, wob:45,  apan:15,  w:'square'},   
+    phantom:   {f:12000,pan:0, hmix:0.5, hdrift:5,   mix:0.5, det:500, scr:0,    buz:0,   wob:0,   apan:30,  w:'sine'},     
+    stress:    {f:3500, pan:0, hmix:0.8, hdrift:8,   mix:0.5, det:75,  scr:200,  buz:0,   wob:0,   apan:0,   w:'square'},
+    dogwhistle:{f:18500,pan:0, hmix:0,   hdrift:0,   mix:0,   det:0,   scr:0,    buz:0,   wob:0,   apan:0,   w:'sine'},     
+    pierce:    {f:14000,pan:0, hmix:1,   hdrift:0,   mix:0,   det:0,   scr:0,    buz:0,   wob:0,   apan:0,   w:'sine'}
+};
+
+document.querySelectorAll('.p-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const p = presets[btn.getAttribute('data-p')];
+        
+        document.getElementById('sl-freq').value = p.f || 1000;
+        document.getElementById('sl-pan').value = p.pan || 0;
+        document.getElementById('sl-hmix').value = p.hmix || 0;
+        document.getElementById('sl-hdrift').value = p.hdrift || 0;
+        document.getElementById('sl-mix').value = p.mix || 0;
+        document.getElementById('sl-detune').value = p.det || 0;
+        document.getElementById('sl-screech').value = p.scr || 0;
+        document.getElementById('sl-buzz').value = p.buz || 0;
+        document.getElementById('sl-wobble').value = p.wob || 0;
+        document.getElementById('sl-autopan').value = p.apan || 0;
+        
+        document.querySelectorAll('.wave-btn').forEach(b => {
+            if(b.getAttribute('data-w') === (p.w || 'sawtooth')) b.click();
+        });
+        
+        toggle(true);
+    });
+});
+</script>
+</body>
+</html>
