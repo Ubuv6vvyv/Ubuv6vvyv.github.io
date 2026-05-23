@@ -3,780 +3,1151 @@
 <head>
     <meta charset=UTF-8>
     <meta content="width=device-width,initial-scale=1" name=viewport>
-    <title>AI Detector v5.3</title>
+    <title> Detector v5.1</title>
     <script src=https://cdn.tailwindcss.com></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Quattrocento:wght@400;700&family=SUSE+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quattrocento:wght@400;700&family=SUSE+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
     <style>
-        :root{--bg:#f8fafc;--text:#1e293b;--border:#e2e8f0;--primary:#0f172a;--highlight:#f1f5f9}
-        body{font-family:"Quattrocento",serif;font-weight:400;background:var(--bg);color:var(--text);line-height:1.6}
-        .editor{min-height:300px;max-height:300px;border:2px solid #cbd5e1;padding:1.2rem;background:#fff;border-radius:12px;font-family:"Quattrocento",serif;font-weight:400;font-size:0.6rem;white-space:pre-wrap;overflow:auto}
-        .editor:focus{outline:0;border-color:#64748b;box-shadow:0 0 0 4px rgba(100,116,139,0.1)}
-        .score-circle{width:160px;height:160px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--score-color,#cbd5e1) 0 var(--score-percent,0),#f1f5f9 0 100%);transition:all 1.5s cubic-bezier(0.4,0,0.2,1);position:relative;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)}
-        .score-circle::before{content:'';position:absolute;width:130px;height:130px;background:#fff;border-radius:50%}
-        .score-circle span{position:relative;z-index:1}
-        .category-header{cursor:pointer;user-select:none}
-        .category-content{max-height:0;overflow:hidden;transition:max-height 0.3s ease-out}
-        .category-content.open{max-height:800px;overflow-y:auto}
-        .match-highlight{background-color:#fee2e2;color:#991b1b;padding:0 2px;border-radius:2px;font-weight:600;border-bottom:1px solid #f87171}
-        .match-highlight-blue{background-color:#dbeafe;color:#1e40af;border-bottom:1px solid #60a5fa}
-        .hidden{display:none}
-        .snippet-box{background-color:#f8fafc;border-left:3px solid #cbd5e1;font-family:"SUSE Mono",sans-serif;font-optical-sizing:auto;font-weight:400;font-size:0.6rem;line-height:1.5}
+        :root {
+            --bg: #f8fafc;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --primary: #0f172a;
+            --highlight: #f1f5f9;
+        }
+
+        body {
+            font-family: "Quattrocento", serif;
+  font-weight: 400;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .editor {
+            min-height: 300px;
+max-height: 300px;
+            border: 2px solid #cbd5e1;
+            padding: 1.2rem;
+            background: #fff;
+            border-radius: 12px;
+            font-family: "Quattrocento", serif;
+  font-weight: 400;
+            font-size: 0.6rem;
+            white-space: pre-wrap;
+overflow: auto;
+        }
+
+        .editor:focus {
+            outline: 0;
+            border-color: #64748b;
+            box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.1);
+        }
+
+        .score-circle {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: conic-gradient(var(--score-color, #cbd5e1) 0 var(--score-percent, 0), #f1f5f9 0 100%);
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .score-circle span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .category-header {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .category-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .category-content.open {
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        .match-highlight {
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 0 2px;
+            border-radius: 2px;
+            font-weight: 600;
+            border-bottom: 1px solid #f87171;
+        }
+
+        .match-highlight-blue {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-bottom: 1px solid #60a5fa;
+        }
+
+        .hidden { display: none; }
+        
+        .snippet-box {
+            background-color: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            font-family: "SUSE Mono", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+            font-size: 0.6rem;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
-<div class="max-w-5xl mx-auto p-4 sm:p-8">
-    <header class="mb-10 text-center">
-        <h1 class="font-bold mb-2 text-3xl sm:text-4xl text-slate-800">AI Detector v5.3</h1>
-        <p class="text-slate-500 text-sm sm:text-base">Think you can fool me? Paste your text below.</p>
-    </header>
-    <div class="bg-white shadow-xl p-6 rounded-xl border border-slate-200 mb-8">
-        <div class="editor" id="editor" contenteditable="true" placeholder="Paste text here to analyze..."></div>
-        <div class="flex gap-3 justify-between mt-4 items-center">
-            <span id="word-count" class="text-xs text-slate-400 font-bold">0 words</span>
-            <div class="flex gap-3">
-                <button class="text-slate-600 hover:text-slate-800 px-4 py-2 text-sm transition" id="clear-btn">Clear</button>
-                <button class="bg-slate-900 hover:bg-slate-700 text-white px-6 py-2 text-sm font-bold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md" id="analyze-btn" disabled>Analyze Text</button>
-            </div>
-        </div>
-    </div>
-    <div class="hidden space-y-8" id="results-area">
-        <div class="bg-white shadow-lg border border-slate-200 flex flex-col items-center p-8 text-center rounded-xl">
-            <h2 class="font-bold mb-8 text-xl text-slate-700 uppercase tracking-wide">Probability Assessment</h2>
-            <div class="mb-4 score-circle" id="score-circle">
-                <div class="flex flex-col items-center">
-                    <span class="font-bold text-5xl" id="score-text">0%</span>
-                    <span class="text-xs text-slate-400 font-bold mt-1">AI PROBABILITY</span>
+    <div class="max-w-5xl mx-auto p-4 sm:p-8">
+        <header class="mb-10 text-center">
+            <h1 class="font-bold mb-2 text-3xl sm:text-4xl text-slate-800">AI Detector v5.1</h1>
+            <p class="text-slate-500 text-sm sm:text-base"> Think you can fool me? Paste your text below.</p>
+        </header>
+
+        <div class="bg-white shadow-xl p-6 rounded-xl border border-slate-200 mb-8">
+            <div class="editor" id="editor" contenteditable="true" placeholder="Paste text here to analyze..."></div>
+            <div class="flex gap-3 justify-between mt-4 items-center">
+                <span id="word-count" class="text-xs text-slate-400 font-bold">0 words</span>
+                <div class="flex gap-3">
+                    <button class="text-slate-600 hover:text-slate-800 px-4 py-2 text-sm transition" id="clear-btn">Clear</button>
+                    <button class="bg-slate-900 hover:bg-slate-700 text-white px-6 py-2 text-sm font-bold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md" id="analyze-btn" disabled>Analyze Text</button>
                 </div>
             </div>
-            <p class="text-lg font-bold mb-2" id="confidence-text">Calculating...</p>
-            <div class="w-full max-w-2xl text-left mt-6">
-                <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Key Indicators</h4>
-                <ul class="space-y-2" id="key-indicators"></ul>
-            </div>
         </div>
-        <div class="space-y-4" id="modules-container"></div>
+
+        <div class="hidden space-y-8" id="results-area">
+            <div class="bg-white shadow-lg border border-slate-200 flex flex-col items-center p-8 text-center rounded-xl">
+                <h2 class="font-bold mb-8 text-xl text-slate-700 uppercase tracking-wide">Probability Assessment</h2>
+                <div class="mb-4 score-circle" id="score-circle">
+                    <div class="flex flex-col items-center">
+                        <span class="font-bold text-5xl" id="score-text">0%</span>
+                        <span class="text-xs text-slate-400 font-bold mt-1">AI PROBABILITY</span>
+                    </div>
+                </div>
+                <p class="text-lg font-bold mb-2" id="confidence-text">Calculating...</p>
+                <div class="w-full max-w-2xl text-left mt-6">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Key Indicators</h4>
+                    <ul class="space-y-2" id="key-indicators"></ul>
+                </div>
+            </div>
+            <div class="space-y-4" id="modules-container"></div>
+        </div>
     </div>
-</div>
-<script>
-const PatternConfig={
-thresholds:{minWords:15},
-weights:{critical:5,high:3,medium:2,low:1},
 
-gptLexicon:["delve","tapestry","nuance","testament","underscores","multifaceted","landscape","democratize","leveraging","realm","facet","paramount","pivotal","cornerstone","intricate","robust","framework","paradigm","holistic","comprehensive","facilitate","optimize","streamline","synergy","proactive","scalable","disruptive","cutting-edge","game-changer","revolutionary","transformative","innovative","dynamic","seamless","versatile","ecosystem","utilize","harness","elucidate","ascertain","endeavor","foster","cultivate","exemplify","epitomize","showcase","unveil","unpack","dissect","navigate","traverse","embark","venture","explore","delve into","dive into","in-depth","meticulously","notably","remarkably","undeniably","inherently","fundamentally","essentially","ultimately","consequently","nevertheless","furthermore","moreover","additionally","conversely","symphony","myriad","orchestrate","beacon","unlock","unleash","poised","imperative","integral","interplay","confluence","nexus","vanguard","forefront","bedrock","catalyst","ignite","propel","elevate","enrich","empower","mitigate","alleviate","exacerbate","unparalleled","unprecedented","rapid","ever-evolving","digital age","dawn","horizon","journey","quest","odyssey","equilibrium","strive","vital","crucial","indispensable","intrinsic","extrinsic","symbiotic","harmonious","cohesive","alignment","bridge","pinnacle","apex","zenith","culmination","embodiment","archetype","shift","status quo","spearhead","revolutionize","reimagine","redefine","bolster","augment","curate","tailor","bespoke","underscores the importance","fosters a sense of","a testament to","serves as a reminder","it is important to consider","navigating the complex","in the realm of","not merely","but rather","tapestry of life","rich history","stark contrast","the implementation of","the utilization of","the integration of","the adoption of","the evolution of","the transformation of","the intersection of","the proliferation of","the manifestation of","the optimization of","serves as a foundation","acts as a bridge","functions as a catalyst","operates as a framework","stands as a testament","from a practical standpoint","from a theoretical perspective","through the lens of","within the context of","game-changing impact","transformative potential","revolutionary approach","innovative solutions","actionable insights","value proposition","competitive advantage","core competencies","best practices","thought leadership","harness the power of","unlock the potential of","leverage the capabilities","maximize the impact of","streamline the process","optimize the workflow","it goes without saying","needless to say","suffice it to say","the fact remains that","at the end of the day","when all is said and done","in the grand scheme of things","deep dive into","high-level overview","granular analysis","bird's-eye view","cutting to the chase","hitting the nail on the head","navigating the waters","charting the course","paving the way","it is worth mentioning","it cannot be overstated","it is fascinating to observe","it is crucial to acknowledge","it is vital to recognize","it is imperative to consider","one must acknowledge","we must consider","there is no denying that","transformative journey","holistic approach","integrated solution","comprehensive strategy","unified vision","synergistic relationship","collaborative effort","cutting-edge technology","state-of-the-art solution","next-generation platform","best-in-class performance","world-class standards","industry-leading approach","mission-driven organization","purpose-built solution","intentionally designed","strategically positioned","thoughtfully crafted","carefully curated","meticulously documented","precisely calibrated","expertly crafted","robust architecture","resilient infrastructure","flexible framework","adaptable system","modular design","scalable architecture","future-proof foundation","sustainable model","actionable recommendations","longitudinal study","cross-sectional analysis","empirical evidence","qualitative data","quantitative metrics","mixed-methods approach","validated findings","peer-reviewed research","statistical significance","causal relationship"],
+    <script>
+        const PatternConfig = {
 
-transitionOverload:["It is important to note","In conclusion","Conversely","Furthermore","To summarize","That being said","With that in mind","On the other hand","It should be noted that","As previously mentioned","In light of this","Taking this into account","Given the above","In this context","From this perspective","To put it another way","In other words","To clarify","To elaborate","To expand on this","Building on this","Following from this","In addition to this","Similarly","Likewise","By the same token","In the same vein","Correspondingly","By contrast","In contrast","On the contrary","Despite this","Notwithstanding","At the same time","Simultaneously","Concurrently","Subsequently","Consequently","As a result","Therefore","Thus","Hence","Accordingly","For this reason","To this end","Bearing this in mind","In summary","To sum up","All things considered","On balance","Ultimately","In the final analysis","At the end of the day","It is worth noting that","It is crucial to recognize","Moving forward","Looking ahead","What's more","In fact","Indeed","Essentially","Basically","Fundamentally","Primarily","For the most part","By and large","On the whole","Generally speaking","Broadly speaking","Strictly speaking","Realistically speaking","Another key point is","Equally important is","No less important","Just as crucial","To be sure","To be fair","To be clear","Granted","Admittedly","Certainly","Undoubtedly","Unquestionably","Without a doubt","Beyond question","First and foremost","First of all","To begin with","In the first place","Initially","At the outset","At first glance","Upon closer examination","More specifically","More precisely","Getting back to the point","As we've established","As we've discussed","As we've seen","As demonstrated above","As illustrated previously","In a similar fashion","Along similar lines","In much the same way","By the same logic","To draw a parallel","To illustrate this point","To demonstrate this","As an example","Turning our attention to","Shifting focus to","Pivoting to","Transitioning to","Proceeding to","Progressing to","Continuing with","Exploring this more deeply"],
+    thresholds: { minWords: 15 },
 
-vagueAuthority:["experts suggest","studies show","research indicates","many believe","it is widely accepted","experts agree","scientists say","data suggests","general consensus","critics argue","observers note","it has been said","popular belief","arguably","according to sources","reports indicate","findings suggest","evidence points to","analysis reveals","surveys show","polls indicate","statistics demonstrate","numbers suggest","trends indicate","data shows","research demonstrates","studies confirm","experts warn","analysts predict","forecasts suggest","common wisdom holds","conventional wisdom suggests","prevailing opinion","mainstream thinking","scholarly consensus","thought leaders believe","industry experts note","seasoned professionals observe","it has been suggested","it has been proposed","it has been argued","it has been claimed","it has been observed","it has been documented","it has been reported","it is generally understood","it is commonly believed","some argue that","others contend that","critics maintain that","proponents claim that","skeptics question whether","advocates insist that","emerging research shows","preliminary studies indicate","initial findings suggest","early evidence points to","recent data demonstrates","historical precedent shows","past experience suggests","previous studies indicate","industry insiders say","field experts claim","domain specialists note","subject matter experts suggest","technical authorities indicate"],
+    weights: { critical: 5, high: 3, medium: 2, low: 1 },
 
-refusalHeaders:["As an AI language model","I cannot fulfill","It is ethically important","I don't have personal opinions","I'm not able to","I cannot provide","I'm unable to","I don't have the ability","As an AI assistant","My purpose is to","My knowledge cutoff","I cannot generate","I'm not capable of","I must decline","I cannot assist with","I'm programmed to","I am designed to","It would be inappropriate for me to","I don't have personal experiences","I don't have feelings about","I cannot make subjective judgments","I should clarify that","I must emphasize that","I should point out that","I need to mention that","I feel compelled to say","I should be clear that","I want to be transparent that","In the interest of transparency","To be completely honest","To maintain objectivity","To avoid bias","I'm here to help","I'm happy to assist","I'd be glad to help","I appreciate your question","Thank you for asking","That's a great question","I understand your concern","I recognize the importance"],
+    
 
-corporateEmojis:["✨","🚀","💡","🤖","🧠","🎯","⚡","🔥","💪","👍","🌟","⭐","📈","📊","🎨","🏆","💯","🎉","🔑","💎","🌈","🛠️","⚙️","🔧","📝","📚","🎓","💼","🏢","📱","💻","🖥️","⌨️","✅","❌","⭕","🔴","🟢","🔵"],
+    gptLexicon: [
 
-emojiPatterns:{endOnly:/[^\s][.!?]\s*[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]+$/mu,midSentence:/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s+[a-z]/mu},
+        "delve", "tapestry", "nuance", "testament", "underscores", "multifaceted", "landscape", "democratize", "leveraging", "realm", "facet", "paramount", "pivotal", "cornerstone", "intricate", "robust", "framework", "paradigm", "holistic", "comprehensive", "facilitate", "optimize", "streamline", "synergy", "proactive", "scalable", "disruptive", "cutting-edge", "game-changer", "revolutionary", "transformative", "innovative", "dynamic", "seamless", "versatile", "ecosystem", "utilize", "harness", "elucidate", "ascertain", "endeavor", "foster", "cultivate", "exemplify", "epitomize", "showcase", "unveil", "unpack", "dissect", "navigate", "traverse", "embark", "venture", "explore", 
 
-compoundAdjectives:["ever-evolving","multi-faceted","fast-paced","well-established","far-reaching","long-term","short-term","high-level","low-level","top-down","bottom-up","end-to-end","cross-functional","cross-disciplinary","multi-dimensional","multi-layered","forward-thinking","backward-compatible","future-proof","time-tested","data-driven","user-centric","customer-focused","results-oriented","goal-oriented","action-oriented","detail-oriented","solution-focused","value-added","mission-critical","business-critical","time-sensitive","cost-effective","resource-efficient","eco-friendly","user-friendly","mobile-friendly","AI-powered","cloud-based","real-time","real-world","hands-on","state-of-the-art","cutting-edge","bleeding-edge","next-generation","best-in-class","world-class","industry-leading","market-leading","battle-tested","production-ready","enterprise-grade","self-service","self-contained","self-sufficient","self-sustaining","self-regulating","self-optimizing","self-healing","self-learning","open-source","closed-source","open-ended","event-driven","message-driven","risk-averse","profit-driven","cost-saving","budget-friendly","performance-boosting","efficiency-gaining","productivity-enhancing","attention-grabbing","eye-catching","mind-blowing","game-changing","industry-disrupting","market-defining"],
+        "delve into", "dive into", "in-depth", "meticulously", "notably", "remarkably", "undeniably", "inherently", "fundamentally", "essentially", "ultimately", "consequently", "nevertheless", "furthermore", "moreover", "additionally", "conversely", "symphony", "myriad", "orchestrate", "beacon", "unlock", "unleash", "poised", "imperative", "integral", "interplay", "confluence", "nexus", "vanguard", "forefront", "bedrock", "catalyst", "ignite", "propel", "elevate", "enrich", "empower", "mitigate", "alleviate", "exacerbate", "unparalleled", "unprecedented", "rapid", "ever-evolving", "digital age", "dawn", "horizon", "journey", "quest", "odyssey", "equilibrium", "strive", "vital", "crucial", "indispensable", "intrinsic", "extrinsic", "symbiotic", "harmonious", "cohesive", "alignment", "bridge", "pinnacle", "apex", "zenith", "culmination", "embodiment", "archetype", "shift", "status quo", "spearhead", "revolutionize", "reimagine", "redefine", "bolster", "augment", "curate", "tailor", "bespoke", 
 
-falseBalance:["while it's true that","on one hand","on the other hand","however it's important to note","that said","having said that","nevertheless","at the same time","conversely","yet it must be acknowledged","still one should consider","although this is the case","despite these benefits","notwithstanding these advantages","balanced against","weighed against","juxtaposed with","contrasted with","both sides of the coin","two sides of the story","multiple perspectives exist","various viewpoints suggest","different angles reveal","alternative interpretations show","competing theories propose","contrasting opinions indicate","divergent views demonstrate","opposing camps argue","conflicting evidence suggests","it's worth considering that","one might argue that","some would say that","others might contend that","an alternative view holds","a different perspective suggests","presents both opportunities and challenges","offers advantages and disadvantages","has pros and cons","comes with trade-offs","involves compromises","requires balancing"],
+        "underscores the importance", "fosters a sense of", "a testament to", "serves as a reminder", "it is important to consider", "navigating the complex", "in the realm of", "not merely", "but rather", "tapestry of life", "rich history", "stark contrast",
 
-academicCosplay:["problematize","theorize","conceptualize","operationalize","contextualize","delineate","elucidate","interrogate","deconstruct","unpack the implications","tease out the nuances","parse the complexities","disentangle the factors","disambiguate the elements","demarcate the boundaries","vis-à-vis","qua","sui generis","a priori","a posteriori","de facto","de jure","per se","prima facie","mutatis mutandis","ceteris paribus","ontological","epistemological","phenomenological","hermeneutic","heuristic","dialectical","teleological","axiological","methodological","taxonomic","typological","morphological","discursive formation","epistemic community","hegemonic discourse","liminal space","rhizomatic structure","assemblage theory","performativity","intersectionality","positionality","reflexivity","praxis","habitus","doxa","heteronormativity","the literature suggests","scholarship indicates","the canon reveals","critical theory posits","postmodern thought argues","seminal works demonstrate","foundational texts establish","theoretical frameworks propose","situated knowledge","contested terrain","power dynamics","structural inequalities","systemic barriers","institutional frameworks","ideological underpinnings","cultural production","social construction","discursive practices","material conditions","historical contingencies","foregrounding","backgrounding","centering","marginalizing","privileging","othering","essentializing","universalizing","naturalizing","normalizing","pathologizing","medicalizing","problematizing"],
+        "the implementation of", "the utilization of", "the integration of", "the adoption of", "the evolution of", "the transformation of", "the intersection of", "the proliferation of", "the manifestation of", "the optimization of", "the contextualization of", "the conceptualization of", "the operationalization of", "the commodification of", "the gamification of", "the democratization of", "the monetization of", "the personalization of", "the customization of", "the standardization of",
 
-hedgingLanguage:["it could be argued","one might say","it seems that","it appears that","it would seem","it might be suggested","arguably","presumably","ostensibly","potentially","conceivably","theoretically","hypothetically","speculatively","tentatively","to some extent","to a certain degree","in some ways","in certain respects","in many cases","in most instances","in several situations","under some conditions","under certain circumstances","given particular contexts","relatively speaking","comparatively speaking","contextually speaking","conditionally speaking","provisionally speaking","preliminarily speaking","cautiously speaking","conservatively speaking","it remains to be seen","time will tell","the jury is still out","the verdict is not in","the question remains open","the debate continues","the discussion is ongoing","the investigation persists","the analysis is incomplete","the assessment is preliminary","the evaluation is tentative","the judgment is provisional"],
+        "serves as a foundation", "acts as a bridge", "functions as a catalyst", "operates as a framework", "stands as a testament", "emerges as a leader", "positions itself as", "distinguishes itself through", "sets itself apart", "prides itself on", "finds itself at", "lends itself to", "proves itself to be", "establishes itself as", "manifests itself in",
 
-listIntroducers:["here are some key points","consider the following","these include","such as","for example","for instance","namely","specifically","in particular","among them","including but not limited to","some examples include","key factors include","main elements are","primary components consist of","let's break this down","let's enumerate","let's outline","let's list","let's itemize","let's detail","let's specify","let's identify","let's highlight","the following are","below are","listed below are","outlined below are","detailed below are","key considerations include","important factors are","critical elements consist of","essential components comprise","vital aspects encompass","crucial dimensions involve","significant features contain","notable characteristics include","defining traits consist of","core properties include","fundamental aspects are"],
+        "from a practical standpoint", "from a theoretical perspective", "from an ethical standpoint", "from a business perspective", "from a strategic viewpoint", "through the lens of", "within the context of", "in the framework of", "under the umbrella of", "at the intersection of", "on the spectrum of", "across the landscape of", "throughout the ecosystem of", "amid the backdrop of", "against the backdrop of",
 
-metaCommentary:["as we've explored","as we've seen","as discussed above","as mentioned earlier","as outlined previously","as established","as demonstrated","as illustrated","as shown","as indicated","as noted","as observed","as highlighted","as emphasized","as clarified","this brings us to","this leads us to","this points us toward","this directs our attention to","this guides us to","this takes us to","this moves us toward","this transitions us to","this segues into","this pivots to","let's explore this further","let's examine this more closely","let's investigate this deeper","let's unpack this concept","let's break this down","let's dissect this idea","let's analyze this aspect","let's scrutinize this element","let's probe this dimension","let's delve into this facet","to better understand","to fully appreciate","to properly contextualize","to adequately explain","to comprehensively cover","to thoroughly examine","to rigorously analyze","the key takeaway is","the main point is","the central theme is","the core idea is","the fundamental concept is","the essential principle is","the primary lesson is","the crucial insight is"],
+        "game-changing impact", "transformative potential", "revolutionary approach", "innovative solutions", "strategic initiatives", "actionable insights", "value proposition", "competitive advantage", "core competencies", "best practices", "industry standards", "thought leadership", "stakeholder engagement", "customer-centric approach", "data-driven decisions", "future-proof strategy", "mission-critical", "bottom-line impact", "scalable solutions", "sustainable growth",
 
-processVerbs:["leverage","utilize","harness","deploy","implement","execute","operationalize","actualize","materialize","effectuate","instantiate","facilitate","enable","empower","catalyze","accelerate","expedite","streamline","optimize","maximize","synergize","integrate","amalgamate","consolidate","unify","merge","blend","fuse","combine","synthesize","aggregate","compile","assemble","orchestrate","coordinate","harmonize","align","synchronize","calibrate","attune","ideate","conceptualize","envision","visualize","imagine","conceive","formulate","devise","craft","design","architect","engineer","construct","build","develop","create","generate","produce","manufacture","fabricate","strategize","plan","scheme","plot","organize","structure","arrange","systematize","order","sequence","prioritize","rank","grade","classify","categorize","sort","group","cluster","segment","partition","benchmark","baseline","gauge","measure","quantify","assess","evaluate","appraise","estimate","calculate","compute","determine","ascertain","establish","verify","validate","authenticate","certify","confirm","substantiate"],
+        "harness the power of", "unlock the potential of", "tap into the possibilities", "seize the opportunity", "embrace the challenge", "leverage the capabilities", "capitalize on the momentum", "maximize the impact of", "amplify the effectiveness", "accelerate the adoption", "streamline the process", "optimize the workflow", "enhance the experience", "elevate the discourse", "enrich the understanding", "deepen the engagement", "broaden the perspective", "expand the horizons", "push the boundaries", "challenge the assumptions",
 
-buzzwordClusters:["digital transformation initiative","agile methodology framework","design thinking workshop","innovation pipeline strategy","change management program","continuous improvement cycle","total quality management","lean six sigma approach","business process reengineering","core value proposition","unique selling point","competitive differentiation","market positioning strategy","brand identity architecture","customer experience journey","user engagement model","conversion funnel optimization","retention strategy framework","revenue stream diversification","monetization strategy","pricing model optimization","cost structure analysis","profit margin enhancement","return on investment calculation","total cost of ownership","lifetime customer value","key performance indicator","success metric dashboard","progress tracking system","milestone achievement plan","project roadmap visualization","sprint planning ceremony","retrospective analysis session","stakeholder alignment meeting","cross-functional collaboration","interdepartmental coordination","organizational synergy","team building exercise","leadership development program","talent acquisition strategy","succession planning initiative","performance review cycle","employee engagement survey"],
+        "it goes without saying", "it stands to reason", "needless to say", "suffice it to say", "the fact remains that", "the reality is that", "the truth of the matter", "at the end of the day", "when all is said and done", "in the grand scheme of things", "in the larger context", "taking everything into account", "all things being equal", "for all intents and purposes", "to all intents and purposes", "by and large", "for the most part", "as a general rule", "as a matter of fact", "in point of fact",
 
-structural:{bulletDensity:/(^|\n)\s*[-•*]\s+/gm,markdownBold:/\*\*([^*]+)\*\*/g,boldColon:/\*\*([A-Z][^*:]{1,40})\*\*:\s*/g,numberedLists:/^\d+\.\s+/gm,headerPattern:/^#{1,6}\s+/gm,colonIntroducer:/:\s*$/gm}
+        "deep dive into", "high-level overview", "granular analysis", "bird's-eye view", "ground-level perspective", "zooming out", "drilling down", "peeling back the layers", "scratching the surface", "getting to the heart of", "cutting to the chase", "hitting the nail on the head", "striking a balance", "finding the sweet spot", "threading the needle", "walking the tightrope", "navigating the waters", "charting the course", "blazing the trail", "paving the way",
+
+        "it is worth mentioning", "it bears repeating", "it cannot be overstated", "it is no secret that", "it is interesting to note", "it is fascinating to observe", "it is crucial to acknowledge", "it is vital to recognize", "it is essential to understand", "it is imperative to consider", "one must acknowledge", "one cannot ignore", "one should recognize", "we must consider", "we cannot overlook", "we should emphasize", "let us not forget", "make no mistake about it", "there is no denying that", "there can be no doubt that",
+
+        "transformative journey", "holistic approach", "integrated solution", "comprehensive strategy", "unified vision", "cohesive framework", "synergistic relationship", "collaborative effort", "collective wisdom", "shared understanding", "mutual benefit", "reciprocal value", "bidirectional flow", "circular economy", "virtuous cycle", "upward trajectory", "forward momentum", "exponential growth", "quantum leap", "paradigm shift",
+
+        "cutting-edge technology", "state-of-the-art solution", "next-generation platform", "best-in-class performance", "world-class standards", "industry-leading approach", "market-leading position", "pioneering innovation", "groundbreaking research", "trailblazing initiative", "forward-thinking strategy", "future-facing design", "backward-compatible", "agnostic framework", "vendor-neutral", "platform-agnostic", "cloud-native", "mobile-first", "user-centric", "human-centered",
+
+        "mission-driven organization", "purpose-built solution", "intentionally designed", "strategically positioned", "thoughtfully crafted", "carefully curated", "deliberately chosen", "consciously structured", "systematically organized", "methodically arranged", "rigorously tested", "thoroughly vetted", "extensively researched", "comprehensively analyzed", "meticulously documented", "precisely calibrated", "finely tuned", "expertly crafted", "skillfully executed", "masterfully implemented",
+
+        "robust architecture", "resilient infrastructure", "flexible framework", "adaptable system", "modular design", "extensible platform", "scalable architecture", "future-proof foundation", "sustainable model", "viable solution", "practical approach", "pragmatic strategy", "realistic expectations", "achievable goals", "measurable outcomes", "quantifiable results", "tangible benefits", "concrete deliverables", "actionable recommendations", "implementable solutions",
+
+        "aesthetic appeal", "visual hierarchy", "intuitive interface", "ergonomic design", "minimalist approach", "maximalist philosophy", "organic growth", "exponential scale", "logarithmic progression", "linear trajectory", "cyclical pattern", "iterative process", "incremental improvement", "radical transformation", "disruptive innovation", "sustaining innovation", "breakthrough discovery", "seminal work", "foundational research", "preliminary findings",
+
+        "longitudinal study", "cross-sectional analysis", "meta-analysis", "systematic review", "empirical evidence", "anecdotal evidence", "qualitative data", "quantitative metrics", "mixed-methods approach", "triangulated data", "validated findings", "peer-reviewed research", "double-blind study", "randomized control", "statistical significance", "correlation coefficient", "causal relationship", "dependent variable", "independent variable", "confounding factor"
+
+    ],
+
+    
+
+    transitionOverload: [
+
+        "It is important to note", "In conclusion", "Conversely", "Furthermore", "To summarize", "That being said", "With that in mind", "On the other hand", "It should be noted that", "As previously mentioned", "In light of this", "Taking this into account", "Given the above", "In this context", "From this perspective", "To put it another way", "In other words", "To clarify", "To elaborate", "To expand on this", "Building on this", "Following from this", "In addition to this", "Along these lines", "Similarly", "Likewise", "By the same token", "In the same vein", "Correspondingly", "By contrast", "In contrast", "On the contrary", "Despite this", "In spite of this", "Regardless of this", "Notwithstanding", "At the same time", "Simultaneously", "Concurrently", "Meanwhile", "In the meantime", "Subsequently", "Consequently", "As a result", "Therefore", "Thus", "Hence", "Accordingly", "For this reason", "To this end", "With this in mind", "Bearing this in mind", "Given these points", "In summary", "To sum up", "All things considered", "On balance", "Ultimately", "In the final analysis", "At the end of the day", "It is worth noting that", "It is crucial to recognize", "It is essential to understand", "Let us consider", "Let's take a closer look at", "Moving forward", "Looking ahead",
+
+        "What's more", "In fact", "Indeed", "As a matter of fact", "Actually", "Essentially", "Basically", "Fundamentally", "Primarily", "Chiefly", "Mainly", "Largely", "Predominantly", "Principally", "For the most part", "By and large", "On the whole", "In general", "Generally speaking", "Broadly speaking", "Roughly speaking", "Strictly speaking", "Technically speaking", "Realistically speaking", "Practically speaking", "Theoretically speaking", "Hypothetically speaking", "Ideally speaking", "Optimally speaking", "Alternatively",
+
+        "Another key point is", "Another important aspect", "It is also worth considering", "Equally important is", "Of equal significance", "No less important", "Just as crucial", "Equally compelling", "Similarly significant", "Comparably important", "Paralleling this", "Mirroring this trend", "Echoing this sentiment", "Reinforcing this point", "Complementing this view", "Supplementing this idea", "Extending this logic", "Advancing this argument", "Furthering this discussion", "Deepening this analysis",
+
+        "To be sure", "To be fair", "To be clear", "To be precise", "To be specific", "To be exact", "To be honest", "To be frank", "Truth be told", "All things being equal", "Granted", "Admittedly", "Certainly", "Undoubtedly", "Unquestionably", "Without a doubt", "Beyond question", "Beyond dispute", "Without question", "By all means", "For all that", "Be that as it may", "Even so", "Having said that", "This being said", "This aside", "That said", "That aside", "That notwithstanding",
+
+        "First and foremost", "First of all", "To begin with", "In the first place", "Initially", "At the outset", "From the outset", "At first glance", "On first inspection", "Upon closer examination", "Upon further reflection", "On deeper analysis", "Digging deeper", "Taking a step back", "Zooming out", "Looking at the bigger picture", "In the broader context", "Within the larger framework", "Against this background", "With this backdrop",
+
+        "More specifically", "More precisely", "More accurately", "More to the point", "Getting back to the point", "Returning to the main topic", "Circling back to", "Revisiting this issue", "Coming back to", "As we've established", "As we've discussed", "As we've seen", "As demonstrated above", "As illustrated previously", "As shown earlier", "As outlined before", "As noted earlier", "As stated above", "As mentioned previously", "As indicated earlier",
+
+        "In a similar fashion", "Along similar lines", "In much the same way", "By the same logic", "Following the same reasoning", "Using similar logic", "Applying the same principle", "Under similar circumstances", "In comparable situations", "In parallel cases", "In analogous scenarios", "Under analogous conditions", "By way of comparison", "For comparison purposes", "To draw a parallel", "To make a comparison", "To illustrate this point", "To demonstrate this", "By way of illustration", "As an example",
+
+        "With this in consideration", "Taking stock of", "Weighing these factors", "Balancing these considerations", "Factoring in these elements", "Accounting for these variables", "Incorporating these insights", "Integrating these perspectives", "Synthesizing these viewpoints", "Reconciling these positions", "Harmonizing these approaches", "Aligning these objectives", "Bridging these perspectives", "Connecting these dots", "Drawing these threads together", "Pulling these strands together", "Weaving these elements together", "Tying these concepts together", "Bringing these ideas together", "Unifying these themes",
+
+        "Before proceeding further", "Before moving on", "Before we continue", "Prior to discussing", "In advance of", "Ahead of", "In preparation for", "Setting the stage for", "Laying the groundwork for", "Establishing the foundation for", "Creating the context for", "Providing the backdrop for", "Framing the discussion", "Contextualizing the issue", "Situating this within", "Positioning this against", "Placing this in context", "Viewing this through", "Examining this from", "Analyzing this via",
+
+        "Turning our attention to", "Shifting focus to", "Directing our gaze toward", "Pivoting to", "Transitioning to", "Proceeding to", "Advancing to", "Progressing to", "Continuing with", "Pursuing this further", "Exploring this more deeply", "Investigating this more thoroughly", "Scrutinizing this more carefully", "Examining this more closely", "Inspecting this more rigorously", "Evaluating this more critically", "Assessing this more objectively", "Appraising this more fairly", "Judging this more accurately", "Measuring this more precisely"
+
+    ],
+
+    
+
+    vagueAuthority: [
+
+        "experts suggest", "studies show", "research indicates", "many believe", "it is widely accepted", "experts agree", "scientists say", "data suggests", "general consensus", "critics argue", "observers note", "it has been said", "popular belief", "rumor has it", "arguably",
+
+        "according to sources", "reports indicate", "findings suggest", "evidence points to", "analysis reveals", "surveys show", "polls indicate", "statistics demonstrate", "numbers suggest", "trends indicate", "patterns emerge", "data shows", "research demonstrates", "studies confirm", "experts warn", "analysts predict", "forecasts suggest", "projections indicate", "estimates show", "calculations reveal",
+
+        "common wisdom holds", "conventional wisdom suggests", "prevailing opinion", "mainstream thinking", "scholarly consensus", "academic agreement", "scientific community agrees", "thought leaders believe", "industry experts note", "seasoned professionals observe", "veteran practitioners suggest", "experienced analysts argue", "informed observers contend", "knowledgeable sources claim", "authoritative voices state",
+
+        "it has been suggested", "it has been proposed", "it has been argued", "it has been claimed", "it has been observed", "it has been documented", "it has been reported", "it has been established", "it is generally understood", "it is commonly believed", "it is frequently stated", "it is often cited", "it is regularly noted", "it is typically acknowledged", "it is universally recognized",
+
+        "some argue that", "others contend that", "critics maintain that", "proponents claim that", "skeptics question whether", "advocates insist that", "opponents challenge the", "supporters defend the", "detractors dispute the", "commentators suggest that", "pundits believe that", "influencers promote the", "stakeholders emphasize that", "practitioners recognize that", "theorists propose that",
+
+        "emerging research shows", "preliminary studies indicate", "initial findings suggest", "early evidence points to", "recent data demonstrates", "latest reports confirm", "updated analysis reveals", "current trends show", "ongoing research suggests", "continuing studies indicate", "forthcoming data will show", "anticipated results suggest", "expected outcomes indicate", "projected findings demonstrate", "forecasted trends point to",
+
+        "historical precedent shows", "past experience suggests", "previous studies indicate", "earlier research demonstrates", "prior evidence confirms", "former analysis revealed", "legacy data shows", "archival records indicate", "documented cases suggest", "established patterns demonstrate", "proven track record shows", "verified results confirm", "authenticated findings reveal", "substantiated claims indicate", "corroborated evidence suggests",
+
+        "industry insiders say", "field experts claim", "domain specialists note", "subject matter experts suggest", "technical authorities indicate", "professional bodies recommend", "trade associations endorse", "regulatory agencies acknowledge", "governmental bodies recognize", "international organizations confirm", "global institutions validate", "multinational corporations report", "Fortune 500 companies demonstrate", "leading firms showcase", "top-tier organizations exemplify"
+
+    ],
+
+    
+
+    refusalHeaders: [
+
+        "As an AI language model", "I cannot fulfill", "It is ethically important", "I don't have personal opinions", "I'm not able to", "I cannot provide", "I'm unable to", "I don't have the ability", "As an AI assistant", "My purpose is to", "My knowledge cutoff", "I cannot generate", "I'm not capable of", "I must decline", "I cannot assist with", "I'm programmed to", "I am designed to", "It would be inappropriate for me to",
+
+        "I don't have personal experiences", "I don't have feelings about", "I cannot make subjective judgments", "I should clarify that", "I must emphasize that", "I should point out that", "I need to mention that", "I feel compelled to say", "I should be clear that", "I want to be transparent that", "In the interest of transparency", "In the spirit of accuracy", "For the sake of clarity", "To be completely honest", "To maintain objectivity", "To avoid bias", "To remain neutral", "To stay impartial", "To preserve integrity",
+
+        "I'm here to help", "I'm happy to assist", "I'd be glad to help", "I can certainly try", "I'll do my best", "Let me see what I can do", "I appreciate your question", "Thank you for asking", "That's a great question", "I understand your concern", "I recognize the importance", "I acknowledge the complexity", "I appreciate the nuance", "I respect your perspective", "I value your input"
+
+    ],
+
+    
+
+    corporateEmojis: ["✨", "🚀", "💡", "🤖", "🧠", "🎯", "⚡", "🔥", "💪", "👍", "🌟", "⭐", "📈", "📊", "🎨", "🏆", "💯", "🎉", "🔑", "💎", "🌈", "🛠️", "⚙️", "🔧", "📝", "📚", "🎓", "💼", "🏢", "📱", "💻", "🖥️", "⌨️", "🎪", "🎭", "🎬", "🎮", "🕹️", "🎲", "🧩", "🔮", "💫", "🌠", "🎆", "🎇", "✅", "❌", "⭕", "🔴", "🟢", "🔵"],
+
+    
+
+    emojiPatterns: {
+
+        endOnly: /[^\s][.!?]\s*[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]+$/mu,
+
+        midSentence: /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s+[a-z]/mu,
+
+    },
+
+    
+
+    compoundAdjectives: [
+
+        "ever-evolving", "multi-faceted", "fast-paced", "well-established", "far-reaching", "long-term", "short-term", "high-level", "low-level", "top-down", "bottom-up", "end-to-end", "cross-functional", "cross-disciplinary", "multi-dimensional", "multi-layered", "forward-thinking", "backward-compatible", "future-proof", "time-tested",
+
+        "data-driven", "user-centric", "customer-focused", "results-oriented", "goal-oriented", "action-oriented", "detail-oriented", "solution-focused", "value-added", "mission-critical", "business-critical", "time-sensitive", "cost-effective", "resource-efficient", "energy-efficient", "eco-friendly", "user-friendly", "mobile-friendly", "AI-powered", "cloud-based",
+
+        "real-time", "real-world", "hands-on", "state-of-the-art", "cutting-edge", "bleeding-edge", "next-generation", "best-in-class", "world-class", "industry-leading", "market-leading", "award-winning", "battle-tested", "production-ready", "enterprise-grade", "military-grade", "industrial-strength", "consumer-grade", "professional-grade", "commercial-grade",
+
+        "full-scale", "large-scale", "small-scale", "wide-ranging", "all-encompassing", "all-inclusive", "full-featured", "feature-rich", "content-rich", "information-rich", "resource-intensive", "labor-intensive", "capital-intensive", "knowledge-intensive", "skill-intensive", "time-consuming", "energy-consuming", "bandwidth-intensive", "compute-intensive", "memory-intensive",
+
+        "self-service", "self-contained", "self-sufficient", "self-sustaining", "self-regulating", "self-organizing", "self-optimizing", "self-healing", "self-learning", "self-aware", "context-aware", "location-aware", "time-aware", "situation-aware", "environment-aware", "user-aware", "device-aware", "network-aware", "platform-aware", "system-aware",
+
+        "open-source", "closed-source", "source-available", "open-ended", "closed-loop", "feed-forward", "feedback-driven", "event-driven", "message-driven", "queue-based", "stack-based", "heap-based", "disk-based", "memory-based", "cache-friendly", "latency-sensitive", "throughput-optimized", "bandwidth-limited", "CPU-bound", "I/O-bound",
+
+        "pre-configured", "pre-installed", "pre-packaged", "pre-built", "pre-tested", "post-processing", "post-deployment", "post-implementation", "post-launch", "pre-release", "alpha-stage", "beta-version", "release-candidate", "production-grade", "prototype-phase", "proof-of-concept", "minimum-viable", "feature-complete", "fully-functional", "partially-implemented",
+
+        "risk-averse", "risk-tolerant", "profit-driven", "revenue-generating", "cost-saving", "budget-friendly", "price-competitive", "margin-enhancing", "yield-improving", "performance-boosting", "efficiency-gaining", "productivity-enhancing", "capacity-building", "capability-expanding", "competency-developing", "skill-enhancing", "knowledge-building", "experience-enriching", "career-advancing", "life-changing",
+
+        "attention-grabbing", "eye-catching", "mind-blowing", "jaw-dropping", "head-turning", "show-stopping", "traffic-stopping", "conversation-starting", "trend-setting", "record-breaking", "ground-breaking", "earth-shattering", "world-changing", "life-altering", "game-changing", "industry-disrupting", "market-defining", "category-creating", "sector-leading", "field-advancing"
+
+    ],
+
+    
+
+    falseBalance: [
+
+        "while it's true that", "on one hand", "on the other hand", "however it's important to note", "that said", "having said that", "nevertheless", "at the same time", "conversely", "yet it must be acknowledged", "still one should consider", "although this is the case", "despite these benefits", "notwithstanding these advantages", "in spite of these merits",
+
+        "balanced against", "weighed against", "measured against", "juxtaposed with", "contrasted with", "compared with", "set against", "viewed alongside", "considered in light of", "evaluated in context of", "assessed relative to", "judged in comparison to", "analyzed vis-à-vis", "examined in relation to", "reviewed in conjunction with",
+
+        "both sides of the coin", "two sides of the story", "multiple perspectives exist", "various viewpoints suggest", "different angles reveal", "alternative interpretations show", "competing theories propose", "contrasting opinions indicate", "divergent views demonstrate", "opposing camps argue", "conflicting evidence suggests", "contradictory findings indicate", "inconsistent results show", "mixed evidence demonstrates", "ambiguous data reveals",
+
+        "it's worth considering that", "one might argue that", "some would say that", "others might contend that", "an alternative view holds", "a different perspective suggests", "another school of thought", "a competing interpretation", "a contrasting position", "an opposing viewpoint", "a dissenting opinion", "a minority view", "a fringe theory", "an outlier position", "a heterodox interpretation",
+
+        "presents both opportunities and challenges", "offers advantages and disadvantages", "has pros and cons", "comes with trade-offs", "involves compromises", "requires balancing", "demands careful weighing", "necessitates thoughtful consideration", "calls for nuanced understanding", "merits careful examination", "deserves balanced assessment", "warrants even-handed evaluation", "needs fair-minded analysis", "requires objective appraisal", "demands impartial judgment"
+
+    ],
+
+    
+
+    academicCosplay: [
+
+        "problematize", "theorize", "conceptualize", "operationalize", "contextualize", "delineate", "elucidate", "interrogate", "deconstruct", "unpack the implications", "tease out the nuances", "parse the complexities", "disentangle the factors", "disambiguate the elements", "demarcate the boundaries",
+
+        "vis-à-vis", "qua", "sui generis", "a priori", "a posteriori", "de facto", "de jure", "per se", "prima facie", "mutatis mutandis", "ceteris paribus", "ex post facto", "in situ", "in vitro", "in vivo",
+
+        "ontological", "epistemological", "phenomenological", "hermeneutic", "heuristic", "dialectical", "teleological", "axiological", "methodological", "taxonomic", "typological", "morphological", "genealogical", "archaeological", "ethnographic",
+
+        "discursive formation", "epistemic community", "hegemonic discourse", "liminal space", "rhizomatic structure", "assemblage theory", "actor-network theory", "performativity", "intersectionality", "positionality", "reflexivity", "praxis", "habitus", "doxa", "heteronormativity",
+
+        "the literature suggests", "scholarship indicates", "the canon reveals", "critical theory posits", "postmodern thought argues", "contemporary discourse shows", "seminal works demonstrate", "foundational texts establish", "theoretical frameworks propose", "analytical lenses reveal", "conceptual models indicate", "interpretive paradigms suggest", "methodological approaches demonstrate", "empirical investigations show", "qualitative studies reveal",
+
+        "situated knowledge", "contested terrain", "power dynamics", "structural inequalities", "systemic barriers", "institutional frameworks", "ideological underpinnings", "cultural production", "social construction", "discursive practices", "material conditions", "historical contingencies", "temporal dimensions", "spatial configurations", "relational networks",
+
+        "foregrounding", "backgrounding", "centering", "marginalizing", "privileging", "othering", "essentializing", "universalizing", "naturalizing", "normalizing", "pathologizing", "medicalizing", "criminalizing", "stigmatizing", "problematizing"
+
+    ],
+
+    
+
+    metaCommentary: [
+
+        "as we've explored", "as we've seen", "as discussed above", "as mentioned earlier", "as outlined previously", "as established", "as demonstrated", "as illustrated", "as shown", "as indicated", "as noted", "as observed", "as highlighted", "as emphasized", "as clarified",
+
+        "this brings us to", "this leads us to", "this points us toward", "this directs our attention to", "this guides us to", "this takes us to", "this moves us toward", "this transitions us to", "this segues into", "this pivots to", "this shifts to", "this turns to", "this brings up", "this raises the question", "this prompts us to consider",
+
+        "let's explore this further", "let's examine this more closely", "let's investigate this deeper", "let's unpack this concept", "let's break this down", "let's dissect this idea", "let's analyze this aspect", "let's scrutinize this element", "let's probe this dimension", "let's delve into this facet", "let's dig into this component", "let's look at this angle", "let's consider this perspective", "let's evaluate this viewpoint", "let's assess this position",
+
+        "to better understand", "to fully appreciate", "to properly contextualize", "to adequately explain", "to sufficiently illustrate", "to comprehensively cover", "to thoroughly examine", "to rigorously analyze", "to systematically explore", "to methodically investigate", "to carefully scrutinize", "to critically evaluate", "to objectively assess", "to fairly judge", "to accurately measure",
+
+        "the key takeaway is", "the main point is", "the central theme is", "the core idea is", "the fundamental concept is", "the essential principle is", "the primary lesson is", "the crucial insight is", "the critical understanding is", "the vital recognition is", "the important realization is", "the significant acknowledgment is", "the notable observation is", "the remarkable finding is", "the striking conclusion is"
+
+    ],
+
+    
+
+    hedgingLanguage: [
+
+        "it could be argued", "one might say", "it seems that", "it appears that", "it would seem", "it might be suggested", "arguably", "presumably", "ostensibly", "potentially", "conceivably", "theoretically", "hypothetically", "speculatively", "tentatively",
+
+        "to some extent", "to a certain degree", "in some ways", "in certain respects", "in many cases", "in most instances", "in several situations", "under some conditions", "under certain circumstances", "given particular contexts", "within specific parameters", "across various scenarios", "throughout different settings", "among diverse populations", "between multiple groups",
+
+        "may or may not", "can or cannot", "will or will not", "should or should not", "might or might not", "could or could not", "would or would not", "does or does not", "is or is not", "has or has not", "appears or appears not", "seems or seems not", "tends or tends not", "likely or unlikely", "probable or improbable",
+
+        "relatively speaking", "comparatively speaking", "proportionally speaking", "contextually speaking", "situationally speaking", "conditionally speaking", "provisionally speaking", "preliminarily speaking", "tentatively speaking", "cautiously speaking", "conservatively speaking", "liberally speaking", "loosely speaking", "strictly speaking", "approximately speaking",
+
+        "it remains to be seen", "time will tell", "only time will tell", "the jury is still out", "the verdict is not in", "the question remains open", "the debate continues", "the discussion is ongoing", "the investigation persists", "the inquiry proceeds", "the research continues", "the analysis is incomplete", "the assessment is preliminary", "the evaluation is tentative", "the judgment is provisional"
+
+    ],
+
+    
+
+    listIntroducers: [
+
+        "here are some key points", "consider the following", "these include", "such as", "for example", "for instance", "namely", "specifically", "in particular", "among them", "including but not limited to", "some examples include", "key factors include", "main elements are", "primary components consist of",
+
+        "let's break this down", "let's enumerate", "let's outline", "let's list", "let's itemize", "let's detail", "let's specify", "let's identify", "let's highlight", "let's pinpoint", "let's single out", "let's flag", "let's mark", "let's note", "let's record",
+
+        "the following are", "below are", "listed below are", "outlined below are", "detailed below are", "enumerated below are", "included are", "featured are", "presented are", "displayed are", "shown are", "illustrated are", "demonstrated are", "exhibited are", "showcased are",
+
+        "key considerations include", "important factors are", "critical elements consist of", "essential components comprise", "vital aspects encompass", "crucial dimensions involve", "significant features contain", "notable characteristics include", "remarkable attributes are", "distinctive qualities comprise", "defining traits consist of", "core properties include", "fundamental aspects are", "basic elements comprise", "primary features consist of"
+
+    ],
+
+    
+
+    processVerbs: [
+
+        "leverage", "utilize", "harness", "deploy", "implement", "execute", "operationalize", "actualize", "materialize", "effectuate", "instantiate", "facilitate", "enable", "empower", "catalyze", "accelerate", "expedite", "streamline", "optimize", "maximize",
+
+        "synergize", "integrate", "amalgamate", "consolidate", "unify", "merge", "blend", "fuse", "combine", "synthesize", "aggregate", "compile", "assemble", "orchestrate", "coordinate", "harmonize", "align", "synchronize", "calibrate", "attune",
+
+        "ideate", "conceptualize", "envision", "visualize", "imagine", "conceive", "formulate", "devise", "craft", "design", "architect", "engineer", "construct", "build", "develop", "create", "generate", "produce", "manufacture", "fabricate",
+
+        "strategize", "plan", "scheme", "plot", "organize", "structure", "arrange", "systematize", "order", "sequence", "prioritize", "rank", "grade", "classify", "categorize", "sort", "group", "cluster", "segment", "partition",
+
+        "benchmark", "baseline", "gauge", "measure", "quantify", "assess", "evaluate", "appraise", "estimate", "calculate", "compute", "determine", "ascertain", "establish", "verify", "validate", "authenticate", "certify", "confirm", "substantiate"
+
+    ],
+
+    
+
+    buzzwordClusters: [
+
+        "digital transformation initiative", "agile methodology framework", "design thinking workshop", "innovation pipeline strategy", "change management program", "continuous improvement cycle", "total quality management", "lean six sigma approach", "business process reengineering", "strategic planning session",
+
+        "core value proposition", "unique selling point", "competitive differentiation", "market positioning strategy", "brand identity architecture", "customer experience journey", "user engagement model", "conversion funnel optimization", "retention strategy framework", "loyalty program design",
+
+        "revenue stream diversification", "monetization strategy", "pricing model optimization", "cost structure analysis", "profit margin enhancement", "return on investment calculation", "total cost of ownership", "lifetime customer value", "acquisition cost ratio", "churn rate reduction",
+
+        "key performance indicator", "success metric dashboard", "progress tracking system", "milestone achievement plan", "deliverable timeline", "project roadmap visualization", "sprint planning ceremony", "retrospective analysis session", "velocity measurement framework", "capacity planning model",
+
+        "stakeholder alignment meeting", "cross-functional collaboration", "interdepartmental coordination", "organizational synergy", "team building exercise", "leadership development program", "talent acquisition strategy", "succession planning initiative", "performance review cycle", "employee engagement survey"
+
+    ],
+
+    
+
+    structural: {
+
+        bulletDensity: /(^|\n)\s*[-•*]\s+/gm,
+
+        markdownBold: /\*\*([^*]+)\*\*/g,
+
+        boldColon: /\*\*([A-Z][^*:]{1,40})\*\*:\s*/g,
+
+        numberedLists: /^\d+\.\s+/gm,
+
+        headerPattern: /^#{1,6}\s+/gm,
+
+        colonIntroducer: /:\s*$/gm,
+
+    }
+
 };
 
-const Utils={
-  htmlToText:e=>{const t=document.createElement("div");t.innerHTML=e;return t.textContent||t.innerText||""},
-  countWords:e=>e.trim().split(/\s+/).filter(Boolean).length,
-  escapeHtml:e=>{const t=document.createElement("div");t.textContent=e;return t.innerHTML},
-  splitSentences:e=>e.match(/[^.!?]+[.!?]+(?=\s|$)/g)||[],
-  extractEmojis:e=>[...e.matchAll(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu)].map(e=>e[0]),
-  calculateStdDev:e=>{if(!e.length)return 0;const t=e.reduce((a,b)=>a+b,0)/e.length;return Math.sqrt(e.map(e=>Math.pow(e-t,2)).reduce((a,b)=>a+b,0)/e.length)},
-  extractSnippet:(f,m,i,c=50,cls="match-highlight")=>{const s=Math.max(0,i-c),e=Math.min(f.length,i+m.length+c);let p=f.substring(s,i),sf=f.substring(i+m.length,e);if(s>0)p="..."+p;if(e<f.length)sf+=+"...";return`${Utils.escapeHtml(p)}<span class="${cls}">${Utils.escapeHtml(m)}</span>${Utils.escapeHtml(sf)}`},
-  getNgrams:(words,n)=>{const g=[];for(let i=0;i<=words.length-n;i++)g.push(words.slice(i,i+n).join(" "));return g},
-  getTokens:t=>t.toLowerCase().match(/\b[a-z]{3,}\b/g)||[]
-};
 
-class WeightedScorer{
-  constructor(){this.totalWeight=0;this.weightedScore=0;this.findings=[]}
-  add(s,w,t="medium"){const wt=PatternConfig.weights[w]||1;this.weightedScore+=s*wt;this.totalWeight+=wt;this.findings.push({s,wt,t})}
-  getScore(){return this.totalWeight>0?Math.min(100,this.weightedScore/this.totalWeight):0}
-  getDetails(){return{raw:this.weightedScore,totalWeight:this.totalWeight,normalized:this.getScore(),findingsCount:this.findings.length}}
-}
+        const Utils = {
+            htmlToText: e => {
+                const t = document.createElement("div");
+                t.innerHTML = e;
+                return t.textContent || t.innerText || "";
+            },
+            countWords: e => e.trim().split(/\s+/).filter(Boolean).length,
+            escapeHtml: e => {
+                const t = document.createElement("div");
+                t.textContent = e;
+                return t.innerHTML;
+            },
+            splitSentences: e => e.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [],
+            extractEmojis: e => [...e.matchAll(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu)].map(e => e[0]),
+            calculateStdDev: e => {
+                if (!e.length) return 0;
+                const t = e.reduce((e, t) => e + t, 0) / e.length;
+                return Math.sqrt(e.map(e => Math.pow(e - t, 2)).reduce((e, t) => e + t, 0) / e.length);
+            },
+            extractSnippet: (fullText, matchText, index, contextLength = 50, className = "match-highlight") => {
+                const start = Math.max(0, index - contextLength);
+                const end = Math.min(fullText.length, index + matchText.length + contextLength);
+                let prefix = fullText.substring(start, index);
+                let suffix = fullText.substring(index + matchText.length, end);
+                if (start > 0) prefix = "..." + prefix;
+                if (end < fullText.length) suffix = suffix + "...";
+                return `${Utils.escapeHtml(prefix)}<span class="${className}">${Utils.escapeHtml(matchText)}</span>${Utils.escapeHtml(suffix)}`;
+            }
+        };
 
-// --- 1. LEXICON ---
-class GPTLexiconAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];let h=0;
-    PatternConfig.gptLexicon.forEach(p=>{
-      const rx=new RegExp(`\\b${p}\\b`,"gi");let x;
-      while((x=rx.exec(this.text))!==null){h++;if(m.length<15)m.push({type:"Lexicon",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Common AI Vocabulary",weight:"high"})}
-    });
-    const d=h/(this.wc||1);
-    if(d>0.03)sc.add(100,"critical");else if(d>0.015)sc.add(60,"high");else if(d>0.005)sc.add(30,"medium");
-    return{name:"Vocabulary Patterns",score:sc.getScore(),matches:m,summary:`${h} specific AI words detected`,details:sc.getDetails()};
-  }
-}
-
-// --- 2. EMOJI FORENSICS ---
-class EmojiAnalyzer{
-  constructor(t){this.text=t;this.emojis=Utils.extractEmojis(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    if(!this.emojis.length)return{name:"Emoji Analysis",score:0,matches:[],summary:"No emojis detected"};
-    let eoc=0,msc=0;
-    Utils.splitSentences(this.text).forEach(s=>{
-      if(PatternConfig.emojiPatterns.endOnly.test(s))eoc++;
-      if(PatternConfig.emojiPatterns.midSentence.test(s))msc++;
-    });
-    if(eoc>2&&msc===0){sc.add(50,"high");m.push({type:"Placement",snippet:"Detected emojis exclusively at end of sentences",context:"Robotic placement pattern",weight:"high"})}
-    let cc=this.emojis.filter(e=>PatternConfig.corporateEmojis.includes(e)).length;
-    if(cc>2){sc.add(40,"medium");m.push({type:"Corporate Style",snippet:`Detected ${cc} corporate emojis (🚀, ✨, etc)`,context:"Linked to AI 'helpful' tone",weight:"medium"})}
-    return{name:"Emoji Forensics",score:sc.getScore(),matches:m,summary:`${this.emojis.length} emojis analyzed`,details:sc.getDetails()};
-  }
-}
-
-// --- 3. STRUCTURAL RIGIDITY (improved: para uniformity + heading density, removed dupe Oxford) ---
-class StructuralRigidityAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-
-    // Bullet density
-    const bullets=(this.text.match(PatternConfig.structural.bulletDensity)||[]).length;
-    if(bullets>0&&(bullets/this.wc>0.3)){sc.add(60,"high");m.push({type:"List Density",snippet:"Text contains excessive bulleted lists (>30%)",context:"AI preference for structuring",weight:"high"})}
-
-    // Markdown artifacts (**Bold**:)
-    let bcr=new RegExp(/\*\*([A-Z][^*:]{1,40})\*\*:/g),bcm,bcc=0;
-    while((bcm=bcr.exec(this.text))!==null){bcc++;if(bcc<=3)m.push({type:"Markdown Artifact",snippet:Utils.extractSnippet(this.text,bcm[0],bcm.index),context:"Standard GPT teaching pattern",weight:"high"})}
-    if(bcc>0)sc.add(70,"high");
-
-    // Heading density (###) — AI loves headers in prose
-    const headers=(this.text.match(/^#{1,6}\s+/gm)||[]).length;
-    if(headers>2){sc.add(50,"medium");m.push({type:"Header Overuse",snippet:`${headers} markdown headers detected in prose`,context:"AI structures all responses with headers",weight:"medium"})}
-
-    // Numbered list density
-    const numbered=(this.text.match(/^\d+\.\s+/gm)||[]).length;
-    if(numbered>3){sc.add(45,"medium");m.push({type:"Numbered Lists",snippet:`${numbered} numbered list items — AI organizes everything as lists`,context:"AI list-structuring behavior",weight:"medium"})}
-
-    // Paragraph length uniformity — AI writes eerily even paragraphs
-    const paras=this.text.split(/\n\s*\n/).filter(p=>p.trim().length>20);
-    if(paras.length>=3){
-      const pLens=paras.map(p=>Utils.countWords(p));
-      const pMean=pLens.reduce((a,b)=>a+b,0)/pLens.length;
-      const pSD=Utils.calculateStdDev(pLens);
-      const pCV=pSD/(pMean||1);
-      if(pCV<0.2&&paras.length>=4){
-        sc.add(65,"high");
-        m.push({type:"Paragraph Uniformity",snippet:`${paras.length} paragraphs with suspiciously uniform length (CV=${pCV.toFixed(2)})`,context:"AI generates mechanically equal paragraph blocks",weight:"high"});
-      } else if(pCV<0.35&&paras.length>=5){
-        sc.add(35,"medium");
-        m.push({type:"Paragraph Uniformity",snippet:`${paras.length} paragraphs with low length variance (CV=${pCV.toFixed(2)})`,context:"Humans write unevenly-sized paragraphs",weight:"medium"});
-      }
-    }
-
-    // Section symmetry: detect "intro + 3-5 equal body paras + conclusion" pattern
-    if(paras.length>=5&&paras.length<=8){
-      const bodyParas=paras.slice(1,-1);
-      const bLens=bodyParas.map(p=>Utils.countWords(p));
-      const bMean=bLens.reduce((a,b)=>a+b,0)/(bLens.length||1);
-      const allClose=bLens.every(l=>Math.abs(l-bMean)/bMean<0.25);
-      if(allClose&&bodyParas.length>=3){
-        sc.add(55,"high");
-        m.push({type:"Essay Template Structure",snippet:`Classic AI structure: intro + ${bodyParas.length} uniform body paragraphs + conclusion`,context:"AI defaults to 5-paragraph essay format",weight:"high"});
-      }
-    }
-
-    return{name:"Structural Rigidity",score:sc.getScore(),matches:m,summary:"Structural patterns analyzed",details:sc.getDetails()};
-  }
-}
-
-// --- 4. PUNCTUATION VECTORS (fixed em-dash polarity + expanded) ---
-class PunctuationAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-
-    // Em-dash analysis: modern LLMs (GPT-4, Claude) consistently output proper Unicode em-dashes (—)
-    // paired with heavy colon use and ZERO informal double-hyphens — a machine-precise typography signature.
-    // Humans are inconsistent: they mix --, spaced - , and occasional — unpredictably.
-    const emDashes=(this.text.match(/—/g)||[]).length;
-    const doubleHyphens=(this.text.match(/--/g)||[]).length;
-    const spacedHyphens=(this.text.match(/ - /g)||[]).length;
-    const colons=(this.text.match(/:\s/g)||[]).length;
-    // AI signal: proper em-dashes + heavy colons + zero informal shortcuts = typographic perfection
-    if(emDashes>0&&colons>4&&this.wc>150&&doubleHyphens===0&&spacedHyphens===0){
-      sc.add(40,"medium");
-      m.push({type:"Perfect Typography",snippet:`${emDashes}× proper em-dashes (—) + ${colons} colons, zero informal -- or ' - '`,context:"AI outputs typographically perfect dashes; humans are inconsistent",weight:"medium"});
-    }
-    // Also flag em-dash + colon combo even without the absence condition — density matters
-    if(emDashes>2&&colons>3&&(emDashes+colons)/(this.wc/100)>3){
-      sc.add(30,"low");
-      m.push({type:"Dash+Colon Density",snippet:`${emDashes} em-dashes + ${colons} colons = ${((emDashes+colons)/(this.wc/100)).toFixed(1)}/100 words`,context:"AI elaborates with both colons and em-dashes at abnormal density",weight:"low"});
-    }
-    // Informal signal: double-hyphen or spaced-hyphen usage = human fingerprint
-    if(doubleHyphens>0){
-      sc.add(-20,"medium");
-      m.push({type:"Informal Dash",snippet:`${doubleHyphens}× informal double-hyphen (--) detected`,context:"Humans type --, AI outputs proper — every time",weight:"medium"});
-    }
-    if(spacedHyphens>1&&emDashes===0){
-      sc.add(-15,"low");
-      m.push({type:"Spaced Hyphen",snippet:`${spacedHyphens}× spaced hyphen ( - ) with no proper em-dashes`,context:"Informal human dash style — AI never does this",weight:"low"});
-    }
-
-    // Smart/curly quotes
-    const smartQ=(this.text.match(/[\u2018\u2019\u201C\u201D]/g)||[]).length;
-    const straightQ=(this.text.match(/["']/g)||[]).length;
-    if(smartQ>2&&straightQ<smartQ){sc.add(30,"low");m.push({type:"Typographic Quotes",snippet:`${smartQ} smart/curly quotes detected`,context:"AI text-generation often outputs typographic quotes",weight:"low"})}
-
-    // Colon overuse
-    const colonDensity=colons/(this.wc/100);
-    if(colonDensity>2.5){sc.add(55,"medium");m.push({type:"Colon Overuse",snippet:`${colons} colons per ${this.wc} words (${colonDensity.toFixed(1)}/100)`,context:"AI introduces every elaboration with a colon",weight:"medium"})}
-
-    // Semicolon analysis — expanded
-    const semicolons=(this.text.match(/;/g)||[]).length;
-    if(this.wc>200&&semicolons===0&&colons>3){
-      sc.add(30,"medium");
-      m.push({type:"Semicolon Absence",snippet:`0 semicolons in ${this.wc}-word text with ${colons} colons`,context:"AI avoids semicolons; uses periods and colons instead",weight:"medium"});
-    } else if(semicolons>0){
-      // Semicolons used correctly (joining independent clauses) = human signal
-      const correctSemi=(this.text.match(/\b\w[^;]{5,}\s*;\s*[A-Za-z]/g)||[]).length;
-      if(correctSemi>1){sc.add(-10,"low");m.push({type:"Semicolon Usage",snippet:`${correctSemi} correct semicolons — human writing pattern`,context:"AI rarely uses semicolons",weight:"low"})}
-    }
-
-    // Ellipsis style
-    const unicodeEllipsis=(this.text.match(/…/g)||[]).length;
-    const triDot=(this.text.match(/\.\.\./g)||[]).length;
-    if(unicodeEllipsis>0&&triDot===0){sc.add(20,"low");m.push({type:"Unicode Ellipsis",snippet:`${unicodeEllipsis}× unicode ellipsis (…) with no typed (...)`,context:"Typographic precision signals LLM origin",weight:"low"})}
-    // Casual ellipsis = human
-    if(triDot>2&&unicodeEllipsis===0){sc.add(-10,"low");m.push({type:"Casual Ellipsis",snippet:`${triDot}× typed (...) — informal human punctuation`,context:"Humans type ..., not Unicode …",weight:"low"})}
-
-    // Exclamation & question absence
-    const excl=(this.text.match(/!/g)||[]).length;
-    const qs=(this.text.match(/\?/g)||[]).length;
-    const periods=(this.text.match(/\./g)||[]).length;
-    const total=excl+qs+periods;
-    if(total>5){
-      if(excl===0&&this.wc>150){sc.add(20,"low");m.push({type:"Zero Exclamations",snippet:`No exclamation marks in ${this.wc} words`,context:"Formal AI prose avoids emotional punctuation",weight:"low"})}
-      if(qs===0&&this.wc>200){sc.add(15,"low");m.push({type:"Zero Questions",snippet:`No question marks — entirely declarative`,context:"Humans use rhetorical questions; AI states",weight:"low"})}
-    }
-    // Excessive exclamations = corporate AI cheerfulness
-    if(excl>0&&excl/(total||1)>0.15&&this.wc>100){
-      sc.add(25,"medium");m.push({type:"Exclamation Overuse",snippet:`${excl} exclamation marks (${(excl/(total||1)*100).toFixed(0)}% of end punct)`,context:"AI 'enthusiastic helper' persona uses excessive exclamations",weight:"medium"});
-    }
-
-    // Parenthetical density
-    const parens=(this.text.match(/\([^)]{5,60}\)/g)||[]).length;
-    const parenDensity=parens/(this.wc/100);
-    if(parenDensity>1.5){sc.add(35,"medium");m.push({type:"Parenthetical Overuse",snippet:`${parens} parenthetical asides detected`,context:"AI adds clarifying asides mechanically",weight:"medium"})}
-
-    // Comma density — AI uses commas excessively for compound sentences
-    const commas=(this.text.match(/,/g)||[]).length;
-    const commaDensity=commas/(this.wc/100);
-    if(commaDensity>7){sc.add(25,"low");m.push({type:"Comma Overload",snippet:`${commas} commas in ${this.wc} words (${commaDensity.toFixed(1)}/100)`,context:"AI constructs long compound sentences with many commas",weight:"low"})}
-
-    return{name:"Punctuation Vectors",score:Math.min(100,sc.getScore()),matches:m,summary:`Em-dashes:${emDashes}, Colons:${colons}, Semis:${semicolons}, Parens:${parens}`,details:{emDashes,colons,semicolons,parens,totalWeight:sc.totalWeight}};
-  }
-}
-
-// --- 5. BINARY PATTERNS ---
-class BinaryPatternAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    const rx=/not (?:only|just|merely)[\s\S]{1,60}?(?:but|also)/gi;
-    let x;
-    while((x=rx.exec(this.text))!==null)m.push({type:"Binary Structure",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"'Not just X, but Y' pattern",weight:"medium"});
-    if(m.length>0)sc.add(40+(m.length*10),"medium");
-    return{name:"Binary Rhetoric Patterns",score:sc.getScore(),matches:m,summary:m.length?"Detected binary sentence structures":"None detected",details:sc.getDetails()};
-  }
-}
-
-// --- 6. REPETITION ANALYZER (massively expanded: TTR + n-gram repetition + phrase clustering) ---
-class RepetitionAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    const sentences=Utils.splitSentences(this.text);
-    const tokens=Utils.getTokens(this.text);
-    const stopwords=new Set(['the','a','an','in','on','it','is','are','was','were','be','been','being','to','of','and','or','for','with','at','by','from','as','this','that','these','those','its','our','their','which','who','how','what','when','where','why','not','but','so','if','can','will','has','have','had','do','did','does','just','also','more','than','into','up','out','one','all','any','each','they','we','you','he','she','them','him','her','his','my','your','very','well']);
-
-    // 1. Type-Token Ratio (TTR) — low TTR = repetitive vocabulary = AI signal
-    if(tokens.length>50){
-      const unique=new Set(tokens).size;
-      const ttr=unique/tokens.length;
-      // AI often has TTR below 0.45 due to repeated structural vocabulary
-      if(ttr<0.4){sc.add(80,"high");m.push({type:"Low Lexical Diversity",snippet:`TTR=${ttr.toFixed(3)} — only ${unique} unique words from ${tokens.length} total`,context:"Humans naturally vary vocabulary; AI reuses structural words",weight:"high"})}
-      else if(ttr<0.5){sc.add(40,"medium");m.push({type:"Moderate Lexical Diversity",snippet:`TTR=${ttr.toFixed(3)} — vocabulary repetition above baseline`,context:"Low type-token ratio suggests templated output",weight:"medium"})}
-    }
-
-    // 2. Consecutive sentence starts (anaphora)
-    const stopwordArr=['the','a','an','in','on','it'];
-    for(let i=1;i<sentences.length;i++){
-      const prev=sentences[i-1].trim().split(" ")[0].toLowerCase();
-      const curr=sentences[i].trim().split(" ")[0].toLowerCase();
-      if(prev===curr&&prev.length>2&&!stopwordArr.includes(prev)){
-        m.push({type:"Anaphora",snippet:`...<span class="match-highlight">${Utils.escapeHtml(sentences[i-1].substring(0,40))}</span>...<br>...<span class="match-highlight">${Utils.escapeHtml(sentences[i].substring(0,40))}</span>...`,context:"Consecutive sentence starts",weight:"medium"});
-      }
-    }
-    if(m.filter(x=>x.type==="Anaphora").length>1)sc.add(60,"medium");
-
-    // 3. Bigram repetition — find bigrams used 3+ times
-    const bigrams=Utils.getNgrams(tokens.filter(w=>!stopwords.has(w)),2);
-    const bigramFreq={};
-    bigrams.forEach(bg=>{bigramFreq[bg]=(bigramFreq[bg]||0)+1});
-    const repeatedBigrams=Object.entries(bigramFreq).filter(([_,c])=>c>=3).sort((a,b)=>b[1]-a[1]);
-    if(repeatedBigrams.length>0){
-      sc.add(Math.min(70,repeatedBigrams.length*20),"high");
-      repeatedBigrams.slice(0,4).forEach(([bg,c])=>{
-        m.push({type:"Repeated Phrase",snippet:`"${bg}" appears <span class="match-highlight">${c}×</span> in the text`,context:"Phrase repetition indicates template generation",weight:"high"});
-      });
-    }
-
-    // 4. Trigram repetition — 2+ repeats of a 3-word non-stopword sequence
-    const trigrams=Utils.getNgrams(tokens.filter(w=>!stopwords.has(w)),3);
-    const trigramFreq={};
-    trigrams.forEach(tg=>{trigramFreq[tg]=(trigramFreq[tg]||0)+1});
-    const repeatedTrigrams=Object.entries(trigramFreq).filter(([_,c])=>c>=2).sort((a,b)=>b[1]-a[1]);
-    if(repeatedTrigrams.length>0){
-      sc.add(75,"high");
-      repeatedTrigrams.slice(0,3).forEach(([tg,c])=>{
-        m.push({type:"Repeated Trigram",snippet:`"${tg}" appears <span class="match-highlight">${c}×</span>`,context:"Trigram repetition is a strong AI generation signal",weight:"high"});
-      });
-    }
-
-    // 5. Word overuse — single content words appearing disproportionately
-    const wordFreq={};
-    tokens.filter(w=>!stopwords.has(w)&&w.length>4).forEach(w=>{wordFreq[w]=(wordFreq[w]||0)+1});
-    const overused=Object.entries(wordFreq).filter(([_,c])=>c>=4&&c/(this.wc||1)>0.015).sort((a,b)=>b[1]-a[1]);
-    if(overused.length>0){
-      sc.add(Math.min(60,overused.length*15),"medium");
-      overused.slice(0,5).forEach(([w,c])=>{
-        m.push({type:"Word Overuse",snippet:`"${w}" used <span class="match-highlight">${c}×</span> (${(c/this.wc*100).toFixed(1)}% of text)`,context:"Vocabulary fixation — AI returns to same terms",weight:"medium"});
-      });
-    }
-
-    return{name:"Repetitive Structures",score:Math.min(100,sc.getScore()),matches:m,summary:m.length?`${m.length} repetition patterns found`:"Vocabulary variance looks natural",details:sc.getDetails()};
-  }
-}
-
-// --- 7. VAGUE AUTHORITY ---
-class VagueAuthorityAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    PatternConfig.vagueAuthority.forEach(p=>{
-      const rx=new RegExp(`\\b${p}\\b`,"gi");let x;
-      while((x=rx.exec(this.text))!==null)m.push({type:"Vague Authority",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Uncited claim attribution",weight:"high"});
-    });
-    if(m.length>0)sc.add(60,"high");
-    return{name:"Vague Authority Claims",score:sc.getScore(),matches:m,summary:m.length?"Uncited authority detected":"No vague sourcing",details:sc.getDetails()};
-  }
-}
-
-// --- 8. PASSIVE VOICE (massively expanded + false positive reduction) ---
-class PassiveVoiceAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-
-    // Irregular past participles that won't catch with -ed
-    const irregulars=['shown','seen','made','found','done','said','held','kept','given','taken','known','brought','thought','told','left','felt','meant','sent','built','bought','caught','taught','written','driven','eaten','fallen','forgotten','grown','hidden','known','lain','led','lit','lost','met','paid','read','run','set','sat','slept','spent','spoken','stood','stolen','struck','swept','swum','swung','taken','torn','thrown','understood','won','worn','woken'];
-
-    // Pattern 1: Standard "to be + past participle"
-    const beVerbs='am|is|are|was|were|be|been|being';
-    const rx1=new RegExp(`\\b(${beVerbs})\\s+(\\w+ed|${irregulars.join('|')})\\b`,'gi');
-    let x,count=0;
-
-    // Exclusion: "is interested", "was excited" etc — stative, not passive
-    const stativeExclusions=/\b(is|are|was|were)\s+(interested|excited|bored|tired|confused|worried|pleased|satisfied|surprised|disappointed|concerned|stressed|embarrassed|delighted|shocked|amazed|overwhelmed)\b/gi;
-    const stativeSet=new Set();
-    let sx;
-    while((sx=stativeExclusions.exec(this.text))!==null)stativeSet.add(sx.index);
-
-    while((x=rx1.exec(this.text))!==null){
-      if(stativeSet.has(x.index))continue;
-      count++;
-      if(m.length<6)m.push({type:"Passive Voice",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Be + participle construction",weight:"low"});
-    }
-
-    // Pattern 2: get-passive ("got rejected", "gets overlooked") — often human but worth noting
-    const rx2=/\b(get|gets|got|gotten)\s+(\w+ed)\b/gi;
-    let gcount=0;
-    while((x=rx2.exec(this.text))!==null){gcount++;if(m.length<8)m.push({type:"Get-Passive",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Get-passive (informal)",weight:"low"})}
-
-    // Pattern 3: "have been + participle" (perfect passive) — very common in AI
-    const rx3=/\b(has|have|had)\s+been\s+(\w+ed|shown|seen|made|found|done|given|taken|written|built)\b/gi;
-    let pcount=0;
-    while((x=rx3.exec(this.text))!==null){
-      pcount++;
-      if(m.length<10)m.push({type:"Perfect Passive",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Have been + participle — formal AI register",weight:"medium"});
-    }
-
-    // Pattern 4: Modal passive ("can be done", "should be noted", "must be considered")
-    const rx4=/\b(can|could|should|would|will|may|might|must|shall)\s+be\s+(\w+ed|shown|seen|made|found|done|given|taken|written|noted|considered|observed|understood)\b/gi;
-    let mcount=0;
-    while((x=rx4.exec(this.text))!==null){
-      mcount++;
-      if(m.length<12)m.push({type:"Modal Passive",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Modal passive — hallmark of formal AI hedging",weight:"medium"});
-    }
-
-    const totalPassive=count+pcount+mcount;
-    const ratio=totalPassive/(this.wc||1);
-    const modalRatio=mcount/(this.wc||1);
-
-    if(modalRatio>0.02){sc.add(70,"high");} // Modal passives are very AI
-    else if(ratio>0.05){sc.add(65,"medium");}
-    else if(ratio>0.03){sc.add(40,"medium");}
-    else if(ratio>0.01){sc.add(20,"low");}
-
-    // Passive density without agent ("by X") = strong AI signal (AI never names agents)
-    const withAgent=(this.text.match(/\b(?:am|is|are|was|were|been|being)\s+\w+(?:ed|en)\s+by\s+\w/gi)||[]).length;
-    const agentRatio=withAgent/(totalPassive||1);
-    if(totalPassive>4&&agentRatio<0.1){
-      sc.add(35,"medium");
-      m.push({type:"Agentless Passive",snippet:`${totalPassive} passives, only ${withAgent} name an agent ("by X")`,context:"AI uses passive to avoid naming who does what",weight:"medium"});
-    }
-
-    return{name:"Passive Voice",score:Math.min(100,sc.getScore()),matches:m,summary:`${totalPassive} passive constructions (${(ratio*100).toFixed(1)}% rate), ${mcount} modal passives`,details:sc.getDetails()};
-  }
-}
-
-// --- 9. BURSTINESS (expanded: n-gram rhythm + paragraph pacing + sentence length runs) ---
-class BurstinessAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sentences=Utils.splitSentences(this.text);
-    if(sentences.length<3)return{name:"Burstiness",score:0,matches:[],summary:"Insufficient data"};
-
-    const sc=new WeightedScorer(),m=[];
-    const lengths=sentences.map(s=>s.trim().split(/\s+/).length);
-    const mean=lengths.reduce((a,b)=>a+b,0)/lengths.length;
-    const sd=Utils.calculateStdDev(lengths);
-    const cv=sd/mean;
-
-    // 1. Overall CV — original check, kept
-    if(cv<0.25){sc.add(80,"high");m.push({type:"Low Variance",snippet:"Sentence lengths are unnaturally uniform",context:`CV=${cv.toFixed(2)} — robotic uniformity`,weight:"high"})}
-    else if(cv>0.5){sc.add(-20,"high");m.push({type:"High Variance",snippet:"Sentence lengths vary significantly",context:`CV=${cv.toFixed(2)} — human-like burst pattern`,weight:"bonus"})}
-
-    // 2. Long-run detection — detect 3+ consecutive sentences within 20% of each other
-    let runs=0,runStart=-1;
-    for(let i=1;i<lengths.length-1;i++){
-      const windowMean=(lengths[i-1]+lengths[i]+lengths[i+1])/3;
-      const allClose=[lengths[i-1],lengths[i],lengths[i+1]].every(l=>Math.abs(l-windowMean)/windowMean<0.2);
-      if(allClose){if(runStart<0)runStart=i-1;runs++;}
-      else runStart=-1;
-    }
-    if(runs>3){sc.add(50,"medium");m.push({type:"Length Run",snippet:`${runs} consecutive sentences with near-identical length`,context:"AI generates sentences in metronomic patterns",weight:"medium"})}
-
-    // 3. Sentence length distribution — AI clusters around 18-25 words
-    const aiZone=lengths.filter(l=>l>=15&&l<=28).length;
-    const aiRatio=aiZone/lengths.length;
-    if(aiRatio>0.7&&sentences.length>6){
-      sc.add(45,"medium");
-      m.push({type:"AI Length Clustering",snippet:`${(aiRatio*100).toFixed(0)}% of sentences are 15-28 words (AI sweet spot)`,context:"GPT defaults to ~20-word 'explanatory' sentences",weight:"medium"});
-    }
-
-    // 4. Very short sentence absence — humans use 1-5 word punchy sentences; AI rarely does
-    const shortSentences=lengths.filter(l=>l<=5).length;
-    if(sentences.length>8&&shortSentences===0){
-      sc.add(30,"medium");
-      m.push({type:"No Short Sentences",snippet:`Zero sentences ≤5 words in ${sentences.length}-sentence text`,context:"Humans punch with short sentences. AI doesn't.",weight:"medium"});
-    }
-
-    // 5. Sentence entropy — measure variety of unique length values
-    const uniqueLengths=new Set(lengths).size;
-    const lengthEntropy=uniqueLengths/lengths.length;
-    if(lengthEntropy<0.4&&sentences.length>8){
-      sc.add(40,"medium");
-      m.push({type:"Low Length Entropy",snippet:`Only ${uniqueLengths} unique sentence lengths across ${lengths.length} sentences`,context:"Low entropy = templated generation",weight:"medium"});
-    }
-
-    // 6. Opening sentence length uniformity across paragraphs
-    const paras=this.text.split(/\n\s*\n/).filter(p=>p.trim().length>20);
-    if(paras.length>=4){
-      const paraOpenLens=paras.map(p=>{const s=Utils.splitSentences(p);return s.length?s[0].trim().split(/\s+/).length:0}).filter(Boolean);
-      if(paraOpenLens.length>=4){
-        const poSD=Utils.calculateStdDev(paraOpenLens);
-        const poMean=paraOpenLens.reduce((a,b)=>a+b,0)/paraOpenLens.length;
-        const poCV=poSD/(poMean||1);
-        if(poCV<0.2){
-          sc.add(45,"medium");
-          m.push({type:"Uniform Para Openers",snippet:`Paragraph opening sentences all similar length (CV=${poCV.toFixed(2)})`,context:"AI begins each paragraph with similarly-sized topic sentences",weight:"medium"});
+        class WeightedScorer {
+            constructor() {
+                this.totalWeight = 0;
+                this.weightedScore = 0;
+                this.findings = [];
+            }
+            add(score, weightLabel, type = "medium") {
+                const weight = PatternConfig.weights[weightLabel] || 1;
+                this.weightedScore += score * weight;
+                this.totalWeight += weight;
+                this.findings.push({ score, weight, type });
+            }
+            getScore() {
+                return this.totalWeight > 0 ? Math.min(100, this.weightedScore / this.totalWeight) : 0;
+            }
+            getDetails() {
+                return {
+                    raw: this.weightedScore,
+                    totalWeight: this.totalWeight,
+                    normalized: this.getScore(),
+                    findingsCount: this.findings.length
+                };
+            }
         }
-      }
+
+        // --- 1. LEXICON ANALYZER ---
+        class GPTLexiconAnalyzer {
+            constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                let totalHits = 0;
+                PatternConfig.gptLexicon.forEach(phrase => {
+                    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        totalHits++;
+                        if (matches.length < 15) {
+                            matches.push({
+                                type: "Lexicon",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "Common AI Vocabulary",
+                                weight: "high"
+                            });
+                        }
+                    }
+                });
+                const density = totalHits / (this.wordCount || 1);
+                if (density > 0.03) scorer.add(100, "critical");
+                else if (density > 0.015) scorer.add(60, "high");
+                else if (density > 0.005) scorer.add(30, "medium");
+                return { name: "Vocabulary Patterns", score: scorer.getScore(), matches, summary: `${totalHits} specific AI words detected`, details: scorer.getDetails() };
+            }
+        }
+
+        // --- 2. EMOJI FORENSICS ---
+        class EmojiAnalyzer {
+            constructor(text) { this.text = text; this.emojis = Utils.extractEmojis(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                if (this.emojis.length === 0) return { name: "Emoji Analysis", score: 0, matches: [], summary: "No emojis detected" };
+                
+                // 1. Check for placement (End of sentence only)
+                let endOnlyCount = 0;
+                let midSentenceCount = 0;
+                const sentences = Utils.splitSentences(this.text);
+                sentences.forEach(s => {
+                    if (PatternConfig.emojiPatterns.endOnly.test(s)) endOnlyCount++;
+                    if (PatternConfig.emojiPatterns.midSentence.test(s)) midSentenceCount++;
+                });
+
+                if (endOnlyCount > 2 && midSentenceCount === 0) {
+                    scorer.add(50, "high");
+                    matches.push({
+                        type: "Placement",
+                        snippet: "Detected emojis exclusively at end of sentences",
+                        context: "Robotic placement pattern",
+                        weight: "high"
+                    });
+                }
+
+                // 2. Corporate Emoji Check
+                let corpCount = 0;
+                this.emojis.forEach(e => {
+                    if (PatternConfig.corporateEmojis.includes(e)) corpCount++;
+                });
+                if (corpCount > 2) {
+                    scorer.add(40, "medium");
+                    matches.push({
+                        type: "Corporate Style",
+                        snippet: `Detected ${corpCount} corporate emojis (🚀, ✨, etc)`,
+                        context: "Linked to AI 'helpful' tone",
+                        weight: "medium"
+                    });
+                }
+
+                return { name: "Emoji Forensics", score: scorer.getScore(), matches, summary: `${this.emojis.length} emojis analyzed`, details: scorer.getDetails() };
+            }
+        }
+
+        // --- 3. STRUCTURAL RIGIDITY ---
+        class StructuralRigidityAnalyzer {
+            constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                // 1. Bullet Density
+                const bullets = (this.text.match(PatternConfig.structural.bulletDensity) || []).length;
+                if (bullets > 0 && (bullets / this.wordCount > 0.3)) {
+                    scorer.add(60, "high");
+                    matches.push({
+                        type: "List Density",
+                        snippet: "Text contains excessive bulleted lists (>30%)",
+                        context: "AI preference for structuring",
+                        weight: "high"
+                    });
+                }
+
+                // 2. Oxford Comma (Strict adherence)
+                const oxford = (this.text.match(/,\s+and\s+/gi) || []).length;
+                const noOxford = (this.text.match(/\s+and\s+(?!,)/gi) || []).length;
+                if (oxford > 3 && noOxford === 0) {
+                    scorer.add(40, "medium");
+                    matches.push({
+                        type: "Oxford Comma",
+                        snippet: "100% Oxford comma usage detected",
+                        context: "AI strictly adheres to grammar rules",
+                        weight: "medium"
+                    });
+                }
+
+                // 3. Markdown Artifacts (**Text**:)
+                let boldColonMatch;
+                const boldColonRegex = /\*\*([A-Z][^*:]{1,40})\*\*:/g;
+                let bcCount = 0;
+                while((boldColonMatch = boldColonRegex.exec(this.text)) !== null) {
+                    bcCount++;
+                    if(bcCount <= 3) {
+                        matches.push({
+                            type: "Markdown Artifact",
+                            snippet: Utils.extractSnippet(this.text, boldColonMatch[0], boldColonMatch.index),
+                            context: "Standard GPT teaching pattern",
+                            weight: "high"
+                        });
+                    }
+                }
+                if(bcCount > 0) scorer.add(70, "high");
+
+                return { name: "Structural Rigidity", score: scorer.getScore(), matches, summary: "Structural patterns analyzed", details: scorer.getDetails() };
+            }
+        }
+
+        // --- 4. PUNCTUATION VECTORS ---
+        class PunctuationAnalyzer {
+    constructor(text) { this.text = text; this.wordCount = Utils.countWords(text); }
+    analyze() {
+        const scorer = new WeightedScorer();
+        const matches = [];
+
+        // --- A. Em-Dash (—) vs double-hyphen / spaced hyphen ---
+        const emDashes = (this.text.match(/—/g) || []).length;
+        const doubleHyphens = (this.text.match(/--/g) || []).length;
+        const spacedHyphens = (this.text.match(/ - /g) || []).length;
+        if (emDashes > 1 && doubleHyphens === 0 && spacedHyphens === 0) {
+            scorer.add(40, "low");
+            matches.push({ type: "Em-Dash Precision", snippet: `${emDashes}× proper em-dashes (—), zero informal dashes`, context: "Humans type -- or ' - ', AI outputs —", weight: "low" });
+        }
+
+        // --- B. Curly/Smart quotes vs straight quotes ---
+        // AI outputs from text editors often keep straight, but raw LLM output uses typographic
+        const smartQuotes = (this.text.match(/[\u2018\u2019\u201C\u201D]/g) || []).length;
+        const straightQuotes = (this.text.match(/["']/g) || []).length;
+        if (smartQuotes > 2 && straightQuotes < smartQuotes) {
+            scorer.add(30, "low");
+            matches.push({ type: "Typographic Quotes", snippet: `${smartQuotes} smart/curly quotes detected`, context: "AI text-generation often outputs typographic quotes", weight: "low" });
+        }
+
+        // --- C. Oxford Comma consistency ---
+        const oxford = (this.text.match(/,\s+(?:and|or)\s+\w/gi) || []).length;
+        const noOxford = (this.text.match(/\b\w+,\s+\w+\s+(?:and|or)\s+\w/gi) || []).length;
+        if (oxford > 3 && noOxford === 0) {
+            scorer.add(20, "low");
+            matches.push({ type: "Oxford Comma Lock", snippet: `${oxford} serial commas, zero omissions`, context: "100% grammatical consistency — algorithmic", weight: "low" });
+        }
+
+        // --- D. Colon overuse (AI loves colons to introduce lists/elaborations) ---
+        const colons = (this.text.match(/:\s/g) || []).length;
+        const colonDensity = colons / (this.wordCount / 100);
+        if (colonDensity > 2.5) {
+            scorer.add(55, "medium");
+            matches.push({ type: "Colon Overuse", snippet: `${colons} colons per ${this.wordCount} words (${colonDensity.toFixed(1)}/100)`, context: "AI introduces every elaboration with a colon", weight: "medium" });
+        }
+
+        // --- E. Semicolon absence (AI rarely uses semicolons; humans use them inconsistently) ---
+        const semicolons = (this.text.match(/;/g) || []).length;
+        if (this.wordCount > 200 && semicolons === 0 && colons > 3) {
+            scorer.add(25, "low");
+            matches.push({ type: "Semicolon Absence", snippet: `0 semicolons in ${this.wordCount}-word text`, context: "AI prefers periods and colons over semicolons", weight: "low" });
+        }
+
+        // --- F. Ellipsis style (...) vs (…) ---
+        const unicodeEllipsis = (this.text.match(/…/g) || []).length;
+        const triDot = (this.text.match(/\.\.\./g) || []).length;
+        if (unicodeEllipsis > 0 && triDot === 0) {
+            scorer.add(20, "low");
+            matches.push({ type: "Unicode Ellipsis", snippet: `${unicodeEllipsis}× unicode ellipsis (…) with no typed (...)`, context: "Typographic precision signals LLM origin", weight: "low" });
+        }
+
+        // --- G. Sentence-ending punctuation variety ---
+        const exclamations = (this.text.match(/!/g) || []).length;
+        const questions = (this.text.match(/\?/g) || []).length;
+        const periods = (this.text.match(/\./g) || []).length;
+        const totalEndPunct = exclamations + questions + periods;
+        if (totalEndPunct > 5) {
+            const exclamRatio = exclamations / totalEndPunct;
+            const questionRatio = questions / totalEndPunct;
+            // AI avoids exclamations in formal mode; uses them formulaically in casual
+            if (exclamRatio === 0 && this.wordCount > 150) {
+                scorer.add(20, "low");
+                matches.push({ type: "Zero Exclamations", snippet: `No exclamation marks in ${this.wordCount} words`, context: "Formal AI prose avoids emotional punctuation", weight: "low" });
+            }
+            // AI almost never uses rhetorical questions in expository text
+            if (questionRatio === 0 && this.wordCount > 200) {
+                scorer.add(15, "low");
+                matches.push({ type: "Zero Questions", snippet: `No question marks — entirely declarative`, context: "Humans use rhetorical questions; AI states", weight: "low" });
+            }
+        }
+
+        // --- H. Parenthetical density (AI overuses parentheticals for "helpful context") ---
+        const parens = (this.text.match(/\([^)]{5,60}\)/g) || []).length;
+        const parenDensity = parens / (this.wordCount / 100);
+        if (parenDensity > 1.5) {
+            scorer.add(35, "medium");
+            matches.push({ type: "Parenthetical Overuse", snippet: `${parens} parenthetical asides detected`, context: "AI adds clarifying asides mechanically", weight: "medium" });
+        }
+
+        return {
+            name: "Punctuation Vectors",
+            score: Math.min(100, scorer.getScore()),
+            matches,
+            summary: `Em-dashes: ${emDashes}, Colons: ${colons}, Parentheticals: ${parens}`,
+            details: { emDashes, colons, semicolons, parens, totalWeight: scorer.totalWeight }
+        };
     }
-
-    return{name:"Burstiness & Rhythm",score:Math.min(100,sc.getScore()),matches:m,summary:cv<0.3?"Mechanical uniformity detected":"Rhythm analysis complete",details:{cv,mean:mean.toFixed(1),sd:sd.toFixed(1),aiZoneRatio:aiRatio.toFixed(2)}};
-  }
 }
+        // --- 5. BINARY PATTERN ANALYZER ---
+        class BinaryPatternAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                // Regex for "Not only/just/merely ... but/also ..."
+                const regex = /not (?:only|just|merely)[\s\S]{1,60}?(?:but|also)/gi;
+                let match;
+                while ((match = regex.exec(this.text)) !== null) {
+                    matches.push({
+                        type: "Binary Structure",
+                        snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                        context: "'Not just X, but Y' pattern",
+                        weight: "medium"
+                    });
+                }
+                if (matches.length > 0) scorer.add(40 + (matches.length * 10), "medium");
 
-// --- 10. REFUSAL ---
-class RefusalAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    PatternConfig.refusalHeaders.forEach(p=>{
-      if(new RegExp(p,"i").test(this.text)){m.push({type:"AI Refusal",snippet:p,context:"Standard LLM refusal",weight:"critical"});sc.add(100,"critical")}
-    });
-    return{name:"AI Guardrails",score:sc.getScore(),matches:m,summary:m.length?"AI Safety signature found":"No refusals found",details:sc.getDetails()};
-  }
-}
+                return { name: "Binary Rhetoric Patterns", score: scorer.getScore(), matches, summary: matches.length ? "Detected binary sentence structures" : "None detected", details: scorer.getDetails() };
+            }
+        }
 
-// --- 11. TRANSITIONS ---
-class TransitionAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];let count=0;
-    PatternConfig.transitionOverload.forEach(p=>{
-      const rx=new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"gi");let x;
-      while((x=rx.exec(this.text))!==null){count++;if(m.length<8)m.push({type:"Coherence Marker",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Forced logical bridging",weight:"medium"})}
-    });
-    if(count>5)sc.add(80,"high");else if(count>2)sc.add(40,"medium");
-    return{name:"Transition Overload",score:sc.getScore(),matches:m,summary:count>3?"Abnormal transition density":"Natural flow",details:sc.getDetails()};
-  }
-}
+        // --- 6. ANAPHORA & REPETITION ---
+        class RepetitionAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                const sentences = Utils.splitSentences(this.text);
+                for (let i = 1; i < sentences.length; i++) {
+                    const prev = sentences[i-1].trim().split(" ")[0].toLowerCase();
+                    const curr = sentences[i].trim().split(" ")[0].toLowerCase();
+                    const stopwords = ['the', 'a', 'an', 'in', 'on', 'it'];
+                    if (prev === curr && prev.length > 2 && !stopwords.includes(prev)) {
+                        matches.push({
+                            type: "Anaphora",
+                            snippet: `...${sentences[i-1].substring(0, 30)}... <br> ...<span class="match-highlight">${sentences[i].substring(0, 20)}</span>...`,
+                            context: "Consecutive sentence starts",
+                            weight: "medium"
+                        });
+                    }
+                }
+                if (matches.length > 1) scorer.add(60, "medium");
+                return { name: "Repetitive Structures", score: scorer.getScore(), matches, summary: matches.length ? "Repetitive sentence starts" : "Variance looks natural", details: scorer.getDetails() };
+            }
+        }
 
-// --- 12. COGNITIVE LOAD ---
-class CognitiveLoadAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    const cats=[
-      {id:'academicCosplay',label:'Pseudo-Academic',weight:'high',list:PatternConfig.academicCosplay},
-      {id:'hedgingLanguage',label:'Excessive Hedging',weight:'medium',list:PatternConfig.hedgingLanguage},
-      {id:'falseBalance',label:'False Balance',weight:'high',list:PatternConfig.falseBalance}
-    ];
-    let h=0;
-    cats.forEach(cat=>cat.list.forEach(p=>{
-      const rx=new RegExp(`\\b${p}\\b`,"gi");let x;
-      while((x=rx.exec(this.text))!==null){h++;if(m.length<15)m.push({type:cat.label,snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Artificial Nuance/Complexity",weight:cat.weight})}
-    }));
-    const d=h/(this.wc||1);
-    if(d>0.02)sc.add(85,"high");else if(d>0.01)sc.add(50,"medium");else if(h>2)sc.add(20,"low");
-    return{name:"Cognitive Load",score:sc.getScore(),matches:m,summary:h>0?`${h} instances of artificial complexity`:"Natural tone complexity",details:sc.getDetails()};
-  }
-}
+        // --- 7. VAGUE AUTHORITY ---
+        class VagueAuthorityAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                PatternConfig.vagueAuthority.forEach(phrase => {
+                    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        matches.push({
+                            type: "Vague Authority",
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Uncited claim attribution",
+                            weight: "high"
+                        });
+                    }
+                });
+                if (matches.length > 0) scorer.add(60, "high");
+                return { name: "Vague Authority Claims", score: scorer.getScore(), matches, summary: matches.length ? "Uncited authority detected" : "No vague sourcing", details: scorer.getDetails() };
+            }
+        }
 
-// --- 13. CORPORATE SPEAK ---
-class CorporateSpeakAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    PatternConfig.buzzwordClusters.forEach(p=>{
-      if(this.text.toLowerCase().includes(p.toLowerCase())){m.push({type:"Buzzword Cluster",snippet:`...${p}...`,context:"High-probability LLM Cluster",weight:"critical"});sc.add(100,"critical")}
-    });
-    let vc=0;
-    PatternConfig.processVerbs.forEach(w=>{
-      const rx=new RegExp(`\\b${w}\\b`,"gi");let x;
-      while((x=rx.exec(this.text))!==null){vc++;if(m.length<10)m.push({type:"Process Verb",snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Corporate/Consultant Tone",weight:"low"})}
-    });
-    if(vc>5)sc.add(60,"medium");
-    return{name:"Corporate Speak",score:sc.getScore(),matches:m,summary:m.length?"Detected 'Consultant' persona":"No corporate jargon",details:sc.getDetails()};
-  }
-}
+        // --- 8. PASSIVE VOICE ---
+        class PassiveVoiceAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                const regex = /\b(am|is|are|was|were|be|been|being)\s+(\w+ed|shown|seen|made|found|done|said|held|kept)\b/gi;
+                let match;
+                let count = 0;
+                while ((match = regex.exec(this.text)) !== null) {
+                    count++;
+                    if(matches.length < 5) {
+                        matches.push({
+                            type: "Passive Construction",
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Passive voice",
+                            weight: "low"
+                        });
+                    }
+                }
+                const ratio = count / (Utils.countWords(this.text) || 1);
+                if (ratio > 0.04) scorer.add(60, "medium");
+                return { name: "Passive Voice", score: scorer.getScore(), matches, summary: `${(ratio*100).toFixed(1)}% passive sentences`, details: scorer.getDetails() };
+            }
+        }
 
-// --- 14. META FILLER ---
-class MetaFillerAnalyzer{
-  constructor(t){this.text=t}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
-    const fillers=[...PatternConfig.metaCommentary.map(p=>({p,type:"Meta-Commentary"})),...PatternConfig.listIntroducers.map(p=>({p,type:"List Introducer"}))];
-    let count=0;
-    fillers.forEach(item=>{
-      const rx=new RegExp(`\\b${item.p}\\b`,"gi");let x;
-      while((x=rx.exec(this.text))!==null){count++;m.push({type:item.type,snippet:Utils.extractSnippet(this.text,x[0],x.index),context:"Structural padding",weight:"medium"})}
-    });
-    if(count>2)sc.add(40+(count*10),"high");
-    return{name:"Structural Filler",score:sc.getScore(),matches:m,summary:count>0?"Detected structural padding phrases":"Concise structure",details:sc.getDetails()};
-  }
-}
+        // --- 9. BURSTINESS ---
+        class BurstinessAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const sentences = Utils.splitSentences(this.text);
+                if (sentences.length < 3) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient data" };
+                const lengths = sentences.map(s => s.trim().split(/\s+/).length);
+                const stdDev = Utils.calculateStdDev(lengths);
+                const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+                const cv = stdDev / mean;
+                let score = 0;
+                let matches = [];
+                if (cv < 0.25) {
+                    score = 80;
+                    matches.push({ type: "Low Variance", snippet: "Sentence lengths are unnaturally uniform", context: `CV Score: ${cv.toFixed(2)} (Robotic)`, weight: "high" });
+                } else if (cv > 0.5) {
+                    score = -20;
+                    matches.push({ type: "High Variance", snippet: "Sentence lengths vary significantly", context: `CV Score: ${cv.toFixed(2)} (Human)`, weight: "bonus" });
+                }
+                return { name: "Burstiness (Variance)", score, matches, summary: cv < 0.3 ? "Mechanical uniformity" : "Natural variance", details: { cv } };
+            }
+        }
 
-// --- 15. PROFANITY & SWEAR WORD ANALYZER ---
-// Rationale: AI outputs are almost entirely free of genuine swearing. When profanity appears it's
-// either quoted, discussed academically, or heavily asterisked. Real humans swear naturally in context.
-// This analyzer distinguishes: genuine contextual swearing (human), absent swearing in casual text
-// (AI), censored/asterisked swearing (AI caution), and academically-framed profanity (AI discussing it).
-class ProfanityAnalyzer{
-  constructor(t){this.text=t;this.wc=Utils.countWords(t)}
-  analyze(){
-    const sc=new WeightedScorer(),m=[];
+        // --- 10. REFUSAL ---
+        class RefusalAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                PatternConfig.refusalHeaders.forEach(phrase => {
+                    if(new RegExp(phrase, "i").test(this.text)) {
+                        matches.push({ type: "AI Refusal", snippet: phrase, context: "Standard LLM refusal", weight: "critical" });
+                        scorer.add(100, "critical");
+                    }
+                });
+                return { name: "AI Guardrails", score: scorer.getScore(), matches, summary: matches.length ? "AI Safety signature found" : "No refusals found", details: scorer.getDetails() };
+            }
+        }
 
-    // Tier 1: Strong swears — very rare in AI output, common in genuine human writing
-    const strong=/\b(fuck(?:ing|ed|er|s)?|shit(?:ty|ting|s)?|cunt(?:s)?|bastard(?:s)?|cock(?:s|sucker)?|ass(?:hole|wipe|hat)?|bitch(?:es|ing)?|dick(?:head|s)?|piss(?:ed|ing)?|damn(?:ed|it)?|crap(?:py|s)?|bullshit|motherfucker|wanker|prick|twat|bollocks|arse(?:hole)?)\b/gi;
-    // Tier 2: Mild swears / casual language — rare in formal AI, common in informal human text
-    const mild=/\b(hell|bloody|bugger|sod(?:ding)?|crap|blimey|feck|shite|bloody hell|christ|jesus christ|oh god|for god's sake|goddamn|friggin|freaking|flippin)\b/gi;
-    // Censored patterns — AI doing its "I'll acknowledge but not say it" dance
-    const censored=/\b\w\*+\w?\b|\b[A-Za-z]\*{2,}[A-Za-z]?\b/g;
-    // Academic framing — AI discussing swearing without swearing
-    const academic=/\b(expletive|profanity|obscenity|vulgar(?:ity)?|offensive language|inappropriate language|strong language|crude language|coarse language|foul language|swear word|curse word|four-letter word)\b/gi;
+        // --- 11. TRANSITION OVERLOAD ---
+        class TransitionAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+                let count = 0;
+                PatternConfig.transitionOverload.forEach(phrase => {
+                    const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        count++;
+                        if (matches.length < 8) {
+                            matches.push({ type: "Coherence Marker", snippet: Utils.extractSnippet(this.text, match[0], match.index), context: "Forced logical bridging", weight: "medium" });
+                        }
+                    }
+                });
+                if (count > 5) scorer.add(80, "high");
+                else if (count > 2) scorer.add(40, "medium");
+                return { name: "Transition Overload", score: scorer.getScore(), matches, summary: count > 3 ? "Abnormal transition density" : "Natural flow", details: scorer.getDetails() };
+            }
+        }
 
-    let strongHits=[],mildHits=[],censorHits=[],acaHits=[];
-    let x;
+        // --- 12. NEW: COGNITIVE LOAD ANALYZER (Academic/Hedging/FalseBalance) ---
+        class CognitiveLoadAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
 
-    while((x=strong.exec(this.text))!==null)strongHits.push({word:x[0],idx:x.index});
-    while((x=mild.exec(this.text))!==null)mildHits.push({word:x[0],idx:x.index});
-    while((x=censored.exec(this.text))!==null)censorHits.push({word:x[0],idx:x.index});
-    while((x=academic.exec(this.text))!==null)acaHits.push({word:x[0],idx:x.index});
+                const categories = [
+                    { id: 'academicCosplay', label: 'Pseudo-Academic', weight: 'high', list: PatternConfig.academicCosplay },
+                    { id: 'hedgingLanguage', label: 'Excessive Hedging', weight: 'medium', list: PatternConfig.hedgingLanguage },
+                    { id: 'falseBalance', label: 'False Balance', weight: 'high', list: PatternConfig.falseBalance }
+                ];
 
-    // HUMAN SIGNALS: genuine contextual swearing
-    if(strongHits.length>0){
-      sc.add(-40,"high"); // Strong negative AI score — this is very human
-      strongHits.slice(0,5).forEach(h=>{
-        m.push({type:"Strong Profanity",snippet:Utils.extractSnippet(this.text,h.word,h.idx,40),context:"Genuine swearing — AI almost never does this naturally",weight:"human"});
-      });
-    }
-    if(mildHits.length>2){
-      sc.add(-20,"medium");
-      mildHits.slice(0,4).forEach(h=>{
-        m.push({type:"Casual Profanity",snippet:Utils.extractSnippet(this.text,h.word,h.idx,40),context:"Mild swearing — informal human register",weight:"human"});
-      });
-    }
+                let totalHits = 0;
 
-    // AI SIGNALS: censored swearing — AI tiptoeing around words
-    if(censorHits.length>0){
-      sc.add(50,"high");
-      censorHits.slice(0,3).forEach(h=>{
-        m.push({type:"Censored Word",snippet:Utils.extractSnippet(this.text,h.word,h.idx,40),context:"Asterisked word — AI self-censorship signature",weight:"high"});
-      });
-    }
+                categories.forEach(cat => {
+                    cat.list.forEach(phrase => {
+                        const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                        let match;
+                        while ((match = regex.exec(this.text)) !== null) {
+                            totalHits++;
+                            if (matches.length < 15) {
+                                matches.push({
+                                    type: cat.label,
+                                    snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                    context: "Artificial Nuance/Complexity",
+                                    weight: cat.weight
+                                });
+                            }
+                        }
+                    });
+                });
 
-    // AI SIGNALS: talking ABOUT profanity without using it
-    if(acaHits.length>0){
-      sc.add(40,"medium");
-      acaHits.slice(0,3).forEach(h=>{
-        m.push({type:"Academic Framing",snippet:Utils.extractSnippet(this.text,h.word,h.idx,40),context:"Discussing swearing without swearing = AI distancing",weight:"medium"});
-      });
-    }
+                // Scoring Logic: Academic language in non-academic contexts is a strong signal
+                const density = totalHits / (this.wordCount || 1);
+                
+                if (density > 0.02) scorer.add(85, "high");
+                else if (density > 0.01) scorer.add(50, "medium");
+                else if (totalHits > 2) scorer.add(20, "low");
 
-    // AI SIGNAL: zero swearing in clearly casual/conversational text (informal register without profanity)
-    // Detect informal register markers without any swearing
-    const informalMarkers=(this.text.match(/\b(gonna|wanna|gotta|kinda|sorta|dunno|ya know|tbh|ngl|lowkey|highkey|legit|literally|honestly|like,|you know,)\b/gi)||[]).length;
-    if(informalMarkers>3&&strongHits.length===0&&mildHits.length===0&&this.wc>100){
-      sc.add(30,"medium");
-      m.push({type:"Sanitised Casual Register",snippet:`${informalMarkers} informal markers (gonna, tbh, literally…) but zero swearing`,context:"AI mimics casual speech but scrubs all profanity",weight:"medium"});
-    }
+                return { 
+                    name: "Cognitive Load", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: totalHits > 0 ? `${totalHits} instances of artificial complexity` : "Natural tone complexity", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
 
-    // Determine summary
-    const totalSwears=strongHits.length+mildHits.length;
-    let summary;
-    if(totalSwears>0)summary=`${totalSwears} swear words detected (human signal)`;
-    else if(censorHits.length>0)summary=`${censorHits.length} censored words detected (AI caution)`;
-    else if(acaHits.length>0)summary=`Profanity discussed academically — not used`;
-    else summary=`No profanity detected — neutral`;
+        // --- 13. NEW: CORPORATE SPEAK ANALYZER (Buzzwords/Process Verbs) ---
+        class CorporateSpeakAnalyzer {
+            constructor(text) { 
+                this.text = text; 
+                this.wordCount = Utils.countWords(text);
+            }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
 
-    return{name:"Profanity & Register",score:Math.min(100,Math.max(0,sc.getScore())),matches:m,summary,details:{strongSwears:strongHits.length,mildSwears:mildHits.length,censored:censorHits.length,academic:acaHits.length,totalWeight:sc.totalWeight}};
-  }
-}
+                // Buzzwords are critical indicators of LLM training data bias
+                PatternConfig.buzzwordClusters.forEach(phrase => {
+                    if (this.text.toLowerCase().includes(phrase.toLowerCase())) {
+                        matches.push({
+                            type: "Buzzword Cluster",
+                            snippet: `...${phrase}...`,
+                            context: "High-probability LLM Cluster",
+                            weight: "critical"
+                        });
+                        scorer.add(100, "critical");
+                    }
+                });
 
-// --- RENDERER ---
-class ResultRenderer{
-  constructor(){
-    this.container=document.getElementById("modules-container");
-    this.scoreCircle=document.getElementById("score-circle");
-    this.scoreText=document.getElementById("score-text");
-    this.keyIndicators=document.getElementById("key-indicators");
-  }
-  updateTotalScore(s){
-    this.scoreText.innerText=`${s}%`;
-    let color,label;
-    if(s>80){color="#ef4444";label="Likely AI-Generated";}
-    else if(s>50){color="#f97316";label="Mixed Signals / Edited";}
-    else{color="#22c55e";label="Likely Human-Written";}
-    this.scoreCircle.style.setProperty("--score-percent",`${s}%`);
-    this.scoreCircle.style.setProperty("--score-color",color);
-    this.scoreText.style.color=color;
-    const ct=document.getElementById("confidence-text");
-    ct.innerText=label;ct.style.color=color;
-  }
-  renderModule(d){
-    if(d.matches.length===0&&d.score<10)return;
-    const wrap=document.createElement("div");
-    wrap.className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm";
-    const hc=d.score>50?"bg-red-50":(d.score>10?"bg-orange-50":"bg-green-50");
-    const tc=d.score>50?"text-red-700":(d.score>10?"text-orange-700":"text-green-700");
-    const barColor=d.score>50?'bg-red-500':(d.score>10?'bg-orange-400':'bg-green-500');
-    const items=d.matches.map(m=>`<div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition"><div class="flex justify-between items-start mb-2"><span class="text-xs font-bold uppercase tracking-wider text-slate-500">${m.type}</span><span class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-600">${m.context}</span></div><div class="snippet-box p-2 rounded text-slate-700 bg-slate-50">${m.snippet}</div></div>`).join("");
-    wrap.innerHTML=`<div class="category-header p-4 flex justify-between items-center ${hc}" onclick="this.nextElementSibling.classList.toggle('open')"><div class="flex items-center gap-3"><div class="w-1.5 h-8 rounded-full ${barColor}"></div><div><h3 class="font-bold text-slate-800">${d.name}</h3><p class="text-xs text-slate-500">${d.matches.length} findings</p></div></div><span class="font-bold text-lg ${tc}">${Math.round(d.score)}%</span></div><div class="category-content bg-white"><p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${d.summary}</p><div class="max-h-96 overflow-y-auto">${items}</div></div>`;
-    this.container.appendChild(wrap);
-    if(d.score>60||d.matches.some(m=>m.weight==='critical')){
-      const li=document.createElement("li");
-      li.className="text-sm text-slate-600 border-l-2 border-red-400 pl-2";
-      li.innerHTML=`<strong>${d.name}:</strong> ${d.summary}`;
-      this.keyIndicators.appendChild(li);
-    }
-  }
-  clear(){
-    this.container.innerHTML="";this.keyIndicators.innerHTML="";
-    document.getElementById("results-area").classList.add("hidden");
-    this.scoreCircle.style.setProperty("--score-percent","0%");
-    this.scoreText.innerText="0%";
-  }
-  show(){document.getElementById("results-area").classList.remove("hidden")}
-}
+                // Process verbs (utilize, leverage) are common, but high density indicates AI
+                let verbCount = 0;
+                PatternConfig.processVerbs.forEach(word => {
+                    const regex = new RegExp(`\\b${word}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        verbCount++;
+                        if (matches.length < 10) {
+                            matches.push({
+                                type: "Process Verb",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "Corporate/Consultant Tone",
+                                weight: "low"
+                            });
+                        }
+                    }
+                });
 
-// --- APP ---
-class App{
-  constructor(){
-    this.editor=document.getElementById("editor");
-    this.analyzeBtn=document.getElementById("analyze-btn");
-    this.clearBtn=document.getElementById("clear-btn");
-    this.wordCountEl=document.getElementById("word-count");
-    this.renderer=new ResultRenderer();
-    this.bindEvents();
-  }
-  bindEvents(){
-    this.editor.addEventListener("input",()=>{
-      const t=Utils.htmlToText(this.editor.innerHTML);
-      const w=Utils.countWords(t);
-      this.wordCountEl.innerText=`${w} words`;
-      this.analyzeBtn.disabled=w<PatternConfig.thresholds.minWords;
-      this.analyzeBtn.classList.toggle("opacity-50",w<PatternConfig.thresholds.minWords);
-      this.analyzeBtn.classList.toggle("cursor-not-allowed",w<PatternConfig.thresholds.minWords);
-    });
-    this.clearBtn.addEventListener("click",()=>{
-      this.editor.innerHTML="";this.renderer.clear();
-      this.wordCountEl.innerText="0 words";this.analyzeBtn.disabled=true;
-    });
-    this.analyzeBtn.addEventListener("click",()=>this.runAnalysis());
-  }
-  runAnalysis(){
-    this.renderer.clear();
-    const text=Utils.htmlToText(this.editor.innerHTML);
-    const analyzers=[
-      new RefusalAnalyzer(text),new GPTLexiconAnalyzer(text),new TransitionAnalyzer(text),
-      new VagueAuthorityAnalyzer(text),new RepetitionAnalyzer(text),new PassiveVoiceAnalyzer(text),
-      new BurstinessAnalyzer(text),new EmojiAnalyzer(text),new StructuralRigidityAnalyzer(text),
-      new PunctuationAnalyzer(text),new BinaryPatternAnalyzer(text),new CognitiveLoadAnalyzer(text),
-      new CorporateSpeakAnalyzer(text),new MetaFillerAnalyzer(text),new ProfanityAnalyzer(text)
-    ];
-    const results=analyzers.map(a=>a.analyze());
-    const totalScorer=new WeightedScorer();
-    results.forEach(res=>{
-      this.renderer.renderModule(res);
-      if(res.details&&res.details.totalWeight>0){
-        const w=res.matches.some(m=>m.weight==='critical')?'critical':'medium';
-        totalScorer.add(res.score,w);
-      }
-    });
-    let final=totalScorer.getScore();
-    if(Utils.countWords(text)<50)final=Math.min(final,85);
-    this.renderer.updateTotalScore(Math.round(final));
-    this.renderer.show();
-  }
-}
-document.addEventListener("DOMContentLoaded",()=>new App());
-</script>
+                if (verbCount > 5) scorer.add(60, "medium");
+
+                return { 
+                    name: "Corporate Speak", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: matches.length ? "Detected 'Consultant' persona" : "No corporate jargon", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- 14. NEW: META FILLER ANALYZER (Meta Commentary/List Introducers) ---
+        class MetaFillerAnalyzer {
+            constructor(text) { this.text = text; }
+            analyze() {
+                const scorer = new WeightedScorer();
+                const matches = [];
+
+                const fillers = [
+                    ...PatternConfig.metaCommentary.map(p => ({ p, type: "Meta-Commentary" })),
+                    ...PatternConfig.listIntroducers.map(p => ({ p, type: "List Introducer" }))
+                ];
+
+                let count = 0;
+                fillers.forEach(item => {
+                    const regex = new RegExp(`\\b${item.p}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        count++;
+                        matches.push({
+                            type: item.type,
+                            snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                            context: "Structural padding",
+                            weight: "medium"
+                        });
+                    }
+                });
+
+                if (count > 2) scorer.add(40 + (count * 10), "high");
+
+                return { 
+                    name: "Structural Filler", 
+                    score: scorer.getScore(), 
+                    matches, 
+                    summary: count > 0 ? "Detected structural padding phrases" : "Concise structure", 
+                    details: scorer.getDetails() 
+                };
+            }
+        }
+
+        // --- RENDERER ---
+        class ResultRenderer {
+            constructor() {
+                this.container = document.getElementById("modules-container");
+                this.scoreCircle = document.getElementById("score-circle");
+                this.scoreText = document.getElementById("score-text");
+                this.keyIndicators = document.getElementById("key-indicators");
+            }
+            updateTotalScore(score) {
+                this.scoreText.innerText = `${score}%`;
+                let color, label;
+                if (score > 80) { color = "#ef4444"; label = "Likely AI-Generated"; }
+                else if (score > 50) { color = "#f97316"; label = "Mixed Signals / Edited"; }
+                else { color = "#22c55e"; label = "Likely Human-Written"; }
+                this.scoreCircle.style.setProperty("--score-percent", `${score}%`);
+                this.scoreCircle.style.setProperty("--score-color", color);
+                this.scoreText.style.color = color;
+                document.getElementById("confidence-text").innerText = label;
+                document.getElementById("confidence-text").style.color = color;
+            }
+            renderModule(data) {
+                if (data.matches.length === 0 && data.score < 20) return;
+                const wrapper = document.createElement("div");
+                wrapper.className = "border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm";
+                const headerColor = data.score > 50 ? "bg-red-50" : (data.score > 0 ? "bg-orange-50" : "bg-green-50");
+                const textColor = data.score > 50 ? "text-red-700" : (data.score > 0 ? "text-orange-700" : "text-green-700");
+                const itemsHtml = data.matches.map(m => `
+                    <div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">${m.type}</span>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-600">${m.context}</span>
+                        </div>
+                        <div class="snippet-box p-2 rounded text-slate-700 bg-slate-50">${m.snippet}</div>
+                    </div>
+                `).join("");
+                wrapper.innerHTML = `
+                    <div class="category-header p-4 flex justify-between items-center ${headerColor}" onclick="this.nextElementSibling.classList.toggle('open')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-1.5 h-8 rounded-full ${data.score > 50 ? 'bg-red-500' : 'bg-green-500'}"></div>
+                            <div>
+                                <h3 class="font-bold text-slate-800">${data.name}</h3>
+                                <p class="text-xs text-slate-500">${data.matches.length} findings</p>
+                            </div>
+                        </div>
+                        <span class="font-bold text-lg ${textColor}">${Math.round(data.score)}%</span>
+                    </div>
+                    <div class="category-content bg-white">
+                        <p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${data.summary}</p>
+                        <div class="max-h-96 overflow-y-auto">${itemsHtml}</div>
+                    </div>
+                `;
+                this.container.appendChild(wrapper);
+                if (data.score > 60 || data.matches.some(m => m.weight === 'critical')) {
+                    const li = document.createElement("li");
+                    li.className = "text-sm text-slate-600 border-l-2 border-red-400 pl-2";
+                    li.innerHTML = `<strong>${data.name}:</strong> ${data.summary}`;
+                    this.keyIndicators.appendChild(li);
+                }
+            }
+            clear() {
+                this.container.innerHTML = "";
+                this.keyIndicators.innerHTML = "";
+                document.getElementById("results-area").classList.add("hidden");
+                this.scoreCircle.style.setProperty("--score-percent", "0%");
+                this.scoreText.innerText = "0%";
+            }
+            show() { document.getElementById("results-area").classList.remove("hidden"); }
+        }
+
+        // --- APP ---
+        class App {
+            constructor() {
+                this.editor = document.getElementById("editor");
+                this.analyzeBtn = document.getElementById("analyze-btn");
+                this.clearBtn = document.getElementById("clear-btn");
+                this.wordCountEl = document.getElementById("word-count");
+                this.renderer = new ResultRenderer();
+                this.bindEvents();
+            }
+            bindEvents() {
+                this.editor.addEventListener("input", () => {
+                    const text = Utils.htmlToText(this.editor.innerHTML);
+                    const words = Utils.countWords(text);
+                    this.wordCountEl.innerText = `${words} words`;
+                    this.analyzeBtn.disabled = words < PatternConfig.thresholds.minWords;
+                    if(words >= PatternConfig.thresholds.minWords) this.analyzeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+                    else this.analyzeBtn.classList.add("opacity-50", "cursor-not-allowed");
+                });
+                this.clearBtn.addEventListener("click", () => {
+                    this.editor.innerHTML = "";
+                    this.renderer.clear();
+                    this.wordCountEl.innerText = "0 words";
+                    this.analyzeBtn.disabled = true;
+                });
+                this.analyzeBtn.addEventListener("click", () => this.runAnalysis());
+            }
+            runAnalysis() {
+                this.renderer.clear();
+                const rawHtml = this.editor.innerHTML;
+                const text = Utils.htmlToText(rawHtml);
+                const analyzers = [
+                    new RefusalAnalyzer(text),
+                    new GPTLexiconAnalyzer(text),
+                    new TransitionAnalyzer(text),
+                    new VagueAuthorityAnalyzer(text),
+                    new RepetitionAnalyzer(text),
+                    new PassiveVoiceAnalyzer(text),
+                    new BurstinessAnalyzer(text),
+                    new EmojiAnalyzer(text),
+                    new StructuralRigidityAnalyzer(text),
+                    new PunctuationAnalyzer(text),
+                    new BinaryPatternAnalyzer(text),
+                    // NEW INTEGRATIONS
+                    new CognitiveLoadAnalyzer(text),
+                    new CorporateSpeakAnalyzer(text),
+                    new MetaFillerAnalyzer(text)
+                ];
+                const results = analyzers.map(a => a.analyze());
+                const totalScorer = new WeightedScorer();
+                results.forEach(res => {
+                    this.renderer.renderModule(res);
+                    if (res.details && res.details.totalWeight > 0) {
+                        const weight = res.matches.some(m => m.weight === 'critical') ? 'critical' : 'medium';
+                        totalScorer.add(res.score, weight);
+                    }
+                });
+                let finalScore = totalScorer.getScore();
+                if (Utils.countWords(text) < 50) finalScore = Math.min(finalScore, 85);
+                this.renderer.updateTotalScore(Math.round(finalScore));
+                this.renderer.show();
+            }
+        }
+        document.addEventListener("DOMContentLoaded", () => new App());
+
+    </script>
 </body>
 </html>
