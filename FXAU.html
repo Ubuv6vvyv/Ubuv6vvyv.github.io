@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>⚡ AUDIO LAB</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08080f;--panel:#0f0f1c;--neon:#00ff88;--hot:#ff4422;--purple:#9944ff;--cyan:#00ddff;--amber:#ffaa00;--dim:#1a1a2e;--muted:#22223a;--border:rgba(0,255,136,0.18);--text:#7788aa;--light:#cce0ff;--font:'Share Tech Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--light);font-family:var(--font);overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+#logo{font-size:20px;letter-spacing:3px;color:var(--neon);text-shadow:0 0 15px var(--neon)}
+#logo span{color:var(--light)}
+#meters{display:flex;gap:3px;align-items:flex-end;height:28px}
+.mbar{width:6px;background:var(--muted);border-radius:1px;overflow:hidden;display:flex;flex-direction:column-reverse}
+.mbar-fill{background:linear-gradient(to top,var(--neon),var(--amber),var(--hot));border-radius:1px;transition:height 0.05s}
+#status{font-size:10px;color:var(--text);letter-spacing:2px;min-width:70px;text-align:right;text-transform:uppercase}
+
+/* UPLOAD */
+#upload-sec{padding:14px;display:flex;gap:10px;align-items:stretch}
+#drop-zone{flex:1;border:2px dashed var(--border);border-radius:8px;padding:18px 10px;text-align:center;cursor:pointer;transition:.2s;background:rgba(0,255,136,.03)}
+#drop-zone:hover,#drop-zone.drag{border-color:var(--neon);background:rgba(0,255,136,.07);box-shadow:0 0 20px rgba(0,255,136,.15)}
+#drop-zone .dz-main{font-size:13px;color:var(--neon);margin-bottom:5px}
+#drop-zone .dz-sub{font-size:10px;color:var(--text)}
+#file-btn{display:inline-block;margin-top:8px;padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--font);font-size:11px;color:var(--light);background:var(--dim)}
+#mic-btn{min-width:62px;padding:10px 6px;border:2px solid rgba(255,68,34,.4);border-radius:8px;background:rgba(255,68,34,.08);color:var(--hot);font-family:var(--font);font-size:11px;cursor:pointer;line-height:1.4;letter-spacing:1px;transition:.2s}
+#mic-btn:active,#mic-btn.recording{background:var(--hot);color:#fff;border-color:var(--hot);box-shadow:0 0 20px rgba(255,68,34,.5)}
+
+/* LOADED STATE */
+#audio-loaded{display:none;padding:10px 14px;flex-direction:column;gap:10px}
+#file-info{display:flex;justify-content:space-between;align-items:center;font-size:11px}
+#file-name{color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+#file-dur{color:var(--text)}
+
+/* VISUALIZER */
+#viz{width:100%;height:110px;background:#04040a;border-radius:8px;border:1px solid var(--border);display:block}
+
+/* TRANSPORT */
+#transport{display:flex;align-items:center;gap:8px}
+.t-btn{width:44px;height:44px;border-radius:6px;border:1px solid var(--border);background:var(--dim);color:var(--light);font-size:16px;cursor:pointer;flex-shrink:0;transition:.15s}
+.t-btn:active{background:var(--muted);transform:scale(.95)}
+.t-btn.active{border-color:var(--neon);color:var(--neon);box-shadow:0 0 10px rgba(0,255,136,.3)}
+#pos-wrap{flex:1;display:flex;flex-direction:column;gap:4px}
+#pos-slider{width:100%;height:4px;-webkit-appearance:none;background:var(--muted);border-radius:2px;outline:none}
+#pos-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);cursor:pointer}
+#time-disp{font-size:10px;color:var(--text);text-align:center}
+
+/* TABS */
+#tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab-btn{flex:1;padding:10px 4px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text);font-family:var(--font);font-size:12px;cursor:pointer;letter-spacing:2px;transition:.2s}
+.tab-btn.active{color:var(--neon);border-bottom-color:var(--neon)}
+.tab-panel{padding-top:10px}
+
+/* SLIDERS */
+.fx-section{background:var(--panel);border-radius:8px;padding:12px;border:1px solid var(--border);margin-bottom:10px}
+.fx-section-title{font-size:9px;color:var(--text);letter-spacing:3px;margin-bottom:10px;text-transform:uppercase}
+.fx-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.fx-lbl{width:72px;font-size:10px;color:var(--text);text-transform:uppercase;letter-spacing:1px;flex-shrink:0}
+.fx-slider{flex:1;height:6px;-webkit-appearance:none;background:var(--muted);border-radius:3px;outline:none;cursor:pointer;position:relative}
+.fx-slider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--neon);box-shadow:0 0 10px rgba(0,255,136,.5);cursor:pointer;transition:.1s}
+.fx-slider::-webkit-slider-thumb:active{transform:scale(1.2)}
+.fx-val{width:58px;text-align:right;font-size:11px;color:var(--neon);flex-shrink:0}
+.fx-toggle-row{display:flex;align-items:center;gap:6px;padding:5px 0}
+.fx-toggle-lbl{width:72px;font-size:10px;color:var(--text);flex-shrink:0}
+.tog-grp{display:flex;gap:4px}
+.tog-btn{padding:5px 10px;border:1px solid var(--muted);border-radius:4px;background:transparent;color:var(--text);font-family:var(--font);font-size:10px;cursor:pointer;transition:.15s}
+.tog-btn.on{border-color:var(--neon);color:var(--neon);background:rgba(0,255,136,.1)}
+
+/* PRESETS */
+.preset-cat-label{font-size:9px;color:var(--text);letter-spacing:3px;text-transform:uppercase;margin:10px 0 6px;padding-left:2px}
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:4px}
+.p-btn{padding:11px 4px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:var(--panel);color:var(--light);font-family:var(--font);font-size:10px;cursor:pointer;text-align:center;line-height:1.4;transition:.15s;letter-spacing:.5px}
+.p-btn:active{transform:scale(.95);opacity:.7}
+.p-btn.running{animation:pulse 0.8s ease-in-out infinite}
+.p-btn.done{border-color:var(--neon);color:var(--neon)}
+.p-btn[data-cat=voice]{border-color:rgba(0,221,255,.3);color:var(--cyan)}
+.p-btn[data-cat=robot]{border-color:rgba(255,170,0,.3);color:var(--amber)}
+.p-btn[data-cat=alien]{border-color:rgba(153,68,255,.3);color:var(--purple)}
+.p-btn[data-cat=fx]{border-color:rgba(0,255,136,.2);color:var(--neon)}
+.p-btn[data-cat=time]{border-color:rgba(255,68,34,.3);color:var(--hot)}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:none}50%{opacity:.5;box-shadow:0 0 12px currentColor}}
+
+/* DOWNLOAD */
+#dl-bar{display:none;margin-top:6px}
+#dl-btn{width:100%;padding:14px;border-radius:8px;border:1px solid rgba(0,221,255,.4);background:rgba(0,221,255,.08);color:var(--cyan);font-family:var(--font);font-size:13px;cursor:pointer;letter-spacing:2px;transition:.2s}
+#dl-btn:active{background:rgba(0,221,255,.2)}
+
+/* PROCESSING OVERLAY */
+#proc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+#proc-overlay.show{display:flex}
+#proc-spin{width:48px;height:48px;border:3px solid var(--muted);border-top-color:var(--neon);border-radius:50%;animation:spin 0.8s linear infinite}
+#proc-msg{color:var(--neon);font-size:13px;letter-spacing:2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div id="logo">⚡ AUDIO<span>LAB</span></div>
+  <div id="meters">
+    <div class="mbar"><div class="mbar-fill" id="ml" style="height:2%"></div></div>
+    <div class="mbar"><div class="mbar-fill" id="mr" style="height:2%"></div></div>
+    <div class="mbar"><div class="mbar-fill" id="ml2" style="height:2%"></div></div>
+    <div class="mbar"><div class="mbar-fill" id="mr2" style="height:2%"></div></div>
+    <div class="mbar"><div class="mbar-fill" id="ml3" style="height:2%"></div></div>
+    <div class="mbar"><div class="mbar-fill" id="mr3" style="height:2%"></div></div>
+  </div>
+  <div id="status">READY</div>
+</header>
+
+<section id="upload-sec">
+  <div id="drop-zone">
+    <div class="dz-main">📂 DROP AUDIO HERE</div>
+    <div class="dz-sub">MP3 · WAV · OGG · FLAC · M4A · WEBM</div>
+    <label id="file-btn">BROWSE FILE<input type="file" id="file-input" accept="audio/*" style="display:none"></label>
+  </div>
+  <button id="mic-btn">🎙️<br>MIC<br><span id="mic-timer" style="font-size:9px"></span></button>
+</section>
+
+<section id="audio-loaded">
+  <div id="file-info">
+    <span id="file-name">—</span>
+    <span id="file-dur">0:00</span>
+  </div>
+
+  <canvas id="viz"></canvas>
+
+  <div id="transport">
+    <button class="t-btn" id="play-btn" title="Play/Pause">▶</button>
+    <div id="pos-wrap">
+      <input type="range" id="pos-slider" min="0" max="1000" value="0" step="1">
+      <div id="time-disp">0:00 / 0:00</div>
+    </div>
+    <button class="t-btn" id="loop-btn" title="Loop">↺</button>
+  </div>
+
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="live">LIVE FX</button>
+    <button class="tab-btn" data-tab="presets">FX PRESETS</button>
+  </div>
+
+  <div id="tab-live" class="tab-panel">
+    <div class="fx-section">
+      <div class="fx-section-title">⚙ TRANSPORT</div>
+      <div class="fx-row"><span class="fx-lbl">SPEED</span><input type="range" class="fx-slider" id="s-speed" min="0.25" max="4" step="0.05" value="1"><span class="fx-val" id="v-speed">1.00×</span></div>
+      <div class="fx-row"><span class="fx-lbl">VOLUME</span><input type="range" class="fx-slider" id="s-vol" min="0" max="1.5" step="0.01" value="1"><span class="fx-val" id="v-vol">100%</span></div>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-title">◈ DISTORTION &amp; FILTER</div>
+      <div class="fx-row"><span class="fx-lbl">DISTORT</span><input type="range" class="fx-slider" id="s-dist" min="0" max="400" step="1" value="0"><span class="fx-val" id="v-dist">0</span></div>
+      <div class="fx-toggle-row"><span class="fx-toggle-lbl">FILTER</span><div class="tog-grp" id="filt-type-grp"><button class="tog-btn on" data-val="allpass">OFF</button><button class="tog-btn" data-val="lowpass">LPF</button><button class="tog-btn" data-val="highpass">HPF</button><button class="tog-btn" data-val="bandpass">BPF</button></div></div>
+      <div class="fx-row"><span class="fx-lbl">CUTOFF</span><input type="range" class="fx-slider" id="s-fcut" min="0" max="1" step="0.001" value="1"><span class="fx-val" id="v-fcut">22kHz</span></div>
+      <div class="fx-row"><span class="fx-lbl">RESONANCE</span><input type="range" class="fx-slider" id="s-fq" min="0.1" max="30" step="0.1" value="1"><span class="fx-val" id="v-fq">Q 1.0</span></div>
+    </div>
+    
+    <div class="fx-section">
+      <div class="fx-section-title">🔥 TONE &amp; MODULATION</div>
+      <div class="fx-row"><span class="fx-lbl">WARMTH</span><input type="range" class="fx-slider" id="s-warm" min="0" max="100" step="1" value="0"><span class="fx-val" id="v-warm">0%</span></div>
+      <div class="fx-row"><span class="fx-lbl">METALLIC</span><input type="range" class="fx-slider" id="s-metal" min="0" max="1" step="0.01" value="0"><span class="fx-val" id="v-metal">0%</span></div>
+      <div class="fx-row"><span class="fx-lbl">AM WOBBLE</span><input type="range" class="fx-slider" id="s-am" min="0" max="20" step="0.1" value="0"><span class="fx-val" id="v-am">0Hz</span></div>
+    </div>
+
+    <div class="fx-section">
+      <div class="fx-section-title">〰 FLANGER / CHORUS</div>
+      <div class="fx-row"><span class="fx-lbl">RATE Hz</span><input type="range" class="fx-slider" id="s-frate" min="0.01" max="20" step="0.01" value="4"><span class="fx-val" id="v-frate">4.0Hz</span></div>
+      <div class="fx-row"><span class="fx-lbl">DEPTH</span><input type="range" class="fx-slider" id="s-fdepth" min="0" max="1" step="0.01" value="0"><span class="fx-val" id="v-fdepth">0%</span></div>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-title">◎ ECHO / DELAY</div>
+      <div class="fx-row"><span class="fx-lbl">TIME</span><input type="range" class="fx-slider" id="s-etime" min="0.01" max="1.5" step="0.01" value="0.3"><span class="fx-val" id="v-etime">0.30s</span></div>
+      <div class="fx-row"><span class="fx-lbl">FEEDBACK</span><input type="range" class="fx-slider" id="s-efb" min="0" max="0.94" step="0.01" value="0.5"><span class="fx-val" id="v-efb">50%</span></div>
+      <div class="fx-row"><span class="fx-lbl">MIX</span><input type="range" class="fx-slider" id="s-emix" min="0" max="1" step="0.01" value="0"><span class="fx-val" id="v-emix">0%</span></div>
+    </div>
+    <div class="fx-section">
+      <div class="fx-section-title">🌊 REVERB</div>
+      <div class="fx-row"><span class="fx-lbl">MIX</span><input type="range" class="fx-slider" id="s-rvb" min="0" max="1" step="0.01" value="0"><span class="fx-val" id="v-rvb">0%</span></div>
+      <div class="fx-row"><span class="fx-lbl">DECAY</span><input type="range" class="fx-slider" id="s-rdec" min="0.5" max="6" step="0.1" value="2.5"><span class="fx-val" id="v-rdec">2.5s</span></div>
+    </div>
+  </div>
+
+  <div id="tab-presets" class="tab-panel" style="display:none">
+    <div class="preset-cat-label">📞 VOICE</div>
+    <div class="preset-grid">
+      <button class="p-btn" data-cat="voice" data-fn="telephone">📞<br>Telephone</button>
+      <button class="p-btn" data-cat="voice" data-fn="megaphone">📣<br>Megaphone</button>
+      <button class="p-btn" data-cat="voice" data-fn="astronaut">🚀<br>Astronaut</button>
+      <button class="p-btn" data-cat="voice" data-fn="bane">🦹<br>Bane</button>
+      <button class="p-btn" data-cat="voice" data-fn="portableRadio">📻<br>Port.Radio</button>
+      <button class="p-btn" data-cat="voice" data-fn="schoolPA">📡<br>School PA</button>
+    </div>
+    <div class="preset-cat-label">🤖 ROBOTS</div>
+    <div class="preset-grid">
+      <button class="p-btn" data-cat="robot" data-fn="robot1">🤖<br>Robot 1</button>
+      <button class="p-btn" data-cat="robot" data-fn="robot2">🤖<br>Robot 2</button>
+      <button class="p-btn" data-cat="robot" data-fn="robot3">🤖<br>Robot 3</button>
+      <button class="p-btn" data-cat="robot" data-fn="robot4">⚙️<br>Beep Boop</button>
+      <button class="p-btn" data-cat="robot" data-fn="cuteRobot">🐤<br>Cute Robot</button>
+      <button class="p-btn" data-cat="robot" data-fn="troll">👹<br>Troll</button>
+    </div>
+    <div class="preset-cat-label">👾 ALIEN &amp; PITCH</div>
+    <div class="preset-grid">
+      <button class="p-btn" data-cat="alien" data-fn="alien1">👽<br>Alien 1</button>
+      <button class="p-btn" data-cat="alien" data-fn="alien2">👽<br>Alien 2</button>
+      <button class="p-btn" data-cat="alien" data-fn="alienRobot1">🛸<br>Alien Bot</button>
+      <button class="p-btn" data-cat="alien" data-fn="mosquito">🦟<br>Mosquito</button>
+      <button class="p-btn" data-cat="alien" data-fn="giantRobot">🦾<br>Giant Bot</button>
+      <button class="p-btn" data-cat="alien" data-fn="slowWobble">🌀<br>Slow Wobble</button>
+    </div>
+    <div class="preset-cat-label">🎛️ EFFECTS</div>
+    <div class="preset-grid">
+      <button class="p-btn" data-cat="fx" data-fn="ringMod">◉<br>Ring Mod</button>
+      <button class="p-btn" data-cat="fx" data-fn="autowah">🎸<br>Auto Wah</button>
+      <button class="p-btn" data-cat="fx" data-fn="vibrato">〰️<br>Vibrato</button>
+      <button class="p-btn" data-cat="fx" data-fn="poorTel">📵<br>Poor Tel</button>
+      <button class="p-btn" data-cat="fx" data-fn="scrambler">👾<br>Scrambler</button>
+      <button class="p-btn" data-cat="fx" data-fn="pitchUp">⬆️<br>Pitch +0.5</button>
+    </div>
+    <div class="preset-cat-label">⏱️ TIME WARP</div>
+    <div class="preset-grid">
+      <button class="p-btn" data-cat="time" data-fn="reverse">🔄<br>Reverse</button>
+      <button class="p-btn" data-cat="time" data-fn="chunkedRev">✂️<br>Chunk Rev</button>
+      <button class="p-btn" data-cat="time" data-fn="mirrored">🪞<br>Mirrored</button>
+      <button class="p-btn" data-cat="time" data-fn="jumbled">🔀<br>Jumbled</button>
+      <button class="p-btn" data-cat="time" data-fn="speed2x">⏩<br>Speed 2×</button>
+      <button class="p-btn" data-cat="time" data-fn="speedHalf">🐢<br>Speed ½×</button>
+    </div>
+
+    <div class="fx-section" style="margin-top: 15px;">
+      <div class="fx-section-title">✂️ CUSTOM SCRAMBLER (OFFLINE)</div>
+      <div class="fx-row"><span class="fx-lbl">CHUNK (s)</span><input type="range" class="fx-slider" id="s-chunk-size" min="0.1" max="3" step="0.1" value="1"><span class="fx-val" id="v-chunk-size">1.0s</span></div>
+      <div class="fx-row"><span class="fx-lbl">FLIP PROB</span><input type="range" class="fx-slider" id="s-flip-prob" min="0" max="1" step="0.05" value="0.5"><span class="fx-val" id="v-flip-prob">50%</span></div>
+      <button class="p-btn" data-fn="customScrambler" style="width: 100%; margin-top: 10px; border-color: var(--hot); color: var(--hot);">🧬 GENERATE SCRAMBLE</button>
+    </div>
+  </div>
+
+  <div id="dl-bar">
+    <button id="dl-btn">⬇ DOWNLOAD PROCESSED WAV</button>
+  </div>
+</section>
+
+<div id="proc-overlay">
+  <div id="proc-spin"></div>
+  <div id="proc-msg">PROCESSING…</div>
+</div>
+<script>
+// ============================================================
+// GLOBALS & DYNAMIC ENCODER BOOTSTRAP
+// ============================================================
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+let globalAudioBuffer = null;
+let processedBuffer = null;
+let liveCtx = null, liveSource = null, liveNodes = {};
+let isPlaying = false, loopEnabled = false;
+let startTime = 0, startOffset = 0;
+let currentlyRecording = false;
+let animId = null;
+let reverbIR = null;
+
+// Automatically fetch and inject the MP3 Lame Encoder library safely into the header
+(function() {
+  if (!window.lamejs) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+    document.head.appendChild(script);
+  }
+})();
+
+const $ = id => document.getElementById(id);
+const fmtTime = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+// ============================================================
+// DISTORTION & WARMTH CURVES
+// ============================================================
+function makeDistCurve(amount) {
+  const k = Math.max(0.001, typeof amount === 'number' ? amount : 50);
+  const n = 44100, curve = new Float32Array(n), deg = Math.PI / 180;
+  for(let i=0;i<n;i++){const x=i*2/n-1;curve[i]=(3+k)*x*20*deg/(Math.PI+k*Math.abs(x));}
+  return curve;
+}
+
+// Analog "Warmth" (Soft clipping tube saturation)
+function makeWarmthCurve(amount) {
+  const k = Math.max(0.001, amount);
+  const n = 44100, curve = new Float32Array(n);
+  for(let i=0; i<n; i++) {
+    const x = i * 2 / n - 1;
+    curve[i] = Math.tanh(x * k); // Hyperbolic tangent for smooth saturation
+  }
+  return curve;
+}
+
+// ============================================================
+// SYNTHETIC REVERB IR
+// ============================================================
+function makeSyntheticIR(ctx, dur=2.5, decay=3) {
+  const sr=ctx.sampleRate, len=Math.floor(sr*dur);
+  const ir=ctx.createBuffer(2,len,sr);
+  for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}
+  return ir;
+}
+
+// ============================================================
+// ASYNC CHUNKED MP3 ENCODER
+// ============================================================
+async function bufferToMp3(buf) {
+  if (!window.lamejs) {
+    alert('MP3 Engine library is still loading from CDN. Please click export again in a brief second.');
+    return null;
+  }
+  const numChannels = buf.numberOfChannels;
+  const sampleRate = buf.sampleRate;
+  const encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, 192); 
+  const mp3Data = [];
+  const chData0 = buf.getChannelData(0);
+  const chData1 = numChannels > 1 ? buf.getChannelData(1) : null;
+  const totalSamples = buf.length;
+  const chunkSize = 115200; 
+  
+  for (let offset = 0; offset < totalSamples; offset += chunkSize) {
+    const end = Math.min(offset + chunkSize, totalSamples);
+    const currentBlockSize = end - offset;
+    const leftInt16 = new Int16Array(currentBlockSize);
+    const rightInt16 = chData1 ? new Int16Array(currentBlockSize) : null;
+    
+    for (let i = 0; i < currentBlockSize; i++) {
+      let s0 = chData0[offset + i];
+      if (s0 > 1) s0 = 1; else if (s0 < -1) s0 = -1;
+      leftInt16[i] = s0 < 0 ? s0 * 0x8000 : s0 * 0x7FFF;
+      if (rightInt16) {
+        let s1 = chData1[offset + i];
+        if (s1 > 1) s1 = 1; else if (s1 < -1) s1 = -1;
+        rightInt16[i] = s1 < 0 ? s1 * 0x8000 : s1 * 0x7FFF;
+      }
+    }
+    
+    let mp3buf = (numChannels === 2) ? encoder.encodeBuffer(leftInt16, rightInt16) : encoder.encodeBuffer(leftInt16);
+    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+    const progress = Math.round((end / totalSamples) * 100);
+    setStatus(`MP3: ${progress}%`);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  
+  const flushBuf = encoder.flush();
+  if (flushBuf.length > 0) mp3Data.push(flushBuf);
+  setStatus('DONE ▶');
+  return new Blob(mp3Data, { type: 'audio/mp3' });
+}
+
+// ============================================================
+// JUNGLE PITCH SHIFTER
+// ============================================================
+function createFadeBuffer(ctx, aT, fT) {
+  const l1=aT*ctx.sampleRate, l2=(aT-2*fT)*ctx.sampleRate, len=l1+l2;
+  const buf=ctx.createBuffer(1,len,ctx.sampleRate), p=buf.getChannelData(0);
+  const fL=fT*ctx.sampleRate, fi1=fL, fi2=l1-fL;
+  for(let i=0;i<l1;i++) p[i]=i<fi1?Math.sqrt(i/fL):i>=fi2?Math.sqrt(1-(i-fi2)/fL):1;
+  return buf;
+}
+function createDelayTimeBuffer(ctx, aT, fT, up) {
+  const l1=aT*ctx.sampleRate, l2=(aT-2*fT)*ctx.sampleRate, len=l1+l2;
+  const buf=ctx.createBuffer(1,len,ctx.sampleRate), p=buf.getChannelData(0);
+  for(let i=0;i<l1;i++) p[i]=up?(l1-i)/len:i/l1;
+  return buf;
+}
+const DT=0.1, FT=0.05, BT=0.1;
+function Jungle(ctx) {
+  const input=ctx.createGain(), output=ctx.createGain();
+  this.input=input; this.output=output;
+  const m1=ctx.createBufferSource(), m2=ctx.createBufferSource(), m3=ctx.createBufferSource(), m4=ctx.createBufferSource();
+  this.sDB=createDelayTimeBuffer(ctx,BT,FT,false);
+  this.sUB=createDelayTimeBuffer(ctx,BT,FT,true);
+  m1.buffer=m2.buffer=this.sDB; m3.buffer=m4.buffer=this.sUB;
+  m1.loop=m2.loop=m3.loop=m4.loop=true;
+  const g1=ctx.createGain(), g2=ctx.createGain(), g3=ctx.createGain(), g4=ctx.createGain();
+  g3.gain.value=g4.gain.value=0;
+  m1.connect(g1);m2.connect(g2);m3.connect(g3);m4.connect(g4);
+  const mg1=ctx.createGain(), mg2=ctx.createGain();
+  const d1=ctx.createDelay(), d2=ctx.createDelay();
+  g1.connect(mg1);g2.connect(mg2);g3.connect(mg1);g4.connect(mg2);
+  mg1.connect(d1.delayTime);mg2.connect(d2.delayTime);
+  const f1=ctx.createBufferSource(), f2=ctx.createBufferSource();
+  const fb=createFadeBuffer(ctx,BT,FT);
+  f1.buffer=f2.buffer=fb; f1.loop=f2.loop=true;
+  const mx1=ctx.createGain(), mx2=ctx.createGain(); mx1.gain.value=mx2.gain.value=0;
+  f1.connect(mx1.gain);f2.connect(mx2.gain);
+  input.connect(d1);input.connect(d2);d1.connect(mx1);d2.connect(mx2);mx1.connect(output);mx2.connect(output);
+  const t=ctx.currentTime+0.05, t2=t+BT-FT;
+  m1.start(t);m2.start(t2);m3.start(t);m4.start(t2);f1.start(t);f2.start(t2);
+  this.g1=g1;this.g2=g2;this.g3=g3;this.g4=g4;this.mg1=mg1;this.mg2=mg2;
+  this.setDelay(DT);
+}
+Jungle.prototype.setDelay=function(d){this.mg1.gain.setTargetAtTime(0.5*d,0,0.01);this.mg2.gain.setTargetAtTime(0.5*d,0,0.01)};
+Jungle.prototype.setPitchOffset=function(m){
+  if(m>0){this.g1.gain.value=0;this.g2.gain.value=0;this.g3.gain.value=1;this.g4.gain.value=1;}
+  else{this.g1.gain.value=1;this.g2.gain.value=1;this.g3.gain.value=0;this.g4.gain.value=0;}
+  this.setDelay(DT*Math.abs(m));
+};
+
+// ============================================================
+// DOWORKERTASK
+// ============================================================
+async function doWorkerTask(fn, input, buffers) {
+  const blob = new Blob(['(' + fn.toString().replace('"use strict";', '') + ')()'], {type: 'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  const w = new Worker(url);
+  return new Promise((res)=>{w.onmessage=e=>{URL.revokeObjectURL(url);res(e.data)};w.postMessage(input,buffers)});
+}
+
+// ============================================================
+// DIODE NODE (for Ring Modulator offline preset)
+// ============================================================
+function DiodeNode(ctx) {
+  this.context=ctx; this.node=ctx.createWaveShaper();
+  this.vb=0.2; this.vl=0.4; this.h=1; this.setCurve();
+}
+DiodeNode.prototype.setDistortion=function(d){this.h=d;return this.setCurve()};
+DiodeNode.prototype.setCurve=function(){
+  const n=1024, c=new Float32Array(n);
+  for(let i=0;i<n;i++){const v=Math.abs((i-n/2)/(n/2));c[i]=v<=this.vb?0:v<=this.vl?this.h*(Math.pow(v-this.vb,2)/(2*this.vl-2*this.vb)):this.h*v-this.h*this.vl+(this.h*(Math.pow(this.vl-this.vb,2)/(2*this.vl-2*this.vb)));}
+  this.node.curve=c;
+};
+DiodeNode.prototype.connect=function(dest){return this.node.connect(dest)};
+
+// ============================================================
+// STOCK VOCAL PRESET TRANSFORMS
+// ============================================================
+async function telephoneTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const lp1=ctx.createBiquadFilter(),lp2=ctx.createBiquadFilter(),hp1=ctx.createBiquadFilter(),hp2=ctx.createBiquadFilter(),cmp=ctx.createDynamicsCompressor();
+  lp1.type=lp2.type='lowpass'; lp1.frequency.value=lp2.frequency.value=2000;
+  hp1.type=hp2.type='highpass'; hp1.frequency.value=hp2.frequency.value=500;
+  lp1.connect(lp2);lp2.connect(hp1);hp1.connect(hp2);hp2.connect(cmp);cmp.connect(ctx.destination);
+  src.connect(lp1); src.start(0); return ctx.startRendering();
+}
+
+async function megaphoneTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const ws=ctx.createWaveShaper(); ws.curve=makeDistCurve(30);
+  const lp1=ctx.createBiquadFilter(),lp2=ctx.createBiquadFilter(),hp1=ctx.createBiquadFilter(),hp2=ctx.createBiquadFilter(),cmp=ctx.createDynamicsCompressor();
+  lp1.type=lp2.type='lowpass'; lp1.frequency.value=lp2.frequency.value=2000;
+  hp1.type=hp2.type='highpass'; hp1.frequency.value=hp2.frequency.value=500;
+  lp1.connect(lp2);lp2.connect(hp1);hp1.connect(hp2);hp2.connect(ws);ws.connect(cmp);cmp.connect(ctx.destination);
+  src.connect(lp1); src.start(0); return ctx.startRendering();
+}
+
+async function astronautTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const ws=ctx.createWaveShaper(); ws.curve=makeDistCurve(50);
+  const filt=ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=1300;
+  const lp1=ctx.createBiquadFilter(),lp2=ctx.createBiquadFilter(),hp1=ctx.createBiquadFilter(),hp2=ctx.createBiquadFilter(),cmp=ctx.createDynamicsCompressor();
+  lp1.type=lp2.type='lowpass'; lp1.frequency.value=lp2.frequency.value=2000;
+  hp1.type=hp2.type='highpass'; hp1.frequency.value=hp2.frequency.value=500;
+  lp1.connect(lp2);lp2.connect(hp1);hp1.connect(hp2);hp2.connect(cmp);cmp.connect(ctx.destination);
+  src.connect(filt);filt.connect(ws);ws.connect(lp1);
+  src.start(); return ctx.startRendering();
+}
+
+async function baneTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const ws=ctx.createWaveShaper(); ws.curve=makeDistCurve(7);
+  const jp=new Jungle(ctx); jp.setPitchOffset(-0.25);
+  const lp1=ctx.createBiquadFilter(),lp2=ctx.createBiquadFilter(),hp1=ctx.createBiquadFilter(),hp2=ctx.createBiquadFilter(),cmp=ctx.createDynamicsCompressor();
+  lp1.type=lp2.type='lowpass'; lp1.frequency.value=lp2.frequency.value=5000;
+  hp1.type=hp2.type='highpass'; hp1.frequency.value=hp2.frequency.value=100;
+  lp1.connect(lp2);lp2.connect(hp1);hp1.connect(hp2);hp2.connect(ws);ws.connect(cmp);cmp.connect(ctx.destination);
+  src.connect(jp.input);jp.output.connect(lp1);
+  src.start(0); return ctx.startRendering();
+}
+
+async function mosquitoTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const jp=new Jungle(ctx); jp.setPitchOffset(5);
+  const cmp=ctx.createDynamicsCompressor();
+  src.connect(jp.input);jp.output.connect(cmp);cmp.connect(ctx.destination);
+  src.start(0); return ctx.startRendering();
+}
+
+async function giantRobotTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const j1=new Jungle(ctx),j2=new Jungle(ctx),j3=new Jungle(ctx),j4=new Jungle(ctx);
+  j1.setPitchOffset(-0.1);j2.setPitchOffset(-0.2);j3.setPitchOffset(-0.4);j4.setPitchOffset(-0.8);
+  const cmp=ctx.createDynamicsCompressor();
+  src.connect(j1.input);src.connect(j2.input);src.connect(j3.input);src.connect(j4.input);
+  j1.output.connect(cmp);j2.output.connect(cmp);j3.output.connect(cmp);j4.output.connect(cmp);
+  cmp.connect(ctx.destination); src.start(0); return ctx.startRendering();
+}
+
+function makeOscDelayFx(b, freq, type, gain, dtime) {
+  return (async ()=>{
+    const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+    const src=ctx.createBufferSource(); src.buffer=b;
+    const osc=ctx.createOscillator(); osc.frequency.value=freq; osc.type=type;
+    const og=ctx.createGain(); og.gain.value=gain;
+    const dl=ctx.createDelay(); dl.delayTime.value=dtime;
+    osc.connect(og);og.connect(dl.delayTime);
+    src.connect(dl);dl.connect(ctx.destination);
+    osc.start();src.start();
+    return ctx.startRendering();
+  })();
+}
+
+async function alien1Transform(b){return makeOscDelayFx(b,5,'sine',0.05,0.05)}
+async function alien2Transform(b){return makeOscDelayFx(b,20,'sine',0.01,0.05)}
+async function alienRobot1Transform(b){return makeOscDelayFx(b,40,'sine',0.015,0.05)}
+async function slowWobbleTransform(b){return makeOscDelayFx(b,1,'sine',0.05,0.05)}
+async function vibratoTransform(b){return makeOscDelayFx(b,4.5,'sine',0.002,0.03)}
+
+async function robot1Transform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const o1=ctx.createOscillator(),o2=ctx.createOscillator();
+  o1.frequency.value=50;o1.type='sawtooth';o2.frequency.value=500;o2.type='sawtooth';
+  const og=ctx.createGain(); og.gain.value=0.004;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.01;
+  o1.connect(og);o2.connect(og);og.connect(dl.delayTime);
+  src.connect(dl);dl.connect(ctx.destination);
+  o1.start(0);o2.start(0);src.start(0); return ctx.startRendering();
+}
+
+async function robot2Transform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const o1=ctx.createOscillator(),o2=ctx.createOscillator(),o3=ctx.createOscillator();
+  o1.frequency.value=50;o1.type='sawtooth';o2.frequency.value=1000;o2.type='sawtooth';o3.frequency.value=50;o3.type='sine';
+  const og=ctx.createGain(); og.gain.value=0.004;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.01;
+  o1.connect(og);o2.connect(og);o3.connect(og);og.connect(dl.delayTime);
+  src.connect(dl);dl.connect(ctx.destination);
+  o1.start(0);o2.start(0);o3.start(0);src.start(0); return ctx.startRendering();
+}
+
+async function robot3Transform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const o1=ctx.createOscillator(); o1.frequency.value=700; o1.type='triangle';
+  const og=ctx.createGain(); og.gain.value=0.004;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.01;
+  const filt=ctx.createBiquadFilter(); filt.type='highpass'; filt.frequency.value=695;
+  o1.connect(og);og.connect(dl.delayTime);
+  src.connect(dl);dl.connect(filt);filt.connect(ctx.destination);
+  o1.start(0);src.start(0); return ctx.startRendering();
+}
+
+async function robot4Transform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, oc=[];
+      for(let i=0;i<ic.length;i++){
+        const len = ic[i].length;
+        oc[i]=new Float32Array(len);
+        let bm=0,bb=0,d1=0,d2=0;
+        for(let j=0;j<len;j++){
+          if(j%1700===0) bm=Math.random();
+          bb=Math.sin(j*bm)*0.05;
+          d1=Math.sin(j/400)*100; d2=Math.sin(j/200)*100;
+          let idx = Math.round(j-d1-d2);
+          if(idx < 0) idx = 0;
+          if(idx >= len) idx = len - 1;
+          oc[i][j]=ic[i][idx]*0.9+bb;
+        }
+      }
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  return ab;
+}
+
+async function trollTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const o1=ctx.createOscillator(),o2=ctx.createOscillator();
+  o1.frequency.value=-10;o1.type='sawtooth';o2.frequency.value=50;o2.type='sawtooth';
+  const og=ctx.createGain(); og.gain.value=0.007;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.01;
+  const filt=ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=2000;
+  const c1=ctx.createDynamicsCompressor(),c2=ctx.createDynamicsCompressor(),c3=ctx.createDynamicsCompressor();
+  o1.connect(og);o2.connect(og);og.connect(dl.delayTime);
+  src.connect(c1);c1.connect(dl);dl.connect(c2);c2.connect(filt);filt.connect(c3);c3.connect(ctx.destination);
+  o1.start(0);o2.start(0);src.start(0); return ctx.startRendering();
+}
+
+async function ringModTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const inp=ctx.createBufferSource(); inp.buffer=b;
+  const out=ctx.createGain(), dry=ctx.createGain(), wet=ctx.createGain();
+  const vIn=ctx.createOscillator(); vIn.frequency.value=30; vIn.start(0);
+  const vInG=ctx.createGain(); vInG.gain.value=0.5;
+  const inv1=ctx.createGain(); inv1.gain.value=-1;
+  const inv2=ctx.createGain(); inv2.gain.value=-1;
+  const d1=new DiodeNode(ctx), d2=new DiodeNode(ctx);
+  const inv3=ctx.createGain(); inv3.gain.value=-1;
+  const vcInv=ctx.createGain(); vcInv.gain.value=-1;
+  const d3=new DiodeNode(ctx), d4=new DiodeNode(ctx);
+  const outG=ctx.createGain(); outG.gain.value=1;
+  const cmp=ctx.createDynamicsCompressor(); cmp.threshold.value=-24; cmp.ratio.value=16;
+  inp.connect(vcInv);inp.connect(d4.node);vcInv.connect(d3.node);
+  vIn.connect(vInG);vInG.connect(inv1);vInG.connect(vcInv);vInG.connect(d4.node);
+  inv1.connect(inv2);inv1.connect(d2.node);inv2.connect(d1.node);
+  d1.connect(inv3);d2.connect(inv3);inv3.connect(cmp);d3.connect(cmp);d4.connect(cmp);
+  cmp.connect(outG);outG.connect(wet);wet.connect(ctx.destination);
+  inp.start(); return ctx.startRendering();
+}
+
+async function autowahTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const inp=ctx.createBufferSource(); inp.buffer=b;
+  const ws=ctx.createWaveShaper();
+  const c=new Float32Array(65536);
+  for(let i=-32768;i<32768;i++) c[i+32768]=i>0?i/32768:(-i)/32768;
+  ws.curve=c;
+  const awF=ctx.createBiquadFilter(); awF.type='lowpass'; awF.frequency.value=10;
+  ws.connect(awF);
+  const awD=ctx.createGain(); awD.gain.value=11585;
+  awF.connect(awD);
+  const awFilt=ctx.createBiquadFilter(); awFilt.type='lowpass'; awFilt.Q.value=15; awFilt.frequency.value=50;
+  awD.connect(awFilt.frequency);
+  const wet=ctx.createGain(); wet.gain.value=1;
+  awFilt.connect(wet);
+  const cmp=ctx.createDynamicsCompressor(); cmp.threshold.value=-20; cmp.ratio.value=16;
+  inp.connect(ws);inp.connect(awFilt);ws.connect(cmp);wet.connect(cmp);cmp.connect(ctx.destination);
+  inp.start(0); return ctx.startRendering();
+}
+
+async function portableRadioTransform(b) {
+  let ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  let src=ctx.createBufferSource(); src.buffer=b;
+  const ws=ctx.createWaveShaper(); ws.curve=makeDistCurve(5);
+  const osc=ctx.createOscillator(); osc.frequency.value=0.2; osc.type='sine';
+  const og=ctx.createGain(); og.gain.value=0.001;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.02;
+  osc.connect(og);og.connect(dl.delayTime);
+  src.connect(dl);dl.connect(ws);ws.connect(ctx.destination);
+  osc.start(0);src.start(0);
+  b=await ctx.startRendering();
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, oc=[];
+      for(let i=0;i<ic.length;i++){
+        const len = ic[i].length;
+        oc[i]=new Float32Array(len);
+        let s=0,qm=Math.random();
+        for(let j=0;j<len;j++){
+          if(j%7===0){s=(ic[i][j]+Math.random()*0.1)*0.3;qm+=(Math.random()*2-1)*0.004;}
+          oc[i][j]=s+Math.sin(j*qm*1.5)*0.05;
+        }
+      }
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  return ab;
+}
+
+async function schoolPATransform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, oc=[];
+      for(let i=0;i<ic.length;i++){
+        const inp=ic[i], len=inp.length, op=new Float32Array(len); let flip=false;
+        for(let j=0;j<len;j++){
+          if(j%100===0&&Math.random()<0.2) flip=!flip;
+          op[j]=flip?Math.abs(inp[j]):inp[j];
+        }
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  const src=ctx.createBufferSource(); src.buffer=ab;
+  const filt=ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=2000;
+  src.connect(filt);filt.connect(ctx.destination);src.start(0);
+  return ctx.startRendering();
+}
+
+async function poorTelTransform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, oc=[];
+      for(let i=0;i<ic.length;i++){
+        const inp=ic[i], len=inp.length, op=new Float32Array(len);
+        let lastSign = inp[0] >= 0 ? 1 : -1;
+        let chunkStart = 0;
+        for(let j=0; j<len; j++){
+          let currentSign = inp[j] >= 0 ? 1 : -1;
+          if(currentSign !== lastSign || j === len - 1){
+            let chunkLen = j - chunkStart;
+            if(chunkLen >= 20){
+              let r = Math.PI / chunkLen;
+              let sg = inp[chunkStart] > 0 ? 1 : -1;
+              for(let p=0; p<chunkLen; p++) op[chunkStart + p] = sg * Math.sin(r * p);
+            } else {
+              for(let p=0; p<chunkLen; p++) op[chunkStart + p] = inp[chunkStart + p];
+            }
+            chunkStart = j;
+            lastSign = currentSign;
+          }
+        }
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i], i);
+  return ab;
+}
+
+async function cuteRobotTransform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, sr=e.data.sampleRate, cs=Math.floor(0.03*sr), oc=[];
+      for(let i=0;i<ic.length;i++){
+        const inp=ic[i], len=inp.length;
+        let fullLen = 0;
+        for(let j=0; j<len; j+=cs) fullLen += Math.min(cs, len - j) * 2;
+        const full = new Float32Array(fullLen);
+        let fPtr = 0;
+        for(let j=0; j<len; j+=cs) {
+          let rem = Math.min(cs, len - j);
+          for(let k=0; k<rem; k++) full[fPtr++] = inp[j+k];
+          for(let k=0; k<rem; k++) full[fPtr++] = inp[j+k];
+        }
+        let rsCount = 0, ns = 0;
+        for(let j=0; j<fullLen; j++) { if(ns / (j+1) < 0.5) { rsCount++; ns++; } }
+        const rs = new Float32Array(rsCount);
+        ns = 0; let rPtr = 0;
+        for(let j=0; j<fullLen; j++) { if(ns / (j+1) < 0.5) { rs[rPtr++] = full[j]; ns++; } }
+        oc.push(rs);
+      }
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels,sampleRate:b.sampleRate},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  return ab;
+}
+
+async function reverseTransform(b) {
+  const ctx=new AudioContext();
+  const ab=ctx.createBuffer(b.numberOfChannels,b.length,b.sampleRate);
+  for(let i=0;i<b.numberOfChannels;i++) ab.copyToChannel(b.getChannelData(i),i);
+  for(let i=0;i<ab.numberOfChannels;i++) ab.getChannelData(i).reverse();
+  return ab;
+}
+
+async function scramblerTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const ws=ctx.createWaveShaper(); ws.curve=makeDistCurve(100);
+  const osc=ctx.createOscillator(); osc.frequency.value=50; osc.type='sawtooth';
+  const og=ctx.createGain(); og.gain.value=0.005;
+  const dl=ctx.createDelay(); dl.delayTime.value=0.01;
+  const noise=ctx.createBufferSource();
+  const nb=ctx.createBuffer(1,32768,ctx.sampleRate);
+  const nd=nb.getChannelData(0);
+  for(let i=0;i<32768;i++) nd[i]=Math.random()*Math.random()*Math.random()*0.6;
+  noise.buffer=nb; noise.loop=true;
+  osc.connect(og);og.connect(dl.delayTime);
+  src.connect(dl);dl.connect(ws);ws.connect(ctx.destination);
+  noise.connect(ctx.destination);
+  osc.start(0);noise.start(0);src.start(0); return ctx.startRendering();
+}
+
+async function pitchUpTransform(b) {
+  const ctx=new OfflineAudioContext(b.numberOfChannels,b.length,b.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=b;
+  const jp=new Jungle(ctx); jp.setPitchOffset(0.5);
+  const cmp=ctx.createDynamicsCompressor();
+  src.connect(jp.input);jp.output.connect(cmp);cmp.connect(ctx.destination);
+  src.start(0); return ctx.startRendering();
+}
+
+async function speed2xTransform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, sp=2, oc=[];
+      for(let i=0;i<ic.length;i++){oc[i]=new Float32Array(Math.floor(ic[i].length/sp));for(let j=0;j<oc[i].length;j++)oc[i][j]=ic[i][Math.floor(j*sp)];}
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  return ab;
+}
+
+async function speedHalfTransform(b) {
+  const channels=[];
+  for(let i=0;i<b.numberOfChannels;i++) channels[i]=new Float32Array(b.getChannelData(i));
+  const out=await doWorkerTask(function(){
+    self.onmessage=function(e){
+      const ic=e.data.channels, sp=0.5, oc=[];
+      for(let i=0;i<ic.length;i++){oc[i]=new Float32Array(Math.floor(ic[i].length/sp));for(let j=0;j<oc[i].length;j++)oc[i][j]=ic[i][Math.floor(j*sp)];}
+      self.postMessage(oc, oc.map(c=>c.buffer));self.close();
+    }
+  },{channels},channels.map(c=>c.buffer));
+  const ctx=new OfflineAudioContext(b.numberOfChannels,out[0].length,b.sampleRate);
+  const ab=ctx.createBuffer(out.length,out[0].length,b.sampleRate);
+  for(let i=0;i<out.length;i++) ab.copyToChannel(out[i],i);
+  return ab;
+}
+
+// ============================================================
+// TIMELINE SCRAPE & DJ EFFECTS
+// ============================================================
+async function originalJumbledTransform(b) {
+  const channels = [];
+  for (let i = 0; i < b.numberOfChannels; i++) channels[i] = new Float32Array(b.getChannelData(i));
+  const out = await doWorkerTask(function() {
+    self.onmessage = function(e) {
+      const ic = e.data.channels, spc = Math.floor(2.0 * e.data.sampleRate), oc = [];
+      const len = ic[0].length;
+      for (let i = 0; i < ic.length; i++) {
+        const inp = ic[i], op = new Float32Array(len);
+        let chunkStarts = [];
+        for (let j = 0; j < len; j += spc) chunkStarts.push(j);
+        for (let m = chunkStarts.length - 1; m > 0; m--) {
+          let r = Math.floor(Math.random() * (m + 1));
+          let t = chunkStarts[m]; chunkStarts[m] = chunkStarts[r]; chunkStarts[r] = t;
+        }
+        let writePtr = 0;
+        for (let j = 0; j < chunkStarts.length; j++) {
+          let start = chunkStarts[j];
+          let rem = Math.min(spc, len - start);
+          for (let k = 0; k < rem; k++) op[writePtr++] = inp[start + k];
+        }
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c => c.buffer)); self.close();
+    }
+  }, { channels, sampleRate: b.sampleRate }, channels.map(c => c.buffer));
+  const ctx = new OfflineAudioContext(b.numberOfChannels, out[0].length, b.sampleRate);
+  const ab = ctx.createBuffer(out.length, out[0].length, b.sampleRate);
+  for (let i = 0; i < out.length; i++) ab.copyToChannel(out[i], i);
+  return ab;
+}
+
+async function tapePullbackTransform40(b) {
+  const channels = [];
+  for (let i = 0; i < b.numberOfChannels; i++) channels[i] = new Float32Array(b.getChannelData(i));
+  const out = await doWorkerTask(function() {
+    self.onmessage = function(e) {
+      const ic = e.data.channels, sr = e.data.sampleRate, oc = [];
+      const len = ic[0].length;
+      const spc = Math.floor(4.0 * sr);
+      const snap = Math.floor(0.40 * sr);
+      let pullbacksCount = 0;
+      for (let j = spc; j < len; j += spc) { if (j >= snap) pullbacksCount++; }
+      const newLen = len + (pullbacksCount * snap * 2);
+      for (let i = 0; i < ic.length; i++) {
+        const inp = ic[i], op = new Float32Array(newLen);
+        let writePtr = 0;
+        let lastExtracted = 0;
+        for (let j = spc; j < len; j += spc) {
+          if (j < snap) continue;
+          let normalLen = j - lastExtracted;
+          for (let k = 0; k < normalLen; k++) op[writePtr++] = inp[lastExtracted + k];
+          for (let k = 0; k < snap; k++) op[writePtr++] = inp[j - 1 - k];
+          for (let k = 0; k < snap; k++) op[writePtr++] = inp[j - snap + k];
+          lastExtracted = j;
+        }
+        while (lastExtracted < len) op[writePtr++] = inp[lastExtracted++];
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c => c.buffer)); self.close();
+    }
+  }, { channels, sampleRate: b.sampleRate }, channels.map(c => c.buffer));
+  const ctx = new OfflineAudioContext(b.numberOfChannels, out[0].length, b.sampleRate);
+  const ab = ctx.createBuffer(out.length, out[0].length, b.sampleRate);
+  for (let i = 0; i < out.length; i++) ab.copyToChannel(out[i], i);
+  return ab;
+}
+
+async function goldenRatioDriftTransform(b) {
+  const channels = [];
+  for (let i = 0; i < b.numberOfChannels; i++) channels[i] = new Float32Array(b.getChannelData(i));
+  const out = await doWorkerTask(function() {
+    self.onmessage = function(e) {
+      const ic = e.data.channels, sr = e.data.sampleRate, oc = [];
+      const len = ic[0].length;
+      for (let i = 0; i < ic.length; i++) {
+        const inp = ic[i], op = new Float32Array(len);
+        const spc = i === 0 ? Math.floor(1.618 * sr) : Math.floor(1.0 * sr);
+        let chunkStarts = [];
+        for (let j = 0; j < len; j += spc) chunkStarts.push(j);
+        for (let m = chunkStarts.length - 1; m > 0; m--) {
+          let r = Math.floor(Math.random() * (m + 1));
+          let t = chunkStarts[m]; chunkStarts[m] = chunkStarts[r]; chunkStarts[r] = t;
+        }
+        let writePtr = 0;
+        for (let j = 0; j < chunkStarts.length; j++) {
+          let start = chunkStarts[j];
+          let rem = Math.min(spc, len - start);
+          for (let k = 0; k < rem; k++) op[writePtr++] = inp[start + k];
+        }
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c => c.buffer)); self.close();
+    }
+  }, { channels, sampleRate: b.sampleRate }, channels.map(c => c.buffer));
+  const ctx = new OfflineAudioContext(b.numberOfChannels, out[0].length, b.sampleRate);
+  const ab = ctx.createBuffer(out.length, out[0].length, b.sampleRate);
+  for (let i = 0; i < out.length; i++) ab.copyToChannel(out[i], i);
+  return ab;
+}
+
+async function tapePullbackTransform25(b) {
+  const channels = [];
+  for (let i = 0; i < b.numberOfChannels; i++) channels[i] = new Float32Array(b.getChannelData(i));
+  const out = await doWorkerTask(function() {
+    self.onmessage = function(e) {
+      const ic = e.data.channels, sr = e.data.sampleRate, oc = [];
+      const len = ic[0].length;
+      const spc = Math.floor(0.2 * sr);
+      const snap = Math.floor(0.25 * sr);
+      let pullbacksCount = 0;
+      for (let j = spc; j < len; j += spc) { if (j >= snap) pullbacksCount++; }
+      const newLen = len + (pullbacksCount * snap * 2);
+      for (let i = 0; i < ic.length; i++) {
+        const inp = ic[i], op = new Float32Array(newLen);
+        let writePtr = 0;
+        let lastExtracted = 0;
+        for (let j = spc; j < len; j += spc) {
+          if (j < snap) continue;
+          let normalLen = j - lastExtracted;
+          for (let k = 0; k < normalLen; k++) op[writePtr++] = inp[lastExtracted + k];
+          for (let k = 0; k < snap; k++) op[writePtr++] = inp[j - 1 - k];
+          for (let k = 0; k < snap; k++) op[writePtr++] = inp[j - snap + k];
+          lastExtracted = j;
+        }
+        while (lastExtracted < len) op[writePtr++] = inp[lastExtracted++];
+        oc.push(op);
+      }
+      self.postMessage(oc, oc.map(c => c.buffer)); self.close();
+    }
+  }, { channels, sampleRate: b.sampleRate }, channels.map(c => c.buffer));
+  const ctx = new OfflineAudioContext(b.numberOfChannels, out[0].length, b.sampleRate);
+  const ab = ctx.createBuffer(out.length, out[0].length, b.sampleRate);
+  for (let i = 0; i < out.length; i++) ab.copyToChannel(out[i], i);
+  return ab;
+}
+
+// ============================================================
+// NEW CUSTOM OFFLINE SCRAMBLER
+// ============================================================
+async function customScramblerTransform(b) {
+  const chunkSeconds = parseFloat($('s-chunk-size').value) || 1.0;
+  const flipProb = parseFloat($('s-flip-prob').value) || 0.5;
+  const channels = [];
+  for(let i = 0; i < b.numberOfChannels; i++) {
+    channels[i] = new Float32Array(b.getChannelData(i));
+  }
+  const out = await doWorkerTask(function() {
+    self.onmessage = function(e) {
+      const inputChannels = e.data.channels;
+      const cSecs = e.data.chunkSeconds;
+      const fProb = e.data.flipProb;
+      const sr = e.data.sampleRate;
+      const chunkSize = Math.floor(cSecs * sr);
+      const outputChannels = [];
+      for(let i = 0; i < inputChannels.length; i++) {
+        const input = inputChannels[i];
+        let chunks = [];
+        for(let j = 0; j < input.length; j += chunkSize) {
+          chunks.push(input.subarray(j, Math.min(j + chunkSize, input.length)));
+        }
+        let totalOutputLength = 0;
+        let processedChunks = chunks.map(chunk => {
+          if (Math.random() < fProb) {
+            let rev = new Float32Array(chunk).reverse();
+            let merged = new Float32Array(chunk.length + rev.length);
+            merged.set(chunk); 
+            merged.set(rev, chunk.length);
+            totalOutputLength += merged.length;
+            return merged;
+          } else {
+            totalOutputLength += chunk.length;
+            return chunk;
+          }
+        });
+        const output = new Float32Array(totalOutputLength);
+        let writePointer = 0;
+        for(let c of processedChunks) {
+          output.set(c, writePointer);
+          writePointer += c.length;
+        }
+        outputChannels.push(output);
+      }
+      self.postMessage(outputChannels, outputChannels.map(c => c.buffer));
+      self.close();
+    }
+  }, {channels, chunkSeconds, flipProb, sampleRate: b.sampleRate}, channels.map(c => c.buffer));
+  const ctx = new OfflineAudioContext(b.numberOfChannels, out[0].length, b.sampleRate);
+  const finalBuffer = ctx.createBuffer(out.length, out[0].length, b.sampleRate);
+  for(let i = 0; i < out.length; i++) { finalBuffer.copyToChannel(out[i], i); }
+  return finalBuffer;
+}
+
+// PRESET DISPATCH MAP
+const PRESETS = {
+  telephone: telephoneTransform, megaphone: megaphoneTransform, astronaut: astronautTransform,
+  bane: baneTransform, portableRadio: portableRadioTransform, schoolPA: schoolPATransform,
+  robot1: robot1Transform, robot2: robot2Transform, robot3: robot3Transform,
+  robot4: robot4Transform, cuteRobot: cuteRobotTransform, troll: trollTransform,
+  alien1: alien1Transform, alien2: alien2Transform, alienRobot1: alienRobot1Transform,
+  mosquito: mosquitoTransform, giantRobot: giantRobotTransform, slowWobble: slowWobbleTransform,
+  ringMod: ringModTransform, autowah: autowahTransform, vibrato: vibratoTransform,
+  poorTel: poorTelTransform, scrambler: tapePullbackTransform25, pitchUp: pitchUpTransform,
+  reverse: reverseTransform, chunkedRev: tapePullbackTransform40, mirrored: goldenRatioDriftTransform,
+  jumbled: originalJumbledTransform, speed2x: speed2xTransform, speedHalf: speedHalfTransform,
+  customScrambler: customScramblerTransform
+};
+
+// ============================================================
+// AUDIO LOADING
+// ============================================================
+async function loadAudioFile(file) {
+  if(!file) return;
+  if(file.size > 100*1024*1024) { alert('File too large (max 100MB)'); return; }
+  setStatus('LOADING…');
+  const reader = new FileReader();
+  reader.onloadend = async function() {
+    try {
+      const tmpCtx = new AudioContext();
+      globalAudioBuffer = await tmpCtx.decodeAudioData(this.result);
+      processedBuffer = null;
+      onAudioLoaded(file.name);
+    } catch(e) { alert('Could not decode audio. Supported: mp3, wav, ogg, flac, m4a, webm'); setStatus('ERROR'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function onAudioLoaded(name) {
+  const dur = globalAudioBuffer.duration;
+  $('file-name').textContent = name || 'Recording';
+  $('file-dur').textContent = fmtTime(dur);
+  $('audio-loaded').style.display = 'flex';
+  $('audio-loaded').style.flexDirection = 'column';
+  resizeCanvas();
+  startOffset = 0;
+  setupLiveChain();
+  drawStaticWaveform(globalAudioBuffer);
+  setStatus('LOADED');
+  $('dl-bar').style.display = 'block'; 
+}
+
+// ============================================================
+// MIC RECORDING
+// ============================================================
+async function recordFromMic() {
+  if(currentlyRecording) return;
+  currentlyRecording = true;
+  const btn = $('mic-btn');
+  btn.classList.add('recording');
+  $('mic-timer').textContent = '●';
+  let chunks = [], seconds = 0;
+  const timerFn = setInterval(() => { seconds++; $('mic-timer').textContent = fmtTime(seconds); }, 1000);
+  let stream, mr;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    const mtype = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    mr = new MediaRecorder(stream, mtype ? {mimeType:mtype} : undefined);
+  } catch(e) { alert('Microphone access denied or unavailable.'); currentlyRecording=false; btn.classList.remove('recording'); clearInterval(timerFn); return; }
+  mr.ondataavailable = e => chunks.push(e.data);
+  mr.onstop = async () => {
+    clearInterval(timerFn);
+    stream.getTracks().forEach(t=>t.stop());
+    btn.classList.remove('recording');
+    currentlyRecording = false;
+    $('mic-timer').textContent = '';
+    setStatus('DECODING…');
+    const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+    const url = URL.createObjectURL(blob);
+    try {
+      const ab = await (await fetch(url)).arrayBuffer();
+      const tmpCtx = new AudioContext();
+      globalAudioBuffer = await tmpCtx.decodeAudioData(ab);
+      processedBuffer = null;
+      onAudioLoaded('Mic Recording');
+    } catch(e) { alert('Could not process mic recording.'); setStatus('ERROR'); }
+    URL.revokeObjectURL(url);
+  };
+  mr.start();
+  const stopFn = () => { mr.stop(); btn.removeEventListener('click', stopFn); clearTimeout(maxT); };
+  btn.addEventListener('click', stopFn);
+  const maxT = setTimeout(stopFn, 5*60*1000);
+}
+
+// ============================================================
+// LIVE AUDIO CHAIN (PARALLEL BUS ARCHITECTURE)
+// ============================================================
+function setupLiveChain() {
+  if(liveCtx) { try{liveCtx.close();}catch(e){} }
+  liveCtx = new AudioContext();
+  const ctx = liveCtx;
+  const N = liveNodes = {};
+
+  N.analyser = ctx.createAnalyser(); N.analyser.fftSize=2048;
+  N.master = ctx.createGain(); N.master.gain.value=1;
+  
+  // Create Parallel Busses to prevent Phase Clashing
+  N.dryBus = ctx.createGain(); N.dryBus.gain.value = 1;
+  N.wetBus = ctx.createGain(); N.wetBus.gain.value = 1;
+
+  // 1. TONE: Warmth & Distortion (Series on input)
+  N.warmth = ctx.createWaveShaper(); N.warmth.curve = makeWarmthCurve(1); N.warmth.oversample = '4x';
+  N.dist = ctx.createWaveShaper(); N.dist.curve = makeDistCurve(0); N.dist.oversample = '4x';
+
+  // 2. MODULATION: AM & Ring Mod (Metallic)
+  N.ringOsc = ctx.createOscillator(); N.ringOsc.type = 'sine'; N.ringOsc.frequency.value = 500;
+  N.ringGain = ctx.createGain(); N.ringGain.gain.value = 0; // Carrier depth
+  N.ringOsc.connect(N.ringGain); N.ringOsc.start();
+  
+  N.amOsc = ctx.createOscillator(); N.amOsc.type = 'sine'; N.amOsc.frequency.value = 0;
+  N.amGain = ctx.createGain(); N.amGain.gain.value = 0; 
+  N.amOsc.connect(N.amGain); N.amOsc.start();
+
+  N.modMultiplier = ctx.createGain(); N.modMultiplier.gain.value = 1; 
+  N.ringGain.connect(N.modMultiplier.gain);
+  N.amGain.connect(N.modMultiplier.gain);
+
+  // 3. FILTER
+  N.filter = ctx.createBiquadFilter(); N.filter.type='allpass'; N.filter.frequency.value=22050; N.filter.Q.value=1;
+
+  // 4. SPACE & TIME: Flanger, Delay, Reverb (Parallel splits)
+  // Flanger
+  N.flanDelay = ctx.createDelay(0.05); N.flanDelay.delayTime.value=0.005;
+  N.flanLFO = ctx.createOscillator(); N.flanLFO.type='sine'; N.flanLFO.frequency.value=4;
+  N.flanLFOGain = ctx.createGain(); N.flanLFOGain.gain.value=0;
+  N.flanLFO.connect(N.flanLFOGain); N.flanLFOGain.connect(N.flanDelay.delayTime);
+  N.flanLFO.start();
+  N.flanWet = ctx.createGain(); N.flanWet.gain.value=0;
+
+  // Delay
+  N.delay = ctx.createDelay(3); N.delay.delayTime.value = 0.3;
+  N.delayFB = ctx.createGain(); N.delayFB.gain.value = 0.5;
+  N.delayWet = ctx.createGain(); N.delayWet.gain.value = 0;
+  N.delay.connect(N.delayFB); N.delayFB.connect(N.delay);
+  N.delay.connect(N.delayWet);
+
+  // Reverb
+  N.reverb = ctx.createConvolver();
+  reverbIR = makeSyntheticIR(ctx, parseFloat($('s-rdec') ? $('s-rdec').value : 2.5), 3);
+  N.reverb.buffer = reverbIR;
+  N.reverbWet = ctx.createGain(); N.reverbWet.gain.value = 0;
+  N.reverb.connect(N.reverbWet);
+
+  // --- ROUTING GRAPH ---
+  N.warmth.connect(N.dist);
+  N.dist.connect(N.modMultiplier);
+  N.modMultiplier.connect(N.filter);
+  
+  // Split to parallel busses
+  N.filter.connect(N.dryBus);
+  N.filter.connect(N.flanDelay);
+  N.filter.connect(N.delay);
+  N.filter.connect(N.reverb);
+  
+  // Sum wet effects
+  N.flanDelay.connect(N.flanWet);
+  N.flanWet.connect(N.wetBus);
+  N.delayWet.connect(N.wetBus);
+  N.reverbWet.connect(N.wetBus);
+
+  // Master Mixdown
+  N.comp = ctx.createDynamicsCompressor(); N.comp.threshold.value = -18; N.comp.ratio.value = 4;
+  N.dryBus.connect(N.comp);
+  N.wetBus.connect(N.comp);
+  
+  N.comp.connect(N.analyser);
+  N.analyser.connect(N.master);
+  N.master.connect(ctx.destination);
+}
+
+function playBuffer(buf) {
+  if(!liveCtx) setupLiveChain();
+  if(liveCtx.state === 'suspended') liveCtx.resume();
+  if(liveSource) { try{liveSource.stop();}catch(e){} liveSource=null; }
+  liveSource = liveCtx.createBufferSource();
+  liveSource.buffer = buf;
+  liveSource.loop = loopEnabled;
+  liveSource.playbackRate.value = parseFloat($('s-speed').value);
+  
+  // Connect directly to warmth instead of distortion now
+  liveSource.connect(liveNodes.warmth);
+  
+  startTime = liveCtx.currentTime;
+  liveSource.start(0, startOffset);
+  isPlaying = true;
+  $('play-btn').textContent = '⏸';
+  liveSource.onended = () => {
+    if(!loopEnabled) { isPlaying=false; $('play-btn').textContent='▶'; startOffset=0; }
+  };
+}
+
+function stopPlayback() {
+  if(liveSource) {
+    const buf = liveNodes && liveNodes.analyser ? liveSource.buffer : null;
+    if(buf) startOffset = Math.min(startOffset + (liveCtx.currentTime - startTime) * liveSource.playbackRate.value, buf.duration);
+    try{liveSource.stop();}catch(e){}
+    liveSource = null;
+  }
+  isPlaying = false;
+  $('play-btn').textContent = '▶';
+}
+
+function updateLiveEffects() {
+  if(!liveNodes.dist) return;
+  const N = liveNodes;
+  const now = liveCtx.currentTime;
+
+  const dist = parseFloat($('s-dist').value);
+  N.dist.curve = makeDistCurve(dist > 0 ? dist : 0);
+  
+  if($('s-warm')) {
+    const warm = parseFloat($('s-warm').value);
+    N.warmth.curve = makeWarmthCurve(warm > 0 ? warm / 10 : 1);
+  }
+
+  if($('s-metal')) {
+    N.ringGain.gain.setTargetAtTime(parseFloat($('s-metal').value), now, 0.05);
+  }
+  
+  if($('s-am')) {
+    const amRate = parseFloat($('s-am').value);
+    N.amOsc.frequency.setTargetAtTime(amRate, now, 0.05);
+    N.amGain.gain.setTargetAtTime(amRate > 0 ? 1 : 0, now, 0.05);
+  }
+
+  N.filter.frequency.setTargetAtTime(logSliderVal('s-fcut', 20, 22050), now, 0.05);
+  N.filter.Q.setTargetAtTime(parseFloat($('s-fq').value), now, 0.05);
+
+  N.flanLFO.frequency.setTargetAtTime(parseFloat($('s-frate').value), now, 0.05);
+  N.flanLFOGain.gain.setTargetAtTime(parseFloat($('s-fdepth').value) * 0.005, now, 0.05);
+  N.flanWet.gain.setTargetAtTime(parseFloat($('s-fdepth').value) > 0 ? 1 : 0, now, 0.05);
+
+  N.delay.delayTime.setTargetAtTime(parseFloat($('s-etime').value), now, 0.05);
+  N.delayFB.gain.setTargetAtTime(parseFloat($('s-efb').value), now, 0.05);
+  N.delayWet.gain.setTargetAtTime(parseFloat($('s-emix').value), now, 0.05);
+  
+  N.reverbWet.gain.setTargetAtTime(parseFloat($('s-rvb').value), now, 0.05);
+  
+  // Anti-clip dry signal volume drop
+  const wetAmount = parseFloat($('s-emix').value) + parseFloat($('s-rvb').value) + parseFloat($('s-fdepth').value);
+  N.dryBus.gain.setTargetAtTime(Math.max(0.4, 1 - (wetAmount * 0.3)), now, 0.1);
+
+  N.master.gain.setTargetAtTime(parseFloat($('s-vol').value), now, 0.05);
+  
+  if(isPlaying && liveSource) liveSource.playbackRate.setTargetAtTime(parseFloat($('s-speed').value), now, 0.05);
+}
+
+function logSliderVal(id, min, max) {
+  const t = parseFloat($(id).value);
+  return min * Math.pow(max/min, t);
+}
+
+function rebuildReverb() {
+  if(!liveNodes.reverb) return;
+  const dec = parseFloat($('s-rdec').value);
+  const ir = makeSyntheticIR(liveCtx, dec, 3);
+  liveNodes.reverb.buffer = ir;
+}
+
+// ============================================================
+// VISUALIZER
+// ============================================================
+const canvas = $('viz');
+const canvCtx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth * (window.devicePixelRatio||1);
+  canvas.height = canvas.offsetHeight * (window.devicePixelRatio||1);
+}
+
+function drawStaticWaveform(buf) {
+  const W=canvas.width, H=canvas.height;
+  canvCtx.clearRect(0,0,W,H);
+  canvCtx.fillStyle='#04040a'; canvCtx.fillRect(0,0,W,H);
+  canvCtx.strokeStyle='rgba(0,255,136,0.07)'; canvCtx.lineWidth=1;
+  for(let i=1;i<4;i++){canvCtx.beginPath();canvCtx.moveTo(0,H*i/4);canvCtx.lineTo(W,H*i/4);canvCtx.stroke();}
+  const data = buf.getChannelData(0);
+  const step = Math.ceil(data.length/W);
+  canvCtx.beginPath(); canvCtx.strokeStyle='rgba(0,255,136,0.4)'; canvCtx.lineWidth=1;
+  for(let x=0;x<W;x++){
+    let mn=0,mx=0;
+    for(let j=0;j<step;j++){const v=data[x*step+j]||0;if(v<mn)mn=v;if(v>mx)mx=v;}
+    const y1=H/2*(1-mx), y2=H/2*(1-mn);
+    if(x===0) canvCtx.moveTo(x,y1); else canvCtx.lineTo(x,y1);
+  }
+  canvCtx.stroke();
+}
+
+function drawLiveViz() {
+  if(!liveNodes.analyser) return;
+  const W=canvas.width, H=canvas.height;
+  const bufSize = liveNodes.analyser.frequencyBinCount;
+  const td = new Float32Array(bufSize);
+  liveNodes.analyser.getFloatTimeDomainData(td);
+
+  canvCtx.fillStyle='rgba(4,4,10,0.4)'; canvCtx.fillRect(0,0,W,H);
+  canvCtx.strokeStyle='rgba(0,255,136,0.07)'; canvCtx.lineWidth=1;
+  canvCtx.beginPath();canvCtx.moveTo(0,H/2);canvCtx.lineTo(W,H/2);canvCtx.stroke();
+
+  canvCtx.beginPath();
+  canvCtx.strokeStyle='#00ff88'; canvCtx.lineWidth=2;
+  canvCtx.shadowColor='#00ff88'; canvCtx.shadowBlur=6;
+  for(let i=0;i<bufSize;i++){
+    const x=i/bufSize*W, y=H/2*(1-td[i]);
+    i===0?canvCtx.moveTo(x,y):canvCtx.lineTo(x,y);
+  }
+  canvCtx.stroke(); canvCtx.shadowBlur=0;
+
+  let rms=0; for(let i=0;i<bufSize;i++) rms+=td[i]*td[i];
+  rms=Math.sqrt(rms/bufSize);
+  const pct = Math.min(100, rms*400);
+  ['ml','mr','ml2','mr2','ml3','mr3'].forEach((id,i)=>{
+    const noise = (Math.random()*10-5)*pct/100;
+    $(id).style.height=Math.max(2,pct+noise*(i%2===0?1:-1))+'%';
+  });
+}
+
+function animLoop() {
+  if(isPlaying) {
+    drawLiveViz();
+    if(globalAudioBuffer || processedBuffer) {
+      const buf = processedBuffer || globalAudioBuffer;
+      const rate = liveSource ? liveSource.playbackRate.value : 1;
+      const cur = startOffset + (liveCtx.currentTime - startTime) * rate;
+      const pct = Math.min(1, cur/buf.duration);
+      $('pos-slider').value = pct * 1000;
+      $('time-disp').textContent = fmtTime(cur)+' / '+fmtTime(buf.duration);
+    }
+  }
+  animId = requestAnimationFrame(animLoop);
+}
+
+// ============================================================
+// PRESET RUNNER
+// ============================================================
+async function runPreset(fn, btn) {
+  const srcBuf = processedBuffer || globalAudioBuffer;
+  if(!srcBuf) return;
+  const transform = PRESETS[fn];
+  if(!transform) return;
+  stopPlayback();
+  document.querySelectorAll('.p-btn.done').forEach(b=>b.classList.remove('done'));
+  btn.classList.add('running');
+  $('proc-overlay').classList.add('show');
+  $('proc-msg').textContent = 'PROCESSING: '+(btn.textContent.replace(/\n/,' ').trim().toUpperCase())+'…';
+  setStatus('PROC…');
+  try {
+    const result = await transform(srcBuf);
+    processedBuffer = result;
+    btn.classList.remove('running'); btn.classList.add('done');
+    $('proc-overlay').classList.remove('show');
+    $('dl-bar').style.display='block';
+    drawStaticWaveform(result);
+    setStatus('DONE ▶');
+    playBuffer(result);
+  } catch(e) {
+    console.error(e);
+    btn.classList.remove('running');
+    $('proc-overlay').classList.remove('show');
+    setStatus('ERROR');
+    alert('Processing failed: '+e.message);
+  }
+}
+
+// ============================================================
+// RESET EFFECTS ENGINE
+// ============================================================
+function resetAllEffects() {
+  stopPlayback();
+  processedBuffer = null;
+
+  const defaults = {
+    's-speed': '1', 's-vol': '1', 's-dist': '0', 's-fcut': '1', 's-fq': '1',
+    's-frate': '4', 's-fdepth': '0', 's-etime': '0.3', 's-efb': '0.5',
+    's-emix': '0', 's-rvb': '0', 's-rdec': '2.5', 's-warm': '0', 's-metal': '0',
+    's-am': '0', 's-chunk-size': '1.0', 's-flip-prob': '0.5'
+  };
+
+  Object.keys(defaults).forEach(id => {
+    const el = $(id);
+    if(el) {
+      el.value = defaults[id];
+      updateSliderDisplay(id);
+    }
+  });
+
+  $('filt-type-grp').querySelectorAll('.tog-btn').forEach(b => b.classList.remove('on'));
+  const offBtn = $('filt-type-grp').querySelector('[data-val="allpass"]');
+  if(offBtn) offBtn.classList.add('on');
+  if(liveNodes.filter) liveNodes.filter.type = 'allpass';
+
+  document.querySelectorAll('.p-btn.done').forEach(b => b.classList.remove('done'));
+
+  if(globalAudioBuffer) {
+    drawStaticWaveform(globalAudioBuffer);
+    startOffset = 0;
+    $('pos-slider').value = 0;
+    $('time-disp').textContent = `0:00 / ${fmtTime(globalAudioBuffer.duration)}`;
+  }
+
+  rebuildReverb();
+  updateLiveEffects();
+  setStatus('RESET');
+  $('dl-bar').style.display = 'block';
+}
+
+// ============================================================
+// SLIDER VALUE FORMATTERS
+// ============================================================
+const sliderFmt = {
+  's-speed': v => parseFloat(v).toFixed(2)+'×',
+  's-vol':   v => Math.round(parseFloat(v)*100)+'%',
+  's-dist':  v => Math.round(v),
+  's-fcut':  v => { const hz=logSliderVal('s-fcut',20,22050); return hz>=1000?(hz/1000).toFixed(1)+'k':Math.round(hz)+'Hz'; },
+  's-fq':    v => 'Q '+parseFloat(v).toFixed(1),
+  's-frate': v => parseFloat(v).toFixed(1)+'Hz',
+  's-fdepth':v => Math.round(parseFloat(v)*100)+'%',
+  's-etime': v => parseFloat(v).toFixed(2)+'s',
+  's-efb':   v => Math.round(parseFloat(v)*100)+'%',
+  's-emix':  v => Math.round(parseFloat(v)*100)+'%',
+  's-rvb':   v => Math.round(parseFloat(v)*100)+'%',
+  's-rdec':  v => parseFloat(v).toFixed(1)+'s',
+  's-warm':  v => Math.round(v)+'%',
+  's-metal': v => Math.round(v*100)+'%',
+  's-am':    v => parseFloat(v).toFixed(1)+'Hz',
+  's-chunk-size': v => parseFloat(v).toFixed(1)+'s',
+  's-flip-prob':  v => Math.round(parseFloat(v)*100)+'%'
+};
+
+const sliderValId = {
+  's-speed':'v-speed','s-vol':'v-vol','s-dist':'v-dist','s-fcut':'v-fcut','s-fq':'v-fq',
+  's-frate':'v-frate','s-fdepth':'v-fdepth','s-etime':'v-etime','s-efb':'v-efb',
+  's-emix':'v-emix','s-rvb':'v-rvb','s-rdec':'v-rdec','s-warm':'v-warm','s-metal':'v-metal',
+  's-am':'v-am','s-chunk-size':'v-chunk-size','s-flip-prob':'v-flip-prob'
+};
+
+function updateSliderDisplay(id) {
+  const el=$(id), vid=sliderValId[id];
+  if(vid && sliderFmt[id]) $(vid).textContent = sliderFmt[id](el.value);
+  const min=parseFloat(el.min)||0, max=parseFloat(el.max)||1, val=parseFloat(el.value);
+  const pct=((val-min)/(max-min))*100;
+  el.style.background=`linear-gradient(to right,var(--neon) ${pct}%,var(--muted) ${pct}%)`;
+}
+
+function setStatus(s) { $('status').textContent = s; }
+
+// ============================================================
+// UI SETUP & EVENT LISTENERS
+// ============================================================
+window.addEventListener('load', () => {
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 't-btn';
+  resetBtn.id = 'reset-btn';
+  resetBtn.title = 'Reset Audio & FX';
+  resetBtn.innerHTML = '✖';
+  resetBtn.style.fontSize = '14px';
+  $('transport').appendChild(resetBtn);
+  resetBtn.addEventListener('click', resetAllEffects);
+
+  // File drop
+  const dz = $('drop-zone');
+  dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('drag')});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)loadAudioFile(f);});
+  dz.addEventListener('click', ()=>$('file-input').click());
+  $('file-input').addEventListener('change', e=>{if(e.target.files[0])loadAudioFile(e.target.files[0])});
+  $('mic-btn').addEventListener('click', recordFromMic);
+
+  // Transport
+  $('play-btn').addEventListener('click', () => {
+    if(!globalAudioBuffer && !processedBuffer) return;
+    const buf = processedBuffer || globalAudioBuffer;
+    if(isPlaying) { stopPlayback(); }
+    else { setupLiveChain(); playBuffer(buf); }
+  });
+
+  $('loop-btn').addEventListener('click', () => {
+    loopEnabled = !loopEnabled;
+    $('loop-btn').classList.toggle('active', loopEnabled);
+    if(liveSource) liveSource.loop = loopEnabled;
+  });
+
+  $('pos-slider').addEventListener('input', e => {
+    const buf = processedBuffer || globalAudioBuffer;
+    if(!buf) return;
+    startOffset = (e.target.value/1000) * buf.duration;
+    $('time-disp').textContent = fmtTime(startOffset)+' / '+fmtTime(buf.duration);
+    if(isPlaying) { stopPlayback(); playBuffer(buf); }
+  });
+
+  // Sliders
+  Object.keys(sliderValId).forEach(id => {
+    const el = $(id);
+    if(!el) return;
+    updateSliderDisplay(id);
+    el.addEventListener('input', () => {
+      updateSliderDisplay(id);
+      if(id==='s-rdec') rebuildReverb();
+      
+      // Do not attempt to update offline sliders directly into the live graph
+      if(id !== 's-chunk-size' && id !== 's-flip-prob') {
+        updateLiveEffects();
+      }
+    });
+  });
+
+  // Filter type toggles
+  $('filt-type-grp').addEventListener('click', e => {
+    const btn = e.target.closest('.tog-btn');
+    if(!btn) return;
+    $('filt-type-grp').querySelectorAll('.tog-btn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    if(liveNodes.filter) liveNodes.filter.type = btn.dataset.val;
+  });
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+      btn.classList.add('active');
+      $('tab-'+btn.dataset.tab).style.display='block';
+    });
+  });
+
+  // Preset buttons
+  document.querySelectorAll('.p-btn').forEach(btn => {
+    btn.addEventListener('click', () => runPreset(btn.dataset.fn, btn));
+  });
+
+  // DOWNLOAD MP3 VIA DYNAMIC CHUNKED ENCODER
+  $('dl-btn').addEventListener('click', async () => {
+    const buf = processedBuffer || globalAudioBuffer;
+    if(!buf) return;
+    
+    $('dl-btn').disabled = true;
+    const initialText = $('dl-btn').textContent;
+    $('dl-btn').textContent = '⚡ COMPILING MP3 TRACK...';
+    
+    try {
+      const blob = await bufferToMp3(buf);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'audio-lab-output.mp3';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+      }
+    } catch(err) {
+      console.error(err);
+      alert('MP3 compilation error: ' + err.message);
+    } finally {
+      $('dl-btn').textContent = initialText;
+      $('dl-btn').disabled = false;
+    }
+  });
+
+  animLoop();
+});
+</script>
+</body>
+</html>
