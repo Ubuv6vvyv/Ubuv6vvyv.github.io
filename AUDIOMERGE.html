@@ -56,14 +56,28 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 6px;
         }
         
         .btn:hover:not(:disabled) { background: var(--accent-hover); }
         .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
         .btn.stop { background: #dc3545; }
         .btn.stop:hover:not(:disabled) { background: #b02a37; }
+        .btn.reset { background: #6c757d; }
+        .btn.reset:hover:not(:disabled) { background: #5a6268; }
         .btn.export { margin-left: auto; background: #28a745; }
         .btn.export:hover:not(:disabled) { background: #218838; }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1e2127;
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 14px;
+        }
 
         .checkbox-wrapper { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
         input[type="file"] { display: none; }
@@ -151,7 +165,7 @@
         .track-title { font-size: 13px; font-weight: 600; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
         .vol-control { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
-        input[type="range"] { flex: 1; accent-color: var(--accent); }
+        input[type="range"] { accent-color: var(--accent); }
 
         .control-row { display: flex; gap: 6px; }
         .mini-btn { flex: 1; background: #333; border: none; color: #ddd; font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; transition: 0.2s; }
@@ -210,13 +224,14 @@
 
         /* MOBILE RESPONSIVE */
         @media (max-width: 768px) {
-            #track-headers { width: 140px; min-width: 140px; }
+            #track-headers { width: 130px; min-width: 130px; }
             .control-row { flex-direction: column; }
             .mini-btn.del { flex: 1; }
             .track-header { padding: 8px; }
             .btn { padding: 8px 12px; font-size: 13px; }
-            .header { justify-content: center; }
+            .header { justify-content: flex-start; gap: 8px; padding: 8px; }
             .btn.export { margin-left: 0; width: 100%; }
+            .control-group { width: 100%; justify-content: space-between; }
         }
     </style>
 </head>
@@ -229,43 +244,53 @@
 
 <div class="header">
     <label class="btn">
-        + Add Audio
+        ➕ Add Audio
         <input type="file" id="fileInput" multiple accept="audio/*">
     </label>
     <button class="btn" id="playBtn">▶ Play</button>
     <button class="btn stop" id="stopBtn" disabled>■ Stop</button>
+    <button class="btn reset" id="resetBtn">🔄 Reset All</button>
     
     <label class="checkbox-wrapper">
-        <input type="checkbox" id="loopCheckbox"> Loop Timeline
+        <input type="checkbox" id="loopCheckbox"> Loop
     </label>
+
+    <div class="control-group">
+        <span>Zoom:</span>
+        <button class="mini-btn" id="zoomOutBtn" style="padding: 4px 10px;">🔍 ➖</button>
+        <button class="mini-btn" id="zoomInBtn" style="padding: 4px 10px;">🔍 ➕</button>
+    </div>
+
+    <div class="control-group">
+        <label for="speedSlider">Speed: <span id="speedLabel">1.0x</span></label>
+        <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" style="width: 80px;">
+    </div>
 
     <button class="btn export" id="exportBtn">💾 Export MP3</button>
 </div>
 
 <div id="timeline-wrapper">
-    <div id="track-headers">
-        </div>
+    <div id="track-headers"></div>
     <div id="timeline-scroll">
         <div id="timeline-content">
             <div id="ruler"></div>
             <div id="playhead"></div>
-            <div id="tracks-container">
-                </div>
+            <div id="tracks-container"></div>
         </div>
     </div>
 </div>
 
 <script>
     /* --- CONFIG & STATE --- */
-    const PX_PER_SEC = 60; // Slightly wider for easier mobile tapping
-    
     const State = {
         audioCtx: new (window.AudioContext || window.webkitAudioContext)(),
         tracks: [],
         isPlaying: false,
-        playStartTime: 0,
+        lastCtxTime: 0,
         pauseOffset: 0,
-        animFrame: null
+        animFrame: null,
+        pxPerSec: 60,
+        playbackRate: 1.0
     };
 
     /* --- DOM ELEMENTS --- */
@@ -278,20 +303,29 @@
         content: document.getElementById('timeline-content'),
         loop: document.getElementById('loopCheckbox'),
         playBtn: document.getElementById('playBtn'),
-        stopBtn: document.getElementById('stopBtn')
+        stopBtn: document.getElementById('stopBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        zoomInBtn: document.getElementById('zoomInBtn'),
+        zoomOutBtn: document.getElementById('zoomOutBtn'),
+        speedSlider: document.getElementById('speedSlider'),
+        speedLabel: document.getElementById('speedLabel')
     };
 
     /* --- INITIALIZATION --- */
     document.getElementById('fileInput').addEventListener('change', handleFiles);
     DOM.playBtn.addEventListener('click', () => startPlayback());
     DOM.stopBtn.addEventListener('click', () => stopPlayback());
+    DOM.resetBtn.addEventListener('click', () => resetAll());
+    DOM.zoomInBtn.addEventListener('click', () => adjustZoom(1.3));
+    DOM.zoomOutBtn.addEventListener('click', () => adjustZoom(0.7));
+    DOM.speedSlider.addEventListener('input', handleSpeedChange);
     document.getElementById('exportBtn').addEventListener('click', exportMix);
     
     // Timeline seeking
     DOM.ruler.addEventListener('pointerdown', (e) => {
         const rect = DOM.content.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const time = Math.max(0, x / PX_PER_SEC);
+        const time = Math.max(0, x / State.pxPerSec);
         
         if (State.isPlaying) {
             stopPlayback();
@@ -314,7 +348,6 @@
         const files = Array.from(e.target.files);
         if(!files.length) return;
         
-        // Browsers require user interaction to start AudioContext
         if (State.audioCtx.state === 'suspended') await State.audioCtx.resume();
         if(State.isPlaying) stopPlayback();
         
@@ -331,7 +364,7 @@
             }
         }
         toggleLoader(false);
-        e.target.value = ''; // Reset input
+        e.target.value = '';
     }
 
     /* --- TRACK CREATION --- */
@@ -351,6 +384,7 @@
         // UI: Header (Controls)
         const header = document.createElement('div');
         header.className = 'track-header';
+        header.id = 'header-' + id;
         
         const title = document.createElement('div');
         title.className = 'track-title';
@@ -377,11 +411,7 @@
 
         const btnDel = document.createElement('button');
         btnDel.className = 'mini-btn del'; btnDel.innerText = '✕';
-        btnDel.onclick = () => {
-            header.remove(); lane.remove();
-            State.tracks = State.tracks.filter(t => t.id !== id);
-            if(State.isPlaying) { stopPlayback(); startPlayback(); }
-        };
+        btnDel.onclick = () => removeTrack(id);
 
         btnRow.append(btnDup, btnDel);
         header.append(title, volRow, btnRow);
@@ -389,6 +419,7 @@
         // UI: Lane & Clip
         const lane = document.createElement('div');
         lane.className = 'track-lane';
+        lane.id = 'lane-' + id;
 
         const clip = document.createElement('div');
         clip.className = 'clip';
@@ -398,9 +429,8 @@
         
         const canvas = document.createElement('canvas');
         canvas.height = 90; 
-        canvas.width = track.fullDuration * PX_PER_SEC; 
+        canvas.width = track.fullDuration * State.pxPerSec; 
         
-        // Yield drawing to prevent UI freeze on large files
         setTimeout(() => drawWaveformOptimized(buffer, canvas), 10);
         
         canvasWrap.appendChild(canvas);
@@ -416,7 +446,7 @@
         DOM.headers.appendChild(header);
         DOM.lanes.appendChild(lane);
 
-        track.dom = { clip, canvasWrap };
+        track.dom = { clip, canvasWrap, canvas };
         State.tracks.push(track);
 
         updateClipVisuals(track);
@@ -428,24 +458,50 @@
     function duplicateTrack(orig) {
         const newState = {
             ...orig,
-            startTime: orig.startTime + orig.trimDuration
+            startTime: orig.startTime + orig.trimDuration,
+            sourceNode: null,
+            gainNode: null
         };
         createTrack(orig.buffer, orig.name, newState);
+    }
+
+    function removeTrack(id) {
+        const trackIndex = State.tracks.findIndex(t => t.id === id);
+        if(trackIndex === -1) return;
+        
+        const track = State.tracks[trackIndex];
+        
+        // Explicitly terminate nodes immediately to prevent memory & audio leakage
+        if(track.sourceNode) {
+            try { track.sourceNode.stop(); } catch(e){}
+            track.sourceNode.disconnect();
+            track.sourceNode = null;
+        }
+        if(track.gainNode) {
+            track.gainNode.disconnect();
+            track.gainNode = null;
+        }
+
+        document.getElementById('header-' + id)?.remove();
+        document.getElementById('lane-' + id)?.remove();
+
+        State.tracks.splice(trackIndex, 1);
+        updateTimelineSize();
     }
 
     /* --- OPTIMIZED VISUALS --- */
     function updateClipVisuals(track) {
         const { clip, canvasWrap } = track.dom;
-        clip.style.left = (track.startTime * PX_PER_SEC) + 'px';
-        clip.style.width = (track.trimDuration * PX_PER_SEC) + 'px';
-        canvasWrap.style.transform = `translateX(-${track.trimStart * PX_PER_SEC}px)`;
+        clip.style.left = (track.startTime * State.pxPerSec) + 'px';
+        clip.style.width = (track.trimDuration * State.pxPerSec) + 'px';
+        canvasWrap.style.transform = `translateX(-${track.trimStart * State.pxPerSec}px)`;
         updateTimelineSize();
     }
 
     function updateTimelineSize() {
         let max = 0;
         State.tracks.forEach(t => {
-            const end = (t.startTime + t.trimDuration) * PX_PER_SEC;
+            const end = (t.startTime + t.trimDuration) * State.pxPerSec;
             if(end > max) max = end;
         });
         DOM.content.style.width = Math.max(DOM.scroll.clientWidth, max + 400) + 'px';
@@ -457,7 +513,6 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         const data = buffer.getChannelData(0);
-        // Sub-sample logic to prevent freezing on 10min+ audio files
         const step = Math.max(1, Math.floor(data.length / canvas.width));
         const amp = canvas.height / 2;
         
@@ -466,7 +521,6 @@
         
         for (let i = 0; i < canvas.width; i++) {
             let min = 1.0, max = -1.0;
-            // Only check a fraction of the step to save CPU
             const jump = Math.max(1, Math.floor(step / 10)); 
             for (let j = 0; j < step; j += jump) {
                 const val = data[(i * step) + j];
@@ -480,6 +534,62 @@
         ctx.fill();
     }
 
+    /* --- ZOOM CONTROLS --- */
+    function adjustZoom(factor) {
+        const previousPxPerSec = State.pxPerSec;
+        State.pxPerSec = Math.max(15, Math.min(300, State.pxPerSec * factor));
+
+        // Center visual view alignment logic
+        const centerTime = (DOM.scroll.scrollLeft + DOM.scroll.clientWidth / 2) / previousPxPerSec;
+
+        State.tracks.forEach(track => {
+            track.dom.canvas.width = track.fullDuration * State.pxPerSec;
+            drawWaveformOptimized(track.buffer, track.dom.canvas);
+            updateClipVisuals(track);
+        });
+
+        updateTimelineSize();
+        updatePlayheadPosition(State.pauseOffset);
+        DOM.scroll.scrollLeft = (centerTime * State.pxPerSec) - DOM.scroll.clientWidth / 2;
+    }
+
+    /* --- GLOBAL SPEED CONTROL --- */
+    function handleSpeedChange(e) {
+        State.playbackRate = parseFloat(e.target.value);
+        DOM.speedLabel.innerText = State.playbackRate.toFixed(1) + 'x';
+        
+        if (State.isPlaying) {
+            // Hot-swap runtime configuration parameters across open context elements
+            State.tracks.forEach(t => {
+                if (t.sourceNode) {
+                    t.sourceNode.playbackRate.setValueAtTime(State.playbackRate, State.audioCtx.currentTime);
+                }
+            });
+        }
+    }
+
+    /* --- GLOBAL RESET PIPELINE --- */
+    function resetAll() {
+        stopPlayback();
+        
+        // Safely wipe out all active internal properties
+        while(State.tracks.length > 0) {
+            removeTrack(State.tracks[0].id);
+        }
+
+        State.pauseOffset = 0;
+        State.playbackRate = 1.0;
+        DOM.speedSlider.value = 1.0;
+        DOM.speedLabel.innerText = '1.0x';
+        DOM.loop.checked = false;
+        
+        DOM.headers.innerHTML = '';
+        DOM.lanes.innerHTML = '';
+        
+        updatePlayheadPosition(0);
+        updateTimelineSize();
+    }
+
     /* --- ROBUST DRAG & CROP --- */
     function setupDrag(el, track) {
         el.addEventListener('pointerdown', e => {
@@ -487,13 +597,13 @@
             e.preventDefault();
             
             const startX = e.clientX;
-            const startLeft = track.startTime * PX_PER_SEC;
+            const startLeft = track.startTime * State.pxPerSec;
 
             const onMove = (ev) => {
                 const dx = ev.clientX - startX;
                 let newLeft = startLeft + dx;
                 if(newLeft < 0) newLeft = 0;
-                track.startTime = newLeft / PX_PER_SEC;
+                track.startTime = newLeft / State.pxPerSec;
                 updateClipVisuals(track);
             };
 
@@ -518,7 +628,7 @@
             const initStartTime = track.startTime;
 
             const onMove = (ev) => {
-                const dxSec = (ev.clientX - startX) / PX_PER_SEC;
+                const dxSec = (ev.clientX - startX) / State.pxPerSec;
 
                 if (type === 'left') {
                     let newTrimStart = initTrimStart + dxSec;
@@ -559,16 +669,13 @@
         DOM.stopBtn.disabled = false;
         DOM.playhead.style.display = 'block';
 
-        // Calculate offset time based on AudioContext
-        State.playStartTime = State.audioCtx.currentTime - State.pauseOffset;
-
+        State.lastCtxTime = State.audioCtx.currentTime;
         let maxDur = 0;
 
         State.tracks.forEach(t => {
             const end = t.startTime + t.trimDuration;
             if(end > maxDur) maxDur = end;
 
-            // Clean up old nodes if they exist
             if(t.sourceNode) {
                 try { t.sourceNode.stop(); } catch(e){}
                 t.sourceNode.disconnect();
@@ -576,6 +683,7 @@
 
             const source = State.audioCtx.createBufferSource();
             source.buffer = t.buffer;
+            source.playbackRate.value = State.playbackRate;
             
             const gain = State.audioCtx.createGain();
             gain.gain.value = t.volume;
@@ -586,41 +694,48 @@
             t.sourceNode = source;
             t.gainNode = gain;
 
-            // Logic to handle playing from a paused state
             const trackAbsoluteStart = t.startTime;
             const trackAbsoluteEnd = t.startTime + t.trimDuration;
 
             if (State.pauseOffset < trackAbsoluteEnd) {
-                let contextPlayTime = State.playStartTime + trackAbsoluteStart;
+                let contextPlayTime;
                 let bufferOffset = t.trimStart;
                 let durationToPlay = t.trimDuration;
 
-                if (State.pauseOffset > trackAbsoluteStart) {
-                    // We are starting halfway through this clip
+                if (State.pauseOffset <= trackAbsoluteStart) {
+                    const delayTrackSec = trackAbsoluteStart - State.pauseOffset;
+                    contextPlayTime = State.audioCtx.currentTime + (delayTrackSec / State.playbackRate);
+                } else {
                     contextPlayTime = State.audioCtx.currentTime;
-                    const shift = State.pauseOffset - trackAbsoluteStart;
-                    bufferOffset += shift;
-                    durationToPlay -= shift;
+                    const shiftTrackSec = State.pauseOffset - trackAbsoluteStart;
+                    bufferOffset += shiftTrackSec;
+                    durationToPlay -= shiftTrackSec;
                 }
 
-                source.start(contextPlayTime, bufferOffset, durationToPlay);
+                if (durationToPlay > 0) {
+                    source.start(contextPlayTime, bufferOffset, durationToPlay);
+                }
             }
         });
 
         const tick = () => {
             if(!State.isPlaying) return;
-            const elapsed = State.audioCtx.currentTime - State.playStartTime;
+            
+            const currentCtxTime = State.audioCtx.currentTime;
+            const deltaCtx = currentCtxTime - State.lastCtxTime;
+            State.lastCtxTime = currentCtxTime;
+            
+            State.pauseOffset += deltaCtx * State.playbackRate;
+            updatePlayheadPosition(State.pauseOffset);
 
-            updatePlayheadPosition(elapsed);
-
-            if (elapsed >= maxDur) {
+            if (State.pauseOffset >= maxDur) {
                 if (DOM.loop.checked) {
                     stopPlayback(true); 
                     State.pauseOffset = 0;
                     startPlayback();
                 } else {
                     stopPlayback();
-                    State.pauseOffset = 0; // Reset to start
+                    State.pauseOffset = 0; 
                     updatePlayheadPosition(0);
                 }
                 return;
@@ -645,31 +760,30 @@
         if (!isLooping) {
             DOM.playBtn.disabled = false;
             DOM.stopBtn.disabled = true;
-            // Record where we stopped
-            State.pauseOffset = Math.max(0, State.audioCtx.currentTime - State.playStartTime);
         }
     }
 
     function updatePlayheadPosition(seconds) {
-        const px = seconds * PX_PER_SEC;
+        const px = seconds * State.pxPerSec;
         DOM.playhead.style.left = px + 'px';
         
-        // Auto-scroll logic
-        const scrollRect = DOM.scroll.getBoundingClientRect();
-        if (px > DOM.scroll.scrollLeft + scrollRect.width * 0.9) {
-            DOM.scroll.scrollLeft = px - scrollRect.width * 0.2;
-        } else if (px < DOM.scroll.scrollLeft) {
-            DOM.scroll.scrollLeft = Math.max(0, px - 100);
+        if (State.isPlaying) {
+            const scrollRect = DOM.scroll.getBoundingClientRect();
+            if (px > DOM.scroll.scrollLeft + scrollRect.width * 0.9) {
+                DOM.scroll.scrollLeft = px - scrollRect.width * 0.2;
+            } else if (px < DOM.scroll.scrollLeft) {
+                DOM.scroll.scrollLeft = Math.max(0, px - 100);
+            }
         }
     }
 
-    /* --- EXPORT (Asynchronous Yielding) --- */
+    /* --- EXPORT MASTER MIX --- */
     async function exportMix() {
         if(!State.tracks.length) return;
         if(State.isPlaying) stopPlayback();
         
         toggleLoader(true, "Rendering Mix...");
-        await new Promise(r => setTimeout(r, 50)); // Allow UI to paint
+        await new Promise(r => setTimeout(r, 50));
 
         let maxDur = 0;
         State.tracks.forEach(t => {
@@ -677,17 +791,21 @@
             if(end > maxDur) maxDur = end;
         });
 
-        // OfflineAudioContext for rendering the exact mix
-        const offlineCtx = new OfflineAudioContext(2, Math.ceil(maxDur * 44100), 44100);
+        const totalRenderedDuration = maxDur / State.playbackRate;
+        const offlineCtx = new OfflineAudioContext(2, Math.ceil(totalRenderedDuration * 44100), 44100);
         
         State.tracks.forEach(t => {
             const src = offlineCtx.createBufferSource();
             src.buffer = t.buffer;
+            src.playbackRate.value = State.playbackRate;
+            
             const gain = offlineCtx.createGain();
             gain.gain.value = t.volume;
+            
             src.connect(gain);
             gain.connect(offlineCtx.destination);
-            src.start(t.startTime, t.trimStart, t.trimDuration);
+            
+            src.start(t.startTime / State.playbackRate, t.trimStart, t.trimDuration);
         });
 
         const renderedBuffer = await offlineCtx.startRendering();
@@ -711,7 +829,7 @@
 
     async function encodeMp3Async(buffer) {
         return new Promise(async (resolve) => {
-            const mp3enc = new lamejs.Mp3Encoder(2, buffer.sampleRate, 192); // Better 192kbps quality
+            const mp3enc = new lamejs.Mp3Encoder(2, buffer.sampleRate, 192);
             const left = buffer.getChannelData(0);
             const right = buffer.getChannelData(1);
             
@@ -732,7 +850,6 @@
                 const b = mp3enc.encodeBuffer(lc, rc);
                 if(b.length > 0) mp3Data.push(b);
                 
-                // Yield to main thread every 100 blocks to prevent browser crash
                 if (i % (blockSize * 100) === 0) {
                     await new Promise(res => setTimeout(res, 0));
                 }
