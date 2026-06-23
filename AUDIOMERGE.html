@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Audio Mixer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1115;
+            --panel: #181a20;
+            --border: #2c2f36;
+            --accent: #007bff;
+            --accent-hover: #0056b3;
+            --handle: #ffc107;
+            --text: #e0e0e0;
+            --track-h: 120px;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* HEADER & CONTROLS */
+        .header {
+            padding: 12px 16px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            z-index: 50;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn:hover:not(:disabled) { background: var(--accent-hover); }
+        .btn:disabled { background: #333; color: #777; cursor: not-allowed; }
+        .btn.stop { background: #dc3545; }
+        .btn.stop:hover:not(:disabled) { background: #b02a37; }
+        .btn.export { margin-left: auto; background: #28a745; }
+        .btn.export:hover:not(:disabled) { background: #218838; }
+
+        .checkbox-wrapper { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+        input[type="file"] { display: none; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+        /* TIMELINE */
+        #timeline-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #track-headers {
+            width: 240px;
+            min-width: 240px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            overflow-y: hidden;
+            z-index: 40;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.5);
+        }
+
+        #timeline-scroll {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: #121212;
+        }
+        
+        #timeline-content {
+            position: relative;
+            min-height: 100%;
+            min-width: 100%;
+            padding-right: 50vw; 
+        }
+
+        #ruler {
+            height: 30px;
+            background: #1e1e1e;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+        }
+
+        #playhead {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px; 
+            background: #ff4757;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 0 4px rgba(255, 71, 87, 0.8);
+        }
+
+        #playhead::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -5px;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #ff4757;
+        }
+
+        /* TRACKS */
+        .track-header {
+            height: var(--track-h);
+            border-bottom: 1px solid var(--border);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .track-lane {
+            height: var(--track-h);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            background: repeating-linear-gradient(90deg, #111 0px, #111 99px, #1a1a1a 100px);
+        }
+
+        .track-title { font-size: 13px; font-weight: 600; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .vol-control { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
+        input[type="range"] { flex: 1; accent-color: var(--accent); }
+
+        .control-row { display: flex; gap: 6px; }
+        .mini-btn { flex: 1; background: #333; border: none; color: #ddd; font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .mini-btn:hover { background: #444; color: #fff; }
+        .mini-btn.del { flex: 0.3; background: #5c1616; }
+        .mini-btn.del:hover { background: #dc3545; }
+
+        /* CLIP & HANDLES */
+        .clip {
+            position: absolute;
+            top: 15px; bottom: 15px;
+            background: rgba(0, 123, 255, 0.15);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            cursor: grab;
+            overflow: hidden;
+            touch-action: none;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        .clip:active { cursor: grabbing; background: rgba(0, 123, 255, 0.25); }
+
+        .clip-canvas-wrapper {
+            position: absolute;
+            top: 0; bottom: 0;
+            pointer-events: none;
+        }
+        
+        canvas { display: block; height: 100%; opacity: 0.9; }
+
+        .handle {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 16px;
+            background: rgba(255, 193, 7, 0.6);
+            cursor: ew-resize;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .handle:hover { background: rgba(255, 193, 7, 0.9); }
+        .handle-l { left: 0; border-right: 1px solid rgba(255,255,255,0.3); }
+        .handle-r { right: 0; border-left: 1px solid rgba(255,255,255,0.3); }
+        .handle::after { content: '⋮'; font-size: 14px; color: #000; font-weight: bold; }
+
+        /* LOADING */
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; align-items: center; justify-content: center; z-index: 999;
+            flex-direction: column; backdrop-filter: blur(4px);
+        }
+        .spinner { width: 50px; height: 50px; border: 4px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+        .overlay-text { margin-top: 15px; font-size: 16px; font-weight: 500; letter-spacing: 1px; }
+
+        /* MOBILE RESPONSIVE */
+        @media (max-width: 768px) {
+            #track-headers { width: 140px; min-width: 140px; }
+            .control-row { flex-direction: column; }
+            .mini-btn.del { flex: 1; }
+            .track-header { padding: 8px; }
+            .btn { padding: 8px 12px; font-size: 13px; }
+            .header { justify-content: center; }
+            .btn.export { margin-left: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <div class="spinner"></div>
+    <div class="overlay-text">Processing...</div>
+</div>
+
+<div class="header">
+    <label class="btn">
+        + Add Audio
+        <input type="file" id="fileInput" multiple accept="audio/*">
+    </label>
+    <button class="btn" id="playBtn">▶ Play</button>
+    <button class="btn stop" id="stopBtn" disabled>■ Stop</button>
+    
+    <label class="checkbox-wrapper">
+        <input type="checkbox" id="loopCheckbox"> Loop Timeline
+    </label>
+
+    <button class="btn export" id="exportBtn">💾 Export MP3</button>
+</div>
+
+<div id="timeline-wrapper">
+    <div id="track-headers">
+        </div>
+    <div id="timeline-scroll">
+        <div id="timeline-content">
+            <div id="ruler"></div>
+            <div id="playhead"></div>
+            <div id="tracks-container">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* --- CONFIG & STATE --- */
+    const PX_PER_SEC = 60; // Slightly wider for easier mobile tapping
+    
+    const State = {
+        audioCtx: new (window.AudioContext || window.webkitAudioContext)(),
+        tracks: [],
+        isPlaying: false,
+        playStartTime: 0,
+        pauseOffset: 0,
+        animFrame: null
+    };
+
+    /* --- DOM ELEMENTS --- */
+    const DOM = {
+        headers: document.getElementById('track-headers'),
+        lanes: document.getElementById('tracks-container'),
+        ruler: document.getElementById('ruler'),
+        playhead: document.getElementById('playhead'),
+        scroll: document.getElementById('timeline-scroll'),
+        content: document.getElementById('timeline-content'),
+        loop: document.getElementById('loopCheckbox'),
+        playBtn: document.getElementById('playBtn'),
+        stopBtn: document.getElementById('stopBtn')
+    };
+
+    /* --- INITIALIZATION --- */
+    document.getElementById('fileInput').addEventListener('change', handleFiles);
+    DOM.playBtn.addEventListener('click', () => startPlayback());
+    DOM.stopBtn.addEventListener('click', () => stopPlayback());
+    document.getElementById('exportBtn').addEventListener('click', exportMix);
+    
+    // Timeline seeking
+    DOM.ruler.addEventListener('pointerdown', (e) => {
+        const rect = DOM.content.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const time = Math.max(0, x / PX_PER_SEC);
+        
+        if (State.isPlaying) {
+            stopPlayback();
+            State.pauseOffset = time;
+            startPlayback();
+        } else {
+            State.pauseOffset = time;
+            updatePlayheadPosition(time);
+        }
+    });
+
+    function toggleLoader(show, msg) {
+        const el = document.getElementById('overlay');
+        el.style.display = show ? 'flex' : 'none';
+        if(msg) el.lastElementChild.innerText = msg;
+    }
+
+    /* --- FILE HANDLING --- */
+    async function handleFiles(e) {
+        const files = Array.from(e.target.files);
+        if(!files.length) return;
+        
+        // Browsers require user interaction to start AudioContext
+        if (State.audioCtx.state === 'suspended') await State.audioCtx.resume();
+        if(State.isPlaying) stopPlayback();
+        
+        toggleLoader(true, "Decoding Audio...");
+
+        for(let file of files) {
+            try {
+                const ab = await file.arrayBuffer();
+                const buffer = await State.audioCtx.decodeAudioData(ab);
+                createTrack(buffer, file.name);
+            } catch(err) {
+                console.error(err);
+                alert("Error loading format: " + file.name);
+            }
+        }
+        toggleLoader(false);
+        e.target.value = ''; // Reset input
+    }
+
+    /* --- TRACK CREATION --- */
+    function createTrack(buffer, name, presetState = null) {
+        const id = Math.random().toString(36).substr(2, 9);
+        const duration = buffer.duration;
+
+        const track = presetState ? { ...presetState, id } : {
+            id, buffer, name,
+            volume: 1.0,
+            startTime: 0,
+            trimStart: 0,
+            trimDuration: duration,
+            fullDuration: duration
+        };
+
+        // UI: Header (Controls)
+        const header = document.createElement('div');
+        header.className = 'track-header';
+        
+        const title = document.createElement('div');
+        title.className = 'track-title';
+        title.innerText = name;
+        title.title = name;
+
+        const volRow = document.createElement('div');
+        volRow.className = 'vol-control';
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range'; volSlider.min = 0; volSlider.max = 1.5; volSlider.step = 0.05; volSlider.value = track.volume;
+        volSlider.oninput = (e) => {
+            track.volume = parseFloat(e.target.value);
+            if(track.gainNode) track.gainNode.gain.value = track.volume;
+        };
+        volRow.innerHTML = '<span>🔈</span>';
+        volRow.appendChild(volSlider);
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'control-row';
+        
+        const btnDup = document.createElement('button');
+        btnDup.className = 'mini-btn'; btnDup.innerText = 'Copy';
+        btnDup.onclick = () => duplicateTrack(track);
+
+        const btnDel = document.createElement('button');
+        btnDel.className = 'mini-btn del'; btnDel.innerText = '✕';
+        btnDel.onclick = () => {
+            header.remove(); lane.remove();
+            State.tracks = State.tracks.filter(t => t.id !== id);
+            if(State.isPlaying) { stopPlayback(); startPlayback(); }
+        };
+
+        btnRow.append(btnDup, btnDel);
+        header.append(title, volRow, btnRow);
+
+        // UI: Lane & Clip
+        const lane = document.createElement('div');
+        lane.className = 'track-lane';
+
+        const clip = document.createElement('div');
+        clip.className = 'clip';
+        
+        const canvasWrap = document.createElement('div');
+        canvasWrap.className = 'clip-canvas-wrapper';
+        
+        const canvas = document.createElement('canvas');
+        canvas.height = 90; 
+        canvas.width = track.fullDuration * PX_PER_SEC; 
+        
+        // Yield drawing to prevent UI freeze on large files
+        setTimeout(() => drawWaveformOptimized(buffer, canvas), 10);
+        
+        canvasWrap.appendChild(canvas);
+
+        const handleL = document.createElement('div');
+        handleL.className = 'handle handle-l';
+        const handleR = document.createElement('div');
+        handleR.className = 'handle handle-r';
+
+        clip.append(canvasWrap, handleL, handleR);
+        lane.appendChild(clip);
+        
+        DOM.headers.appendChild(header);
+        DOM.lanes.appendChild(lane);
+
+        track.dom = { clip, canvasWrap };
+        State.tracks.push(track);
+
+        updateClipVisuals(track);
+        setupDrag(clip, track);
+        setupCrop(handleL, track, 'left');
+        setupCrop(handleR, track, 'right');
+    }
+
+    function duplicateTrack(orig) {
+        const newState = {
+            ...orig,
+            startTime: orig.startTime + orig.trimDuration
+        };
+        createTrack(orig.buffer, orig.name, newState);
+    }
+
+    /* --- OPTIMIZED VISUALS --- */
+    function updateClipVisuals(track) {
+        const { clip, canvasWrap } = track.dom;
+        clip.style.left = (track.startTime * PX_PER_SEC) + 'px';
+        clip.style.width = (track.trimDuration * PX_PER_SEC) + 'px';
+        canvasWrap.style.transform = `translateX(-${track.trimStart * PX_PER_SEC}px)`;
+        updateTimelineSize();
+    }
+
+    function updateTimelineSize() {
+        let max = 0;
+        State.tracks.forEach(t => {
+            const end = (t.startTime + t.trimDuration) * PX_PER_SEC;
+            if(end > max) max = end;
+        });
+        DOM.content.style.width = Math.max(DOM.scroll.clientWidth, max + 400) + 'px';
+    }
+
+    function drawWaveformOptimized(buffer, canvas) {
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.fillStyle = '#0f1115';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const data = buffer.getChannelData(0);
+        // Sub-sample logic to prevent freezing on 10min+ audio files
+        const step = Math.max(1, Math.floor(data.length / canvas.width));
+        const amp = canvas.height / 2;
+        
+        ctx.fillStyle = '#007bff';
+        ctx.beginPath();
+        
+        for (let i = 0; i < canvas.width; i++) {
+            let min = 1.0, max = -1.0;
+            // Only check a fraction of the step to save CPU
+            const jump = Math.max(1, Math.floor(step / 10)); 
+            for (let j = 0; j < step; j += jump) {
+                const val = data[(i * step) + j];
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+            const y = (1 + min) * amp;
+            const h = Math.max(1, (max - min) * amp);
+            ctx.rect(i, y, 1, h);
+        }
+        ctx.fill();
+    }
+
+    /* --- ROBUST DRAG & CROP --- */
+    function setupDrag(el, track) {
+        el.addEventListener('pointerdown', e => {
+            if(e.target.classList.contains('handle')) return;
+            e.preventDefault();
+            
+            const startX = e.clientX;
+            const startLeft = track.startTime * PX_PER_SEC;
+
+            const onMove = (ev) => {
+                const dx = ev.clientX - startX;
+                let newLeft = startLeft + dx;
+                if(newLeft < 0) newLeft = 0;
+                track.startTime = newLeft / PX_PER_SEC;
+                updateClipVisuals(track);
+            };
+
+            const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+            };
+
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
+    }
+
+    function setupCrop(handle, track, type) {
+        handle.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const startX = e.clientX;
+            const initTrimStart = track.trimStart;
+            const initTrimDur = track.trimDuration;
+            const initStartTime = track.startTime;
+
+            const onMove = (ev) => {
+                const dxSec = (ev.clientX - startX) / PX_PER_SEC;
+
+                if (type === 'left') {
+                    let newTrimStart = initTrimStart + dxSec;
+                    if(newTrimStart < 0) newTrimStart = 0;
+                    if(newTrimStart > (initTrimStart + initTrimDur - 0.1)) newTrimStart = initTrimStart + initTrimDur - 0.1;
+
+                    track.trimStart = newTrimStart;
+                    track.trimDuration = initTrimDur - (newTrimStart - initTrimStart);
+                    track.startTime = initStartTime + (newTrimStart - initTrimStart);
+                } else {
+                    let newTrimDur = initTrimDur + dxSec;
+                    if(newTrimDur < 0.1) newTrimDur = 0.1;
+                    if((initTrimStart + newTrimDur) > track.fullDuration) {
+                        newTrimDur = track.fullDuration - initTrimStart;
+                    }
+                    track.trimDuration = newTrimDur;
+                }
+                updateClipVisuals(track);
+            };
+
+            const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+            };
+
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
+    }
+
+    /* --- PLAYBACK ENGINE --- */
+    async function startPlayback() {
+        if(!State.tracks.length) return;
+        if(State.audioCtx.state === 'suspended') await State.audioCtx.resume();
+        
+        State.isPlaying = true;
+        DOM.playBtn.disabled = true;
+        DOM.stopBtn.disabled = false;
+        DOM.playhead.style.display = 'block';
+
+        // Calculate offset time based on AudioContext
+        State.playStartTime = State.audioCtx.currentTime - State.pauseOffset;
+
+        let maxDur = 0;
+
+        State.tracks.forEach(t => {
+            const end = t.startTime + t.trimDuration;
+            if(end > maxDur) maxDur = end;
+
+            // Clean up old nodes if they exist
+            if(t.sourceNode) {
+                try { t.sourceNode.stop(); } catch(e){}
+                t.sourceNode.disconnect();
+            }
+
+            const source = State.audioCtx.createBufferSource();
+            source.buffer = t.buffer;
+            
+            const gain = State.audioCtx.createGain();
+            gain.gain.value = t.volume;
+
+            source.connect(gain);
+            gain.connect(State.audioCtx.destination);
+
+            t.sourceNode = source;
+            t.gainNode = gain;
+
+            // Logic to handle playing from a paused state
+            const trackAbsoluteStart = t.startTime;
+            const trackAbsoluteEnd = t.startTime + t.trimDuration;
+
+            if (State.pauseOffset < trackAbsoluteEnd) {
+                let contextPlayTime = State.playStartTime + trackAbsoluteStart;
+                let bufferOffset = t.trimStart;
+                let durationToPlay = t.trimDuration;
+
+                if (State.pauseOffset > trackAbsoluteStart) {
+                    // We are starting halfway through this clip
+                    contextPlayTime = State.audioCtx.currentTime;
+                    const shift = State.pauseOffset - trackAbsoluteStart;
+                    bufferOffset += shift;
+                    durationToPlay -= shift;
+                }
+
+                source.start(contextPlayTime, bufferOffset, durationToPlay);
+            }
+        });
+
+        const tick = () => {
+            if(!State.isPlaying) return;
+            const elapsed = State.audioCtx.currentTime - State.playStartTime;
+
+            updatePlayheadPosition(elapsed);
+
+            if (elapsed >= maxDur) {
+                if (DOM.loop.checked) {
+                    stopPlayback(true); 
+                    State.pauseOffset = 0;
+                    startPlayback();
+                } else {
+                    stopPlayback();
+                    State.pauseOffset = 0; // Reset to start
+                    updatePlayheadPosition(0);
+                }
+                return;
+            }
+            State.animFrame = requestAnimationFrame(tick);
+        };
+        State.animFrame = requestAnimationFrame(tick);
+    }
+
+    function stopPlayback(isLooping = false) {
+        State.isPlaying = false;
+        cancelAnimationFrame(State.animFrame);
+        
+        State.tracks.forEach(t => {
+            if(t.sourceNode) {
+                try { t.sourceNode.stop(); } catch(e){}
+                t.sourceNode.disconnect();
+                t.sourceNode = null;
+            }
+        });
+        
+        if (!isLooping) {
+            DOM.playBtn.disabled = false;
+            DOM.stopBtn.disabled = true;
+            // Record where we stopped
+            State.pauseOffset = Math.max(0, State.audioCtx.currentTime - State.playStartTime);
+        }
+    }
+
+    function updatePlayheadPosition(seconds) {
+        const px = seconds * PX_PER_SEC;
+        DOM.playhead.style.left = px + 'px';
+        
+        // Auto-scroll logic
+        const scrollRect = DOM.scroll.getBoundingClientRect();
+        if (px > DOM.scroll.scrollLeft + scrollRect.width * 0.9) {
+            DOM.scroll.scrollLeft = px - scrollRect.width * 0.2;
+        } else if (px < DOM.scroll.scrollLeft) {
+            DOM.scroll.scrollLeft = Math.max(0, px - 100);
+        }
+    }
+
+    /* --- EXPORT (Asynchronous Yielding) --- */
+    async function exportMix() {
+        if(!State.tracks.length) return;
+        if(State.isPlaying) stopPlayback();
+        
+        toggleLoader(true, "Rendering Mix...");
+        await new Promise(r => setTimeout(r, 50)); // Allow UI to paint
+
+        let maxDur = 0;
+        State.tracks.forEach(t => {
+            const end = t.startTime + t.trimDuration;
+            if(end > maxDur) maxDur = end;
+        });
+
+        // OfflineAudioContext for rendering the exact mix
+        const offlineCtx = new OfflineAudioContext(2, Math.ceil(maxDur * 44100), 44100);
+        
+        State.tracks.forEach(t => {
+            const src = offlineCtx.createBufferSource();
+            src.buffer = t.buffer;
+            const gain = offlineCtx.createGain();
+            gain.gain.value = t.volume;
+            src.connect(gain);
+            gain.connect(offlineCtx.destination);
+            src.start(t.startTime, t.trimStart, t.trimDuration);
+        });
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        
+        toggleLoader(true, "Encoding MP3... (This may take a moment)");
+        await new Promise(r => setTimeout(r, 50));
+
+        try {
+            const mp3Blob = await encodeMp3Async(renderedBuffer);
+            const url = URL.createObjectURL(mp3Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Pro_Mix_Export.mp3';
+            a.click();
+        } catch (e) {
+            alert("Encoding failed.");
+            console.error(e);
+        }
+        toggleLoader(false);
+    }
+
+    async function encodeMp3Async(buffer) {
+        return new Promise(async (resolve) => {
+            const mp3enc = new lamejs.Mp3Encoder(2, buffer.sampleRate, 192); // Better 192kbps quality
+            const left = buffer.getChannelData(0);
+            const right = buffer.getChannelData(1);
+            
+            const l = new Int16Array(left.length);
+            const r = new Int16Array(right.length);
+            
+            for(let i=0; i<left.length; i++) {
+                l[i] = left[i] < 0 ? left[i]*0x8000 : left[i]*0x7FFF;
+                r[i] = right[i] < 0 ? right[i]*0x8000 : right[i]*0x7FFF;
+            }
+
+            const mp3Data = [];
+            const blockSize = 1152;
+            
+            for(let i=0; i<l.length; i+=blockSize) {
+                const lc = l.subarray(i, i+blockSize);
+                const rc = r.subarray(i, i+blockSize);
+                const b = mp3enc.encodeBuffer(lc, rc);
+                if(b.length > 0) mp3Data.push(b);
+                
+                // Yield to main thread every 100 blocks to prevent browser crash
+                if (i % (blockSize * 100) === 0) {
+                    await new Promise(res => setTimeout(res, 0));
+                }
+            }
+            
+            const b = mp3enc.flush();
+            if(b.length > 0) mp3Data.push(b);
+
+            resolve(new Blob(mp3Data, {type: 'audio/mp3'}));
+        });
+    }
+</script>
+</body>
+</html>
