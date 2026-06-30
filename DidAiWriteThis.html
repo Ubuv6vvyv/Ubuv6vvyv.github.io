@@ -3,7 +3,7 @@
 <head>
     <meta charset=UTF-8>
     <meta content="width=device-width,initial-scale=1" name=viewport>
-    <title> Detector v5.1</title>
+    <title> Detector v5.2</title>
     <script src=https://cdn.tailwindcss.com></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1311,13 +1311,14 @@ overflow: auto;
             analyze() {
                 const scorer = new WeightedScorer();
                 const matches = [];
+                const MATCH_DISPLAY_CAP = 40;
                 let totalHits = 0;
                 PatternConfig.gptLexicon.forEach(phrase => {
                     const regex = new RegExp(`\\b${phrase}\\b`, "gi");
                     let match;
                     while ((match = regex.exec(this.text)) !== null) {
                         totalHits++;
-                        if (matches.length < 15) {
+                        if (matches.length < MATCH_DISPLAY_CAP) {
                             matches.push({
                                 type: "Lexicon",
                                 snippet: Utils.extractSnippet(this.text, match[0], match.index),
@@ -1327,11 +1328,52 @@ overflow: auto;
                         }
                     }
                 });
+
+                // Compound adjectives ("cutting-edge", "data-driven", "best-in-class"...)
+                // were sitting in PatternConfig fully populated but never referenced by
+                // any analyzer. They're a distinct stylistic signal from the standalone
+                // lexicon phrases above (LLMs lean heavily on these hyphenated modifiers),
+                // so they're tracked and scored separately, then folded into the same
+                // overall "Vocabulary Patterns" category.
+                let compoundHits = 0;
+                PatternConfig.compoundAdjectives.forEach(phrase => {
+                    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+                    let match;
+                    while ((match = regex.exec(this.text)) !== null) {
+                        compoundHits++;
+                        if (matches.length < MATCH_DISPLAY_CAP) {
+                            matches.push({
+                                type: "Compound Adjective",
+                                snippet: Utils.extractSnippet(this.text, match[0], match.index),
+                                context: "AI-favored hyphenated modifier",
+                                weight: "medium"
+                            });
+                        }
+                    }
+                });
+
+                const totalAllHits = totalHits + compoundHits;
+                if (totalAllHits > matches.length) {
+                    matches.push({ type: "Lexicon", snippet: `...and ${totalAllHits - matches.length} more instance(s) not shown`, context: "Truncated for length", weight: "low" });
+                }
+
                 const density = totalHits / (this.wordCount || 1);
+                const compoundDensity = compoundHits / (this.wordCount || 1);
                 if (density > 0.03) scorer.add(100, "critical");
                 else if (density > 0.015) scorer.add(60, "high");
                 else if (density > 0.005) scorer.add(30, "medium");
-                return { name: "Vocabulary Patterns", score: scorer.getScore(), matches, summary: `${totalHits} specific AI words detected`, details: scorer.getDetails() };
+
+                if (compoundDensity > 0.025) scorer.add(70, "high");
+                else if (compoundDensity > 0.012) scorer.add(40, "medium");
+                else if (compoundHits >= 3) scorer.add(15, "low");
+
+                return {
+                    name: "Vocabulary Patterns",
+                    score: scorer.getScore(),
+                    matches,
+                    summary: `${totalHits} AI vocabulary phrase(s), ${compoundHits} AI-favored compound adjective(s) detected`,
+                    details: scorer.getDetails()
+                };
             }
         }
 
@@ -1394,32 +1436,51 @@ overflow: auto;
                     scorer.add(60, "high");
                     matches.push({
                         type: "List Density",
-                        snippet: "Text contains excessive bulleted lists (>30%)",
+                        snippet: `${bullets} bulleted lines across ${this.wordCount} words (${((bullets / this.wordCount) * 100).toFixed(0)}% density)`,
                         context: "AI preference for structuring",
                         weight: "high"
                     });
                 }
 
-                // 2. Oxford Comma (Strict adherence)
-                const oxford = (this.text.match(/,\s+and\s+/gi) || []).length;
-                const noOxford = (this.text.match(/\s+and\s+(?!,)/gi) || []).length;
-                if (oxford > 3 && noOxford === 0) {
-                    scorer.add(40, "medium");
-                    matches.push({
-                        type: "Oxford Comma",
-                        snippet: "100% Oxford comma usage detected",
-                        context: "AI strictly adheres to grammar rules",
-                        weight: "medium"
-                    });
+                // 2. Markdown Headers (#, ##, etc.) — AI chat output defaults to headered
+                // sections even for short answers; human prose almost never does in
+                // plain-text contexts.
+                const headers = (this.text.match(PatternConfig.structural.headerPattern) || []).length;
+                if (headers > 0) {
+                    const density = headers / (this.wordCount / 100);
+                    if (density > 1.5) {
+                        scorer.add(65, "high");
+                        matches.push({ type: "Header Density", snippet: `${headers} markdown headers (#/##/###) detected`, context: "AI defaults to headered sections", weight: "high" });
+                    } else {
+                        scorer.add(25, "low");
+                        matches.push({ type: "Markdown Headers", snippet: `${headers} markdown header(s) detected`, context: "Possible AI formatting carryover", weight: "low" });
+                    }
                 }
 
-                // 3. Markdown Artifacts (**Text**:)
+                // 3. Numbered List Density
+                const numbered = (this.text.match(PatternConfig.structural.numberedLists) || []).length;
+                if (numbered >= 3 && (numbered / this.wordCount > 0.02)) {
+                    scorer.add(35, "medium");
+                    matches.push({ type: "Numbered List Density", snippet: `${numbered} numbered list items detected`, context: "AI prefers enumerated breakdowns", weight: "medium" });
+                }
+
+                // 4. Bold-text overuse (AI tends to bold key terms throughout for
+                // skimmability, well beyond normal human emphasis usage)
+                const boldMatches = this.text.match(PatternConfig.structural.markdownBold) || [];
+                const boldDensity = boldMatches.length / (this.wordCount / 100);
+                if (boldMatches.length >= 4 && boldDensity > 1.2) {
+                    scorer.add(45, "medium");
+                    matches.push({ type: "Bold Emphasis Overuse", snippet: `${boldMatches.length} bolded terms (${boldDensity.toFixed(1)} per 100 words)`, context: "AI over-bolds key terms for skimmability", weight: "medium" });
+                }
+
+                // 5. Bold-Colon Artifacts (**Term**: explanation) — classic GPT
+                // teaching/definition-list pattern.
                 let boldColonMatch;
-                const boldColonRegex = /\*\*([A-Z][^*:]{1,40})\*\*:/g;
+                const boldColonRegex = new RegExp(PatternConfig.structural.boldColon.source, "g");
                 let bcCount = 0;
-                while((boldColonMatch = boldColonRegex.exec(this.text)) !== null) {
+                while ((boldColonMatch = boldColonRegex.exec(this.text)) !== null) {
                     bcCount++;
-                    if(bcCount <= 3) {
+                    if (bcCount <= 10) {
                         matches.push({
                             type: "Markdown Artifact",
                             snippet: Utils.extractSnippet(this.text, boldColonMatch[0], boldColonMatch.index),
@@ -1428,7 +1489,8 @@ overflow: auto;
                         });
                     }
                 }
-                if(bcCount > 0) scorer.add(70, "high");
+                if (bcCount > 10) matches.push({ type: "Markdown Artifact", snippet: `...and ${bcCount - 10} more "**Term**:" instances not shown`, context: "Truncated for length", weight: "high" });
+                if (bcCount > 0) scorer.add(70, "high");
 
                 return { name: "Structural Rigidity", score: scorer.getScore(), matches, summary: "Structural patterns analyzed", details: scorer.getDetails() };
             }
@@ -1557,21 +1619,76 @@ overflow: auto;
                 const scorer = new WeightedScorer();
                 const matches = [];
                 const sentences = Utils.splitSentences(this.text);
+                // Trimmed stopword list: bare articles only. The original list also
+                // excluded "it" and "in"/"on" — but "It's important...", "It also...",
+                // "It allows..." repeated every few sentences is one of the more common
+                // AI anaphora tells, so it shouldn't have been filtered out.
+                const stopwords = ['the', 'a', 'an'];
+
+                // 1. Consecutive repetition (strongest signal — back-to-back sentences
+                // sharing an opener reads as obviously mechanical).
+                let consecutiveCount = 0;
                 for (let i = 1; i < sentences.length; i++) {
-                    const prev = sentences[i-1].trim().split(" ")[0].toLowerCase();
-                    const curr = sentences[i].trim().split(" ")[0].toLowerCase();
-                    const stopwords = ['the', 'a', 'an', 'in', 'on', 'it'];
-                    if (prev === curr && prev.length > 2 && !stopwords.includes(prev)) {
+                    const prev = sentences[i - 1].trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, '') || '';
+                    const curr = sentences[i].trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, '') || '';
+                    if (prev === curr && prev.length > 1 && !stopwords.includes(prev)) {
+                        consecutiveCount++;
+                        if (matches.length < 20) {
+                            matches.push({
+                                type: "Anaphora (Consecutive)",
+                                snippet: `...${sentences[i - 1].trim().substring(0, 40)}... <br> ...<span class="match-highlight">${sentences[i].trim().substring(0, 40)}</span>...`,
+                                context: "Back-to-back sentences share an opener",
+                                weight: "high"
+                            });
+                        }
+                    }
+                }
+
+                // 2. Document-wide starter repetition — same opener recurring across the
+                // text even when not adjacent (e.g. "This..." used to open 5 of 20
+                // sentences). This is the more common real-world AI signature.
+                const starterCounts = {};
+                const starterExamples = {};
+                sentences.forEach(s => {
+                    const word = s.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, '') || '';
+                    if (word.length > 1 && !stopwords.includes(word)) {
+                        starterCounts[word] = (starterCounts[word] || 0) + 1;
+                        if (!starterExamples[word]) starterExamples[word] = [];
+                        if (starterExamples[word].length < 3) starterExamples[word].push(s.trim().substring(0, 50));
+                    }
+                });
+                let repeatedStarterWords = 0;
+                let repeatedStarterTotal = 0;
+                Object.keys(starterCounts).forEach(word => {
+                    const count = starterCounts[word];
+                    if (count >= 3) {
+                        repeatedStarterWords++;
+                        repeatedStarterTotal += count;
                         matches.push({
-                            type: "Anaphora",
-                            snippet: `...${sentences[i-1].substring(0, 30)}... <br> ...<span class="match-highlight">${sentences[i].substring(0, 20)}</span>...`,
-                            context: "Consecutive sentence starts",
+                            type: "Anaphora (Document-wide)",
+                            snippet: starterExamples[word].map(s => Utils.escapeHtml(s)).join(" / "),
+                            context: `"${word}" opens ${count} sentences across the text (not necessarily consecutive)`,
                             weight: "medium"
                         });
                     }
-                }
-                if (matches.length > 1) scorer.add(60, "medium");
-                return { name: "Repetitive Structures", score: scorer.getScore(), matches, summary: matches.length ? "Repetitive sentence starts" : "Variance looks natural", details: scorer.getDetails() };
+                });
+
+                const sentenceCount = sentences.length || 1;
+                if (consecutiveCount >= 2) scorer.add(70, "high");
+                else if (consecutiveCount === 1) scorer.add(30, "medium");
+
+                const repeatRatio = repeatedStarterTotal / sentenceCount;
+                if (repeatedStarterWords > 0 && repeatRatio > 0.3) scorer.add(75, "high");
+                else if (repeatedStarterWords > 0 && repeatRatio > 0.15) scorer.add(45, "medium");
+                else if (repeatedStarterWords > 0) scorer.add(20, "low");
+
+                return {
+                    name: "Repetitive Structures",
+                    score: scorer.getScore(),
+                    matches,
+                    summary: matches.length ? `${consecutiveCount} consecutive repeat(s), ${repeatedStarterWords} starter word(s) reused 3+ times` : "Sentence-opener variance looks natural",
+                    details: scorer.getDetails()
+                };
             }
         }
 
@@ -1609,7 +1726,7 @@ overflow: auto;
                 let count = 0;
                 while ((match = regex.exec(this.text)) !== null) {
                     count++;
-                    if(matches.length < 5) {
+                    if(matches.length < 25) {
                         matches.push({
                             type: "Passive Construction",
                             snippet: Utils.extractSnippet(this.text, match[0], match.index),
@@ -1618,9 +1735,10 @@ overflow: auto;
                         });
                     }
                 }
+                if (count > 25) matches.push({ type: "Passive Construction", snippet: `...and ${count - 25} more instance(s) not shown`, context: "Truncated for length", weight: "low" });
                 const ratio = count / (Utils.countWords(this.text) || 1);
                 if (ratio > 0.04) scorer.add(60, "medium");
-                return { name: "Passive Voice", score: scorer.getScore(), matches, summary: `${(ratio*100).toFixed(1)}% passive sentences`, details: scorer.getDetails() };
+                return { name: "Passive Voice", score: scorer.getScore(), matches, summary: `${(ratio*100).toFixed(1)}% passive sentences (${count} found)`, details: scorer.getDetails() };
             }
         }
 
@@ -1629,21 +1747,38 @@ overflow: auto;
             constructor(text) { this.text = text; }
             analyze() {
                 const sentences = Utils.splitSentences(this.text);
-                if (sentences.length < 3) return { name: "Burstiness", score: 0, matches: [], summary: "Insufficient data" };
+                if (sentences.length < 3) return { name: "Burstiness (Variance)", score: 0, matches: [], summary: "Insufficient data (need 3+ sentences)", details: {} };
                 const lengths = sentences.map(s => s.trim().split(/\s+/).length);
                 const stdDev = Utils.calculateStdDev(lengths);
                 const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-                const cv = stdDev / mean;
-                let score = 0;
-                let matches = [];
+                const cv = mean > 0 ? stdDev / mean : 0;
+                const scorer = new WeightedScorer();
+                const matches = [];
+                // NOTE: this analyzer used to compute a score/details object that never
+                // carried a `totalWeight`, so App.runAnalysis()'s `details.totalWeight > 0`
+                // gate silently excluded Burstiness from the final weighted score no matter
+                // what it found. Routing it through WeightedScorer (like every other
+                // analyzer) fixes that — low variance now actually pushes the total score
+                // up, and high variance now actually pulls it down.
                 if (cv < 0.25) {
-                    score = 80;
-                    matches.push({ type: "Low Variance", snippet: "Sentence lengths are unnaturally uniform", context: `CV Score: ${cv.toFixed(2)} (Robotic)`, weight: "high" });
+                    scorer.add(80, "high");
+                    matches.push({ type: "Low Variance", snippet: `Sentence lengths are unnaturally uniform (avg ${mean.toFixed(1)} words/sentence, σ=${stdDev.toFixed(1)})`, context: `CV Score: ${cv.toFixed(2)} (Robotic — AI tends to write evenly-paced sentences)`, weight: "high" });
                 } else if (cv > 0.5) {
-                    score = -20;
-                    matches.push({ type: "High Variance", snippet: "Sentence lengths vary significantly", context: `CV Score: ${cv.toFixed(2)} (Human)`, weight: "bonus" });
+                    // "Bonus" signal: strong sentence-length variance is a human trait, so it
+                    // nudges the category score negative, which in turn pulls the overall
+                    // total down once it's correctly aggregated.
+                    scorer.add(-30, "medium");
+                    matches.push({ type: "High Variance", snippet: `Sentence lengths vary significantly (avg ${mean.toFixed(1)} words/sentence, σ=${stdDev.toFixed(1)})`, context: `CV Score: ${cv.toFixed(2)} (Human — natural writing mixes short and long sentences)`, weight: "bonus" });
+                } else {
+                    scorer.add(15, "low");
                 }
-                return { name: "Burstiness (Variance)", score, matches, summary: cv < 0.3 ? "Mechanical uniformity" : "Natural variance", details: { cv } };
+                return {
+                    name: "Burstiness (Variance)",
+                    score: scorer.getScore(),
+                    matches,
+                    summary: cv < 0.25 ? "Mechanical sentence-length uniformity" : (cv > 0.5 ? "Natural sentence-length variance" : "Moderate sentence-length variance"),
+                    details: { ...scorer.getDetails(), cv: cv.toFixed(2), meanLength: mean.toFixed(1), stdDev: stdDev.toFixed(1) }
+                };
             }
         }
 
@@ -1675,14 +1810,15 @@ overflow: auto;
                     let match;
                     while ((match = regex.exec(this.text)) !== null) {
                         count++;
-                        if (matches.length < 8) {
+                        if (matches.length < 30) {
                             matches.push({ type: "Coherence Marker", snippet: Utils.extractSnippet(this.text, match[0], match.index), context: "Forced logical bridging", weight: "medium" });
                         }
                     }
                 });
+                if (count > 30) matches.push({ type: "Coherence Marker", snippet: `...and ${count - 30} more instance(s) not shown`, context: "Truncated for length", weight: "medium" });
                 if (count > 5) scorer.add(80, "high");
                 else if (count > 2) scorer.add(40, "medium");
-                return { name: "Transition Overload", score: scorer.getScore(), matches, summary: count > 3 ? "Abnormal transition density" : "Natural flow", details: scorer.getDetails() };
+                return { name: "Transition Overload", score: scorer.getScore(), matches, summary: count > 3 ? `Abnormal transition density (${count} found)` : `Natural flow (${count} found)`, details: scorer.getDetails() };
             }
         }
 
@@ -1710,7 +1846,7 @@ overflow: auto;
                         let match;
                         while ((match = regex.exec(this.text)) !== null) {
                             totalHits++;
-                            if (matches.length < 15) {
+                            if (matches.length < 30) {
                                 matches.push({
                                     type: cat.label,
                                     snippet: Utils.extractSnippet(this.text, match[0], match.index),
@@ -1721,6 +1857,7 @@ overflow: auto;
                         }
                     });
                 });
+                if (totalHits > 30) matches.push({ type: "Cognitive Load", snippet: `...and ${totalHits - 30} more instance(s) not shown`, context: "Truncated for length", weight: "low" });
 
                 // Scoring Logic: Academic language in non-academic contexts is a strong signal
                 const density = totalHits / (this.wordCount || 1);
@@ -1749,27 +1886,39 @@ overflow: auto;
                 const scorer = new WeightedScorer();
                 const matches = [];
 
-                // Buzzwords are critical indicators of LLM training data bias
+                // Buzzwords are strong indicators of LLM training data bias, but a single
+                // hit shouldn't instantly max the category — that made the score
+                // effectively binary (0 or 100) regardless of how saturated the text
+                // actually was. Now scored by distinct-cluster count, and snippets pull
+                // real surrounding context instead of just echoing the dictionary phrase.
+                let clusterHits = 0;
+                const lowerText = this.text.toLowerCase();
                 PatternConfig.buzzwordClusters.forEach(phrase => {
-                    if (this.text.toLowerCase().includes(phrase.toLowerCase())) {
-                        matches.push({
-                            type: "Buzzword Cluster",
-                            snippet: `...${phrase}...`,
-                            context: "High-probability LLM Cluster",
-                            weight: "critical"
-                        });
-                        scorer.add(100, "critical");
+                    const idx = lowerText.indexOf(phrase.toLowerCase());
+                    if (idx !== -1) {
+                        clusterHits++;
+                        if (matches.length < 25) {
+                            matches.push({
+                                type: "Buzzword Cluster",
+                                snippet: Utils.extractSnippet(this.text, this.text.substr(idx, phrase.length), idx),
+                                context: "High-probability LLM cluster phrase",
+                                weight: clusterHits >= 2 ? "critical" : "high"
+                            });
+                        }
                     }
                 });
+                if (clusterHits >= 2) scorer.add(100, "critical");
+                else if (clusterHits === 1) scorer.add(55, "high");
 
                 // Process verbs (utilize, leverage) are common, but high density indicates AI
                 let verbCount = 0;
+                const VERB_DISPLAY_CAP = 25;
                 PatternConfig.processVerbs.forEach(word => {
                     const regex = new RegExp(`\\b${word}\\b`, "gi");
                     let match;
                     while ((match = regex.exec(this.text)) !== null) {
                         verbCount++;
-                        if (matches.length < 10) {
+                        if (matches.length < VERB_DISPLAY_CAP) {
                             matches.push({
                                 type: "Process Verb",
                                 snippet: Utils.extractSnippet(this.text, match[0], match.index),
@@ -1779,14 +1928,18 @@ overflow: auto;
                         }
                     }
                 });
+                if (verbCount > matches.filter(m => m.type === "Process Verb").length + clusterHits) {
+                    matches.push({ type: "Process Verb", snippet: `...and more instances not shown (${verbCount} total process verbs)`, context: "Truncated for length", weight: "low" });
+                }
 
-                if (verbCount > 5) scorer.add(60, "medium");
+                if (verbCount > 8) scorer.add(70, "high");
+                else if (verbCount > 5) scorer.add(40, "medium");
 
                 return { 
                     name: "Corporate Speak", 
                     score: scorer.getScore(), 
                     matches, 
-                    summary: matches.length ? "Detected 'Consultant' persona" : "No corporate jargon", 
+                    summary: clusterHits > 0 ? `${clusterHits} buzzword cluster(s), ${verbCount} process verb(s) detected` : (verbCount > 0 ? `${verbCount} process verb(s) detected` : "No corporate jargon"), 
                     details: scorer.getDetails() 
                 };
             }
@@ -1950,10 +2103,17 @@ overflow: auto;
                 ];
                 const results = analyzers.map(a => a.analyze());
                 const totalScorer = new WeightedScorer();
+                const severityOrder = ["critical", "high", "medium", "low"];
                 results.forEach(res => {
                     this.renderer.renderModule(res);
                     if (res.details && res.details.totalWeight > 0) {
-                        const weight = res.matches.some(m => m.weight === 'critical') ? 'critical' : 'medium';
+                        // Use the highest severity tier actually present among this
+                        // category's findings, rather than collapsing everything that
+                        // isn't "critical" down to a flat "medium".
+                        let weight = "medium";
+                        for (const tier of severityOrder) {
+                            if (res.matches.some(m => m.weight === tier)) { weight = tier; break; }
+                        }
                         totalScorer.add(res.score, weight);
                     }
                 });
