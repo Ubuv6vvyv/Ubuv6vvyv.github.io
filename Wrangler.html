@@ -163,7 +163,7 @@ textarea{resize:vertical;min-height:60px}
 <label>Max results: <input type="number" id="cfgMaxResults" value="50" min="1" max="500"></label>
 <label>Output limit: <input type="number" id="cfgOutputLimit" value="50000" min="1000" max="1000000"></label>
 <label>Min word freq: <input type="number" id="cfgMinFreq" value="1" min="1" max="100"></label>
-<label>Line separator: <select id="cfgLineSep"><option value="\n">LF (\n)</option><option value="\r\n">CRLF (\r\n)</option></select></label>
+<label>Line separator: <select id="cfgLineSep"><option value="LF">LF (\n)</option><option value="CRLF">CRLF (\r\n)</option></select></label>
 <label>Case sensitive default: <input type="checkbox" id="cfgCaseSens"></label>
 </div>
 <div class="btn-group" style="margin-top:6px">
@@ -339,6 +339,7 @@ const config={
   caseSensDefault:false
 };
 
+// BUG FIX: Translating string back to actual line break character
 const loadConfig=()=>{
   const saved=localStorage.getItem('wranglerConfig');
   if(saved)Object.assign(config,JSON.parse(saved));
@@ -346,16 +347,17 @@ const loadConfig=()=>{
   $('cfgMaxResults').value=config.maxResults;
   $('cfgOutputLimit').value=config.outputLimit;
   $('cfgMinFreq').value=config.minFreq;
-  $('cfgLineSep').value=config.lineSep;
+  $('cfgLineSep').value=config.lineSep === '\r\n' ? 'CRLF' : 'LF';
   $('cfgCaseSens').checked=config.caseSensDefault;
 };
 
+// BUG FIX: Saving actual line break character instead of string literal
 const saveConfig=()=>{
   config.ngramSize=parseInt($('cfgNgram').value);
   config.maxResults=parseInt($('cfgMaxResults').value);
   config.outputLimit=parseInt($('cfgOutputLimit').value);
   config.minFreq=parseInt($('cfgMinFreq').value);
-  config.lineSep=$('cfgLineSep').value;
+  config.lineSep=$('cfgLineSep').value === 'CRLF' ? '\r\n' : '\n';
   config.caseSensDefault=$('cfgCaseSens').checked;
   localStorage.setItem('wranglerConfig',JSON.stringify(config));
   o.textContent='✓ Config saved';
@@ -384,7 +386,6 @@ a.click();
 const getWords=()=>txt.toLowerCase().match(/\b[\w']+\b/g)||[];
 const getLines=()=>txt.split('\n').filter(l=>l.trim());
 
-// BUG FIX: Standardised modal IDs without dynamically appending 'Modal' string.
 const showModal=id=>{
     if(!txt && id!=='configModal' && id!=='operationChainsModal' && id!=='findReplacePreviewModal'){
         o.textContent='⚠ Load text first';
@@ -464,37 +465,17 @@ const syl=wd=>{wd=wd.toLowerCase().replace(/[^a-z]/g,'');if(wd.length<=3)return 
 const ts=w.reduce((a,b)=>a+syl(b),0),aw=w.length/s||0,as=ts/w.length||0,fk=206.835-1.015*aw-84.6*as;
 return `Flesch: ${fk.toFixed(1)}${config.lineSep}Grade: ${(0.39*aw+11.8*as-15.59).toFixed(1)}${config.lineSep}Avg words/sent: ${aw.toFixed(1)}${config.lineSep}Avg syl/word: ${as.toFixed(2)}`;
 },
-extractEmails:()=>{const e=[...new Set(txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g)||[])];return e.length?`EMAILS (${e.length})${config.lineSep}${config.lineSep}${e.slice(0,config.maxResults).join(config.lineSep)}`:'No emails found';},
-extractUrls:()=>{const u=[...new Set(txt.match(/https?:\/\/[^\s<>"]+/g)||[])];return u.length?`URLS (${u.length})${config.lineSep}${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}`:'No URLs found';},
-extractPhones:()=>{
-const p=[/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g,/\(\d{3}\)\s?\d{3}[-.\s]?\d{4}/g,/\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g],ph=[];
-p.forEach(r=>ph.push(...(txt.match(r)||[])));const u=[...new Set(ph)];return u.length?`PHONES (${u.length})${config.lineSep}${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}`:'No phones found';
-},
-extractIPs:()=>{const ip=[...new Set(txt.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)||[])];return ip.length?`IPs (${ip.length})${config.lineSep}${config.lineSep}${ip.slice(0,config.maxResults).join(config.lineSep)}`:'No IPs found';},
-extractDates:()=>{
-const d=[/\b\d{4}-\d{2}-\d{2}\b/g,/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/gi],dt=[];
-d.forEach(r=>dt.push(...(txt.match(r)||[])));const u=[...new Set(dt)];return u.length?`DATES (${u.length})${config.lineSep}${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}`:'No dates found';
-},
-extractCodes:()=>{
-const c=[/\b[A-Z0-9]{4,}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)*\b/g,/\b[A-Z]{3,}[0-9]{3,}\b/g,/\b[0-9]{3,}[A-Z]{3,}\b/g],cd=[];
-c.forEach(r=>cd.push(...(txt.match(r)||[])));const u=[...new Set(cd)];return u.length?`CODES (${u.length})${config.lineSep}${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}`:'No codes found';
-},
-extractHashes:()=>{
-const h=[/\b[A-Fa-f0-9]{32}\b/g,/\b[A-Fa-f0-9]{40}\b/g,/\b[A-Fa-f0-9]{64}\b/g],hs=[];
-h.forEach(r=>hs.push(...(txt.match(r)||[])));const u=[...new Set(hs)];return u.length?`HASHES (${u.length})${config.lineSep}${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}`:'No hashes found';
-},
-extractLogistics:()=>{
-const p={'CONTAINER':{r:/\b[A-Z]{4}\d{7}\b/g},'AWB':{r:/\b\d{3}-?\d{8}\b/g},'BOL':{r:/\b[A-Z]{3,4}\d{6,10}\b/g},'PRO':{r:/\b\d{3}-\d{7}\b/g},'TRACK':{r:/\b1Z[A-Z0-9]{16}\b/g},'PO':{r:/\bPO[-#\s]?(\d{4,})\b/g}};
-let out='LOGISTICS\n\n',f=0;Object.entries(p).forEach(([k,{r}])=>{const m=[...new Set(txt.match(r)||[])];if(m.length){out+=`${k} (${m.length})${config.lineSep}${m.slice(0,config.maxResults).join(config.lineSep)}${config.lineSep}${config.lineSep}`;f+=m.length}});return f?out:'No logistics codes found';
-},
-extractKeys:()=>{
-const p={'GOOG':/\bAIza[0-9A-Za-z_-]{35}\b/g,'AWS':/\bAKIA[0-9A-Z]{16}\b/g,'GH':/\bghp_[0-9a-zA-Z]{36}\b/g,'STRIPE':/\b(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/g,'JWT':/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g};
-let out='KEYS\n\n',f=0;Object.entries(p).forEach(([k,r])=>{const m=[...new Set(txt.match(r)||[])];if(m.length){out+=`${k} (${m.length})${config.lineSep}${m.slice(0,config.maxResults).join(config.lineSep)}${config.lineSep}${config.lineSep}`;f+=m.length}});return f?out:'No API keys found';
-},
-extractAll:()=>{
-const p={'EMAIL':/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,'URL':/https?:\/\/[^\s<>"]+/g,'IP':/\b(?:\d{1,3}\.){3}\d{1,3}\b/g};
-let out='EXTRACT ALL\n\n';Object.entries(p).forEach(([k,r])=>{const u=[...new Set(txt.match(r)||[])];if(u.length)out+=`${k} (${u.length})${config.lineSep}${u.slice(0,config.maxResults).join(config.lineSep)}${config.lineSep}${config.lineSep}`});return out;
-},
+// BUG FIX: Stripped headers from all extractors so outputs can be directly piped into sort/dedupe
+extractEmails:()=>{const e=[...new Set(txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g)||[])];return e.slice(0,config.maxResults).join(config.lineSep);},
+extractUrls:()=>{const u=[...new Set(txt.match(/https?:\/\/[^\s<>"]+/g)||[])];return u.slice(0,config.maxResults).join(config.lineSep);},
+extractPhones:()=>{const p=[/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g,/\(\d{3}\)\s?\d{3}[-.\s]?\d{4}/g,/\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g],ph=[];p.forEach(r=>ph.push(...(txt.match(r)||[])));return [...new Set(ph)].slice(0,config.maxResults).join(config.lineSep);},
+extractIPs:()=>{const ip=[...new Set(txt.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)||[])];return ip.slice(0,config.maxResults).join(config.lineSep);},
+extractDates:()=>{const d=[/\b\d{4}-\d{2}-\d{2}\b/g,/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/gi],dt=[];d.forEach(r=>dt.push(...(txt.match(r)||[])));return [...new Set(dt)].slice(0,config.maxResults).join(config.lineSep);},
+extractCodes:()=>{const c=[/\b[A-Z0-9]{4,}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)*\b/g,/\b[A-Z]{3,}[0-9]{3,}\b/g,/\b[0-9]{3,}[A-Z]{3,}\b/g],cd=[];c.forEach(r=>cd.push(...(txt.match(r)||[])));return [...new Set(cd)].slice(0,config.maxResults).join(config.lineSep);},
+extractHashes:()=>{const h=[/\b[A-Fa-f0-9]{32}\b/g,/\b[A-Fa-f0-9]{40}\b/g,/\b[A-Fa-f0-9]{64}\b/g],hs=[];h.forEach(r=>hs.push(...(txt.match(r)||[])));return [...new Set(hs)].slice(0,config.maxResults).join(config.lineSep);},
+extractLogistics:()=>{const p=[/\b[A-Z]{4}\d{7}\b/g, /\b\d{3}-?\d{8}\b/g, /\b[A-Z]{3,4}\d{6,10}\b/g, /\b\d{3}-\d{7}\b/g, /\b1Z[A-Z0-9]{16}\b/g, /\bPO[-#\s]?(\d{4,})\b/g], m=[];p.forEach(r=>m.push(...(txt.match(r)||[])));return [...new Set(m)].slice(0,config.maxResults).join(config.lineSep);},
+extractKeys:()=>{const p=[/\bAIza[0-9A-Za-z_-]{35}\b/g, /\bAKIA[0-9A-Z]{16}\b/g, /\bghp_[0-9a-zA-Z]{36}\b/g, /\b(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/g, /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g], m=[];p.forEach(r=>m.push(...(txt.match(r)||[])));return [...new Set(m)].slice(0,config.maxResults).join(config.lineSep);},
+extractAll:()=>{const p=[/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, /https?:\/\/[^\s<>"]+/g, /\b(?:\d{1,3}\.){3}\d{1,3}\b/g], m=[];p.forEach(r=>m.push(...(txt.match(r)||[])));return [...new Set(m)].slice(0,config.maxResults).join(config.lineSep);},
 patterns:()=>{
 const m={};getLines().forEach(l=>m[l.replace(/[a-z]/g,'a').replace(/[A-Z]/g,'A').replace(/\d/g,'0').replace(/\s/g,'_').replace(/[^aA0_]/g,'*')]=(m[l]||0)+1);
 return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,config.maxResults).map(([p,c])=>`${c.toString().padStart(4)} ${p}`).join(config.lineSep);
@@ -684,7 +665,6 @@ o.textContent=Object.entries(groups).map(([k,lines])=>`[${k}] (${lines.length})$
 closeModals();
 };
 
-// BUG FIX: State protection cache added so the master text isn't permanently overwritten by the chain operation.
 const runChain=()=>{
 const preset=$('chainPreset').value;
 let chainOps=[];
@@ -697,12 +677,12 @@ chainOps=chains[preset];
 }
 if(!txt){alert('Load text first');return}
 
-const origTxt = txt; // Cache original text state 
+const origTxt = txt; 
 let result = txt;
 
 try {
     chainOps.forEach(op=>{
-    txt=result; // Feed previous result into next op loop
+    txt=result; 
     if(ops[op]){
         result=ops[op]();
     }else{
@@ -713,7 +693,7 @@ try {
 } catch (e) {
     alert('Chain Error: ' + e.message);
 } finally {
-    txt = origTxt; // Always restore original state
+    txt = origTxt; 
     closeModals();
 }
 };
