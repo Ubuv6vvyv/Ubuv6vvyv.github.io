@@ -1245,6 +1245,30 @@ overflow: auto;
 
         colonIntroducer: /:\s*$/gm,
 
+        // Curated label-style pseudo-headers: short standalone lines AI uses
+        // in place of real markdown headers or prose transitions, e.g. a
+        // paragraph that is just "The Problem" followed by explanatory text.
+        pseudoHeaderPhrases: [
+            "the problem", "the issue", "the solution", "the fix", "the result",
+            "the results", "the outcome", "the takeaway", "the key takeaway",
+            "the bottom line", "the verdict", "the upshot", "the catch",
+            "the caveat", "the tradeoff", "the trade-off", "the challenge",
+            "the answer", "the impact", "the implication", "the implications",
+            "the big picture", "the bigger picture", "the reality",
+            "the good news", "the bad news", "the context", "the background",
+            "the takeaways", "the approach", "the method", "the process",
+            "the breakdown", "the summary", "the conclusion", "the upside",
+            "the downside", "why this matters", "why it matters",
+            "why this is important", "what this means", "what it means",
+            "how this works", "how it works", "where this leaves us",
+            "what's next", "what comes next", "the road ahead"
+        ],
+
+        // Generic fallback: any short "The/Why/What/How/Where ___" line
+        // (<=4 words) standing alone as its own paragraph — catches variants
+        // not in the curated list above without over-matching full sentences.
+        pseudoHeaderGeneric: /^(the|why|what|how|where|when)\s+[a-z][a-z'-]*(\s+[a-z'-]+){0,3}$/i,
+
     }
 
 };
@@ -1252,9 +1276,20 @@ overflow: auto;
 
         const Utils = {
             htmlToText: e => {
+                // textContent alone concatenates across block-element boundaries
+                // with zero whitespace (e.g. "<div>Line1</div><div>Line2</div>"
+                // becomes "Line1Line2"), which silently breaks every analyzer
+                // that relies on line-anchored regexes (bullets, headers,
+                // numbered lists, pseudo-header paragraphs). Normalize block
+                // boundaries to newlines first.
+                const normalized = e
+                    .replace(/<br\s*\/?>/gi, "\n")
+                    .replace(/<\/(div|p|li|h[1-6]|blockquote|tr)>/gi, "\n</$1>")
+                    .replace(/<(p|div|li|h[1-6]|blockquote)(\s[^>]*)?>/gi, "\n$&");
                 const t = document.createElement("div");
-                t.innerHTML = e;
-                return t.textContent || t.innerText || "";
+                t.innerHTML = normalized;
+                const raw = t.textContent || t.innerText || "";
+                return raw.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
             },
             countWords: e => e.trim().split(/\s+/).filter(Boolean).length,
             escapeHtml: e => {
@@ -1491,6 +1526,35 @@ overflow: auto;
                 }
                 if (bcCount > 10) matches.push({ type: "Markdown Artifact", snippet: `...and ${bcCount - 10} more "**Term**:" instances not shown`, context: "Truncated for length", weight: "high" });
                 if (bcCount > 0) scorer.add(70, "high");
+
+                // 6. Pseudo-Header Paragraphs ("The Problem", "The Result",
+                // "Why This Matters") — short standalone lines used as
+                // informal section labels instead of real markdown headers
+                // or a prose transition. Very common AI explainer scaffold.
+                const paragraphs = this.text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+                let pseudoHeaderHits = 0;
+                const pseudoHeaderSamples = [];
+                if (paragraphs.length >= 3) {
+                    for (let i = 0; i < paragraphs.length - 1; i++) {
+                        const clean = paragraphs[i].replace(/\*\*/g, "").replace(/:$/, "").trim();
+                        const wc = Utils.countWords(clean);
+                        if (wc === 0 || wc > 5) continue;
+                        PatternConfig.structural.pseudoHeaderGeneric.lastIndex = 0;
+                        const isCurated = PatternConfig.structural.pseudoHeaderPhrases.includes(clean.toLowerCase());
+                        const isGeneric = PatternConfig.structural.pseudoHeaderGeneric.test(clean);
+                        if (isCurated || isGeneric) {
+                            pseudoHeaderHits++;
+                            if (pseudoHeaderSamples.length < 8) pseudoHeaderSamples.push(clean);
+                        }
+                    }
+                }
+                if (pseudoHeaderHits >= 3) {
+                    scorer.add(70, "high");
+                    matches.push({ type: "Pseudo-Header Paragraphs", snippet: pseudoHeaderSamples.join(" | "), context: `${pseudoHeaderHits} label-style mini-headers used instead of prose transitions (e.g. "The Problem", "Why This Matters")`, weight: "high" });
+                } else if (pseudoHeaderHits > 0) {
+                    scorer.add(35, "medium");
+                    matches.push({ type: "Pseudo-Header Paragraph", snippet: pseudoHeaderSamples.join(" | "), context: "Label-style mini-header line detected (common AI explainer pattern)", weight: "medium" });
+                }
 
                 return { name: "Structural Rigidity", score: scorer.getScore(), matches, summary: "Structural patterns analyzed", details: scorer.getDetails() };
             }
@@ -1737,7 +1801,10 @@ overflow: auto;
                 }
                 if (count > 25) matches.push({ type: "Passive Construction", snippet: `...and ${count - 25} more instance(s) not shown`, context: "Truncated for length", weight: "low" });
                 const ratio = count / (Utils.countWords(this.text) || 1);
-                if (ratio > 0.04) scorer.add(60, "medium");
+                if (ratio > 0.06) scorer.add(70, "high");
+                else if (ratio > 0.04) scorer.add(50, "medium");
+                else if (count >= 6) scorer.add(22, "low");
+                else if (count >= 3) scorer.add(10, "low");
                 return { name: "Passive Voice", score: scorer.getScore(), matches, summary: `${(ratio*100).toFixed(1)}% passive sentences (${count} found)`, details: scorer.getDetails() };
             }
         }
@@ -1818,6 +1885,7 @@ overflow: auto;
                 if (count > 30) matches.push({ type: "Coherence Marker", snippet: `...and ${count - 30} more instance(s) not shown`, context: "Truncated for length", weight: "medium" });
                 if (count > 5) scorer.add(80, "high");
                 else if (count > 2) scorer.add(40, "medium");
+                else if (count > 0) scorer.add(15, "low");
                 return { name: "Transition Overload", score: scorer.getScore(), matches, summary: count > 3 ? `Abnormal transition density (${count} found)` : `Natural flow (${count} found)`, details: scorer.getDetails() };
             }
         }
@@ -1865,6 +1933,7 @@ overflow: auto;
                 if (density > 0.02) scorer.add(85, "high");
                 else if (density > 0.01) scorer.add(50, "medium");
                 else if (totalHits > 2) scorer.add(20, "low");
+                else if (totalHits > 0) scorer.add(8, "low");
 
                 return { 
                     name: "Cognitive Load", 
@@ -1934,6 +2003,8 @@ overflow: auto;
 
                 if (verbCount > 8) scorer.add(70, "high");
                 else if (verbCount > 5) scorer.add(40, "medium");
+                else if (verbCount >= 3) scorer.add(18, "low");
+                else if (verbCount >= 1) scorer.add(8, "low");
 
                 return { 
                     name: "Corporate Speak", 
@@ -1973,6 +2044,7 @@ overflow: auto;
                 });
 
                 if (count > 2) scorer.add(40 + (count * 10), "high");
+                else if (count > 0) scorer.add(18, "medium");
 
                 return { 
                     name: "Structural Filler", 
@@ -2006,10 +2078,14 @@ overflow: auto;
             }
             renderModule(data) {
                 if (data.matches.length === 0 && data.score < 20) return;
+                const isHumanSignal = data.score < 0;
                 const wrapper = document.createElement("div");
                 wrapper.className = "border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm";
                 const headerColor = data.score > 50 ? "bg-red-50" : (data.score > 0 ? "bg-orange-50" : "bg-green-50");
                 const textColor = data.score > 50 ? "text-red-700" : (data.score > 0 ? "text-orange-700" : "text-green-700");
+                const displayScore = isHumanSignal
+                    ? `<span title="Human-pattern signal — lowers the overall AI score instead of counting toward it">0%*</span>`
+                    : `${Math.round(data.score)}%`;
                 const itemsHtml = data.matches.map(m => `
                     <div class="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
                         <div class="flex justify-between items-start mb-2">
@@ -2028,10 +2104,10 @@ overflow: auto;
                                 <p class="text-xs text-slate-500">${data.matches.length} findings</p>
                             </div>
                         </div>
-                        <span class="font-bold text-lg ${textColor}">${Math.round(data.score)}%</span>
+                        <span class="font-bold text-lg ${textColor}">${displayScore}</span>
                     </div>
                     <div class="category-content bg-white">
-                        <p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${data.summary}</p>
+                        <p class="p-4 text-sm text-slate-500 italic border-b border-slate-100">${data.summary}${isHumanSignal ? ' — *reads as a human-writing indicator, so it lowers the overall AI score rather than adding to it' : ''}</p>
                         <div class="max-h-96 overflow-y-auto">${itemsHtml}</div>
                     </div>
                 `;
@@ -2102,22 +2178,42 @@ overflow: auto;
                     new MetaFillerAnalyzer(text)
                 ];
                 const results = analyzers.map(a => a.analyze());
-                const totalScorer = new WeightedScorer();
                 const severityOrder = ["critical", "high", "medium", "low"];
+                // Combine per-category scores as independent probabilities of AI
+                // authorship via a noisy-OR: overall = 1 - Π(1 - p_i). This is what
+                // "many different tells fired" should mean — each additional
+                // independent signal pushes confidence up (with diminishing
+                // returns), instead of being averaged down toward the crowd. A
+                // single very strong signal (e.g. a caught refusal phrase) can
+                // still dominate on its own. Trust factors scale each category's
+                // contribution by its own highest-severity finding, so a stack of
+                // trivial "low" tells (an em-dash here, an Oxford comma there)
+                // can't alone manufacture a high verdict the way one "critical"
+                // finding can.
+                const trustByTier = { critical: 1.0, high: 0.85, medium: 0.65, low: 0.4 };
+                let survivalProb = 1;
+                let humanBonusPenalty = 0;
                 results.forEach(res => {
                     this.renderer.renderModule(res);
-                    if (res.details && res.details.totalWeight > 0) {
-                        // Use the highest severity tier actually present among this
-                        // category's findings, rather than collapsing everything that
-                        // isn't "critical" down to a flat "medium".
-                        let weight = "medium";
-                        for (const tier of severityOrder) {
-                            if (res.matches.some(m => m.weight === tier)) { weight = tier; break; }
-                        }
-                        totalScorer.add(res.score, weight);
+                    if (!res.details || !(res.details.totalWeight > 0) || res.score === 0) return;
+                    let tier = "medium";
+                    for (const t of severityOrder) {
+                        if (res.matches.some(m => m.weight === t)) { tier = t; break; }
+                    }
+                    const trust = trustByTier[tier] || 0.5;
+                    if (res.score > 0) {
+                        const p = Math.min(1, res.score / 100) * trust;
+                        survivalProb *= (1 - p);
+                    } else {
+                        // Negative scores are an analyzer's explicit "this looks
+                        // human" signal (e.g. Burstiness high-variance bonus) —
+                        // apply as a flat penalty rather than letting it dilute
+                        // the positive evidence in an average.
+                        humanBonusPenalty += Math.abs(res.score) * trust;
                     }
                 });
-                let finalScore = totalScorer.getScore();
+                let finalScore = (1 - survivalProb) * 100 - humanBonusPenalty;
+                finalScore = Math.max(0, Math.min(100, finalScore));
                 if (Utils.countWords(text) < 50) finalScore = Math.min(finalScore, 85);
                 this.renderer.updateTotalScore(Math.round(finalScore));
                 this.renderer.show();
