@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>CAM FILTER</title>
+<style>
+:root{--fc:#0cf}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{height:100dvh;display:flex;flex-direction:column;background:#0a0a0a;color:#ccc;font-family:monospace;touch-action:none}
+
+/* â”€â”€ Canvas zone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#cz{flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden;position:relative;touch-action:none;min-height:60px;transition:flex .2s}
+#C{display:block;transform-origin:center center}
+#zmhint{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;letter-spacing:1px;color:#ffffff0f;pointer-events:none;user-select:none}
+#fshint{position:absolute;top:8px;right:8px;font-size:9px;letter-spacing:1px;color:#ffffff14;pointer-events:none;user-select:none}
+
+/* â”€â”€ Controls panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#ctrl{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:4px;padding:5px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+
+/* â”€â”€ HUD bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#hud{display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding:2px 2px 0}
+#flbl{font-size:11px;letter-spacing:2px;color:var(--fc);font-weight:bold;transition:color .2s}
+#hud-r{display:flex;align-items:center;gap:6px}
+#mlbl{font-size:9px;color:#333;letter-spacing:1px;background:#141414;border-radius:3px;padding:2px 5px}
+#fps{font-size:9px;color:#222;min-width:32px;text-align:right}
+.hbtn{font:10px monospace;background:none;border:1px solid #1e1e1e;border-radius:3px;color:#2a2a2a;padding:3px 7px;cursor:pointer;letter-spacing:.5px;white-space:nowrap}
+.hbtn:active,#saveBtn:active{border-color:var(--fc);color:var(--fc)}
+
+/* â”€â”€ Source bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#src{display:flex;gap:5px;flex-shrink:0}
+.sb{flex:1;background:#141414;border:1px solid #1c1c1c;border-radius:7px;padding:8px 2px;font:11px monospace;color:#444;cursor:pointer;text-align:center;outline:none;letter-spacing:.5px;transition:border-color .12s,color .12s;white-space:nowrap}
+label.sb{display:flex;align-items:center;justify-content:center}
+#cBtn.on{border-color:var(--fc);color:var(--fc)}
+#clBtn{pointer-events:none;color:#1c1c1c}
+#clBtn.on{border-color:#f336;color:#f36;pointer-events:auto}
+input[type=file]{display:none}
+
+/* â”€â”€ Filter tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+#tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;background:#141414;border:1px solid #1c1c1c;border-radius:5px;padding:7px 11px;font:11px monospace;color:#333;cursor:pointer;letter-spacing:.5px;transition:all .1s;white-space:nowrap}
+.tab.on{border-color:var(--fc);color:var(--fc);background:#fff1}
+
+/* â”€â”€ Preset chips â€“ horizontal scroll, never wraps â”€â”€ */
+#presets{display:none;gap:5px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+#presets::-webkit-scrollbar{display:none}
+#presets.show{display:flex}
+.pre{flex:0 0 auto;background:#141414;border:1px solid #1e1e1e;border-radius:14px;padding:5px 11px;font:10px monospace;color:#555;cursor:pointer;letter-spacing:.5px;white-space:nowrap;transition:border-color .12s,color .12s}
+.pre:active{border-color:var(--fc);color:var(--fc)}
+
+/* â”€â”€ Compact single-row sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#fp,#gsls{display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.sl{display:flex;align-items:center;gap:7px;padding:0 11px;height:36px;background:#141414;border-radius:6px;flex-shrink:0}
+.sn{font-size:9px;letter-spacing:1px;color:#0cf;white-space:nowrap;width:86px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
+#fp .sn{color:var(--fc);width:82px}
+input[type=range]{-webkit-appearance:none;flex:1;min-width:0;height:4px;background:#222;border-radius:2px;outline:none;cursor:pointer;touch-action:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#0cf;cursor:pointer;border:2px solid #0007}
+#fp input[type=range]::-webkit-slider-thumb{background:var(--fc)}
+.sv{font-size:11px;color:#444;width:34px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
+
+/* â”€â”€ Section divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.div{font-size:8px;letter-spacing:2px;color:#1a1a1a;text-align:center;padding:2px 0 1px;border-top:1px solid #151515;flex-shrink:0}
+#accNote{font-size:9px;color:#1e1e1e;text-align:center;display:none;flex-shrink:0;padding:1px 0}
+#accNote.show{display:block}
+#fpHint{font-size:9px;color:#1a1a1a;text-align:center;letter-spacing:1px;padding:7px 0}
+</style>
+</head>
+<body>
+<div id="cz">
+  <canvas id="C"></canvas>
+  <div id="zmhint">PINCHÂ·ZOOM â€” DOUBLE-TAPÂ·RESET â€” TAPÂ·TOGGLE CONTROLS</div>
+  <div id="fshint">CONTROLS HIDDEN Â· TAP TO SHOW</div>
+</div>
+<div id="ctrl">
+  <div id="hud">
+    <span id="flbl">NORMAL</span>
+    <div id="hud-r"><span id="mlbl">IDLE</span><span id="fps"></span><button class="hbtn" id="saveBtn">â¤“ SAVE</button></div>
+  </div>
+  <div id="src">
+    <button class="sb" id="cBtn">âŸ³ CAMERA</button>
+    <label class="sb">âŠž IMAGE<input type="file" id="fIn" accept="image/*"></label>
+    <button class="sb" id="clBtn">âœ• CLEAR</button>
+  </div>
+  <div id="tabs"></div>
+  <div id="presets"></div>
+  <div id="fp"><div id="fpHint">SELECT A FILTER FOR ITS CONTROLS</div></div>
+  <div class="div">GLOBAL</div>
+  <div id="gsls">
+    <div class="sl"><span class="sn">EXPOSURE</span><input id="M1" type="range" min="-1" max="1" step="0.01" value="0"><span class="sv" id="M1v">0.00</span></div>
+    <div class="sl"><span class="sn">CLARITY</span><input id="M2" type="range" min="-1" max="1" step="0.01" value="0"><span class="sv" id="M2v">0.00</span></div>
+    <div class="sl"><span class="sn">BLEND</span><input id="FI" type="range" min="0" max="1" step="0.01" value="1"><span class="sv" id="FIv">1.00</span></div>
+    <div class="sl"><span class="sn">ACCUMULATE</span><input id="AC" type="range" min="0" max="0.92" step="0.01" value="0"><span class="sv" id="ACv">0.00</span></div>
+  </div>
+  <div id="accNote">â–² KEEP PHONE STILL Â· ACCUMULATE ACTIVE</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const C=$('C'),X=C.getContext('2d',{willReadFrequently:true,alpha:false});
+const O=document.createElement('canvas'),Y=O.getContext('2d',{willReadFrequently:true,alpha:false});
+const V=document.createElement('video');V.setAttribute('playsinline','');V.muted=true;
+
+const NAMES=['NORMAL','X-RAY','THERMAL','EDGE','NIR','DEHAZE','SCOPE'];
+const COLS=['#0cf','#6af','#f73','#0f9','#fa0','#4be','#a4f'];
+const PANELS=[null,
+  [{id:'XD',n:'DENSITY',min:.5,max:4,step:.05,val:1.5},{id:'XT',n:'TINT',min:0,max:1,step:.01,val:.4}],
+  [{id:'TR',n:'RANGE',min:.4,max:3,step:.05,val:1}],
+  [{id:'ES',n:'SENSITIVITY',min:.3,max:6,step:.05,val:1},{id:'EC',n:'COLOURISE',min:0,max:1,step:.01,val:0}],
+  [{id:'NC',n:'CHANNEL',min:0,max:1,step:.01,val:0},{id:'SK',n:'SCATTER KILL',min:1,max:5,step:.05,val:1.5},{id:'NB',n:'BOOST',min:.5,max:4,step:.05,val:1.2},{id:'FC',n:'FALSE COLOUR',min:0,max:1,step:.01,val:0}],
+  [{id:'HR',n:'HAZE RADIUS',min:5,max:120,step:1,val:40},{id:'HS',n:'STRENGTH',min:0,max:.95,step:.01,val:.7},{id:'HG',n:'GAIN',min:1,max:6,step:.05,val:2},{id:'HN',n:'NIR WEIGHT',min:0,max:1,step:.01,val:.6}],
+  [{id:'SR',n:'DETAIL RAD',min:2,max:40,step:1,val:8},{id:'SB',n:'BOOST',min:1,max:20,step:.5,val:5},{id:'ST',n:'THRESHOLD',min:0,max:30,step:1,val:5}]
+];
+const PRESETS={
+  cotton:{t:5,v:{HR:55,HS:.72,HG:2.2,HN:.65,M1:.25,M2:.4,FI:1,AC:.55}},
+  mesh:  {t:4,v:{NC:.1,SK:2.8,NB:2.2,FC:0,M1:.2,M2:.5,FI:1,AC:.4}},
+  dark:  {t:6,v:{SR:5,SB:10,ST:2,M1:.55,M2:.55,FI:1,AC:.45}},
+  colour:{t:4,v:{NC:.8,SK:2,NB:1.8,FC:.2,M1:.15,M2:.4,FI:1,AC:.35}}
+};
+const PLBLS={cotton:'ðŸª¡ COTTON',mesh:'ðŸ•¸ MESH',dark:'â¬› DARK',colour:'ðŸŽ¨ COLOUR'};
+const PF=new Set([4,5,6]);
+
+// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let W=0,H=0,stream=null,front=false,ticking=false,lastT=0;
+let mode='idle',filterT=0,src=null,rafQ=false;
+let blurBuf=null,intBuf=null,accumBuf=null,srcBuf=null,outBuf=null,bW=0,bH=0;
+let pCache=null,dirty=true;
+let pzoom=1,panX=0,panY=0,ctrlHidden=false;
+
+// â”€â”€ LUTs (pre-computed, rebuilt only on param change) â”€â”€
+const lut=new Uint8Array(256),xrLUT=new Uint8Array(768),thLUT=new Uint8Array(768),nirLUT=new Uint8Array(256),fcLUT=new Uint8Array(768);
+const cl=v=>v<0?0:v>255?255:v+.5|0;
+
+function ensureBufs(){
+  if(bW===W&&bH===H)return;bW=W;bH=H;
+  const n=W*H;
+  blurBuf=new Float32Array(n*3);intBuf=new Float32Array((W+1)*(H+1));
+  accumBuf=new Float32Array(n*4);srcBuf=new Uint8ClampedArray(n*4);outBuf=new Uint8ClampedArray(n*4);
+}
+
+const gv=(id,d)=>{const e=$(id);return e?+e.value:d;};
+function calcP(){
+  const m1=+$('M1').value,m2=+$('M2').value;
+  return{gm:m1>=0?1-m1*.65:1+Math.abs(m1)*1.2,ev:m1>=0?m1*1.5:m1,lift:m1>=0?m1*40:m1*20,
+    ct:m2>=0?1+m2*1.8:1+m2*.7,ua:m2>0?m2*6:0,ur:Math.max(1,3+m2*3|0),uth:m2>0?15-m2*10:15,
+    fi:+$('FI').value,ac:+$('AC').value,
+    xd:gv('XD',1.5),xt:gv('XT',.4),tr:gv('TR',1),es:gv('ES',1),ec:gv('EC',0),
+    nc:gv('NC',0),sk:gv('SK',1.5),nb:Math.min(4,gv('NB',1.2)),fc:gv('FC',0),
+    hr:gv('HR',40)|0,hs:gv('HS',.7),hg:gv('HG',2),hn:gv('HN',.6),
+    sr:gv('SR',8)|0,sb:gv('SB',5),st:gv('ST',5)};
+}
+function P(){return pCache||(pCache=calcP());}
+function markDirty(){pCache=null;dirty=true;}
+
+function buildLUTs(p){
+  dirty=false;
+  const{gm,ev,lift,ct,xd,xt,tr,sk,nb,fc}=p,em=Math.pow(2,ev),gi=1/Math.max(.05,gm);
+  for(let i=0;i<256;i++){
+    let v=i/255*em;v=Math.pow(v<0?0:v>1?1:v,gi);v=(v-.5)*ct+.5+lift/255;
+    lut[i]=cl(v*255);
+    const inv=255-i,d=(inv-128)*xd+128;
+    xrLUT[i*3]=cl(d*(1-xt*.2));xrLUT[i*3+1]=cl(d*(1+xt*.05));xrLUT[i*3+2]=cl(d*(1+xt*.28));
+    const h=i/255*tr<1?i/255*tr:1;
+    thLUT[i*3]=cl(h*3*255);thLUT[i*3+1]=cl((h*3-1)*255);thLUT[i*3+2]=cl((1-h*1.8)*160);
+    nirLUT[i]=cl(Math.pow(i/255,sk)*nb*255);
+    const c=i/255,fr=cl(c*3*255),fg=cl((c*3-1)*255),fb=cl((c*3-2)*255);
+    fcLUT[i*3]=cl(i+(fr-i)*fc);fcLUT[i*3+1]=cl(i+(fg-i)*fc);fcLUT[i*3+2]=cl(i+(fb-i)*fc);
+  }
+}
+
+// â”€â”€ Integral-image box blur, O(WH) any radius â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function buildBlur(s,radius){
+  const r=Math.max(1,radius|0),W1=W+1;
+  for(let ch=0;ch<3;ch++){
+    for(let y=0;y<H;y++)
+      for(let x=0;x<W;x++)
+        intBuf[(y+1)*W1+(x+1)]=s[(y*W+x)*4+ch]+intBuf[y*W1+(x+1)]+intBuf[(y+1)*W1+x]-intBuf[y*W1+x];
+    for(let y=0;y<H;y++){
+      const y1=y-r<0?0:y-r,y2=y+r+1>H?H:y+r+1,iy1=y1*W1,iy2=y2*W1;
+      for(let x=0;x<W;x++){
+        const x1=x-r<0?0:x-r,x2=x+r+1>W?W:x+r+1;
+        blurBuf[(y*W+x)*3+ch]=(intBuf[iy2+x2]-intBuf[iy1+x2]-intBuf[iy2+x1]+intBuf[iy1+x1])/((x2-x1)*(y2-y1));
+      }
+    }
+  }
+}
+
+// â”€â”€ Pixel pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function run(d,s,t,p){
+  const{ua,ur,uth,fi,es,ec,nc,hs,hg,hn,sb,st}=p;
+  if(t===5)buildBlur(s,p.hr);
+  if(t===6)buildBlur(s,p.sr);
+  for(let i=0,len=d.length;i<len;i+=4){
+    const px=i>>2,x=px%W,y=px/W|0;
+    let r=s[i],g=s[i+1],b=s[i+2];
+    // Unsharp mask (8-tap, inlined bounds check)
+    if(ua>0){
+      const yn=y-ur,ys=y+ur,xw=x-ur,xe=x+ur;
+      const n=yn>=0?(yn*W+x)<<2:-1,so=ys<H?(ys*W+x)<<2:-1;
+      const ww=xw>=0?(y*W+xw)<<2:-1,e=xe<W?(y*W+xe)<<2:-1;
+      const nw=yn>=0&&xw>=0?(yn*W+xw)<<2:-1,ne=yn>=0&&xe<W?(yn*W+xe)<<2:-1;
+      const sw=ys<H&&xw>=0?(ys*W+xw)<<2:-1,se=ys<H&&xe<W?(ys*W+xe)<<2:-1;
+      const q=(j,c,f)=>j>=0?s[j+c]:f;
+      const br=(q(n,0,r)+q(so,0,r)+q(ww,0,r)+q(e,0,r)+q(nw,0,r)+q(ne,0,r)+q(sw,0,r)+q(se,0,r))*.125;
+      const bg=(q(n,1,g)+q(so,1,g)+q(ww,1,g)+q(e,1,g)+q(nw,1,g)+q(ne,1,g)+q(sw,1,g)+q(se,1,g))*.125;
+      const bb=(q(n,2,b)+q(so,2,b)+q(ww,2,b)+q(e,2,b)+q(nw,2,b)+q(ne,2,b)+q(sw,2,b)+q(se,2,b))*.125;
+      const l=r*.299+g*.587+b*.114,lb=br*.299+bg*.587+bb*.114;
+      if(Math.abs(l-lb)>uth){
+        r=cl(r+(r-br)*ua);g=cl(g+(g-bg)*ua);b=cl(b+(b-bb)*ua);
+      }
+    }
+    let nr=r,ng=g,nb2=b;
+    const l=r*.299+g*.587+b*.114,li=l+.5|0;
+    switch(t){
+      case 1:nr=xrLUT[li*3];ng=xrLUT[li*3+1];nb2=xrLUT[li*3+2];break;
+      case 2:nr=thLUT[li*3];ng=thLUT[li*3+1];nb2=thLUT[li*3+2];break;
+      case 3:{
+        const ex=x+1<W?(y*W+x+1)<<2:-1,wx=x>0?(y*W+x-1)<<2:-1;
+        const ey=y+1<H?((y+1)*W+x)<<2:-1,wy=y>0?((y-1)*W+x)<<2:-1;
+        const L=j=>j>=0?s[j]*.299+s[j+1]*.587+s[j+2]*.114:l;
+        const gx=(L(ex)-L(wx))*es,gy=(L(ey)-L(wy))*es;
+        const mag=Math.min(255,Math.sqrt(gx*gx+gy*gy)*2)|0;
+        if(ec>0.01){
+          const a=(Math.atan2(gy,gx)+Math.PI)/(2*Math.PI),v=mag/255,h6=a*6,hi=h6|0,f=h6-hi,qv=v*(1-f),tv=v*f;
+          let cr,cg,cb;
+          switch(hi%6){case 0:cr=v;cg=tv;cb=0;break;case 1:cr=qv;cg=v;cb=0;break;
+            case 2:cr=0;cg=v;cb=tv;break;case 3:cr=0;cg=qv;cb=v;break;
+            case 4:cr=tv;cg=0;cb=v;break;default:cr=v;cg=0;cb=qv;}
+          nr=cl(mag+(cr*255-mag)*ec);ng=cl(mag+(cg*255-mag)*ec);nb2=cl(mag+(cb*255-mag)*ec);
+        }else{nr=ng=nb2=mag;}
+        break;}
+      case 4:{
+        const ni=Math.min(255,Math.max(0,r*(.85+.15*nc)+g*.10*(1-nc)+b*(.05-1.05*nc))+.5|0);
+        const nv=nirLUT[ni];nr=fcLUT[nv*3];ng=fcLUT[nv*3+1];nb2=fcLUT[nv*3+2];
+        break;}
+      case 5:{
+        const bi=(y*W+x)*3,blr=blurBuf[bi],blg=blurBuf[bi+1],blb=blurBuf[bi+2],dn=Math.max(.05,1-hs);
+        if(hn>0.01){
+          const np=r*.85+g*.10+b*.05,nb3=blr*.85+blg*.10+blb*.05,nv=cl((np-nb3*hs)/dn*hg);
+          nr=cl(cl((r-blr*hs)/dn*hg)+(nv-cl((r-blr*hs)/dn*hg))*hn);
+          ng=cl(cl((g-blg*hs)/dn*hg)+(nv-cl((g-blg*hs)/dn*hg))*hn);
+          nb2=cl(cl((b-blb*hs)/dn*hg)+(nv-cl((b-blb*hs)/dn*hg))*hn);
+        }else{nr=cl((r-blr*hs)/dn*hg);ng=cl((g-blg*hs)/dn*hg);nb2=cl((b-blb*hs)/dn*hg);}
+        break;}
+      case 6:{
+        const bi=(y*W+x)*3,hpR=r-blurBuf[bi],hpG=g-blurBuf[bi+1],hpB=b-blurBuf[bi+2];
+        if(Math.abs(hpR*.299+hpG*.587+hpB*.114)>st){nr=cl(128+hpR*sb);ng=cl(128+hpG*sb);nb2=cl(128+hpB*sb);}
+        else{nr=ng=nb2=128;}
+        break;}
+    }
+    d[i]=lut[cl(r+(nr-r)*fi)];d[i+1]=lut[cl(g+(ng-g)*fi)];d[i+2]=lut[cl(b+(nb2-b)*fi)];
+  }
+}
+
+// â”€â”€ Canvas sizing (preserves aspect, fits screen) â”€â”€â”€â”€â”€â”€â”€
+function sizeC(){
+  if(!W||!H)return;
+  const vw=window.innerWidth;
+  const vh=ctrlHidden?window.innerHeight:Math.floor(window.innerHeight*.5);
+  const sc=Math.min(vw/W,vh/H);
+  const cw=W*sc|0,ch=H*sc|0;
+  C.style.width=cw+'px';C.style.height=ch+'px';
+  pzoom=1;panX=0;panY=0;C.style.transform='';
+}
+
+// â”€â”€ Live loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function liveLoop(ts){
+  if(mode!=='live'){ticking=false;return;}
+  requestAnimationFrame(liveLoop);
+  if(V.readyState<V.HAVE_CURRENT_DATA||!W)return;
+  Y.drawImage(V,0,0,W,H);ensureBufs();
+  srcBuf.set(Y.getImageData(0,0,W,H).data);
+  const p=P(),ac=p.ac;
+  if(ac>0.01){
+    const a=ac,bv=1-ac;
+    for(let i=0;i<srcBuf.length;i+=4){
+      srcBuf[i]  =accumBuf[i]  =accumBuf[i]  *a+srcBuf[i]  *bv;
+      srcBuf[i+1]=accumBuf[i+1]=accumBuf[i+1]*a+srcBuf[i+1]*bv;
+      srcBuf[i+2]=accumBuf[i+2]=accumBuf[i+2]*a+srcBuf[i+2]*bv;
+      srcBuf[i+3]=255;
+    }
+  }else if(accumBuf)accumBuf.fill(0);
+  outBuf.set(srcBuf);
+  if(dirty)buildLUTs(p);
+  run(outBuf,srcBuf,filterT,p);
+  X.putImageData(new ImageData(outBuf,W,H),0,0);
+  const dt=ts-lastT;if(dt>0&&dt<2000)$('fps').textContent=(1000/dt|0)+' fps';
+  lastT=ts;
+}
+
+// â”€â”€ Static render (debounced, non-destructive) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function render(){
+  if(mode!=='image'||!src)return;
+  if(rafQ)return;rafQ=true;
+  requestAnimationFrame(()=>{
+    rafQ=false;if(mode!=='image'||!src)return;
+    ensureBufs();srcBuf.set(src);outBuf.set(src);
+    const p=calcP();pCache=p;buildLUTs(p);
+    run(outBuf,srcBuf,filterT,p);
+    X.putImageData(new ImageData(outBuf,W,H),0,0);
+  });
+}
+
+// â”€â”€ Camera â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function startCam(){
+  stop();mode='live';ui();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:front?'user':'environment',width:{ideal:1280},height:{ideal:720}}});
+    V.srcObject=stream;await V.play();
+    V.onloadedmetadata=()=>{
+      W=Math.round(V.videoWidth*.4);H=Math.round(V.videoHeight*.4);
+      C.width=O.width=W;C.height=O.height=H;bW=bH=0;sizeC();
+      if(!ticking){ticking=true;requestAnimationFrame(liveLoop);}
+    };
+  }catch(e){mode='idle';ui();alert('Camera: '+e.message);}
+}
+
+function stop(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  V.srcObject=null;V.onloadedmetadata=null;src=null;ticking=false;mode='idle';
+}
+
+// â”€â”€ File image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+$('fIn').addEventListener('change',function(){
+  const file=this.files[0];if(!file)return;
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+    stop();mode='image';
+    const sc=Math.min(1,1920/img.naturalWidth,1920/img.naturalHeight);
+    W=Math.round(img.naturalWidth*sc);H=Math.round(img.naturalHeight*sc);
+    C.width=O.width=W;C.height=O.height=H;bW=bH=0;
+    Y.drawImage(img,0,0,W,H);src=new Uint8ClampedArray(Y.getImageData(0,0,W,H).data);
+    URL.revokeObjectURL(url);sizeC();ui();render();
+  };
+  img.src=url;this.value='';
+});
+
+// â”€â”€ Pinch zoom + pan + tap-toggle controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let lastDist2=0,pinching=false,lastTapT=0,panStart={x:0,y:0},panning=false;
+function pdist(t){const dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.sqrt(dx*dx+dy*dy);}
+function applyXform(){C.style.transform=`scale(${pzoom}) translate(${panX/pzoom}px,${panY/pzoom}px)`;}
+
+$('cz').addEventListener('touchstart',e=>{
+  if(e.touches.length===2){pinching=true;panning=false;lastDist2=pdist(e.touches);}
+  else if(e.touches.length===1){
+    const now=Date.now();
+    if(now-lastTapT<280&&!pinching){
+      // double-tap: reset zoom
+      pzoom=1;panX=0;panY=0;C.style.transform='';
+    } else if(pzoom>1){panning=true;panStart={x:e.touches[0].clientX-panX,y:e.touches[0].clientY-panY};}
+    lastTapT=now;
+  }
+},{passive:true});
+
+$('cz').addEventListener('touchmove',e=>{
+  if(e.touches.length===2&&pinching){
+    const d=pdist(e.touches);
+    pzoom=Math.max(1,Math.min(8,pzoom*d/lastDist2));
+    lastDist2=d;applyXform();
+  }else if(e.touches.length===1&&panning){
+    panX=e.touches[0].clientX-panStart.x;panY=e.touches[0].clientY-panStart.y;applyXform();
+  }
+},{passive:true});
+
+$('cz').addEventListener('touchend',e=>{
+  if(e.touches.length<2)pinching=false;
+  if(e.touches.length===0){
+    panning=false;
+    // single tap to toggle controls (only if not just zoomed/panned)
+    if(pzoom===1&&Date.now()-lastTapT>250)toggleCtrl();
+  }
+});
+
+// â”€â”€ Toggle controls visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function toggleCtrl(){
+  ctrlHidden=!ctrlHidden;
+  $('ctrl').style.display=ctrlHidden?'none':'flex';
+  $('fshint').style.opacity=ctrlHidden?'1':'0';
+  if(ctrlHidden)$('cz').style.flex='1'; else $('cz').style.flex='';
+  sizeC();
+}
+
+// â”€â”€ Save, clear, mode UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+$('saveBtn').addEventListener('click',()=>{if(!W)return;const a=document.createElement('a');a.download='filtered_'+Date.now()+'.png';a.href=C.toDataURL();a.click();});
+$('clBtn').addEventListener('click',()=>{stop();X.clearRect(0,0,C.width,C.height);sizeC();ui();$('fps').textContent='';});
+$('cBtn').addEventListener('click',()=>{front=!front;startCam();});
+
+function ui(){
+  $('cBtn').classList.toggle('on',mode==='live');
+  $('clBtn').classList.toggle('on',mode==='image');
+  $('mlbl').textContent=mode.toUpperCase();
+  $('mlbl').style.color=mode==='live'?'#0cf':mode==='image'?'#f80':'#333';
+  $('accNote').classList.toggle('show',mode==='live');
+}
+
+// â”€â”€ Filter panel (rebuilt on tab switch) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function renderPanel(t){
+  const fp=$('fp'),defs=PANELS[t];
+  fp.innerHTML='';
+  if(!defs){fp.innerHTML='<div id="fpHint">USE EXPOSURE &amp; CLARITY ABOVE</div>';return;}
+  defs.forEach(s=>{
+    const pr=s.step<0.1?2:s.step<1?1:0,d=document.createElement('div');d.className='sl';
+    d.innerHTML=`<span class="sn">${s.n}</span><input id="${s.id}" type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.val}"><span class="sv" id="${s.id}v">${s.val.toFixed(pr)}</span>`;
+    fp.appendChild(d);
+    const el=$(s.id),out=$(s.id+'v');
+    el.addEventListener('input',()=>{out.textContent=parseFloat(el.value).toFixed(pr);markDirty();if(mode==='image')render();});
+  });
+}
+
+// â”€â”€ Presets (horizontal strip, never wraps) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function renderPresets(t){
+  const el=$('presets');el.innerHTML='';
+  if(!PF.has(t)){el.classList.remove('show');return;}
+  el.classList.add('show');
+  Object.keys(PRESETS).forEach(k=>{
+    const b=document.createElement('button');b.className='pre';b.textContent=PLBLS[k];
+    b.addEventListener('click',()=>{
+      const pr=PRESETS[k];setFilter(pr.t);
+      Object.entries(pr.v).forEach(([id,val])=>{const e=$(id);if(!e)return;e.value=val;const o=$(id+'v');if(o)o.textContent=(+val).toFixed(2);});
+      markDirty();if(mode==='image')render();
+    });
+    el.appendChild(b);
+  });
+}
+
+// â”€â”€ Filter switch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function setFilter(t){
+  filterT=t;
+  document.querySelectorAll('.tab').forEach(tb=>tb.classList.toggle('on',+tb.dataset.t===t));
+  document.documentElement.style.setProperty('--fc',COLS[t]);
+  $('flbl').textContent=NAMES[t];
+  renderPanel(t);renderPresets(t);
+  if(mode==='image')render();
+}
+
+// â”€â”€ Build tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+NAMES.forEach((n,i)=>{
+  const d=document.createElement('div');d.className='tab'+(i===0?' on':'');d.dataset.t=i;d.textContent=n;
+  d.addEventListener('click',()=>setFilter(i));$('tabs').appendChild(d);
+});
+
+// â”€â”€ Global sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+['M1','M2','FI','AC'].forEach(id=>{
+  const el=$(id),out=$(id+'v');
+  el.addEventListener('input',()=>{out.textContent=parseFloat(el.value).toFixed(2);markDirty();if(mode==='image')render();});
+});
+
+window.addEventListener('resize',sizeC);
+renderPanel(0);renderPresets(0);
+</script>
+</body>
+</html>
