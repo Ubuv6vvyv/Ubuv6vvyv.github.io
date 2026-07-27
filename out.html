@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Annoyance Generator 10.0</title>
+    <style>
+        :root { 
+            --bg: #0a0a0c; 
+            --panel: #121215; 
+            --border: #202025; 
+            --txt: #e2e2e9; 
+            --primary: #ff2a2a; 
+            --accent: #00f0ff; 
+            --preset: #238636; 
+            --play: #0091ea; 
+        }
+        body { 
+            font-family: monospace; 
+            background-color: var(--bg); 
+            color: var(--txt); 
+            padding: 6px; 
+            font-size: 0.75rem; 
+            margin: 0; 
+            box-sizing: border-box; 
+        }
+        .container { 
+            width: 100%; 
+            max-width: 620px; 
+            margin: 0 auto; 
+            background-color: var(--panel); 
+            padding: 10px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+            box-sizing: border-box; 
+        }
+        h1 { 
+            text-align: center; 
+            color: var(--primary); 
+            font-size: 1.3rem; 
+            margin: 4px 0 6px 0; 
+            letter-spacing: 1.5px; 
+            text-transform: uppercase; 
+            text-shadow: 0 0 8px rgba(255, 42, 42, 0.3);
+        }
+        
+        .section-title { 
+            color: var(--accent); 
+            font-size: 0.78rem; 
+            text-transform: uppercase; 
+            margin: 10px 0 6px 0; 
+            border-bottom: 1px solid var(--border); 
+            padding-bottom: 2px; 
+            letter-spacing: 0.8px; 
+        }
+        .preset-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); 
+            gap: 4px; 
+            margin-bottom: 12px; 
+        }
+        .preset-btn { 
+            padding: 6px 4px; 
+            background-color: #1a1a20; 
+            color: #ccc; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 0.65rem; 
+            font-weight: bold; 
+            transition: all 0.1s ease; 
+            text-align: center; 
+        }
+        .preset-btn:hover { 
+            background-color: var(--preset); 
+            color: #fff; 
+            border-color: #4caf50; 
+            box-shadow: 0 0 6px rgba(76, 175, 80, 0.4);
+        }
+        
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px 14px; 
+            background: rgba(0,0,0,0.35); 
+            padding: 10px; 
+            border: 1px solid var(--border); 
+            border-radius: 6px; 
+            margin-bottom: 10px; 
+        }
+        .control { 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+        }
+        .full-row { 
+            grid-column: span 2; 
+        }
+        label { 
+            margin-bottom: 3px; 
+            font-size: 0.68rem; 
+            color: #aaa; 
+            display: flex; 
+            justify-content: space-between; 
+        }
+        label span { 
+            color: var(--accent); 
+            font-weight: bold; 
+        }
+        input[type="range"] { 
+            width: 100%; 
+            margin: 0; 
+            height: 14px; 
+            accent-color: var(--primary); 
+            cursor: pointer; 
+        }
+        select { 
+            background: #1a1a20; 
+            color: #fff; 
+            border: 1px solid var(--border); 
+            padding: 3px; 
+            font-size: 0.7rem; 
+            height: 24px; 
+            border-radius: 3px; 
+            width: 100%; 
+        }
+        
+        #vis { 
+            width: 100%; 
+            height: 50px; 
+            background: #050507; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            margin: 6px 0; 
+            display: block; 
+        }
+        
+        .action-footer { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 8px; 
+            margin-top: 10px; 
+        }
+        .action-btn { 
+            color: white; 
+            padding: 12px; 
+            font-size: 0.95rem; 
+            font-weight: bold; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            letter-spacing: 1px; 
+            text-transform: uppercase; 
+            transition: all 0.15s;
+        }
+        #play-btn { 
+            background-color: var(--play); 
+            box-shadow: 0 0 8px rgba(0, 145, 234, 0.2);
+        }
+        #play-btn:hover { 
+            background-color: #00b0ff; 
+            box-shadow: 0 0 12px rgba(0, 176, 255, 0.4);
+        }
+        #stop-btn { 
+            background-color: var(--primary); 
+            box-shadow: 0 0 8px rgba(255, 42, 42, 0.2);
+        }
+        #stop-btn:hover { 
+            background-color: #ff5252; 
+            box-shadow: 0 0 12px rgba(255, 82, 82, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Annoyance Generator 10.0</h1>
+        <canvas id="vis"></canvas>
+
+        <!-- Presets Grid -->
+        <div class="section-title">1. Select Baseline Torment (Presets)</div>
+        <div class="preset-grid">
+            <button class="preset-btn" onclick="loadPreset('classicWhine')">🦟 Classic Whine</button>
+            <button class="preset-btn" onclick="loadPreset('dentalDrill')">🦷 Dentist Drill</button>
+            <button class="preset-btn" onclick="loadPreset('gyroDrill')">⚙️ Gyro Drill</button>
+            <button class="preset-btn" onclick="loadPreset('inharmonicClang')">🧮 Inharmonic Clang</button>
+            <button class="preset-btn" onclick="loadPreset('fmSideband')">📻 FM Sideband</button>
+            <button class="preset-btn" onclick="loadPreset('clusterBeat')">🐝 Cluster Beat</button>
+            <button class="preset-btn" onclick="loadPreset('sirenSweep')">🚨 Siren Sweep</button>
+            <button class="preset-btn" onclick="loadPreset('hardClip')">⚡ Hard Clip</button>
+            <button class="preset-btn" onclick="loadPreset('bitCrushedGlitch')">👾 Bitcrush Glitch</button>
+            <button class="preset-btn" onclick="loadPreset('feedbackRattle')">🔁 Feedback Rattle</button>
+            <button class="preset-btn" onclick="loadPreset('combResonance')">🔊 Comb Resonance</button>
+            <button class="preset-btn" onclick="loadPreset('dopplerRotary')">🚁 Rotary Doppler</button>
+            <button class="preset-btn" onclick="loadPreset('brakeSqueal')">🛠️ Brake Squeal</button>
+            <button class="preset-btn" onclick="loadPreset('ultraShriek')">🔊 Ultra Shriek</button>
+            <button class="preset-btn" onclick="loadPreset('tinTorment')">🧠 Tin Torment</button>
+            <button class="preset-btn" onclick="loadPreset('gratedMetal')">🛠️ Grated Grinder</button>
+            <button class="preset-btn" onclick="loadPreset('chirpAlarm')">🚨 Battery Chirp</button>
+            <button class="preset-btn" onclick="loadPreset('dialUp')">⚡ 56k Dial-Up</button>
+        </div>
+
+        <!-- Universal Control Dashboard -->
+        <div class="section-title">2. Global Modification Dashboard</div>
+        <div class="dashboard">
+            <!-- C1: Core Signal Generator -->
+            <div class="control"><label>Core Pitch:<span id="p-f-v">1k</span></label><input type="range" id="p-f" min="40" max="18000" value="1000" step="10"></div>
+            <div class="control"><label>Core Waveform:</label><select id="p-type"><option value="sine">Sine (Pure)</option><option value="square">Square (Harsh)</option><option value="sawtooth">Sawtooth (Sharp)</option><option value="triangle">Triangle</option></select></div>
+            
+            <div class="control"><label>Phase Detune:<span id="p-det-v">0</span></label><input type="range" id="p-det" min="-100" max="100" value="0"></div>
+            <div class="control"><label>Binaural Offset:<span id="p-off-v">0</span></label><input type="range" id="p-off" min="0" max="40" value="0" step="0.5"></div>
+
+            <!-- C2: Cluster Bank & C3: Inharmonic Partials -->
+            <div class="control"><label>5-Node Detune Cluster:<span id="p-clust-v">0</span></label><input type="range" id="p-clust" min="0" max="50" value="0" step="1"></div>
+            <div class="control"><label>Inharmonic Stacking Ratio:</label><select id="p-inharm"><option value="off">Off (Standard)</option><option value="golden">Golden Ratio (1.618)</option><option value="root2">Pythagorean (1.414)</option><option value="pi">Transcendental (3.141)</option></select></div>
+
+            <!-- C4: Vibrato & Tremolo -->
+            <div class="control"><label>Vibrato Rate (Hz):<span id="p-vib-r-v">10</span></label><input type="range" id="p-vib-r" min="0.1" max="120" value="10" step="0.1"></div>
+            <div class="control"><label>Vibrato Depth (Hz):<span id="p-vib-d-v">0</span></label><input type="range" id="p-vib-d" min="0" max="1500" value="0" step="5"></div>
+            
+            <div class="control"><label>Tremolo Rate (Hz):<span id="p-trem-r-v">10</span></label><input type="range" id="p-trem-r" min="0.1" max="100" value="10" step="0.1"></div>
+            <div class="control"><label>Tremolo Depth:<span id="p-trem-d-v">0.00</span></label><input type="range" id="p-trem-d" min="0" max="1" value="0" step="0.01"></div>
+
+            <!-- C4: High Frequency FM Dissonance -->
+            <div class="control"><label>FM Mod Freq (Hz):<span id="p-fm-r-v">100</span></label><input type="range" id="p-fm-r" min="10" max="4000" value="100" step="10"></div>
+            <div class="control"><label>FM Mod Index:<span id="p-fm-d-v">0</span></label><input type="range" id="p-fm-d" min="0" max="5000" value="0" step="50"></div>
+
+            <!-- C5: Sweep / Siren Ramp -->
+            <div class="control"><label>Sweep Ramp Speed (Hz):<span id="p-swp-r-v">1</span></label><input type="range" id="p-swp-r" min="0.1" max="20" value="1" step="0.1"></div>
+            <div class="control"><label>Sweep Span (Hz):<span id="p-swp-d-v">0</span></label><input type="range" id="p-swp-d" min="0" max="6000" value="0" step="50"></div>
+
+            <!-- C6: WaveShaper Distortion -->
+            <div class="control full-row"><label>WaveShaper Hard Clip Drive:<span id="p-dist-v">0.00</span></label><input type="range" id="p-dist" min="0" max="1" value="0" step="0.02"></div>
+
+            <!-- C7: Buffer & Bitcrush Degradation -->
+            <div class="control"><label>Bit Depth Resolution:<span id="p-crush-v">16</span></label><input type="range" id="p-crush" min="1" max="16" value="16" step="1"></div>
+            <div class="control"><label>Downsample Rate (Hz):<span id="p-rate-v">48k</span></label><input type="range" id="p-rate" min="1000" max="48000" value="48000" step="500"></div>
+
+            <!-- C8: Feedback Delay & Comb Filter Chaos -->
+            <div class="control"><label>Feedback Delay Time (s):<span id="p-fb-t-v">0.00</span></label><input type="range" id="p-fb-t" min="0.01" max="0.5" value="0.01" step="0.01"></div>
+            <div class="control"><label>Feedback Gain:<span id="p-fb-g-v">0.00</span></label><input type="range" id="p-fb-g" min="0" max="0.95" value="0" step="0.05"></div>
+            <div class="control full-row"><label>Comb Filter Resonance (Q):<span id="p-comb-q-v">0.0</span></label><input type="range" id="p-comb-q" min="0" max="30" value="0" step="0.5"></div>
+
+            <!-- C9: Spatial, Doppler & Phaser -->
+            <div class="control"><label>Rotary Doppler Swirl (Hz):<span id="p-rot-v">0</span></label><input type="range" id="p-rot" min="0" max="10" value="0" step="0.1"></div>
+            <div class="control"><label>Spatial Swivel Pan Rate (Hz):<span id="p-pan-v">0</span></label><input type="range" id="p-pan" min="0" max="25" value="0" step="0.2"></div>
+
+            <div class="control"><label>Phaser Swirl Rate:<span id="p-phas-r-v">0.5</span></label><input type="range" id="p-phas-r" min="0.1" max="30" value="0.5" step="0.1"></div>
+            <div class="control"><label>Phaser Sweep Depth:<span id="p-phas-d-v">0</span></label><input type="range" id="p-phas-d" min="0" max="4000" value="0" step="20"></div>
+            
+            <div class="control"><label>Wobble Speed (Hz):<span id="p-wob-r-v">5</span></label><input type="range" id="p-wob-r" min="0.1" max="40" value="5" step="0.1"></div>
+            <div class="control"><label>Wobble Intensity:<span id="p-wob-d-v">0</span></label><input type="range" id="p-wob-d" min="0" max="4000" value="0" step="20"></div>
+        </div>
+
+        <div class="control"><label style="padding:0 4px;">Master Output Trim Control:<span id="p-vol-v">0.30</span></label><input type="range" id="p-vol" min="0" max="1" value="0.3" step="0.01"></div>
+        
+        <!-- Symmetrical Action Footer -->
+        <div class="action-footer">
+            <button class="action-btn" id="play-btn" onclick="startSnd()">Start / Play ▶️</button>
+            <button class="action-btn" id="stop-btn" onclick="stopSnd()">Abort Sound 🛑</button>
+        </div>
+    </div>
+
+    <script>
+        let actx, mGain, analyzer, shaperNode, crusherNode, nodes = [];
+        let active = false;
+        const cv = document.getElementById('vis'), cctx = cv.getContext('2d');
+
+        // Dynamic AudioParam references
+        let mainOsc = null, offsetOsc = null;
+        let clusterOscs = [], inharmOscs = [];
+        let fmMoodOsc = null, fmGain = null;
+        let swpLfo = null, swpGain = null;
+        let vibLfo = null, vibGain = null;
+        let tremLfo = null, tremGainMod = null, tremGain = null;
+        let phasLfo = null, phasGain = null;
+        let wobLfo = null, wobGain = null, wobFilter = null;
+        let delayNode = null, fbGain = null, combFilter = null;
+        let panN = null, pLfo = null, pGain = null;
+        let rotLfo = null, rotGain = null;
+
+        const presets = {
+            classicWhine:    {f:14500, type:'sawtooth', det:35, off:0,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0,   crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:45, vibD:120, tremR:20,  tremD:0.4, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:8},
+            dentalDrill:     {f:8200,  type:'square',   det:-15, off:0,   clust:0,  inharm:'off',    fmR:220, fmD:400,  swpR:0,  swpD:0,    dist:0.25,crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:3,  vibD:80,  tremR:45,  tremD:0.5, phasR:1.5, phasD:200,  wobR:0,   wobD:0,    pan:1.5},
+            gyroDrill:       {f:9800,  type:'square',   det:-45, off:7,   clust:0,  inharm:'off',    fmR:850, fmD:1200, swpR:0,  swpD:0,    dist:0.1, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:12, vibD:300, tremR:5,   tremD:0.3, phasR:8,   phasD:1200, wobR:15,  wobD:1800, pan:4},
+            inharmonicClang: {f:3400,  type:'triangle', det:0,   off:0,   clust:0,  inharm:'golden', fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0.15,crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0,  vibD:0,   tremR:12,  tremD:0.2, phasR:2,   phasD:1500, wobR:0,   wobD:0,    pan:4},
+            fmSideband:      {f:11000, type:'sine',     det:0,   off:0,   clust:0,  inharm:'off',    fmR:2850,fmD:3500, swpR:0,  swpD:0,    dist:0.3, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0,  vibD:0,   tremR:8,   tremD:0.4, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:6},
+            clusterBeat:     {f:14000, type:'sine',     det:0,   off:0,   clust:21, inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0,   crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0,  vibD:0,   tremR:7.5, tremD:0.65,phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:12},
+            sirenSweep:      {f:8000,  type:'sawtooth', det:0,   off:0,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0.8,swpD:4000, dist:0.2, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0,  vibD:0,   tremR:0,   tremD:0,   phasR:5,   phasD:2000, wobR:0,   wobD:0,    pan:10},
+            hardClip:        {f:4200,  type:'square',   det:15,  off:0,   clust:0,  inharm:'off',    fmR:120, fmD:800,  swpR:0,  swpD:0,    dist:0.85,crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:15, vibD:200, tremR:30,  tremD:0.7, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:2},
+            bitCrushedGlitch:{f:2800,  type:'square',   det:10,  off:0,   clust:0,  inharm:'off',    fmR:400, fmD:1200, swpR:0,  swpD:0,    dist:0.4, crush:4,  rate:8000,  fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:20, vibD:100, tremR:40,  tremD:0.8, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:0},
+            feedbackRattle:  {f:1200,  type:'sawtooth', det:0,   off:0,   clust:10, inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0.2, crush:16, rate:48000, fbT:0.12, fbG:0.85,combQ:15, rot:0,  vibR:0,  vibD:0,   tremR:15,  tremD:0.5, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:5},
+            combResonance:   {f:6000,  type:'square',   det:0,   off:0,   clust:0,  inharm:'golden', fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0.1, crush:16, rate:48000, fbT:0.05, fbG:0.70,combQ:28, rot:0,  vibR:5,  vibD:50,  tremR:0,   tremD:0,   phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:0},
+            dopplerRotary:   {f:5500,  type:'sawtooth', det:20,  off:0,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0.5,swpD:1500, dist:0.15,crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:4.5,vibR:10, vibD:80,  tremR:0,   tremD:0,   phasR:4,   phasD:1000, wobR:0,   wobD:0,    pan:12},
+            brakeSqueal:     {f:6900,  type:'sawtooth', det:20,  off:0,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0.1, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:90, vibD:250, tremR:0,   tremD:0,   phasR:12,  phasD:2500, wobR:0,   wobD:0,    pan:5},
+            ultraShriek:     {f:16800, type:'sawtooth', det:60,  off:6,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0,   crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:150,vibD:1000,tremR:10,  tremD:0.8, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:20},
+            tinTorment:      {f:13500, type:'sine',     det:4,   off:2.5, clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0,   crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0.2,vibD:10,  tremR:0.5, tremD:0.15,phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:10},
+            gratedMetal:     {f:1900,  type:'sawtooth', det:30,  off:0,   clust:0,  inharm:'pythag', fmR:400, fmD:1000, swpR:0,  swpD:0,    dist:0.4, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:12, vibD:100, tremR:60,  tremD:0.7, phasR:4.5, phasD:3000, wobR:28,  wobD:2500, pan:8},
+            chirpAlarm:      {f:4100,  type:'square',   det:0,   off:0,   clust:0,  inharm:'off',    fmR:0,   fmD:0,    swpR:0,  swpD:0,    dist:0.5, crush:16, rate:48000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:0,  vibD:0,   tremR:2.5, tremD:1.0, phasR:0,   phasD:0,    wobR:0,   wobD:0,    pan:0},
+            dialUp:          {f:2200,  type:'square',   det:40,  off:0,   clust:0,  inharm:'off',    fmR:1100,fmD:2200, swpR:0,  swpD:0,    dist:0.6, crush:8,  rate:12000, fbT:0.01, fbG:0,   combQ:0,  rot:0,  vibR:110,vibD:1500,tremR:30,  tremD:0.9, phasR:2,   phasD:500,  wobR:0,   wobD:0,    pan:4}
+        };
+
+        const initAudio = () => {
+            if (!actx) {
+                actx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: "interactive" });
+                mGain = actx.createGain();
+                shaperNode = actx.createWaveShaper();
+                analyzer = actx.createAnalyser(); 
+                analyzer.fftSize = 128;
+                
+                shaperNode.connect(mGain);
+                mGain.connect(analyzer); 
+                analyzer.connect(actx.destination);
+                
+                updDist();
+                updMGain(); 
+                drawVis();
+            }
+        };
+
+        const fmtF = v => { 
+            let f = parseFloat(v); 
+            return f >= 1000 ? (f / 1000).toFixed(1) + 'k' : f.toFixed(0); 
+        };
+        
+        const updTxt = (id, v, isF = false) => { 
+            const el = document.getElementById(id); 
+            if (el) {
+                el.textContent = isF ? fmtF(v) : parseFloat(v).toFixed(id.includes('vol') || id.includes('trem-d') || id.includes('off') || id.includes('dist') || id.includes('fb-t') || id.includes('fb-g') ? 2 : 0); 
+            }
+        };
+        
+        const getV = id => parseFloat(document.getElementById(id).value);
+        const smth = (p, v) => { if (p) p.setTargetAtTime(parseFloat(v), actx.currentTime, 0.01); };
+
+        const makeDistortionCurve = (amount) => {
+            const k = amount * 50;
+            const n = 44100;
+            const curve = new Float32Array(n);
+            const deg = Math.PI / 180;
+            for (let i = 0; i < n; ++i) {
+                let x = (i * 2) / n - 1;
+                if (amount <= 0) {
+                    curve[i] = x;
+                } else {
+                    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+                }
+            }
+            return curve;
+        };
+
+        const updDist = () => {
+            if (shaperNode) {
+                const amount = getV('p-dist');
+                shaperNode.curve = makeDistortionCurve(amount);
+                updTxt('p-dist-v', amount);
+            }
+        };
+
+        const startSnd = () => { active = true; initAudio(); engineBuild(); };
+        const stopSnd = () => { 
+            nodes.forEach(n => { 
+                try { n.stop(0); } catch (e) {} 
+                try { n.disconnect(); } catch (e) {} 
+            }); 
+            if (crusherNode) {
+                try { crusherNode.onaudioprocess = null; crusherNode.disconnect(); } catch(e){}
+                crusherNode = null;
+            }
+            nodes = []; 
+            mainOsc = null; offsetOsc = null;
+            clusterOscs = []; inharmOscs = [];
+            fmMoodOsc = null; fmGain = null;
+            swpLfo = null; swpGain = null;
+            vibLfo = null; vibGain = null;
+            tremLfo = null; tremGainMod = null; tremGain = null;
+            phasLfo = null; phasGain = null;
+            wobLfo = null; wobGain = null; wobFilter = null;
+            delayNode = null; fbGain = null; combFilter = null;
+            panN = null; pLfo = null; pGain = null;
+            rotLfo = null; rotGain = null;
+            active = false; 
+        };
+
+        const engineBuild = () => {
+            if (!active) return;
+            initAudio();
+            nodes.forEach(n => { 
+                try { n.stop(0); } catch (e) {} 
+                try { n.disconnect(); } catch (e) {} 
+            });
+            if (crusherNode) {
+                try { crusherNode.onaudioprocess = null; crusherNode.disconnect(); } catch(e){}
+                crusherNode = null;
+            }
+            nodes = [];
+            clusterOscs = []; inharmOscs = [];
+
+            const coreGain = actx.createGain();
+            nodes.push(coreGain);
+
+            mainOsc = actx.createOscillator();
+            nodes.push(mainOsc);
+            mainOsc.type = document.getElementById('p-type').value;
+            mainOsc.frequency.setValueAtTime(getV('p-f'), actx.currentTime);
+            mainOsc.detune.setValueAtTime(getV('p-det'), actx.currentTime);
+            mainOsc.connect(coreGain);
+
+            let chainNode = coreGain;
+
+            // --- C2: Offset Detune Cluster Bank ---
+            const clustVal = getV('p-clust');
+            if (clustVal > 0) {
+                const offsets = [-1.0, -0.4, 0.4, 1.0];
+                offsets.forEach(mult => {
+                    const cOsc = actx.createOscillator();
+                    nodes.push(cOsc); clusterOscs.push(cOsc);
+                    cOsc.type = mainOsc.type;
+                    cOsc.frequency.setValueAtTime(getV('p-f'), actx.currentTime);
+                    cOsc.detune.setValueAtTime(getV('p-det') + (mult * clustVal), actx.currentTime);
+                    cOsc.connect(coreGain);
+                    cOsc.start(0);
+                });
+            }
+
+            // --- C3: Inharmonic Partial Stacking ---
+            const inharmMode = document.getElementById('p-inharm').value;
+            if (inharmMode !== 'off') {
+                let ratios = [];
+                if (inharmMode === 'golden') ratios = [1.618, 2.618, 4.236];
+                else if (inharmMode === 'pythag') ratios = [1.414, 2.828, 4.242];
+                else if (inharmMode === 'pi') ratios = [3.141, 6.283, 9.424];
+
+                ratios.forEach((r, idx) => {
+                    const iOsc = actx.createOscillator();
+                    const iGain = actx.createGain();
+                    nodes.push(iOsc, iGain); inharmOscs.push(iOsc);
+                    iOsc.type = 'triangle';
+                    iOsc.frequency.setValueAtTime(getV('p-f') * r, actx.currentTime);
+                    iGain.gain.setValueAtTime(0.3 / (idx + 1), actx.currentTime);
+                    iOsc.connect(iGain);
+                    iGain.connect(coreGain);
+                    iOsc.start(0);
+                });
+            }
+
+            // --- C4: FM High Frequency Dissonance ---
+            const fmDepth = getV('p-fm-d');
+            if (fmDepth > 0) {
+                fmMoodOsc = actx.createOscillator();
+                fmGain = actx.createGain();
+                nodes.push(fmMoodOsc, fmGain);
+                fmMoodOsc.frequency.setValueAtTime(getV('p-fm-r'), actx.currentTime);
+                fmGain.gain.setValueAtTime(fmDepth, actx.currentTime);
+                fmMoodOsc.connect(fmGain);
+                fmGain.connect(mainOsc.frequency);
+                clusterOscs.forEach(o => fmGain.connect(o.frequency));
+                fmMoodOsc.start(0);
+            }
+
+            // --- C5: Pitch Sweeps & Siren Ramps ---
+            const swpDepth = getV('p-swp-d');
+            if (swpDepth > 0) {
+                swpLfo = actx.createOscillator();
+                swpGain = actx.createGain();
+                nodes.push(swpLfo, swpGain);
+                swpLfo.frequency.setValueAtTime(getV('p-swp-r'), actx.currentTime);
+                swpGain.gain.setValueAtTime(swpDepth, actx.currentTime);
+                swpLfo.connect(swpGain);
+                swpGain.connect(mainOsc.frequency);
+                clusterOscs.forEach(o => swpGain.connect(o.frequency));
+                swpLfo.start(0);
+            }
+
+            // --- C4: Vibrato ---
+            const vibDepth = getV('p-vib-d');
+            if (vibDepth > 0) {
+                vibLfo = actx.createOscillator();
+                vibGain = actx.createGain();
+                nodes.push(vibLfo, vibGain);
+                vibLfo.frequency.setValueAtTime(getV('p-vib-r'), actx.currentTime);
+                vibGain.gain.setValueAtTime(vibDepth, actx.currentTime);
+                vibLfo.connect(vibGain);
+                vibGain.connect(mainOsc.frequency);
+                clusterOscs.forEach(o => vibGain.connect(o.frequency));
+                vibLfo.start(0);
+            }
+
+            // --- C7: Bitcrusher & Sample Downsampler ---
+            const bits = getV('p-crush');
+            const targetRate = getV('p-rate');
+            if (bits < 16 || targetRate < 48000) {
+                crusherNode = actx.createScriptProcessor(4096, 1, 1);
+                let lastSample = 0, sampleCount = 0;
+                crusherNode.onaudioprocess = (e) => {
+                    const inp = e.inputBuffer.getChannelData(0);
+                    const out = e.outputBuffer.getChannelData(0);
+                    const cBits = getV('p-crush');
+                    const cRate = getV('p-rate');
+                    const stepRatio = cRate / actx.sampleRate;
+                    const stepVal = Math.pow(0.5, cBits);
+                    for (let i = 0; i < inp.length; i++) {
+                        sampleCount += stepRatio;
+                        if (sampleCount >= 1) {
+                            sampleCount -= 1;
+                            lastSample = stepVal * Math.floor(inp[i] / stepVal + 0.5);
+                        }
+                        out[i] = lastSample;
+                    }
+                };
+                chainNode.connect(crusherNode);
+                chainNode = crusherNode;
+            }
+
+            // --- C8: Feedback Delay & Comb Filter Chaos ---
+            const fbTime = getV('p-fb-t');
+            const fbGVal = getV('p-fb-g');
+            const combQ = getV('p-comb-q');
+            if (fbGVal > 0 || combQ > 0) {
+                delayNode = actx.createDelay(1.0);
+                fbGain = actx.createGain();
+                combFilter = actx.createBiquadFilter();
+                nodes.push(delayNode, fbGain, combFilter);
+
+                delayNode.delayTime.setValueAtTime(fbTime, actx.currentTime);
+                fbGain.gain.setValueAtTime(fbGVal, actx.currentTime);
+                combFilter.type = 'bandpass';
+                combFilter.frequency.setValueAtTime(getV('p-f'), actx.currentTime);
+                combFilter.Q.setValueAtTime(Math.max(0.1, combQ), actx.currentTime);
+
+                chainNode.connect(delayNode);
+                delayNode.connect(combFilter);
+                combFilter.connect(fbGain);
+                fbGain.connect(delayNode);
+                chainNode.connect(combFilter);
+                chainNode = combFilter;
+            }
+
+            // --- C9: Rotary Doppler Swirl ---
+            const rotRate = getV('p-rot');
+            if (rotRate > 0) {
+                rotLfo = actx.createOscillator();
+                rotGain = actx.createGain();
+                nodes.push(rotLfo, rotGain);
+                rotLfo.frequency.setValueAtTime(rotRate, actx.currentTime);
+                rotGain.gain.setValueAtTime(120, actx.currentTime);
+                rotLfo.connect(rotGain);
+                rotGain.connect(mainOsc.frequency);
+                rotLfo.start(0);
+            }
+
+            // --- Phaser Swirl ---
+            const phasDepth = getV('p-phas-d');
+            if (phasDepth > 0) {
+                const ap1 = actx.createBiquadFilter();
+                const ap2 = actx.createBiquadFilter();
+                nodes.push(ap1, ap2);
+                ap1.type = 'allpass'; ap2.type = 'allpass';
+                ap1.frequency.setValueAtTime(1500, actx.currentTime);
+                ap2.frequency.setValueAtTime(1500, actx.currentTime);
+
+                phasLfo = actx.createOscillator();
+                phasGain = actx.createGain();
+                nodes.push(phasLfo, phasGain);
+                phasLfo.frequency.setValueAtTime(getV('p-phas-r'), actx.currentTime);
+                phasGain.gain.setValueAtTime(phasDepth, actx.currentTime);
+
+                phasLfo.connect(phasGain);
+                phasGain.connect(ap1.frequency);
+                phasGain.connect(ap2.frequency);
+                phasLfo.start(0);
+
+                chainNode.connect(ap1);
+                ap1.connect(ap2);
+                chainNode = ap2;
+            }
+
+            // --- Wobble Filter Sweep ---
+            const wobDepth = getV('p-wob-d');
+            if (wobDepth > 0) {
+                wobFilter = actx.createBiquadFilter();
+                nodes.push(wobFilter);
+                wobFilter.type = 'bandpass';
+                wobFilter.Q.setValueAtTime(5.0, actx.currentTime);
+                wobFilter.frequency.setValueAtTime(getV('p-f'), actx.currentTime);
+
+                wobLfo = actx.createOscillator();
+                wobGain = actx.createGain();
+                nodes.push(wobLfo, wobGain);
+                wobLfo.frequency.setValueAtTime(getV('p-wob-r'), actx.currentTime);
+                wobGain.gain.setValueAtTime(wobDepth, actx.currentTime);
+
+                wobLfo.connect(wobGain);
+                wobGain.connect(wobFilter.frequency);
+                wobLfo.start(0);
+
+                chainNode.connect(wobFilter);
+                chainNode = wobFilter;
+            }
+
+            // --- C4: Tremolo ---
+            const tremDepth = getV('p-trem-d');
+            if (tremDepth > 0) {
+                tremGain = actx.createGain();
+                nodes.push(tremGain);
+                tremGain.gain.setValueAtTime(1.0 - (tremDepth / 2.0), actx.currentTime);
+
+                tremLfo = actx.createOscillator();
+                tremGainMod = actx.createGain();
+                nodes.push(tremLfo, tremGainMod);
+                tremLfo.frequency.setValueAtTime(getV('p-trem-r'), actx.currentTime);
+                tremGainMod.gain.setValueAtTime(tremDepth / 2.0, actx.currentTime);
+
+                tremLfo.connect(tremGainMod);
+                tremGainMod.connect(tremGain.gain);
+                tremLfo.start(0);
+
+                chainNode.connect(tremGain);
+                chainNode = tremGain;
+            }
+
+            // --- C2: Binaural Offset Oscillator ---
+            const bOffset = getV('p-off');
+            if (bOffset > 0) {
+                offsetOsc = actx.createOscillator(); 
+                nodes.push(offsetOsc);
+                offsetOsc.type = mainOsc.type; 
+                offsetOsc.frequency.setValueAtTime(getV('p-f') + bOffset, actx.currentTime);
+                offsetOsc.connect(coreGain); 
+                offsetOsc.start(0);
+            }
+
+            // --- Spatial Stereo Panner ---
+            const panRate = getV('p-pan');
+            if (panRate > 0 && actx.createStereoPanner) {
+                panN = actx.createStereoPanner(); 
+                nodes.push(panN);
+                pLfo = actx.createOscillator();
+                pGain = actx.createGain(); 
+                nodes.push(pLfo, pGain);
+                pLfo.frequency.setValueAtTime(panRate, actx.currentTime); 
+                pGain.gain.setValueAtTime(0.9, actx.currentTime);
+                pLfo.connect(pGain); 
+                pGain.connect(panN.pan); 
+                pLfo.start(0);
+                
+                chainNode.connect(panN); 
+                chainNode = panN;
+            }
+
+            coreGain.gain.setValueAtTime(0.4, actx.currentTime);
+            chainNode.connect(shaperNode); 
+            mainOsc.start(0);
+        };
+
+        const loadPreset = (pKey) => {
+            const p = presets[pKey];
+            const setUI = (id, val, isF = false) => { 
+                document.getElementById(id).value = val; 
+                updTxt(id + '-v', val, isF); 
+            };
+            setUI('p-f', p.f, true); 
+            setUI('p-det', p.det); 
+            setUI('p-off', p.off); 
+            setUI('p-clust', p.clust);
+            setUI('p-fm-r', p.fmR);
+            setUI('p-fm-d', p.fmD);
+            setUI('p-swp-r', p.swpR);
+            setUI('p-swp-d', p.swpD);
+            setUI('p-dist', p.dist);
+            setUI('p-crush', p.crush);
+            setUI('p-rate', p.rate, true);
+            setUI('p-fb-t', p.fbT);
+            setUI('p-fb-g', p.fbG);
+            setUI('p-comb-q', p.combQ);
+            setUI('p-rot', p.rot);
+            setUI('p-vib-r', p.vibR);
+            setUI('p-vib-d', p.vibD); 
+            setUI('p-trem-r', p.tremR); 
+            setUI('p-trem-d', p.tremD); 
+            setUI('p-phas-r', p.phasR);
+            setUI('p-phas-d', p.phasD); 
+            setUI('p-wob-r', p.wobR);
+            setUI('p-wob-d', p.wobD);
+            setUI('p-pan', p.pan);
+            document.getElementById('p-type').value = p.type; 
+            document.getElementById('p-inharm').value = p.inharm; 
+            updDist();
+            startSnd();
+        };
+
+        // Real-Time Event Mappings
+        document.getElementById('p-f').addEventListener('input', e => { 
+            updTxt('p-f-v', e.target.value, true); 
+            if (active && mainOsc) { 
+                const baseF = parseFloat(e.target.value);
+                smth(mainOsc.frequency, baseF); 
+                clusterOscs.forEach(co => smth(co.frequency, baseF));
+                if (offsetOsc) smth(offsetOsc.frequency, baseF + getV('p-off')); 
+                if (combFilter) smth(combFilter.frequency, baseF);
+                
+                const inharmMode = document.getElementById('p-inharm').value;
+                if (inharmMode !== 'off' && inharmOscs.length === 3) {
+                    let ratios = [1.618, 2.618, 4.236];
+                    if (inharmMode === 'pythag') ratios = [1.414, 2.828, 4.242];
+                    if (inharmMode === 'pi') ratios = [3.141, 6.283, 9.424];
+                    ratios.forEach((r, idx) => smth(inharmOscs[idx].frequency, baseF * r));
+                }
+            } 
+        });
+
+        document.getElementById('p-type').addEventListener('change', e => { 
+            if (active) {
+                if (mainOsc) mainOsc.type = e.target.value;
+                if (offsetOsc) offsetOsc.type = e.target.value;
+                clusterOscs.forEach(co => co.type = e.target.value);
+            }
+        });
+
+        document.getElementById('p-inharm').addEventListener('change', () => { if (active) engineBuild(); });
+        document.getElementById('p-clust').addEventListener('input', e => { updTxt('p-clust-v', e.target.value); if (active) engineBuild(); });
+        
+        document.getElementById('p-det').addEventListener('input', e => { 
+            updTxt('p-det-v', e.target.value); 
+            if (active && mainOsc) smth(mainOsc.detune, e.target.value); 
+        });
+        
+        document.getElementById('p-off').addEventListener('input', e => { 
+            updTxt('p-off-v', e.target.value); 
+            if (active) engineBuild();
+        });
+
+        document.getElementById('p-fm-r').addEventListener('input', e => { updTxt('p-fm-r-v', e.target.value); if (active && fmMoodOsc) smth(fmMoodOsc.frequency, e.target.value); });
+        document.getElementById('p-fm-d').addEventListener('input', e => { updTxt('p-fm-d-v', e.target.value); if (active) engineBuild(); });
+
+        document.getElementById('p-swp-r').addEventListener('input', e => { updTxt('p-swp-r-v', e.target.value); if (active && swpLfo) smth(swpLfo.frequency, e.target.value); });
+        document.getElementById('p-swp-d').addEventListener('input', e => { updTxt('p-swp-d-v', e.target.value); if (active) engineBuild(); });
+
+        document.getElementById('p-dist').addEventListener('input', updDist);
+
+        document.getElementById('p-crush').addEventListener('input', e => { updTxt('p-crush-v', e.target.value); if (active) engineBuild(); });
+        document.getElementById('p-rate').addEventListener('input', e => { updTxt('p-rate-v', e.target.value, true); if (active) engineBuild(); });
+
+        document.getElementById('p-fb-t').addEventListener('input', e => { updTxt('p-fb-t-v', e.target.value); if (active && delayNode) smth(delayNode.delayTime, e.target.value); else if (active) engineBuild(); });
+        document.getElementById('p-fb-g').addEventListener('input', e => { updTxt('p-fb-g-v', e.target.value); if (active && fbGain) smth(fbGain.gain, e.target.value); else if (active) engineBuild(); });
+        document.getElementById('p-comb-q').addEventListener('input', e => { updTxt('p-comb-q-v', e.target.value); if (active && combFilter) smth(combFilter.Q, e.target.value); else if (active) engineBuild(); });
+
+        document.getElementById('p-rot').addEventListener('input', e => { updTxt('p-rot-v', e.target.value); if (active && rotLfo) smth(rotLfo.frequency, e.target.value); else if (active) engineBuild(); });
+        
+        document.getElementById('p-vib-r').addEventListener('input', e => { updTxt('p-vib-r-v', e.target.value); if (active && vibLfo) smth(vibLfo.frequency, e.target.value); });
+        document.getElementById('p-vib-d').addEventListener('input', e => { updTxt('p-vib-d-v', e.target.value); if (active) engineBuild(); });
+        
+        document.getElementById('p-trem-r').addEventListener('input', e => { updTxt('p-trem-r-v', e.target.value); if (active && tremLfo) smth(tremLfo.frequency, e.target.value); });
+        document.getElementById('p-trem-d').addEventListener('input', e => { updTxt('p-trem-d-v', e.target.value); if (active) engineBuild(); });
+        
+        document.getElementById('p-phas-r').addEventListener('input', e => { updTxt('p-phas-r-v', e.target.value); if (active && phasLfo) smth(phasLfo.frequency, e.target.value); });
+        document.getElementById('p-phas-d').addEventListener('input', e => { updTxt('p-phas-d-v', e.target.value); if (active) engineBuild(); });
+        
+        document.getElementById('p-wob-r').addEventListener('input', e => { updTxt('p-wob-r-v', e.target.value); if (active && wobLfo) smth(wobLfo.frequency, e.target.value); });
+        document.getElementById('p-wob-d').addEventListener('input', e => { updTxt('p-wob-d-v', e.target.value); if (active) engineBuild(); });
+        
+        document.getElementById('p-pan').addEventListener('input', e => { updTxt('p-pan-v', e.target.value); if (active) engineBuild(); });
+
+        const updMGain = () => { const v = getV('p-vol'); if (mGain) smth(mGain.gain, v); updTxt('p-vol-v', v); };
+        document.getElementById('p-vol').addEventListener('input', updMGain); 
+
+        const drawVis = () => {
+            requestAnimationFrame(drawVis);
+            const len = analyzer.frequencyBinCount, data = new Uint8Array(len);
+            analyzer.getByteTimeDomainData(data);
+            cctx.fillStyle = '#050507'; 
+            cctx.fillRect(0, 0, cv.width, cv.height);
+            cctx.lineWidth = 1.2; 
+            cctx.strokeStyle = active ? '#ff2a2a' : '#444';
+            cctx.beginPath();
+            let step = cv.width / len, x = 0;
+            for (let i = 0; i < len; i++) {
+                let y = (data[i] / 128.0) * cv.height / 2;
+                if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
+                x += step;
+            }
+            cctx.lineTo(cv.width, cv.height / 2); 
+            cctx.stroke();
+        };
+
+        const resz = () => { cv.width = cv.clientWidth; cv.height = 50; };
+        window.addEventListener('resize', resz); 
+        window.addEventListener('load', () => {
+            resz();
+            document.querySelectorAll('input[type="range"]').forEach(s => {
+                const isF = s.id.includes('-f') && !s.id.includes('l1f') && !s.id.includes('l2f');
+                updTxt(s.id + '-v', s.value, isF);
+            });
+        });
+    </script>
+</body>
+</html>
