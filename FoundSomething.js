@@ -892,88 +892,85 @@ function cleanArray(arr) {
 }
 
 async function runAdvancedScan() {
-    console.clear();
-    console.log(`%c 🚀 STARTING DEEP SCAN...`, 'background: #222; color: #bada55; font-size: 14px; padding: 4px;');
+    // Remove old modal if exists
+    document.getElementById('deepScanModal')?.remove();
+
+    // Create Modal
+    let modal = document.createElement('div');
+    modal.id = 'deepScanModal';
+    modal.innerHTML = `
+    <div id="ds-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999998;"></div>
+    <div id="ds-box" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;max-height:85vh;background:#111;color:#eee;border:1px solid #333;border-radius:12px;z-index:999999;display:flex;flex-direction:column;font-family:monospace;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,0.8)">
+        <div style="padding:12px 15px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;background:#1a1a1a;border-radius:12px 12px 0 0">
+            <span style="color:#bada55;font-weight:bold">🚀 DEEP SCAN - Fetching ${document.querySelectorAll('script[src]').length} scripts...</span>
+            <div>
+                <button id="ds-save-txt" style="margin-right:6px;padding:5px 10px;background:#2196f3;color:#fff;border:0;border-radius:5px;cursor:pointer">Save.TXT</button>
+                <button id="ds-save-json" style="margin-right:10px;padding:5px 10px;background:#4caf50;color:#fff;border:0;border-radius:5px;cursor:pointer">Save.JSON</button>
+                <button id="ds-close" style="padding:5px 10px;background:#f44336;color:#fff;border:0;border-radius:5px;cursor:pointer">✕ Close</button>
+            </div>
+        </div>
+        <div id="ds-content" style="padding:15px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5">
+            Scanning... ${(document.documentElement.outerHTML.length/1024).toFixed(1)} KB initial
+        </div>
+    </div>`;
+
+    document.body.appendChild(modal);
+    document.getElementById('ds-close').onclick = () => modal.remove();
+    document.getElementById('ds-overlay').onclick = () => modal.remove();
 
     let combinedSource = document.documentElement.outerHTML;
-
     const scripts = Array.from(document.querySelectorAll('script[src]'));
-    console.log(`%c 📦 Found ${scripts.length} external scripts. Fetching content...`, 'color: #00bcd4');
-
-    const fetchPromises = scripts.map(s => 
-        fetch(s.src)
-            .then(res => res.text())
-            .catch(e => {
-                console.warn("Failed to read script:", s.src);
-                return "";
-            })
-    );
-
+    const fetchPromises = scripts.map(s => fetch(s.src).then(r => r.text()).catch(e => ""));
     const scriptContents = await Promise.all(fetchPromises);
     combinedSource += "\n" + scriptContents.join("\n");
 
-    console.log(`%c 💾 Total Source Size: ${(combinedSource.length / 1024).toFixed(2)} KB`, 'color: #888');
-
     let rawResults = extract_info(combinedSource);
-
     let finalOutput = {};
-
     const clickableKeys = ['url', 'path', 'incomplete_path', 'ip', 'domain'];
 
     for (let key in rawResults) {
         let items = cleanArray(rawResults[key]);
-
         if (items.length > 0) {
             if (clickableKeys.includes(key)) {
-
                 finalOutput[key] = items.map(normalizeToLink).filter(x => x);
             } else {
-
                 finalOutput[key] = items.map(x => x.replace(/^['"]|['"]$/g, ''));
             }
-
             finalOutput[key] = [...new Set(finalOutput[key])];
         }
     }
 
-    console.log(`%c 🏁 SCAN COMPLETE`, 'background: #222; color: #bada55; font-size: 14px; padding: 4px;');
-
+    // Render
+    let html = `<div style="color:#888;margin-bottom:10px">Total Scanned: ${(combinedSource.length/1024).toFixed(2)} KB | Found ${Object.keys(finalOutput).length} categories</div>`;
     if (Object.keys(finalOutput).length === 0) {
-        console.log("No interesting data found based on current regex rules.");
+        html += `<div>No interesting data found.</div>`;
     } else {
-
-        if (finalOutput.secret || finalOutput.jwt || finalOutput.aws_key) {
-            console.group('%c 🧨 POTENTIAL SECRETS / KEYS', 'color: red; font-size: 12px; font-weight: bold;');
-            if(finalOutput.secret) console.table(finalOutput.secret);
-            if(finalOutput.jwt) console.log("JWTs:", finalOutput.jwt);
-            console.groupEnd();
+        for (let k in finalOutput) {
+            html += `<div style="margin-top:12px;color:#ff9800;font-weight:bold;border-bottom:1px solid #222;padding-bottom:3px">${k.toUpperCase()} (${finalOutput[k].length})</div>`;
+            finalOutput[k].forEach(item => {
+                if (clickableKeys.includes(k)) {
+                    html += `<a href="${item}" target="_blank" style="color:#4fc3f7;text-decoration:none">${item}</a><br>`;
+                } else {
+                    html += `<span style="color:#ddd">${item}</span><br>`;
+                }
+            });
         }
-
-        console.groupCollapsed('%c 🔗 API ENDPOINTS & PATHS (Click to Open)', 'color: #2196f3; font-size: 12px;');
-        if(finalOutput.url) {
-             console.log("%c Full URLs:", "color:gray", finalOutput.url);
-        }
-        if(finalOutput.path) {
-            console.log("%c Relative Paths (Converted):", "color:gray");
-            finalOutput.path.forEach(link => console.log(link)); 
-        }
-        console.groupEnd();
-
-        console.groupCollapsed('%c 🏗️ INFRASTRUCTURE (IPs & Domains)', 'color: #ff9800; font-size: 12px;');
-        if(finalOutput.ip) console.table(finalOutput.ip);
-        if(finalOutput.domain) console.table(finalOutput.domain);
-        console.groupEnd();
-
-        console.groupCollapsed('Other Findings');
-        Object.keys(finalOutput).forEach(k => {
-            if(!['secret','url','path','ip','domain','jwt'].includes(k)) {
-                console.log(k, finalOutput[k]);
-            }
-        });
-        console.groupEnd();
     }
+    document.getElementById('ds-content').innerHTML = html;
 
-    return "Scan Finished. Check groups above.";
+    // Save buttons
+    document.getElementById('ds-save-json').onclick = () => {
+        let blob = new Blob([JSON.stringify(finalOutput, null, 2)], {type: 'application/json'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `scan_${location.hostname}_${Date.now()}.json`; a.click();
+    };
+    document.getElementById('ds-save-txt').onclick = () => {
+        let txt = "";
+        for (let k in finalOutput) txt += `\n== ${k.toUpperCase()} ==\n` + finalOutput[k].join('\n') + '\n';
+        let blob = new Blob([txt], {type: 'text/plain'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `scan_${location.hostname}_${Date.now()}.txt`; a.click();
+    };
 }
 
 runAdvancedScan();
