@@ -735,115 +735,35 @@ var nuclei_regex = [
 ]
 var tab_url = {};
 var selected_id = -1;
+function get_js(){ return js; }
+function add_js(js_name) { js.push(js_name); }
+function unique(arr1){ if(arr1 == 'null') return null; let arr2=[]; arr1.forEach(function(item){ if(arr2.indexOf(item)==-1) arr2.push(item)}); return arr2 }
+function find(arr1,arr2){ var arr3=[]; arr1.forEach(function(item){ if(arr2.indexOf(item)==-1) arr3.push(item)}); return arr3 }
+function add(arr1,arr2){ if(!arr1) return arr2; if(!arr2) return arr1; arr1.forEach(function(item){ if(arr2.indexOf(item)==-1) arr2.push(item)}); return arr2 }
+function jiaoji(arr1,arr2){ var arr3=[]; arr1.forEach(function(item){ if(arr2.indexOf(item)>-1) arr3.push(item)}); return arr3 }
+function collect_static(arr1,arr2){ var arr3=arr1.slice(0,arr1.length); arr1.forEach(function(item){ for(var i=0;i<static_file.length;i++){ if(item.indexOf(static_file[i])!=-1){ if(static_file[i]=='.js' && item.indexOf('.jsp')!=-1) continue; arr3.splice(arr3.indexOf(item),1); if(arr2.indexOf(item)==-1) arr2.push(item) }}}); return {'arr1':arr3,'static':arr2} }
+function sub_1(arr1){ var arr3=[]; arr1.forEach(function(item){ let start=0,end=0; if(item.startsWith("'")||item.startsWith('"')) start=1; if(item.endsWith("'")||item.endsWith('"')) end=1; arr3.push(item.substring(start,item.length-end))}); return arr3 }
 
-function get_js(){
-	return js;
-}
-function add_js(js_name) {
-	js.push(js_name);
-}
-function unique(arr1){
-  if(arr1 == 'null'){
-    return null;
-  }
-  let arr2=[];
-  arr1.forEach(function (item,index,array) {
-
-    if(arr2.indexOf(item)==-1){
-      arr2.push(item)
-    }
-  })
-
-  return arr2
-}
-
-function find(arr1,arr2) {
-  var arr3 = []
-  arr1.forEach(function (item,index,array) {
-    if(arr2.indexOf(item)==-1){
-      arr3.push(item)
-    }
-  })
-  return arr3
-}
-
-function add(arr1,arr2) {
-  if(!arr1){
-    return arr2
-  }
-  if(!arr2){
-    return arr1
-  }
-  arr1.forEach(function (item,index,array) {
-    if(arr2.indexOf(item)==-1){
-      arr2.push(item)
-    }
-  })
-  return arr2
-}
-
-function jiaoji(arr1,arr2) {
-  var arr3 = [];
-  arr1.forEach(function (item,index,array) {
-    if(arr2.indexOf(item)>-1){
-      arr3.push(item)
-    }
-  })
-  return arr3
-}
-
-function collect_static(arr1,arr2) {
-  var arr3 = arr1.slice(0,arr1.length);
-  arr1.forEach(function (item,index,array) {
-    for (var i = 0; i < static_file.length; i++) {
-      if(item.indexOf(static_file[i])!=-1){
-        if(static_file[i]=='.js' && item.indexOf('.jsp')!=-1){
-           continue
-        }
-        arr3.splice(arr3.indexOf(item),1)
-        if(arr2.indexOf(item)==-1){
-            arr2.push(item)
-        }
-      }
-    }
-  })
-  return {'arr1':arr3,'static':arr2}
-}
-
-function sub_1(arr1) {
-  var arr3 = []
-  arr1.forEach(function (item,index,array) {
-    let start = 0
-    let end = 0
-    if(item.startsWith("'") || item.startsWith('"')){
-        start = 1
-    }
-    if(item.endsWith("'") || item.endsWith('"')){
-        end = 1
-    }
-    arr3.push(item.substring(start,item.length-end))
-  })
-  return arr3
-}
-
+// --- FIXED: was pushing capture groups as results = truncated ---
 function get_secret(data) {
-
     var result = [];
     for (var i = nuclei_regex.length - 1; i >= 0; i--) {
-        var tmp_result = data.match(nuclei_regex[i]);
-        if (tmp_result != null){
-            for(var j in tmp_result){
-                result.push(tmp_result[j]);
+        try{
+            var re = nuclei_regex[i];
+            // ensure global so we get ALL, not just first
+            if(!re.global){
+                re = new RegExp(re.source, re.flags + 'g');
             }
-        }
-
+            let m;
+            while((m = re.exec(data))!== null){
+                if(m[0]) result.push(m[0]); // only full match, not m[1], m[2]
+            }
+        }catch(e){}
     }
-
     return result;
 }
 
 function extract_info(data) {
-
   var extract_data = {}
   extract_data['sfz'] = data.match(/['"]((\d{8}(0\d|10|11|12)([0-2]\d|30|31)\d{3}$)|(\d{6}(18|19|20)\d{2}(0[1-9]|10|11|12)([0-2]\d|30|31)\d{3}(\d|X|x)))['"]/g);
   extract_data['mobile'] = data.match(/['"](1(3([0-35-9]\d|4[1-8])|4[14-9]\d|5([\d]\d|7[1-79])|66\d|7[2-35-8]\d|8\d{2}|9[89]\d)\d{7})['"]/g);
@@ -855,7 +775,6 @@ function extract_info(data) {
   extract_data['incomplete_path'] = data.match(/['"][^\/\>\< \)\(\{\}\,\'\"\\][\w\/]*?\/[\w\/]*?['"]/g);
   extract_data['url'] = data.match(/['"](([a-zA-Z0-9]+:)?\/\/)?[a-zA-Z0-9\-\.]*?\.(xin|com|cn|net|com.cn|vip|top|cc|shop|club|wang|xyz|luxe|site|news|pub|fun|online|win|red|loan|ren|mom|net.cn|org|link|biz|bid|help|tech|date|mobi|so|me|tv|co|vc|pw|video|party|pics|website|store|ltd|ink|trade|live|wiki|space|gift|lol|work|band|info|click|photo|market|tel|social|press|game|kim|org.cn|games|pro|men|love|studio|rocks|asia|group|science|design|software|engineer|lawyer|fit|beer|tw|我爱你|中国|公司|网络|在线|网址|网店|集团|中文网)(\:\d{1,5})?(\/.*?)?['"]/g);
   extract_data['jwt'] = data.match(/['"](ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}|ey[A-Za-z0-9_\/+-]{10,}\.[A-Za-z0-9._\/+-]{10,})['"]/g);
-
   extract_data['algorithm'] = data.match(/\W(Base64\.encode|Base64\.decode|btoa|atob|CryptoJS\.AES|CryptoJS\.DES|JSEncrypt|rsa|KJUR|$\.md5|md5|sha1|sha256|sha512)[\(\.]/gi);
   extract_data['secret'] = get_secret(data);
   if (extract_data['url']){
@@ -870,107 +789,92 @@ function extract_info(data) {
 
 function normalizeToLink(str) {
     if (!str) return null;
-
-    let clean = str.replace(/^['"]|['"]$/g, '').trim();
-
-    if (clean.length < 2) return null;
-
+    let clean = str.replace(/^['"`]+|['"`]+$/g, '').trim();
+    if (clean.length < 1) return null;
     if (clean.startsWith('http')) return clean;
     if (clean.startsWith('//')) return window.location.protocol + clean;
-
-    if (clean.startsWith('/') && !clean.includes(' ') && !clean.includes('<')) {
+    if (clean.startsWith('/') &&!clean.includes(' ') &&!clean.includes('<')) {
         return window.location.origin + clean;
     }
-
-    return clean; 
+    return clean;
 }
 
 function cleanArray(arr) {
     if (!arr) return [];
-
-    return [...new Set(arr)].filter(x => x !== null && x !== undefined);
+    return [...new Set(arr)].filter(x => x!== null && x!== undefined && x!== '');
 }
 
 async function runAdvancedScan() {
-    // Remove old modal if exists
     document.getElementById('deepScanModal')?.remove();
-
-    // Create Modal
     let modal = document.createElement('div');
     modal.id = 'deepScanModal';
     modal.innerHTML = `
     <div id="ds-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999998;"></div>
-    <div id="ds-box" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;max-height:85vh;background:#111;color:#eee;border:1px solid #333;border-radius:12px;z-index:999999;display:flex;flex-direction:column;font-family:monospace;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,0.8)">
+    <div id="ds-box" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;max-height:85vh;background:#111;color:#eee;border:1px solid #333;border-radius:12px;z-index:999999;display:flex;flex-direction:column;font-family:monospace;font-size:12px;">
         <div style="padding:12px 15px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;background:#1a1a1a;border-radius:12px 12px 0 0">
-            <span style="color:#bada55;font-weight:bold">🚀 DEEP SCAN - Fetching ${document.querySelectorAll('script[src]').length} scripts...</span>
+            <span style="color:#bada55;font-weight:bold">🚀 SCANNING ${document.querySelectorAll('script[src]').length} scripts...</span>
             <div>
                 <button id="ds-save-txt" style="margin-right:6px;padding:5px 10px;background:#2196f3;color:#fff;border:0;border-radius:5px;cursor:pointer">Save.TXT</button>
                 <button id="ds-save-json" style="margin-right:10px;padding:5px 10px;background:#4caf50;color:#fff;border:0;border-radius:5px;cursor:pointer">Save.JSON</button>
-                <button id="ds-close" style="padding:5px 10px;background:#f44336;color:#fff;border:0;border-radius:5px;cursor:pointer">✕ Close</button>
+                <button id="ds-close" style="padding:5px 10px;background:#f44336;color:#fff;border:0;border-radius:5px;cursor:pointer">✕</button>
             </div>
         </div>
-        <div id="ds-content" style="padding:15px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5">
-            Scanning... ${(document.documentElement.outerHTML.length/1024).toFixed(1)} KB initial
-        </div>
+        <div id="ds-content" style="padding:15px;overflow-y:auto;word-break:break-all;line-height:1.5">Scanning...</div>
     </div>`;
-
     document.body.appendChild(modal);
     document.getElementById('ds-close').onclick = () => modal.remove();
     document.getElementById('ds-overlay').onclick = () => modal.remove();
 
+    // FIXED: include inline scripts + try to get external from DOM first
     let combinedSource = document.documentElement.outerHTML;
-    const scripts = Array.from(document.querySelectorAll('script[src]'));
-    const fetchPromises = scripts.map(s => fetch(s.src).then(r => r.text()).catch(e => ""));
+    document.querySelectorAll('script').forEach(s=>{
+        if(s.textContent && s.textContent.length > 20) combinedSource += "\n" + s.textContent;
+    });
+    const external = Array.from(document.querySelectorAll('script[src]'));
+    const fetchPromises = external.map(s => fetch(s.src).then(r => r.text()).catch(e => ""));
     const scriptContents = await Promise.all(fetchPromises);
     combinedSource += "\n" + scriptContents.join("\n");
 
     let rawResults = extract_info(combinedSource);
     let finalOutput = {};
-    const clickableKeys = ['url', 'path', 'incomplete_path', 'ip', 'domain'];
-
+    const clickableKeys = ['url', 'path', 'incomplete_path', 'ip', 'domain', 'ip_port'];
     for (let key in rawResults) {
         let items = cleanArray(rawResults[key]);
         if (items.length > 0) {
             if (clickableKeys.includes(key)) {
                 finalOutput[key] = items.map(normalizeToLink).filter(x => x);
             } else {
-                finalOutput[key] = items.map(x => x.replace(/^['"]|['"]$/g, ''));
+                finalOutput[key] = items.map(x => x.replace(/^['"`]+|['"`]+$/g, ''));
             }
             finalOutput[key] = [...new Set(finalOutput[key])];
         }
     }
-
-    // Render
-    let html = `<div style="color:#888;margin-bottom:10px">Total Scanned: ${(combinedSource.length/1024).toFixed(2)} KB | Found ${Object.keys(finalOutput).length} categories</div>`;
-    if (Object.keys(finalOutput).length === 0) {
-        html += `<div>No interesting data found.</div>`;
-    } else {
+    let html = `<div style="color:#888;margin-bottom:10px">Scanned: ${(combinedSource.length/1024).toFixed(2)} KB</div>`;
+    if (Object.keys(finalOutput).length === 0) html += `<div>No data</div>`;
+    else {
         for (let k in finalOutput) {
-            html += `<div style="margin-top:12px;color:#ff9800;font-weight:bold;border-bottom:1px solid #222;padding-bottom:3px">${k.toUpperCase()} (${finalOutput[k].length})</div>`;
+            html += `<div style="margin-top:12px;color:#ff9800;font-weight:bold;border-bottom:1px solid #222">${k.toUpperCase()} (${finalOutput[k].length})</div>`;
             finalOutput[k].forEach(item => {
+                let esc = item.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 if (clickableKeys.includes(k)) {
-                    html += `<a href="${item}" target="_blank" style="color:#4fc3f7;text-decoration:none">${item}</a><br>`;
+                    html += `<a href="${esc}" target="_blank" style="color:#4fc3f7;text-decoration:none">${esc}</a><br>`;
                 } else {
-                    html += `<span style="color:#ddd">${item}</span><br>`;
+                    html += `<span style="color:#ddd">${esc}</span><br>`;
                 }
             });
         }
     }
     document.getElementById('ds-content').innerHTML = html;
-
-    // Save buttons
     document.getElementById('ds-save-json').onclick = () => {
         let blob = new Blob([JSON.stringify(finalOutput, null, 2)], {type: 'application/json'});
         let a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = `scan_${location.hostname}_${Date.now()}.json`; a.click();
     };
     document.getElementById('ds-save-txt').onclick = () => {
-        let txt = "";
-        for (let k in finalOutput) txt += `\n== ${k.toUpperCase()} ==\n` + finalOutput[k].join('\n') + '\n';
+        let txt = ""; for (let k in finalOutput) txt += `\n== ${k.toUpperCase()} ==\n` + finalOutput[k].join('\n') + '\n';
         let blob = new Blob([txt], {type: 'text/plain'});
         let a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = `scan_${location.hostname}_${Date.now()}.txt`; a.click();
     };
 }
-
 runAdvancedScan();
