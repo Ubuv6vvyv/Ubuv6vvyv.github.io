@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hypnotic & Ocular Optical Illusion Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Compact Fine-Line Optical Illusion Generator</title>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      touch-action: manipulation;
     }
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -17,19 +18,21 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      width: 100vw;
       overflow: hidden;
     }
     .container {
       display: flex;
       flex-direction: column;
       height: 100%;
+      width: 100%;
     }
     .canvas-container {
-      flex: 1;
+      flex: 1 1 auto;
       position: relative;
       background: #000;
       overflow: hidden;
-      min-height: 45vh;
+      min-height: 0; /* Allows flex item to shrink below content size */
     }
     canvas {
       width: 100%;
@@ -38,45 +41,38 @@
     }
     .controls {
       flex: 0 0 auto;
-      max-height: 50vh;
       background: #0f172a;
       border-top: 1px solid #1e293b;
-      padding: 12px;
-      overflow-y: auto;
-      font-size: 12px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .control-top {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #1e293b;
+      gap: 4px;
     }
     .control-group-inline {
       display: flex;
       align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+      gap: 4px;
     }
     select, button, input[type="color"] {
       background: #1e293b;
       color: #f8fafc;
       border: 1px solid #334155;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 11px;
       cursor: pointer;
       outline: none;
-      transition: all 0.2s ease;
+      height: 26px;
     }
-    select:hover, button:hover {
-      background: #334155;
-    }
-    .toggle-btn {
-      padding: 6px 12px;
+    select {
+      max-width: 160px;
     }
     .toggle-btn.active {
       background: #2563eb;
@@ -85,22 +81,32 @@
     }
     .sliders-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    @media (max-width: 500px) {
+      .sliders-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }
     .slider-group {
       background: #182238;
-      padding: 8px 10px;
-      border-radius: 6px;
+      padding: 3px 6px;
+      border-radius: 4px;
       border: 1px solid #24324d;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .slider-label {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 4px;
       color: #94a3b8;
-      font-weight: 500;
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
     }
     .slider-label span.value {
       color: #38bdf8;
@@ -108,34 +114,34 @@
     }
     input[type="range"] {
       width: 100%;
-      height: 4px;
+      height: 3px;
       background: #334155;
       border-radius: 2px;
       appearance: none;
       outline: none;
+      margin-top: 2px;
     }
     input[type="range"]::-webkit-slider-thumb {
       appearance: none;
-      width: 14px;
-      height: 14px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: #38bdf8;
       cursor: pointer;
     }
     .action-buttons {
       display: flex;
-      gap: 8px;
+      gap: 4px;
     }
     .action-buttons button {
       flex: 1;
       font-weight: 600;
+      font-size: 10px;
+      padding: 2px 4px;
     }
     .btn-primary {
       background: #2563eb;
       border-color: #3b82f6;
-    }
-    .btn-primary:hover {
-      background: #1d4ed8;
     }
   </style>
 </head>
@@ -147,89 +153,64 @@
     <div class="controls">
       <div class="control-top">
         <div class="control-group-inline">
-          <label for="patternSelect" style="color: #94a3b8; font-weight: 600;">Pattern Mode:</label>
           <select id="patternSelect">
-            <option value="vortex">Dual Counter-Rotating Vortex</option>
-            <option value="moire">Moiré Interference Lattice</option>
-            <option value="peripheral">Fraser Peripheral Drift Wheels</option>
+            <option value="vortex">Counter Vortex</option>
+            <option value="moire">Moiré Interference</option>
+            <option value="peripheral">Fraser Drift Wheels</option>
             <option value="tunnel">Op-Art Hyper-Tunnel</option>
-            <option value="ouchi">Ouchi Floating Lattice</option>
-            <option value="hering">Hering-Wundt Radiation Warp</option>
-            <option value="ripple">Oscillating Ripple Field</option>
-            <option value="pinwheel">Pinwheel Optical Exhaustion</option>
+            <option value="ouchi">Ouchi Floating Grid</option>
+            <option value="hering">Hering-Wundt Warp</option>
+            <option value="ripple">Oscillating Ripple</option>
+            <option value="pinwheel">Pinwheel Exhaustion</option>
           </select>
+          <input type="color" id="colorPicker" value="#ffffff" title="Line Color">
         </div>
         <div class="control-group-inline">
-          <button class="toggle-btn active" data-effect="invert">Invert (Dark/Light)</button>
-          <button class="toggle-btn" data-effect="rainbow">Spectrum Mode</button>
-          <button id="pauseToggle">Pause Motion</button>
-          <input type="color" id="colorPicker" value="#ffffff" title="Line Color">
+          <button class="toggle-btn active" data-effect="invert">Invert</button>
+          <button class="toggle-btn" data-effect="rainbow">Spectrum</button>
+          <button id="pauseToggle">Pause</button>
         </div>
       </div>
 
       <div class="sliders-grid">
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Line Density / Elements</span>
-            <span id="elementsValue" class="value">45</span>
-          </div>
-          <input type="range" id="elements" min="10" max="150" step="1" value="45">
+          <div class="slider-label"><span>Density</span><span id="elementsValue" class="value">60</span></div>
+          <input type="range" id="elements" min="5" max="300" step="1" value="60">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Line Thickness</span>
-            <span id="lineWidthValue" class="value">0.8</span>
-          </div>
-          <input type="range" id="lineWidth" min="0.05" max="4" step="0.05" value="0.8">
+          <div class="slider-label"><span>Thickness</span><span id="lineWidthValue" class="value">0.8</span></div>
+          <input type="range" id="lineWidth" min="0.01" max="8" step="0.01" value="0.8">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Rotation Speed</span>
-            <span id="rotationSpeedValue" class="value">5</span>
-          </div>
-          <input type="range" id="rotationSpeed" min="0" max="30" step="0.2" value="5">
+          <div class="slider-label"><span>Rotation</span><span id="rotationSpeedValue" class="value">6</span></div>
+          <input type="range" id="rotationSpeed" min="0" max="100" step="0.5" value="6">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Wave Speed</span>
-            <span id="waveSpeedValue" class="value">1.5</span>
-          </div>
-          <input type="range" id="waveSpeed" min="0" max="10" step="0.1" value="1.5">
+          <div class="slider-label"><span>Wave Speed</span><span id="waveSpeedValue" class="value">2</span></div>
+          <input type="range" id="waveSpeed" min="0" max="30" step="0.1" value="2">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Displacement Amplitude</span>
-            <span id="waveAmplitudeValue" class="value">20</span>
-          </div>
-          <input type="range" id="waveAmplitude" min="0" max="100" step="1" value="20">
+          <div class="slider-label"><span>Amplitude</span><span id="waveAmplitudeValue" class="value">25</span></div>
+          <input type="range" id="waveAmplitude" min="0" max="250" step="1" value="25">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Spatial Frequency</span>
-            <span id="waveFrequencyValue" class="value">4</span>
-          </div>
-          <input type="range" id="waveFrequency" min="1" max="30" step="0.5" value="4">
+          <div class="slider-label"><span>Spatial Freq</span><span id="waveFrequencyValue" class="value">6</span></div>
+          <input type="range" id="waveFrequency" min="0.5" max="100" step="0.5" value="6">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Spiral Curvature</span>
-            <span id="spiralMultiplierValue" class="value">8</span>
-          </div>
-          <input type="range" id="spiralMultiplier" min="1" max="25" step="0.5" value="8">
+          <div class="slider-label"><span>Curvature</span><span id="spiralMultiplierValue" class="value">12</span></div>
+          <input type="range" id="spiralMultiplier" min="0.5" max="60" step="0.5" value="12">
         </div>
         <div class="slider-group">
-          <div class="slider-label">
-            <span>Moiré / Angle Distortion</span>
-            <span id="distortionValue" class="value">15</span>
-          </div>
-          <input type="range" id="distortion" min="0" max="100" step="1" value="15">
+          <div class="slider-label"><span>Distortion</span><span id="distortionValue" class="value">20</span></div>
+          <input type="range" id="distortion" min="0" max="200" step="1" value="20">
         </div>
       </div>
 
       <div class="action-buttons">
-        <button id="randomize">Randomize Illusion</button>
-        <button id="reset">Reset Defaults</button>
-        <button id="download" class="btn-primary">Export High-Res PNG</button>
+        <button id="randomize">Randomize</button>
+        <button id="reset">Reset</button>
+        <button id="download" class="btn-primary">Export PNG</button>
       </div>
     </div>
   </div>
@@ -245,19 +226,16 @@
 
     const config = {
       pattern: 'vortex',
-      elements: 45,
+      elements: 60,
       lineWidth: 0.8,
-      rotationSpeed: 5,
-      waveSpeed: 1.5,
-      waveAmplitude: 20,
-      waveFrequency: 4,
-      spiralMultiplier: 8,
-      distortion: 15,
+      rotationSpeed: 6,
+      waveSpeed: 2,
+      waveAmplitude: 25,
+      waveFrequency: 6,
+      spiralMultiplier: 12,
+      distortion: 20,
       color: '#ffffff',
-      effects: {
-        invert: true,
-        rainbow: false
-      }
+      effects: { invert: true, rainbow: false }
     };
 
     function resizeCanvas() {
@@ -275,8 +253,8 @@
 
     function getColor(offset = 0) {
       if (config.effects.rainbow) {
-        const hue = (offset + time * 60) % 360;
-        return `hsl(${hue}, 85%, 60%)`;
+        const hue = (offset + time * 80) % 360;
+        return `hsl(${hue}, 90%, 60%)`;
       }
       return config.color;
     }
@@ -308,21 +286,17 @@
           ctx.beginPath();
           let first = true;
 
-          for (let r = 5; r < maxRadius; r += 2.5) {
-            const theta = baseAngle + dir * (Math.log(r * 0.05 + 1) * config.spiralMultiplier * 0.3 + time * config.rotationSpeed * 0.02);
-            const wave = Math.sin(r * config.waveFrequency * 0.02 + time * config.waveSpeed) * config.waveAmplitude;
+          for (let r = 3; r < maxRadius; r += 2) {
+            const theta = baseAngle + dir * (Math.log(r * 0.05 + 1) * config.spiralMultiplier * 0.2 + time * config.rotationSpeed * 0.01);
+            const wave = Math.sin(r * config.waveFrequency * 0.01 + time * config.waveSpeed) * config.waveAmplitude;
             const finalR = Math.max(0, r + wave);
             const x = cx + Math.cos(theta) * finalR;
             const y = cy + Math.sin(theta) * finalR;
 
-            if (config.effects.rainbow) ctx.strokeStyle = getColor(r + i * 10);
+            if (config.effects.rainbow) ctx.strokeStyle = getColor(r + i * 5);
 
-            if (first) {
-              ctx.moveTo(x, y);
-              first = false;
-            } else {
-              ctx.lineTo(x, y);
-            }
+            if (first) { ctx.moveTo(x, y); first = false; } 
+            else { ctx.lineTo(x, y); }
           }
           ctx.stroke();
         }
@@ -335,7 +309,6 @@
       const maxRadius = Math.hypot(cx, cy);
       const rings = Math.floor(config.elements * 1.5);
 
-      // Base Grid
       for (let i = 1; i <= rings; i++) {
         const r = (i / rings) * maxRadius;
         ctx.beginPath();
@@ -343,17 +316,16 @@
         ctx.stroke();
       }
 
-      // Superimposed Offset Moire Layer
       const offsetX = Math.cos(time * config.waveSpeed) * config.waveAmplitude;
       const offsetY = Math.sin(time * config.waveSpeed) * config.waveAmplitude;
-      const rotAngle = (config.distortion * 0.02) + time * config.rotationSpeed * 0.01;
+      const rotAngle = (config.distortion * 0.01) + time * config.rotationSpeed * 0.005;
 
       ctx.save();
       ctx.translate(cx + offsetX, cy + offsetY);
       ctx.rotate(rotAngle);
       for (let i = 1; i <= rings; i++) {
         const r = (i / rings) * maxRadius;
-        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 5);
+        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 4);
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.stroke();
@@ -365,14 +337,14 @@
       const cx = viewWidth / 2;
       const cy = viewHeight / 2;
       const maxRadius = Math.min(cx, cy) * 0.95;
-      const rings = Math.floor(config.elements * 0.6);
-      const tilt = (config.distortion * 0.01) + 0.35;
+      const rings = Math.floor(config.elements * 0.5);
+      const tilt = (config.distortion * 0.008) + 0.35;
 
       for (let rIdx = 1; rIdx <= rings; rIdx++) {
         const r = (rIdx / rings) * maxRadius;
-        const numSegments = Math.floor(r * 0.4 * (config.spiralMultiplier * 0.2 + 0.5));
+        const numSegments = Math.floor(r * 0.3 * (config.spiralMultiplier * 0.1 + 0.5));
         const rotDir = (rIdx % 2 === 0 ? 1 : -1);
-        const rot = rotDir * time * config.rotationSpeed * 0.01;
+        const rot = rotDir * time * config.rotationSpeed * 0.008;
 
         for (let s = 0; s < numSegments; s++) {
           const angle = (s / numSegments) * Math.PI * 2 + rot;
@@ -384,7 +356,7 @@
           const x2 = x1 + Math.cos(hatchAngle) * hatchLen;
           const y2 = y1 + Math.sin(hatchAngle) * hatchLen;
 
-          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle * 50 + rIdx * 10);
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle * 40 + rIdx * 5);
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
@@ -397,25 +369,25 @@
       const cx = viewWidth / 2;
       const cy = viewHeight / 2;
       const maxRadius = Math.hypot(cx, cy);
-      const rings = Math.floor(config.elements * 1.8);
+      const rings = Math.floor(config.elements * 1.5);
 
       for (let i = 1; i <= rings; i++) {
         const norm = i / rings;
         const baseR = Math.pow(norm, 1.8) * maxRadius;
-        const phase = time * config.waveSpeed * 2 - norm * config.waveFrequency * 5;
+        const phase = time * config.waveSpeed * 2 - norm * config.waveFrequency * 3;
         const waveR = baseR + Math.sin(phase) * config.waveAmplitude;
 
         if (waveR <= 0) continue;
 
-        const points = Math.floor(4 + config.spiralMultiplier);
+        const points = Math.floor(3 + config.spiralMultiplier * 0.5);
         ctx.beginPath();
         for (let p = 0; p <= points; p++) {
-          const a = (p / points) * Math.PI * 2 + time * config.rotationSpeed * 0.005 * (i % 2 === 0 ? 1 : -1);
-          const distMod = Math.cos(a * config.waveFrequency + phase) * (config.distortion * 0.15);
+          const a = (p / points) * Math.PI * 2 + time * config.rotationSpeed * 0.003 * (i % 2 === 0 ? 1 : -1);
+          const distMod = Math.cos(a * config.waveFrequency + phase) * (config.distortion * 0.1);
           const x = cx + Math.cos(a) * (waveR + distMod);
           const y = cy + Math.sin(a) * (waveR + distMod);
 
-          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 8);
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 6);
 
           if (p === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
@@ -429,12 +401,11 @@
       const cx = viewWidth / 2;
       const cy = viewHeight / 2;
       const discRadius = Math.min(cx, cy) * 0.45;
-      const step = Math.max(4, Math.floor(45 - config.elements * 0.2));
+      const step = Math.max(3, Math.floor(60 - config.elements * 0.15));
 
       const primaryColor = config.effects.invert ? '#ffffff' : '#000000';
       ctx.fillStyle = primaryColor;
 
-      // Background Grid (Vertical Stripes)
       ctx.save();
       for (let x = 0; x < viewWidth; x += step) {
         for (let y = 0; y < viewHeight; y += step * 2) {
@@ -443,9 +414,8 @@
         }
       }
 
-      // Foreground Disc (Horizontal Stripes with Motion Offset)
-      const floatX = cx + Math.cos(time * config.rotationSpeed * 0.2) * (config.waveAmplitude * 0.2);
-      const floatY = cy + Math.sin(time * config.rotationSpeed * 0.2) * (config.waveAmplitude * 0.2);
+      const floatX = cx + Math.cos(time * config.rotationSpeed * 0.1) * (config.waveAmplitude * 0.15);
+      const floatY = cy + Math.sin(time * config.rotationSpeed * 0.1) * (config.waveAmplitude * 0.15);
 
       ctx.beginPath();
       ctx.arc(floatX, floatY, discRadius, 0, Math.PI * 2);
@@ -476,18 +446,18 @@
       const maxRadius = Math.hypot(cx, cy);
 
       for (let i = 0; i < spokes; i++) {
-        const a = (i / spokes) * Math.PI * 2 + time * config.rotationSpeed * 0.005;
-        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 10);
+        const a = (i / spokes) * Math.PI * 2 + time * config.rotationSpeed * 0.003;
+        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 8);
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.lineTo(cx + Math.cos(a) * maxRadius, cy + Math.sin(a) * maxRadius);
         ctx.stroke();
       }
 
-      const lineSpacing = Math.max(12, 180 - config.waveFrequency * 4);
+      const lineSpacing = Math.max(8, 200 - config.waveFrequency * 2);
       const numLines = Math.floor(viewHeight / lineSpacing);
 
-      ctx.lineWidth = config.lineWidth * 2.5;
+      ctx.lineWidth = config.lineWidth * 2;
       const strokeStyle = config.effects.rainbow ? '#ff0055' : (config.effects.invert ? '#00e5ff' : '#ff0044');
       ctx.strokeStyle = strokeStyle;
 
@@ -504,19 +474,19 @@
     function drawRippleField() {
       const cx = viewWidth / 2;
       const cy = viewHeight / 2;
-      const rings = Math.floor(config.elements * 1.2);
+      const rings = Math.floor(config.elements);
       const maxRadius = Math.hypot(cx, cy);
 
       for (let i = 1; i <= rings; i++) {
         const r = (i / rings) * maxRadius;
         ctx.beginPath();
-        const points = 160;
+        const points = 140;
         for (let p = 0; p <= points; p++) {
           const a = (p / points) * Math.PI * 2;
-          const ripple = Math.sin(a * config.waveFrequency + r * 0.04 + time * config.waveSpeed * 2) * config.waveAmplitude;
+          const ripple = Math.sin(a * config.waveFrequency + r * 0.03 + time * config.waveSpeed * 2) * config.waveAmplitude;
           const radialDist = Math.max(0, r + ripple);
-          const x = cx + Math.cos(a + time * config.rotationSpeed * 0.005) * radialDist;
-          const y = cy + Math.sin(a + time * config.rotationSpeed * 0.005) * radialDist;
+          const x = cx + Math.cos(a + time * config.rotationSpeed * 0.003) * radialDist;
+          const y = cy + Math.sin(a + time * config.rotationSpeed * 0.003) * radialDist;
 
           if (config.effects.rainbow) ctx.strokeStyle = getColor(r + p);
 
@@ -534,15 +504,15 @@
       const maxRadius = Math.min(cx, cy) * 0.95;
 
       for (let i = 0; i < blades; i++) {
-        const baseAngle = (i / blades) * Math.PI * 2 + time * config.rotationSpeed * 0.01;
+        const baseAngle = (i / blades) * Math.PI * 2 + time * config.rotationSpeed * 0.008;
         ctx.beginPath();
-        for (let r = 0; r < maxRadius; r += 3) {
-          const phase = (r / maxRadius) * config.spiralMultiplier * 0.5;
-          const angle = baseAngle + Math.sin(phase + time * config.waveSpeed) * (config.waveAmplitude * 0.015);
+        for (let r = 0; r < maxRadius; r += 2) {
+          const phase = (r / maxRadius) * config.spiralMultiplier * 0.4;
+          const angle = baseAngle + Math.sin(phase + time * config.waveSpeed) * (config.waveAmplitude * 0.01);
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
 
-          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 12 + r);
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 8 + r);
 
           if (r === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
@@ -564,9 +534,7 @@
         case 'pinwheel': drawPinwheelExhaustion(); break;
       }
 
-      if (!isPaused) {
-        time += 0.016;
-      }
+      if (!isPaused) { time += 0.016; }
       animationId = requestAnimationFrame(draw);
     }
 
@@ -600,12 +568,12 @@
 
     document.getElementById('pauseToggle').addEventListener('click', (e) => {
       isPaused = !isPaused;
-      e.target.textContent = isPaused ? 'Resume Motion' : 'Pause Motion';
+      e.target.textContent = isPaused ? 'Resume' : 'Pause';
     });
 
     document.getElementById('download').addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = `optical_illusion_${config.pattern}.png`;
+      link.download = `illusion_${config.pattern}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     });
@@ -617,7 +585,7 @@
         const slider = document.getElementById(id);
         const min = parseFloat(slider.min);
         const max = parseFloat(slider.max);
-        const randomVal = (Math.random() * (max - min) + min).toFixed(2);
+        const randomVal = (Math.random() * (max - min) + min).toFixed(1);
         slider.value = randomVal;
         updateSlider(id, randomVal);
       });
@@ -625,14 +593,14 @@
 
     document.getElementById('reset').addEventListener('click', () => {
       const defaults = {
-        elements: 45,
+        elements: 60,
         lineWidth: 0.8,
-        rotationSpeed: 5,
-        waveSpeed: 1.5,
-        waveAmplitude: 20,
-        waveFrequency: 4,
-        spiralMultiplier: 8,
-        distortion: 15
+        rotationSpeed: 6,
+        waveSpeed: 2,
+        waveAmplitude: 25,
+        waveFrequency: 6,
+        spiralMultiplier: 12,
+        distortion: 20
       };
       Object.entries(defaults).forEach(([id, val]) => {
         const slider = document.getElementById(id);
