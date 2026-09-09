@@ -1,14 +1,19 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pattern Generator</title>
+  <title>Hypnotic & Ocular Optical Illusion Generator</title>
   <style>
-    body {
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #f8fafc;
-      color: #1e293b;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #090d16;
+      color: #f1f5f9;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -22,91 +27,115 @@
     .canvas-container {
       flex: 1;
       position: relative;
-      background: #fff;
-      border-bottom: 1px solid #e2e8f0;
-      min-height: 50vh;
+      background: #000;
+      overflow: hidden;
+      min-height: 45vh;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
     .controls {
-      flex: 0 0 50vh;
-      padding: 5px;
-      background: #fff;
+      flex: 0 0 auto;
+      max-height: 50vh;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      padding: 12px;
       overflow-y: auto;
       font-size: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
     }
     .control-top {
-      width: 100%;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: center;
-      gap: 5px;
-      margin-bottom: 5px;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1e293b;
     }
-    .control-top .pattern-select,
-    .control-top .color-picker {
-      margin: 2px;
-      font-size: 10px;
-    }
-    .toggle-group {
+    .control-group-inline {
       display: flex;
-      gap: 2px;
+      align-items: center;
+      gap: 8px;
       flex-wrap: wrap;
-      margin: 2px;
+    }
+    select, button, input[type="color"] {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    select:hover, button:hover {
+      background: #334155;
     }
     .toggle-btn {
-      padding: 2px 4px;
-      background: #eee;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
+      padding: 6px 12px;
     }
     .toggle-btn.active {
-      background: #007bff;
-      color: white;
-      border-color: #0056b3;
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #fff;
     }
     .sliders-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 5px;
-      width: 100%;
-      margin-bottom: 5px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
     }
     .slider-group {
-      padding: 4px;
-      background: #f8f8f8;
-      border-radius: 4px;
+      background: #182238;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #24324d;
     }
     .slider-label {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .slider-label span.value {
+      color: #38bdf8;
+      font-family: monospace;
     }
     input[type="range"] {
       width: 100%;
-      height: 15px;
+      height: 4px;
+      background: #334155;
+      border-radius: 2px;
+      appearance: none;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
     }
     .action-buttons {
       display: flex;
-      gap: 2px;
-      width: 100%;
+      gap: 8px;
     }
     .action-buttons button {
       flex: 1;
-      padding: 4px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 11px;
+      font-weight: 600;
     }
-    .action-buttons button:hover {
-      background: #0056b3;
+    .btn-primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
     }
   </style>
 </head>
@@ -117,99 +146,90 @@
     </div>
     <div class="controls">
       <div class="control-top">
-        <select class="pattern-select" id="patternSelect">
-          <option value="circles">Hypnotic Spiral</option>
-          <option value="scary">Dark Pattern</option>
-        </select>
-        <div class="toggle-group">
-          <button class="toggle-btn" data-effect="invert">Invert</button>
-          <button class="toggle-btn" data-effect="rainbow">Rainbow</button>
+        <div class="control-group-inline">
+          <label for="patternSelect" style="color: #94a3b8; font-weight: 600;">Pattern Mode:</label>
+          <select id="patternSelect">
+            <option value="vortex">Dual Counter-Rotating Vortex</option>
+            <option value="moire">Moiré Interference Lattice</option>
+            <option value="peripheral">Fraser Peripheral Drift Wheels</option>
+            <option value="tunnel">Op-Art Hyper-Tunnel</option>
+            <option value="ouchi">Ouchi Floating Lattice</option>
+            <option value="hering">Hering-Wundt Radiation Warp</option>
+            <option value="ripple">Oscillating Ripple Field</option>
+            <option value="pinwheel">Pinwheel Optical Exhaustion</option>
+          </select>
         </div>
-        <input type="color" id="colorPicker" class="color-picker" value="#000000">
+        <div class="control-group-inline">
+          <button class="toggle-btn active" data-effect="invert">Invert (Dark/Light)</button>
+          <button class="toggle-btn" data-effect="rainbow">Spectrum Mode</button>
+          <button id="pauseToggle">Pause Motion</button>
+          <input type="color" id="colorPicker" value="#ffffff" title="Line Color">
+        </div>
       </div>
+
       <div class="sliders-grid">
         <div class="slider-group">
           <div class="slider-label">
-            <span>Elements</span>
-            <span id="elementsValue">30</span>
+            <span>Line Density / Elements</span>
+            <span id="elementsValue" class="value">45</span>
           </div>
-          <input type="range" id="elements" min="5" max="200" step="1" value="30">
+          <input type="range" id="elements" min="10" max="150" step="1" value="45">
         </div>
         <div class="slider-group">
           <div class="slider-label">
-            <span>Line Width</span>
-            <span id="lineWidthValue">0.5</span>
+            <span>Line Thickness</span>
+            <span id="lineWidthValue" class="value">0.8</span>
           </div>
-          <input type="range" id="lineWidth" min="0.01" max="6" step="0.001" value="0.5">
-        </div>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Distortion (Careful)</span>
-            <span id="distortionValue">0</span>
-          </div>
-          <input type="range" id="distortion" min="0" max="100" step="1" value="0">
-        </div>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Wave Amplitude</span>
-            <span id="waveAmplitudeValue">25</span>
-          </div>
-          <input type="range" id="waveAmplitude" min="-25" max="285" step="1" value="50">
-        </div>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Wave Frequency</span>
-            <span id="waveFrequencyValue">1</span>
-          </div>
-          <input type="range" id="waveFrequency" min="-10" max="30" step="0.1" value="1">
+          <input type="range" id="lineWidth" min="0.05" max="4" step="0.05" value="0.8">
         </div>
         <div class="slider-group">
           <div class="slider-label">
             <span>Rotation Speed</span>
-            <span id="rotationSpeedValue">4</span>
+            <span id="rotationSpeedValue" class="value">5</span>
           </div>
-          <input type="range" id="rotationSpeed" min="0" max="50" step="0.1" value="4">
+          <input type="range" id="rotationSpeed" min="0" max="30" step="0.2" value="5">
         </div>
         <div class="slider-group">
           <div class="slider-label">
             <span>Wave Speed</span>
-            <span id="waveSpeedValue">1</span>
+            <span id="waveSpeedValue" class="value">1.5</span>
           </div>
-          <input type="range" id="waveSpeed" min="0" max="50" step="0.01" value="1">
+          <input type="range" id="waveSpeed" min="0" max="10" step="0.1" value="1.5">
         </div>
         <div class="slider-group">
           <div class="slider-label">
-            <span>Circle Step</span>
-            <span id="angleStepValue">0.01</span>
+            <span>Displacement Amplitude</span>
+            <span id="waveAmplitudeValue" class="value">20</span>
           </div>
-          <input type="range" id="angleStep" min="0.001" max="0.1" step="0.001" value="0.01">
+          <input type="range" id="waveAmplitude" min="0" max="100" step="1" value="20">
         </div>
         <div class="slider-group">
           <div class="slider-label">
-            <span>Spike Resolution</span>
-            <span id="spikeStepValue">0.1</span>
+            <span>Spatial Frequency</span>
+            <span id="waveFrequencyValue" class="value">4</span>
           </div>
-          <input type="range" id="spikeStep" min="0.01" max="0.5" step="0.01" value="0.1">
+          <input type="range" id="waveFrequency" min="1" max="30" step="0.5" value="4">
         </div>
         <div class="slider-group">
           <div class="slider-label">
-            <span>Spiral Multiplier</span>
-            <span id="spiralMultiplierValue">10</span>
+            <span>Spiral Curvature</span>
+            <span id="spiralMultiplierValue" class="value">8</span>
           </div>
-          <input type="range" id="spiralMultiplier" min="1" max="20" step="0.5" value="10">
+          <input type="range" id="spiralMultiplier" min="1" max="25" step="0.5" value="8">
         </div>
         <div class="slider-group">
           <div class="slider-label">
-            <span>Jitter Amount</span>
-            <span id="jitterValue">5</span>
+            <span>Moiré / Angle Distortion</span>
+            <span id="distortionValue" class="value">15</span>
           </div>
-          <input type="range" id="jitter" min="0" max="20" step="0.1" value="5">
+          <input type="range" id="distortion" min="0" max="100" step="1" value="15">
         </div>
       </div>
+
       <div class="action-buttons">
-        <button id="randomize">Randomize</button>
-        <button id="reset">Reset</button>
-        <button id="download">Download Canvas (PNG)</button>
+        <button id="randomize">Randomize Illusion</button>
+        <button id="reset">Reset Defaults</button>
+        <button id="download" class="btn-primary">Export High-Res PNG</button>
       </div>
     </div>
   </div>
@@ -219,213 +239,414 @@
     const ctx = canvas.getContext('2d');
     let animationId;
     let time = 0;
-    
+    let isPaused = false;
+    let viewWidth = 0;
+    let viewHeight = 0;
+
     const config = {
-      elements: 30,
-      lineWidth: 0.5,
-      rotationSpeed: 4,
-      waveSpeed: 1,
-      distortion: 0,
-      waveAmplitude: 25,
-      waveFrequency: 1,
-      angleStep: 0.01,
-      spikeStep: 0.1,
-      spiralMultiplier: 10,
-      jitter: 5,
-      pattern: 'circles',
-      color: '#000000',
+      pattern: 'vortex',
+      elements: 45,
+      lineWidth: 0.8,
+      rotationSpeed: 5,
+      waveSpeed: 1.5,
+      waveAmplitude: 20,
+      waveFrequency: 4,
+      spiralMultiplier: 8,
+      distortion: 15,
+      color: '#ffffff',
       effects: {
         invert: true,
         rainbow: false
       }
     };
-    
-    // Set invert toggle as active initially.
-    document.querySelector('[data-effect="invert"]').classList.add('active');
-    
+
     function resizeCanvas() {
       const container = canvas.parentElement;
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      viewWidth = container.clientWidth;
+      viewHeight = container.clientHeight;
+      canvas.width = viewWidth * dpr;
+      canvas.height = viewHeight * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
-    
-    function getColor(angle) {
+
+    function getColor(offset = 0) {
       if (config.effects.rainbow) {
-        const hue = (angle / (Math.PI * 2) * 360 + time * 50) % 360;
-        return `hsl(${hue}, 70%, 50%)`;
+        const hue = (offset + time * 60) % 360;
+        return `hsl(${hue}, 85%, 60%)`;
       }
       return config.color;
     }
-    
+
     function setupContext() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (config.pattern === 'scary' && !config.effects.invert) {
-        ctx.fillStyle = '#0d0d0d';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = config.color;
-      } else if (config.effects.invert) {
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'white';
+      ctx.clearRect(0, 0, viewWidth, viewHeight);
+      if (config.effects.invert) {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, viewWidth, viewHeight);
+        ctx.strokeStyle = config.effects.rainbow ? getColor() : (config.color === '#000000' ? '#ffffff' : config.color);
       } else {
-        ctx.strokeStyle = config.color;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, viewWidth, viewHeight);
+        ctx.strokeStyle = config.effects.rainbow ? getColor() : (config.color === '#ffffff' ? '#000000' : config.color);
       }
       ctx.lineWidth = config.lineWidth;
+      ctx.lineCap = 'round';
     }
-    
-    function drawHypnoticCircles() {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const maxRadius = Math.min(canvas.width, canvas.height) * 0.45;
-      for (let i = 0; i < config.elements; i++) {
-        const radius = (i + 1) * (maxRadius / config.elements);
+
+    function drawLogarithmicVortex() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const maxRadius = Math.hypot(cx, cy);
+      const arms = Math.floor(config.elements);
+
+      for (let dir = -1; dir <= 1; dir += 2) {
+        for (let i = 0; i < arms; i++) {
+          const baseAngle = (i / arms) * Math.PI * 2;
+          ctx.beginPath();
+          let first = true;
+
+          for (let r = 5; r < maxRadius; r += 2.5) {
+            const theta = baseAngle + dir * (Math.log(r * 0.05 + 1) * config.spiralMultiplier * 0.3 + time * config.rotationSpeed * 0.02);
+            const wave = Math.sin(r * config.waveFrequency * 0.02 + time * config.waveSpeed) * config.waveAmplitude;
+            const finalR = Math.max(0, r + wave);
+            const x = cx + Math.cos(theta) * finalR;
+            const y = cy + Math.sin(theta) * finalR;
+
+            if (config.effects.rainbow) ctx.strokeStyle = getColor(r + i * 10);
+
+            if (first) {
+              ctx.moveTo(x, y);
+              first = false;
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawMoireLattice() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const maxRadius = Math.hypot(cx, cy);
+      const rings = Math.floor(config.elements * 1.5);
+
+      // Base Grid
+      for (let i = 1; i <= rings; i++) {
+        const r = (i / rings) * maxRadius;
         ctx.beginPath();
-        for (let angle = 0; angle < Math.PI * 2; angle += config.angleStep) {
-          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
-          const distortedRadius = radius +
-            Math.sin(angle * config.waveFrequency + time * config.waveSpeed) * config.waveAmplitude +
-            Math.random() * config.distortion;
-          const rotatedAngle = angle + time * config.rotationSpeed * (i % 2 ? 1 : -1) * 0.01;
-          const x = centerX + Math.cos(rotatedAngle) * distortedRadius;
-          const y = centerY + Math.sin(rotatedAngle) * distortedRadius;
-          angle === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Superimposed Offset Moire Layer
+      const offsetX = Math.cos(time * config.waveSpeed) * config.waveAmplitude;
+      const offsetY = Math.sin(time * config.waveSpeed) * config.waveAmplitude;
+      const rotAngle = (config.distortion * 0.02) + time * config.rotationSpeed * 0.01;
+
+      ctx.save();
+      ctx.translate(cx + offsetX, cy + offsetY);
+      ctx.rotate(rotAngle);
+      for (let i = 1; i <= rings; i++) {
+        const r = (i / rings) * maxRadius;
+        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 5);
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawFraserSpiral() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const maxRadius = Math.min(cx, cy) * 0.95;
+      const rings = Math.floor(config.elements * 0.6);
+      const tilt = (config.distortion * 0.01) + 0.35;
+
+      for (let rIdx = 1; rIdx <= rings; rIdx++) {
+        const r = (rIdx / rings) * maxRadius;
+        const numSegments = Math.floor(r * 0.4 * (config.spiralMultiplier * 0.2 + 0.5));
+        const rotDir = (rIdx % 2 === 0 ? 1 : -1);
+        const rot = rotDir * time * config.rotationSpeed * 0.01;
+
+        for (let s = 0; s < numSegments; s++) {
+          const angle = (s / numSegments) * Math.PI * 2 + rot;
+          const x1 = cx + Math.cos(angle) * r;
+          const y1 = cy + Math.sin(angle) * r;
+
+          const hatchLen = (maxRadius / rings) * 1.2;
+          const hatchAngle = angle + (rIdx % 2 === 0 ? tilt : -tilt);
+          const x2 = x1 + Math.cos(hatchAngle) * hatchLen;
+          const y2 = y1 + Math.sin(hatchAngle) * hatchLen;
+
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle * 50 + rIdx * 10);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawOpArtTunnel() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const maxRadius = Math.hypot(cx, cy);
+      const rings = Math.floor(config.elements * 1.8);
+
+      for (let i = 1; i <= rings; i++) {
+        const norm = i / rings;
+        const baseR = Math.pow(norm, 1.8) * maxRadius;
+        const phase = time * config.waveSpeed * 2 - norm * config.waveFrequency * 5;
+        const waveR = baseR + Math.sin(phase) * config.waveAmplitude;
+
+        if (waveR <= 0) continue;
+
+        const points = Math.floor(4 + config.spiralMultiplier);
+        ctx.beginPath();
+        for (let p = 0; p <= points; p++) {
+          const a = (p / points) * Math.PI * 2 + time * config.rotationSpeed * 0.005 * (i % 2 === 0 ? 1 : -1);
+          const distMod = Math.cos(a * config.waveFrequency + phase) * (config.distortion * 0.15);
+          const x = cx + Math.cos(a) * (waveR + distMod);
+          const y = cy + Math.sin(a) * (waveR + distMod);
+
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 8);
+
+          if (p === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+
+    function drawOuchiIllusion() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const discRadius = Math.min(cx, cy) * 0.45;
+      const step = Math.max(4, Math.floor(45 - config.elements * 0.2));
+
+      const primaryColor = config.effects.invert ? '#ffffff' : '#000000';
+      ctx.fillStyle = primaryColor;
+
+      // Background Grid (Vertical Stripes)
+      ctx.save();
+      for (let x = 0; x < viewWidth; x += step) {
+        for (let y = 0; y < viewHeight; y += step * 2) {
+          const shift = ((Math.floor(x / step) % 2) * step);
+          ctx.fillRect(x, y + shift, step * 0.5, step);
+        }
+      }
+
+      // Foreground Disc (Horizontal Stripes with Motion Offset)
+      const floatX = cx + Math.cos(time * config.rotationSpeed * 0.2) * (config.waveAmplitude * 0.2);
+      const floatY = cy + Math.sin(time * config.rotationSpeed * 0.2) * (config.waveAmplitude * 0.2);
+
+      ctx.beginPath();
+      ctx.arc(floatX, floatY, discRadius, 0, Math.PI * 2);
+      ctx.clip();
+
+      ctx.fillStyle = config.effects.invert ? '#000000' : '#ffffff';
+      ctx.fillRect(floatX - discRadius, floatY - discRadius, discRadius * 2, discRadius * 2);
+
+      ctx.fillStyle = primaryColor;
+      for (let x = floatX - discRadius - step; x < floatX + discRadius + step; x += step * 2) {
+        for (let y = floatY - discRadius - step; y < floatY + discRadius + step; y += step) {
+          const shift = ((Math.floor(y / step) % 2) * step);
+          ctx.fillRect(x + shift, y, step, step * 0.5);
+        }
+      }
+
+      ctx.beginPath();
+      ctx.arc(floatX, floatY, discRadius, 0, Math.PI * 2);
+      ctx.lineWidth = config.lineWidth * 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawHeringWundt() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const spokes = Math.floor(config.elements);
+      const maxRadius = Math.hypot(cx, cy);
+
+      for (let i = 0; i < spokes; i++) {
+        const a = (i / spokes) * Math.PI * 2 + time * config.rotationSpeed * 0.005;
+        if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 10);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * maxRadius, cy + Math.sin(a) * maxRadius);
+        ctx.stroke();
+      }
+
+      const lineSpacing = Math.max(12, 180 - config.waveFrequency * 4);
+      const numLines = Math.floor(viewHeight / lineSpacing);
+
+      ctx.lineWidth = config.lineWidth * 2.5;
+      const strokeStyle = config.effects.rainbow ? '#ff0055' : (config.effects.invert ? '#00e5ff' : '#ff0044');
+      ctx.strokeStyle = strokeStyle;
+
+      for (let i = -numLines; i <= numLines; i++) {
+        if (i === 0) continue;
+        const y = cy + i * lineSpacing;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(viewWidth, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawRippleField() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const rings = Math.floor(config.elements * 1.2);
+      const maxRadius = Math.hypot(cx, cy);
+
+      for (let i = 1; i <= rings; i++) {
+        const r = (i / rings) * maxRadius;
+        ctx.beginPath();
+        const points = 160;
+        for (let p = 0; p <= points; p++) {
+          const a = (p / points) * Math.PI * 2;
+          const ripple = Math.sin(a * config.waveFrequency + r * 0.04 + time * config.waveSpeed * 2) * config.waveAmplitude;
+          const radialDist = Math.max(0, r + ripple);
+          const x = cx + Math.cos(a + time * config.rotationSpeed * 0.005) * radialDist;
+          const y = cy + Math.sin(a + time * config.rotationSpeed * 0.005) * radialDist;
+
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(r + p);
+
+          if (p === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
         ctx.stroke();
       }
     }
-    
-    function drawScaryPattern() {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const maxRadius = Math.min(canvas.width, canvas.height) * 0.45;
-      // Draw spiral.
-      for (let i = 0; i < config.elements; i++) {
+
+    function drawPinwheelExhaustion() {
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
+      const blades = Math.floor(config.elements);
+      const maxRadius = Math.min(cx, cy) * 0.95;
+
+      for (let i = 0; i < blades; i++) {
+        const baseAngle = (i / blades) * Math.PI * 2 + time * config.rotationSpeed * 0.01;
         ctx.beginPath();
-        const spiralOffset = (i / config.elements) * Math.PI * 2;
-        for (let radius = 0; radius < maxRadius; radius += 2) {
-          const angle = (radius / maxRadius) * Math.PI * config.spiralMultiplier +
-            time * config.rotationSpeed + spiralOffset;
-          if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
-          const distortion = Math.sin(angle * config.waveFrequency + time * config.waveSpeed) * config.waveAmplitude;
-          const noiseX = Math.random() * config.distortion;
-          const noiseY = Math.random() * config.distortion;
-          const extraJitter = (Math.random() - 0.5) * config.jitter;
-          const x = centerX + Math.cos(angle) * (radius + distortion) + noiseX + extraJitter;
-          const y = centerY + Math.sin(angle) * (radius + distortion) + noiseY + extraJitter;
-          radius === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-      for (let i = 0; i < config.elements / 2; i++) {
-        ctx.beginPath();
-        const angle = (i / config.elements) * Math.PI * 4 + time * config.rotationSpeed;
-        if (config.effects.rainbow) ctx.strokeStyle = getColor(angle);
-        for (let t = 0; t <= 1; t += config.spikeStep) {
-          const spikeRadius = maxRadius * (0.5 + Math.sin(t * Math.PI * 2) * 0.3);
-          const extraJitter = (Math.random() - 0.5) * config.jitter;
-          const x = centerX + Math.cos(angle + t * Math.PI) * spikeRadius + extraJitter;
-          const y = centerY + Math.sin(angle + t * Math.PI) * spikeRadius + extraJitter;
-          t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        for (let r = 0; r < maxRadius; r += 3) {
+          const phase = (r / maxRadius) * config.spiralMultiplier * 0.5;
+          const angle = baseAngle + Math.sin(phase + time * config.waveSpeed) * (config.waveAmplitude * 0.015);
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+
+          if (config.effects.rainbow) ctx.strokeStyle = getColor(i * 12 + r);
+
+          if (r === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
         ctx.stroke();
       }
     }
-    
+
     function draw() {
       setupContext();
       switch (config.pattern) {
-        case 'circles':
-          drawHypnoticCircles();
-          break;
-        case 'scary':
-          drawScaryPattern();
-          break;
+        case 'vortex': drawLogarithmicVortex(); break;
+        case 'moire': drawMoireLattice(); break;
+        case 'peripheral': drawFraserSpiral(); break;
+        case 'tunnel': drawOpArtTunnel(); break;
+        case 'ouchi': drawOuchiIllusion(); break;
+        case 'hering': drawHeringWundt(); break;
+        case 'ripple': drawRippleField(); break;
+        case 'pinwheel': drawPinwheelExhaustion(); break;
       }
-      time += 0.016;
+
+      if (!isPaused) {
+        time += 0.016;
+      }
       animationId = requestAnimationFrame(draw);
     }
-    
-    function updateSliderValue(sliderId, value) {
-      document.getElementById(`${sliderId}Value`).textContent = value;
-      config[sliderId] = parseFloat(value);
+
+    function updateSlider(id, val) {
+      document.getElementById(`${id}Value`).textContent = val;
+      config[id] = parseFloat(val);
     }
-    
-    ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'distortion',
-     'waveAmplitude', 'waveFrequency', 'angleStep', 'spikeStep', 'spiralMultiplier', 'jitter'
+
+    ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'waveAmplitude',
+     'waveFrequency', 'spiralMultiplier', 'distortion'
     ].forEach(id => {
       const slider = document.getElementById(id);
-      slider.addEventListener('input', (e) => updateSliderValue(id, e.target.value));
+      slider.addEventListener('input', (e) => updateSlider(id, e.target.value));
     });
-    
+
     document.getElementById('patternSelect').addEventListener('change', (e) => {
       config.pattern = e.target.value;
     });
+
     document.getElementById('colorPicker').addEventListener('input', (e) => {
       config.color = e.target.value;
     });
+
     document.querySelectorAll('.toggle-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const effect = btn.dataset.effect;
         config.effects[effect] = !config.effects[effect];
-        btn.classList.toggle('active');
-      });
-    });
-    document.getElementById('download').addEventListener('click', () => {
-      const link = document.createElement('a');
-      link.download = 'pattern.png';
-      link.href = canvas.toDataURL();
-      link.click();
-    });
-    document.getElementById('randomize').addEventListener('click', () => {
-      ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'distortion',
-       'waveAmplitude', 'waveFrequency', 'angleStep', 'spikeStep', 'spiralMultiplier', 'jitter'
-      ].forEach(key => {
-        const slider = document.getElementById(key);
-        const randomValue = Math.random() * (slider.max - slider.min) + parseFloat(slider.min);
-        slider.value = randomValue;
-        updateSliderValue(key, randomValue);
-      });
-      Object.keys(config.effects).forEach(effect => {
-        config.effects[effect] = Math.random() > 0.01;
-        const btn = document.querySelector(`[data-effect="${effect}"]`);
         btn.classList.toggle('active', config.effects[effect]);
       });
-      const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
-      document.getElementById('colorPicker').value = randomColor;
-      config.color = randomColor;
     });
-    document.getElementById('reset').addEventListener('click', () => {
-      const defaultValues = {
-        elements: 30,
-        lineWidth: 0.5,
-        rotationSpeed: 4,
-        waveSpeed: 1,
-        distortion: 0,
-        waveAmplitude: 25,
-        waveFrequency: 1,
-        angleStep: 0.01,
-        spikeStep: 0.1,
-        spiralMultiplier: 10,
-        jitter: 5
-      };
-      Object.entries(defaultValues).forEach(([key, value]) => {
-        const slider = document.getElementById(key);
-        slider.value = value;
-        updateSliderValue(key, value);
+
+    document.getElementById('pauseToggle').addEventListener('click', (e) => {
+      isPaused = !isPaused;
+      e.target.textContent = isPaused ? 'Resume Motion' : 'Pause Motion';
+    });
+
+    document.getElementById('download').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `optical_illusion_${config.pattern}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    document.getElementById('randomize').addEventListener('click', () => {
+      ['elements', 'lineWidth', 'rotationSpeed', 'waveSpeed', 'waveAmplitude',
+       'waveFrequency', 'spiralMultiplier', 'distortion'
+      ].forEach(id => {
+        const slider = document.getElementById(id);
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        const randomVal = (Math.random() * (max - min) + min).toFixed(2);
+        slider.value = randomVal;
+        updateSlider(id, randomVal);
       });
-      Object.keys(config.effects).forEach(effect => {
-        config.effects[effect] = false;
-        const btn = document.querySelector(`[data-effect="${effect}"]`);
-        btn.classList.remove('active');
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      const defaults = {
+        elements: 45,
+        lineWidth: 0.8,
+        rotationSpeed: 5,
+        waveSpeed: 1.5,
+        waveAmplitude: 20,
+        waveFrequency: 4,
+        spiralMultiplier: 8,
+        distortion: 15
+      };
+      Object.entries(defaults).forEach(([id, val]) => {
+        const slider = document.getElementById(id);
+        slider.value = val;
+        updateSlider(id, val);
       });
       config.effects.invert = true;
+      config.effects.rainbow = false;
       document.querySelector('[data-effect="invert"]').classList.add('active');
-      document.getElementById('colorPicker').value = '#000000';
-      config.color = '#000000';
+      document.querySelector('[data-effect="rainbow"]').classList.remove('active');
+      config.color = '#ffffff';
+      document.getElementById('colorPicker').value = '#ffffff';
     });
-    
+
     draw();
   </script>
 </body>
