@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUSION ENGINE v6.0</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap');
+body{background:#030303;color:#fff;font-family:'Inter',-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+.extreme-font{font-family:'Archivo Black',sans-serif}
+.control-card{background:linear-gradient(145deg,rgba(30,30,30,.9),rgba(10,10,10,.9));border-radius:16px;padding:1.25rem;border:1px solid rgba(255,0,0,.2);box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
+input[type=range]{accent-color:#f00;width:100%;height:6px;background:#222;border-radius:10px;cursor:pointer}
+input[type=text]{background:#111;border:1px solid #444;color:#fff;padding:.75rem;border-radius:8px;width:100%;font-family:'Archivo Black',sans-serif;text-transform:uppercase}
+input[type=text]:focus{outline:none;border-color:#f00;box-shadow:0 0 10px rgba(255,0,0,.3)}
+canvas{image-rendering:pixelated;max-width:100%;height:auto!important;border-radius:8px}
+.btn-primary{background:linear-gradient(to right,#f00,#900);box-shadow:0 4px 15px rgba(255,0,0,.3);transition:all .2s cubic-bezier(.175,.885,.32,1.275)}
+.btn-primary:active{transform:scale(.92)}
+.custom-scrollbar::-webkit-scrollbar{width:4px}
+.custom-scrollbar::-webkit-scrollbar-track{background:#111}
+.custom-scrollbar::-webkit-scrollbar-thumb{background:#f00;border-radius:10px}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 10px rgba(255,0,0,.5)}50%{box-shadow:0 0 25px rgba(255,0,0,.8)}}
+.rendering-active{animation:pulse-red 1.5s infinite}
+#msgBox{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;pointer-events:none}
+</style>
+</head>
+<body class="p-4 min-h-screen flex flex-col items-center custom-scrollbar">
+<div id="msgBox"></div>
+<header class="w-full max-w-md mb-6 text-center">
+  <div class="inline-block bg-red-600 px-2 py-0.5 mb-1 text-[10px] font-black tracking-widest uppercase">Level 3 Extreme</div>
+  <h1 class="text-4xl extreme-font text-white leading-none tracking-tighter uppercase">Lusion Engine</h1>
+  <p class="text-[10px] text-gray-500 mt-2 font-mono uppercase tracking-widest">v6.0 // 65 Effects</p>
+  <p class="text-[9px] text-zinc-600 mt-1 uppercase tracking-widest">⚠ Rapid flashing — photosensitivity caution</p>
+</header>
+<div class="w-full max-w-md">
+  <!-- ── STICKY PANEL: always visible while controls scroll ── -->
+  <div class="sticky top-0 z-30 pb-2" style="background:#030303">
+    <div class="relative bg-zinc-900 rounded-xl overflow-hidden border-2 border-zinc-800">
+      <div id="canvasWrapper" class="flex justify-center bg-black">
+        <canvas id="previewCanvas" style="max-height:52vw;width:auto"></canvas>
+      </div>
+      <div id="renderOverlay" class="hidden absolute inset-0 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+        <div class="relative w-20 h-20 mb-3">
+          <svg class="w-full h-full transform -rotate-90">
+            <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="7" fill="transparent" class="text-zinc-800"/>
+            <circle id="progressCircle" cx="40" cy="40" r="34" stroke="currentColor" stroke-width="7" fill="transparent" stroke-dasharray="213.6" stroke-dashoffset="213.6" class="text-red-600 transition-all duration-300"/>
+          </svg>
+          <div id="renderProgress" class="absolute inset-0 flex items-center justify-center text-lg font-black extreme-font">0%</div>
+        </div>
+        <p id="statusText" class="text-xs font-bold text-red-500 uppercase tracking-[.3em]">Processing</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <button onclick="togglePreview()" id="playBtn" class="btn-primary py-3 rounded-xl text-white font-black extreme-font uppercase text-sm tracking-widest">Start Live</button>
+      <button onclick="generateGIF()" class="bg-white py-3 rounded-xl text-black font-black extreme-font uppercase text-sm tracking-widest">Render GIF</button>
+    </div>
+  </div>
+  <!-- ── SCROLLABLE CONTROLS ── -->
+  <main class="space-y-4 mt-2">
+    <div class="control-card">
+      <label class="block text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Select Effect</label>
+      <select id="presetSelect" class="w-full bg-black text-white border border-zinc-800 rounded-lg p-3 focus:border-red-600 outline-none text-sm font-bold appearance-none mb-3">
+        <optgroup label="Text Engine">
+          <option value="text" selected>Custom Word Burst</option>
+        </optgroup>
+        <optgroup label="Classic Optical Illusions">
+          <option value="ouchi">Ouchi (Relative Motion)</option>
+          <option value="hypno_rings">Hypnotic Expansion</option>
+          <option value="pinwheel">Peripheral Pinwheel</option>
+          <option value="droste">Droste Void Zoom</option>
+          <option value="peripheral">Fraser-Wilcox Grid</option>
+        </optgroup>
+        <optgroup label="Classic Strobes">
+          <option value="quad">Quadrant Strobe</option>
+          <option value="split">Split Alternate</option>
+          <option value="checker">Checker Insanity</option>
+          <option value="rotate">Rotational Flash</option>
+          <option value="slice">Vertical Slice</option>
+          <option value="rgb">RGB Channel Offset</option>
+          <option value="desync">Phase Desync Quad</option>
+          <option value="radial">Radial Pulse</option>
+          <option value="invert">Temporal Inversion</option>
+        </optgroup>
+        <optgroup label="Extreme Additions">
+          <option value="scanline">Interlaced Static</option>
+          <option value="glitch">Chunk Displacement</option>
+          <option value="spiral">Hypno Spiral</option>
+          <option value="tunnel">Infinite Void</option>
+          <option value="noise">Gaussian Filth</option>
+          <option value="mosaic">Macro Pixel Strobe</option>
+          <option value="starfield">Warp Velocity</option>
+          <option value="plasma">Heat Map Cycle</option>
+          <option value="wave">Sinusoidal Warp</option>
+          <option value="orbit">Solar Flare</option>
+        </optgroup>
+        <optgroup label="Peripheral Drift">
+          <option value="rotating_snakes">Rotating Snakes</option>
+          <option value="scintillating_grid">Scintillating Grid</option>
+          <option value="barberpole">Barber Pole Ambiguity</option>
+          <option value="plaid_drift">Plaid Cross-Drift</option>
+          <option value="moire">Moiré Fringe Engine</option>
+          <option value="herringbone">Herringbone Glare</option>
+          <option value="sunburst">Sunburst Ray Glare</option>
+        </optgroup>
+        <optgroup label="Optic Flow Hijack">
+          <option value="vection">Vection Polygon Tunnel</option>
+          <option value="warp">Warp Funnel Streak</option>
+          <option value="fractal">Breathing Fractal</option>
+          <option value="corridor">Infinite Corridor</option>
+        </optgroup>
+        <optgroup label="Temporal Exhaustion">
+          <option value="strobe_matrix">Async Strobe Matrix</option>
+          <option value="afterimage">Afterimage Burst</option>
+          <option value="pulse_field">Binary Pulse Field</option>
+        </optgroup>
+        <optgroup label="Chromatic Rivalry">
+          <option value="chroma_pulse">Chroma Pulse</option>
+          <option value="anaglyph">Anaglyph Drift</option>
+          <option value="complementary">Complementary Flicker</option>
+        </optgroup>
+        <optgroup label="Hybrid Combos">
+          <option value="vortex_strobe">Vortex Strobe</option>
+          <option value="fraser_tunnel">Fraser-Wilcox Tunnel</option>
+          <option value="chromatic_vertigo">Chromatic Vertigo</option>
+          <option value="glare_storm">Glare Storm</option>
+          <option value="serpent_storm">Serpent Storm</option>
+          <option value="fortification">Fortification Arc</option>
+          <option value="saccade_trap">Saccade Trap</option>
+        </optgroup>
+        <optgroup label="★ Static Motion Inducers">
+          <option value="cafe_wall">Café Wall Mortar</option>
+          <option value="fraser_spiral">Fraser Fake Spiral</option>
+          <option value="pinna_rings">Pinna-Brelstaff Rings</option>
+          <option value="chevron_drift">Chevron Directional Drift</option>
+          <option value="bilateral_drift">Bilateral Opposition</option>
+        </optgroup>
+        <optgroup label="★ Grid & Glare Extremes">
+          <option value="lingelbach">Dense Lingelbach Grid</option>
+          <option value="ehrenstein">Ehrenstein Radial Glare</option>
+          <option value="contrast_beat">Spatial Beat Frequency</option>
+          <option value="radiance">White Radiance Blast</option>
+          <option value="oblique_grating">Oblique Grating Strain</option>
+        </optgroup>
+        <optgroup label="★ Vortex & Deep Spiral">
+          <option value="log_spiral">Log Spiral Vortex</option>
+          <option value="counter_rings">Counter-Spin Rings</option>
+          <option value="leviant">Leviant Enigma</option>
+        </optgroup>
+        <optgroup label="★ Temporal Aliasing">
+          <option value="wagon_wheel">Wagon Wheel Alias</option>
+          <option value="reverse_phi">Reverse Phi Motion</option>
+          <option value="stroboscopic">Stroboscopic Leap</option>
+        </optgroup>
+      </select>
+      <div id="textInputContainer">
+        <label class="block text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Words (Comma Separated)</label>
+        <input type="text" id="customTextInput" value="VOID, MAX, FLASH, GO, KILL, LIVE" placeholder="ENTER, WORDS, HERE">
+      </div>
+    </div>
+    <div class="control-card grid grid-cols-1 gap-5">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Resolution</label><span id="resVal" class="text-sm font-black text-red-600 leading-none">400px</span></div>
+          <input type="range" id="resSlider" min="100" max="600" step="10" value="400">
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Complexity</label><span id="complexityVal" class="text-sm font-black text-red-600 leading-none">5</span></div>
+          <input type="range" id="complexitySlider" min="1" max="30" value="5">
+        </div>
+      </div>
+      <div class="space-y-2">
+        <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Intensity (Speed)</label><span id="intensityVal" class="text-sm font-black text-red-600 leading-none">25</span></div>
+        <input type="range" id="intensitySlider" min="1" max="70" value="25">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">FPS</label><span id="fpsVal" class="text-sm font-black text-red-600 leading-none">30</span></div>
+          <input type="range" id="fpsSlider" min="5" max="60" value="30">
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Frames</label><span id="frameVal" class="text-sm font-black text-red-600 leading-none">30</span></div>
+          <input type="range" id="frameSlider" min="10" max="150" value="30">
+        </div>
+      </div>
+    </div>
+    <div class="control-card grid grid-cols-1 gap-4">
+      <label class="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 -mb-1">Post-FX — global on every effect</label>
+      <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Chroma Split</label><span id="chromaVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+          <input type="range" id="chromaSlider" min="0" max="50" value="0">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Invert Pulse</label><span id="flickerVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+          <input type="range" id="flickerSlider" min="0" max="60" value="0">
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Spin Speed</label><span id="spinVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+          <input type="range" id="spinSlider" min="0" max="60" value="0">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Zoom Pulse</label><span id="zoomVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+          <input type="range" id="zoomSlider" min="0" max="50" value="0">
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Contrast Crush</label><span id="contrastVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+          <input type="range" id="contrastSlider" min="0" max="100" value="0">
+        </div>
+      </div>
+      <div class="space-y-2">
+        <div class="flex justify-between items-end"><label class="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Motion Trail</label><span id="trailVal" class="text-sm font-black text-red-600 leading-none">0</span></div>
+        <input type="range" id="trailSlider" min="0" max="19" value="0">
+      </div>
+    </div>
+  </div>
+  <div id="resultContainer" class="flex flex-col items-center gap-4 pb-12"></div>
+  </main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<script>
+const canvas=document.getElementById("previewCanvas");
+const ctx=canvas.getContext("2d",{alpha:false});
+const bufCanvas=document.createElement("canvas");
+const bufCtx=bufCanvas.getContext("2d",{alpha:false});
+const fxCanvas=document.createElement("canvas");
+const fxCtx=fxCanvas.getContext("2d",{alpha:false});
+const playBtn=document.getElementById("playBtn");
+const renderOverlay=document.getElementById("renderOverlay");
+const progressEl=document.getElementById("renderProgress");
+const circleEl=document.getElementById("progressCircle");
+const statusText=document.getElementById("statusText");
+const textInputContainer=document.getElementById("textInputContainer");
+const customTextInput=document.getElementById("customTextInput");
+let animationId,tick=0,isRunning=false;
+
+// ── OPTIMAL PRESET DEFAULTS ──────────────────────────────────────────────────
+// Each key maps to {f=fps,fr=frames,i=intensity,c=complexity,ch=chroma,
+//                   fl=flicker,sp=spin,z=zoom,co=contrast,tr=trail}
+// Missing keys fall back to GLOBAL_DEFAULTS.
+const GD={f:30,fr:24,i:25,c:6,ch:0,fl:0,sp:0,z:0,co:0,tr:0};
+const PD={
+  text:          {i:30,f:8,c:5,ch:20,fl:15,co:20},
+  ouchi:         {i:15,c:8,sp:3,co:20},
+  hypno_rings:   {i:20,c:10,z:15,co:10},
+  pinwheel:      {i:25,c:12,fl:8,co:15},
+  droste:        {i:15,c:8,z:20,co:15},
+  peripheral:    {i:20,c:10,co:15},
+  quad:          {i:30,c:4,fl:22,co:60},
+  split:         {i:30,c:8,fl:22,co:40},
+  checker:       {i:30,c:8,fl:22,co:80},
+  rotate:        {i:20,c:8,sp:5,co:20},
+  slice:         {i:30,c:12,fl:26,co:40},
+  rgb:           {i:25,ch:30,co:30},
+  desync:        {i:30,fl:20,co:50},
+  radial:        {i:20,c:8,fl:15,co:30},
+  invert:        {i:25,c:8,fl:22,co:80},
+  scanline:      {i:30,c:15,fl:22,co:40},
+  glitch:        {i:30,c:12,fl:26,co:30},
+  spiral:        {i:20,c:10,sp:8,co:20},
+  tunnel:        {i:20,c:12,z:30,co:20},
+  noise:         {i:30,c:12,fl:26},
+  mosaic:        {i:30,c:8,fl:26,co:30},
+  starfield:     {i:25,c:15,tr:5,co:20},
+  plasma:        {i:20,c:8,ch:20,co:20},
+  wave:          {i:25,c:12,co:20},
+  orbit:         {i:25,c:10,ch:15,fl:15,co:20},
+  rotating_snakes:{i:15,c:8,sp:5,co:30},
+  scintillating_grid:{i:20,c:10,fl:14,co:50},
+  barberpole:    {i:25,c:12,co:30},
+  plaid_drift:   {i:20,c:10,ch:20,co:20},
+  moire:         {i:15,c:12,sp:3,co:40},
+  herringbone:   {i:30,c:12,fl:22,co:60},
+  sunburst:      {i:20,c:15,sp:5,fl:15,co:30},
+  vection:       {i:15,c:8,z:25,co:20},
+  warp:          {i:25,c:12,tr:3,co:20},
+  fractal:       {i:15,c:10,sp:5,z:15,co:20},
+  corridor:      {i:15,c:10,z:20,fl:10,co:20},
+  strobe_matrix: {i:30,c:8,fl:26,co:80},
+  afterimage:    {i:30,fl:26,co:60},
+  pulse_field:   {i:30,c:10,fl:28,co:80},
+  chroma_pulse:  {i:20,c:8,ch:40,co:20},
+  anaglyph:      {i:20,c:8,ch:35,co:20},
+  complementary: {i:30,fl:26,co:30},
+  vortex_strobe: {i:25,c:10,fl:22,sp:5,co:60},
+  fraser_tunnel: {i:15,c:8,z:20,co:20},
+  chromatic_vertigo:{i:15,c:8,ch:35,sp:5,co:20},
+  glare_storm:   {i:30,c:12,fl:22,co:60},
+  serpent_storm: {i:15,c:8,sp:8,co:20},
+  fortification: {i:20,c:10,fl:15,co:30},
+  saccade_trap:  {i:25,c:10,fl:18,co:30},
+  cafe_wall:     {i:12,c:6,co:40},
+  fraser_spiral: {i:10,c:8,sp:3,co:30},
+  pinna_rings:   {i:10,c:8,z:35,co:20},
+  chevron_drift: {i:20,c:8,co:20},
+  bilateral_drift:{i:20,c:10,co:20},
+  lingelbach:    {i:20,c:12,fl:16,co:50},
+  ehrenstein:    {i:15,c:8,fl:10,co:30},
+  contrast_beat: {i:15,c:8,co:60},
+  radiance:      {i:20,c:15,fl:22,co:50},
+  oblique_grating:{i:15,c:12,co:60},
+  log_spiral:    {i:15,c:6,sp:8,z:20,co:20},
+  counter_rings: {i:15,c:8,co:40},
+  leviant:       {i:10,c:10,sp:3,co:20},
+  wagon_wheel:   {i:25,c:10,fl:22,co:30},
+  reverse_phi:   {i:25,c:8,fl:18,co:30},
+  stroboscopic:  {i:30,c:8,fl:26,co:40}
+};
+function applyPresetDefaults(preset){
+  const p=PD[preset]||{};
+  const s=(el,id,k)=>{const v=p[k]!==undefined?p[k]:GD[k];el.value=v;document.getElementById(id).innerText=v};
+  s(cfg.fps,'fpsVal','f');s(cfg.frames,'frameVal','fr');
+  s(cfg.intensity,'intensityVal','i');s(cfg.complexity,'complexityVal','c');
+  s(cfg.chroma,'chromaVal','ch');s(cfg.flicker,'flickerVal','fl');
+  s(cfg.spin,'spinVal','sp');s(cfg.zoom,'zoomVal','z');
+  s(cfg.contrast,'contrastVal','co');s(cfg.trail,'trailVal','tr');
+  showMsg('Optimal settings loaded','bg-zinc-700');
+}
+const cfg={
+  res:document.getElementById("resSlider"),fps:document.getElementById("fpsSlider"),
+  frames:document.getElementById("frameSlider"),intensity:document.getElementById("intensitySlider"),
+  complexity:document.getElementById("complexitySlider"),
+  chroma:document.getElementById("chromaSlider"),flicker:document.getElementById("flickerSlider"),
+  spin:document.getElementById("spinSlider"),zoom:document.getElementById("zoomSlider"),
+  contrast:document.getElementById("contrastSlider"),trail:document.getElementById("trailSlider"),
+  preset:document.getElementById("presetSelect")
+};
+function showMsg(text,cls="bg-red-600"){const el=document.createElement("div");el.className=`${cls} text-white px-4 py-2 rounded shadow-lg mb-2 text-xs font-bold uppercase tracking-widest transition-opacity duration-1000`;el.innerText=text;document.getElementById("msgBox").appendChild(el);setTimeout(()=>{el.style.opacity="0";setTimeout(()=>el.remove(),1000)},3000)}
+function updateSize(){const s=parseInt(cfg.res.value);[canvas,bufCanvas,fxCanvas].forEach(c=>{c.width=s;c.height=s});document.getElementById("resVal").innerText=`${s}px`;if(!isRunning)drawFrame()}
+function handlePreset(){textInputContainer.style.display=cfg.preset.value==="text"?"block":"none";applyPresetDefaults(cfg.preset.value);if(!isRunning)drawFrame()}
+cfg.res.oninput=updateSize;
+cfg.fps.oninput=()=>document.getElementById("fpsVal").innerText=cfg.fps.value;
+cfg.frames.oninput=()=>document.getElementById("frameVal").innerText=cfg.frames.value;
+cfg.intensity.oninput=()=>{document.getElementById("intensityVal").innerText=cfg.intensity.value;if(!isRunning)drawFrame()};
+cfg.complexity.oninput=()=>{document.getElementById("complexityVal").innerText=cfg.complexity.value;if(!isRunning)drawFrame()};
+cfg.chroma.oninput=()=>{document.getElementById("chromaVal").innerText=cfg.chroma.value;if(!isRunning)drawFrame()};
+cfg.flicker.oninput=()=>{document.getElementById("flickerVal").innerText=cfg.flicker.value;if(!isRunning)drawFrame()};
+cfg.spin.oninput=()=>{document.getElementById("spinVal").innerText=cfg.spin.value;if(!isRunning)drawFrame()};
+cfg.zoom.oninput=()=>{document.getElementById("zoomVal").innerText=cfg.zoom.value;if(!isRunning)drawFrame()};
+cfg.contrast.oninput=()=>{document.getElementById("contrastVal").innerText=cfg.contrast.value;if(!isRunning)drawFrame()};
+cfg.trail.oninput=()=>{document.getElementById("trailVal").innerText=cfg.trail.value;if(!isRunning)drawFrame()};
+cfg.preset.onchange=handlePreset;
+customTextInput.oninput=()=>{if(!isRunning)drawFrame()};
+function togglePreview(){isRunning?stopPreview():startPreview()}
+function startPreview(){isRunning=true;playBtn.innerText="Stop Live";playBtn.classList.replace("btn-primary","bg-zinc-700");animate()}
+function stopPreview(){isRunning=false;playBtn.innerText="Start Live";playBtn.classList.replace("bg-zinc-700","btn-primary");cancelAnimationFrame(animationId)}
+function animate(){if(!isRunning)return;drawFrame();tick++;animationId=requestAnimationFrame(animate)}
+
+function drawFrame(){
+  const preset=cfg.preset.value,w=canvas.width,h=canvas.height;
+  const intensity=parseInt(cfg.intensity.value),complexity=parseInt(cfg.complexity.value);
+  const chroma=parseInt(cfg.chroma.value),flicker=parseInt(cfg.flicker.value);
+  const spin=parseInt(cfg.spin.value),zoom=parseInt(cfg.zoom.value);
+  const contrast=parseInt(cfg.contrast.value),trail=parseInt(cfg.trail.value);
+  const speed=tick*(intensity/10);
+  const ctx=bufCtx; // render into off-screen buffer; postFX composites to visible canvas
+  // Trail: partially retain previous frame instead of full clear — creates motion persistence/ghosting
+  if(trail>0){ctx.fillStyle=`rgba(0,0,0,${1-trail/20})`;ctx.fillRect(0,0,w,h)}
+  else{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h)}
+
+  switch(preset){
+
+  // ── TEXT ENGINE ─────────────────────────────────────────────────────────────
+  case"text":{
+    const words=(customTextInput.value||"VOID").split(",").map(w=>w.trim().toUpperCase()).filter(w=>w.length>0);
+    if(!words.length)words.push("VOID");
+    const word=words[Math.floor(speed)%words.length];
+    const tog=Math.floor(speed*2)%2===0;
+    ctx.fillStyle=tog?"#000":"#fff";ctx.fillRect(0,0,w,h);
+    ctx.fillStyle=tog?"#fff":"#000";
+    let base=100;ctx.font=`900 ${base}px Archivo Black,Impact,sans-serif`;
+    const tw=ctx.measureText(word).width,th=base*.75;
+    const fs=base*Math.min((w*.9)/tw,(h*.9)/th);
+    ctx.font=`900 ${fs}px Archivo Black,Impact,sans-serif`;
+    ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(word,w/2,h/2);
+    if(complexity>5){ctx.globalAlpha=.5;const off=complexity*2;ctx.fillStyle="#f00";ctx.fillText(word,w/2-off,h/2);ctx.fillStyle="#0ff";ctx.fillText(word,w/2+off,h/2);ctx.globalAlpha=1}
+    break}
+
+  // ── CLASSIC OPTICAL ILLUSIONS ────────────────────────────────────────────────
+  case"ouchi":{
+    const sw=Math.max(2,40/complexity);
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.fillStyle="#fff";
+    for(let x=0;x<w;x+=sw*2)ctx.fillRect(x,0,sw,h);
+    const cs=w*.6,dx=Math.sin(speed*.1)*complexity*2,dy=Math.cos(speed*.1)*complexity*2;
+    ctx.save();ctx.beginPath();ctx.arc(w/2+dx,h/2+dy,cs/2,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.fillStyle="#fff";
+    for(let y=0;y<h;y+=sw*2)ctx.fillRect(0,y,w,sw);
+    ctx.restore();break}
+
+  case"hypno_rings":{
+    const rw=Math.max(5,w/(complexity*2)),off=(speed*rw*.2)%(rw*2);
+    for(let r=w*1.5;r>0;r-=rw){ctx.beginPath();ctx.arc(w/2,h/2,Math.max(0,r+off),0,Math.PI*2);ctx.fillStyle=Math.floor(r/rw)%2===0?"#fff":"#000";ctx.fill()}
+    break}
+
+  case"pinwheel":{
+    ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.05);
+    const sl=complexity*4,ang=Math.PI*2/sl;
+    for(let i=0;i<sl;i++){ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,i*ang,(i+1)*ang);ctx.fillStyle=i%2===0?"#fff":"#000";ctx.fill()}
+    ctx.restore();break}
+
+  case"droste":{
+    ctx.save();ctx.translate(w/2,h/2);
+    const cnt=complexity*2;
+    for(let i=cnt;i>0;i--){const p=((i/cnt)+(speed*.02))%1,s=w*2.5*Math.pow(p,2);ctx.rotate(speed*.01*(i%2===0?1:-1));ctx.fillStyle=i%2===0?"#fff":"#000";ctx.fillRect(-s/2,-s/2,s,s)}
+    ctx.restore();break}
+
+  case"peripheral":{
+    const cols=Math.max(4,complexity),cs=w/cols;
+    for(let x=0;x<cols;x++)for(let y=0;y<cols;y++){const ph=(x+y)*.5+speed*.2;const l1=Math.sin(ph)*127+128;ctx.fillStyle=`rgb(${l1},${l1},${l1})`;ctx.fillRect(x*cs,y*cs,cs,cs);const l2=Math.cos(ph)*127+128;ctx.fillStyle=`rgb(${l2},${l2},${l2})`;ctx.fillRect(x*cs+cs*.25,y*cs+cs*.25,cs*.5,cs*.5)}
+    break}
+
+  // ── CLASSIC STROBES ──────────────────────────────────────────────────────────
+  case"quad":{const d=complexity>5?4:2,sw=w/d,sh=h/d,tog=Math.floor(speed)%2===0;for(let x=0;x<d;x++)for(let y=0;y<d;y++){ctx.fillStyle=((x+y)%2===0===tog)?"#fff":"#000";ctx.fillRect(x*sw,y*sh,sw,sh)}break}
+  case"split":{const tog=Math.floor(speed)%2===0,sw=w/complexity;for(let i=0;i<complexity;i++){ctx.fillStyle=i%2===0===tog?"#f00":"#00f";ctx.fillRect(i*sw,0,sw,h)}break}
+  case"checker":{const cs=Math.max(4,100/complexity),tog=Math.floor(speed)%2===0;for(let x=0;x<w;x+=cs)for(let y=0;y<h;y+=cs)if((Math.floor(x/cs)+Math.floor(y/cs))%2===0===tog){ctx.fillStyle="#fff";ctx.fillRect(x,y,cs,cs)}break}
+  case"rotate":{ctx.save();ctx.translate(w/2,h/2);for(let i=0;i<complexity;i++){ctx.rotate(speed*.1*(i+1));ctx.strokeStyle=Math.floor(speed+i)%2===0?"#fff":"#f00";ctx.lineWidth=complexity;ctx.strokeRect(-w/(4+i),-h/(4+i),w/(2+i),h/(2+i))}ctx.restore();break}
+  case"slice":{const sl=Math.max(2,complexity*2),sw=w/sl;for(let i=0;i<sl;i++){ctx.fillStyle=Math.floor(speed+i)%2===0?"#fff":"#000";ctx.fillRect(i*sw,0,sw,h)}break}
+  case"rgb":{ctx.globalCompositeOperation="lighter";const o=Math.sin(speed*.5)*complexity*2;ctx.fillStyle="#f00";ctx.fillRect(o,0,w,h);ctx.fillStyle="#0f0";ctx.fillRect(-o,o,w,h);ctx.fillStyle="#00f";ctx.fillRect(0,-o,w,h);ctx.globalCompositeOperation="source-over";break}
+  case"desync":{const g=complexity>10?4:2,s=w/g;for(let i=0;i<g*g;i++){ctx.fillStyle=Math.floor(speed+(i*.2))%2===0?"#fff":"#000";ctx.fillRect((i%g)*s,Math.floor(i/g)*s,s,s)}break}
+  case"radial":{for(let i=complexity;i>0;i--){const r=(i/complexity)*(w*.8)+Math.sin(speed)*20;ctx.fillStyle=Math.floor(speed+i)%2===0?"#fff":"#000";ctx.beginPath();ctx.arc(w/2,h/2,r,0,Math.PI*2);ctx.fill()}break}
+  case"invert":{const tog=Math.floor(speed)%2===0;for(let i=0;i<complexity;i++){const s=w-(i*(w/complexity));ctx.fillStyle=i%2===0===tog?"#fff":"#000";ctx.fillRect(w/2-s/2,h/2-s/2,s,s)}break}
+
+  // ── EXTREME ADDITIONS ────────────────────────────────────────────────────────
+  case"scanline":{const lh=Math.max(1,40/complexity);for(let y=0;y<h;y+=lh){ctx.fillStyle=Math.floor(y/lh+speed)%2===0?"#fff":"#000";ctx.fillRect(0,y,w,lh)}break}
+  case"glitch":{ctx.fillStyle=Math.floor(speed)%2===0?"#fff":"#000";ctx.fillRect(0,0,w,h);for(let i=0;i<complexity*2;i++){ctx.fillStyle=i%2===0?"#f00":"#0ff";ctx.fillRect(Math.random()*w,Math.random()*h,Math.random()*w/2,Math.random()*20)}break}
+  case"spiral":{ctx.save();ctx.translate(w/2,h/2);const pts=complexity*5;for(let i=0;i<pts;i++){ctx.rotate(speed*.05);ctx.fillStyle=i%2===0?"#fff":"#000";ctx.beginPath();ctx.arc(0,0,(pts-i)*(w/pts),0,Math.PI*2);ctx.fill()}ctx.restore();break}
+  case"tunnel":{const cnt=complexity*2,tog=Math.floor(speed)%2===0;for(let i=cnt;i>0;i--){const s=(i/cnt)*w+Math.sin(speed)*20;ctx.fillStyle=i%2===(tog?0:1)?"#fff":"#000";ctx.fillRect(w/2-s/2,h/2-s/2,s,s)}break}
+  case"noise":{const gr=Math.max(1,Math.floor(10/(complexity/2))),tog=Math.floor(speed)%2===0;for(let x=0;x<w;x+=gr)for(let y=0;y<h;y+=gr)if(Math.random()>(tog?.3:.7)){ctx.fillStyle="#fff";ctx.fillRect(x,y,gr,gr)}break}
+  case"mosaic":{const ms=Math.max(5,w/(complexity+2));for(let x=0;x<w;x+=ms)for(let y=0;y<h;y+=ms){ctx.fillStyle=Math.random()>.5?"#fff":"#000";ctx.fillRect(x,y,ms,ms)}break}
+  case"starfield":{const tog=Math.floor(speed)%2===0;ctx.fillStyle=tog?"#111":"#000";ctx.fillRect(0,0,w,h);ctx.fillStyle="#fff";for(let i=0;i<complexity*10;i++)ctx.fillRect((Math.sin(i)*w+speed*100)%w,(Math.cos(i)*h+h)%h,2+complexity/5,2);break}
+  case"plasma":{for(let x=0;x<w;x+=10){const v=Math.sin(x/50*(complexity/2)+speed)*127+128;ctx.fillStyle=`rgb(${v},${255-v},${Math.sin(speed)*255})`;ctx.fillRect(x,0,10,h)}break}
+  case"wave":{const amp=complexity*4;ctx.fillStyle="#fff";for(let y=0;y<h;y+=4){const xo=Math.sin(y*.02*(complexity/5)+speed)*amp;ctx.fillRect(w/2+xo-10,y,20,4);ctx.fillRect(w/2-xo-10,y,20,4)}break}
+  case"orbit":{const tog=Math.floor(speed)%2===0;for(let i=0;i<complexity;i++){const a=speed+(i*Math.PI*2/complexity),d=w/4+Math.sin(speed)*20;ctx.fillStyle=i%2===0?(tog?"#ff0":"#f00"):(tog?"#0ff":"#fff");ctx.beginPath();ctx.arc(w/2+Math.cos(a)*d,h/2+Math.sin(a)*d,w/12,0,Math.PI*2);ctx.fill()}break}
+
+  // ── PERIPHERAL DRIFT ─────────────────────────────────────────────────────────
+  case"rotating_snakes":{
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(3,complexity),segs=16;
+    for(let r=0;r<rings;r++){const rad=(r+1)/rings*(w*.5),rw=(w*.5)/rings,dir=r%2===0?1:-1;for(let i=0;i<segs;i++){const a0=(i/segs)*Math.PI*2+speed*.04*dir,a1=a0+(Math.PI*2/segs)*.5;ctx.fillStyle=["#000","#555","#fff","#999"][(i+r)%4];ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,rad+rw,a0,a1);ctx.arc(0,0,rad,a1,a0,true);ctx.closePath();ctx.fill()}}
+    ctx.restore();break}
+
+  case"scintillating_grid":{
+    const cells=Math.max(4,complexity*2),cell=w/cells,lw=Math.max(2,cell*.18);
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.fillStyle="#ccc";
+    for(let i=0;i<=cells;i++){ctx.fillRect(i*cell-lw/2,0,lw,h);ctx.fillRect(0,i*cell-lw/2,w,lw)}
+    for(let x=0;x<=cells;x++)for(let y=0;y<=cells;y++){if(Math.sin(x*1.7+y*1.3+speed*.4)>.3){ctx.fillStyle="#000";ctx.beginPath();ctx.arc(x*cell,y*cell,lw*.8,0,Math.PI*2);ctx.fill()}}
+    break}
+
+  case"barberpole":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);ctx.rotate(Math.PI/4);ctx.translate(-w/2,-h/2);const sw=Math.max(4,w/(complexity*1.5)),off=(speed*sw*.4)%(sw*2);ctx.fillStyle="#fff";for(let x=-w;x<w*2;x+=sw*2)ctx.fillRect(x+off,-h,sw,h*3);ctx.restore();break}
+
+  case"plaid_drift":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation="lighter";const sw=Math.max(4,w/(complexity*1.2)),off=(speed*sw*.3)%(sw*2);ctx.fillStyle="#f00";for(let x=-sw*2;x<w+sw*2;x+=sw*2)ctx.fillRect(x+off,0,sw,h);ctx.save();ctx.translate(w/2,h/2);ctx.rotate(Math.PI/2+Math.sin(speed*.02)*.3);ctx.translate(-w/2,-h/2);ctx.fillStyle="#0ff";for(let x=-sw*2;x<w+sw*2;x+=sw*2)ctx.fillRect(x-off,-h,sw,h*3);ctx.restore();ctx.globalCompositeOperation="source-over";break}
+
+  case"moire":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);const sp=Math.max(3,w/(complexity*3));ctx.strokeStyle="#fff";ctx.lineWidth=1;ctx.save();ctx.translate(w/2,h/2);for(let i=-w;i<w;i+=sp){ctx.beginPath();ctx.moveTo(i,-h);ctx.lineTo(i,h);ctx.stroke()}ctx.rotate(.08+Math.sin(speed*.05)*.06);for(let i=-w;i<w;i+=sp){ctx.beginPath();ctx.moveTo(i,-h);ctx.lineTo(i,h);ctx.stroke()}ctx.restore();break}
+
+  case"herringbone":{const size=Math.max(6,80/complexity),tog=Math.floor(speed*2)%2===0;ctx.fillStyle=tog?"#000":"#fff";ctx.fillRect(0,0,w,h);ctx.fillStyle=tog?"#fff":"#000";for(let y=0;y<h;y+=size)for(let x=0;x<w;x+=size*2){const off=Math.floor(y/size)%2===0?0:size;ctx.save();ctx.translate(x+off,y);ctx.rotate(Math.PI/4);ctx.fillRect(0,0,size*1.4,size*.6);ctx.restore()}break}
+
+  case"sunburst":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.08);const rays=complexity*6;ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(1,3-complexity/10);for(let i=0;i<rays;i++){ctx.rotate(Math.PI*2/rays);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(w,0);ctx.stroke()}ctx.restore();break}
+
+  // ── OPTIC FLOW HIJACK ────────────────────────────────────────────────────────
+  case"vection":{
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=complexity*2;
+    for(let i=rings;i>0;i--){const p=((i/rings)+(speed*.025))%1,s=w*1.8*Math.pow(p,1.8);ctx.save();ctx.rotate(p*Math.PI*2*(i%2===0?1:-1));ctx.beginPath();for(let s2=0;s2<=6;s2++){const a=s2/6*Math.PI*2;s2===0?ctx.moveTo(Math.cos(a)*s/2,Math.sin(a)*s/2):ctx.lineTo(Math.cos(a)*s/2,Math.sin(a)*s/2)}ctx.closePath();ctx.fillStyle=i%2===0?"#fff":"#000";ctx.fill();ctx.restore()}
+    ctx.restore();break}
+
+  case"warp":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);const lines=complexity*4;ctx.strokeStyle="#fff";for(let i=0;i<lines;i++){const a=i/lines*Math.PI*2,dist=(speed*8+i*37)%(w*1.2),x1=Math.cos(a)*dist,y1=Math.sin(a)*dist,x2=Math.cos(a)*(dist+w*.3),y2=Math.sin(a)*(dist+w*.3);ctx.lineWidth=Math.max(1,(dist/w)*8);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}ctx.restore();break}
+
+  case"fractal":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);const md=Math.min(complexity,12);function rf(x,y,s,d,dir){if(d<=0||s<3)return;ctx.fillStyle=d%2===0?"#fff":"#000";ctx.save();ctx.translate(x,y);ctx.rotate(speed*.02*dir);ctx.fillRect(-s/2,-s/2,s,s);ctx.restore();rf(x,y,s*(.5+Math.sin(speed*.1+d)*.15),d-1,-dir)}rf(w/2,h/2,w*.9,md,1);break}
+
+  case"corridor":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);const dep=complexity*3;for(let i=dep;i>0;i--){const p=((i/dep)+(speed*.02))%1,s=w*Math.pow(p,2.2),tog=Math.floor(speed*flicker*.05+i)%2===0;ctx.strokeStyle=tog?"#fff":"#0ff";ctx.lineWidth=Math.max(1,s*.015);ctx.strokeRect(-s/2,-s*.35,s,s*.7)}ctx.restore();break}
+
+  // ── TEMPORAL EXHAUSTION ──────────────────────────────────────────────────────
+  case"strobe_matrix":{const cells=Math.max(3,Math.min(12,complexity)),cw=w/cells,ch=h/cells;for(let x=0;x<cells;x++)for(let y=0;y<cells;y++){const ph=(x*7+y*13)%17,on=Math.floor(speed*Math.max(1,flicker)*.1+ph)%2===0;ctx.fillStyle=on?"#fff":"#000";ctx.fillRect(x*cw,y*ch,cw,ch)}break}
+
+  case"afterimage":{const cp=Math.floor(speed*Math.max(1,flicker)*.15)%4;ctx.fillStyle=cp<2?"#fff":"#000";ctx.fillRect(0,0,w,h);ctx.fillStyle=cp%2===0?"#0ff":"#f0f";ctx.beginPath();ctx.arc(w/2,h/2,w*.08+Math.sin(speed*.1)*w*.02,0,Math.PI*2);ctx.fill();break}
+
+  case"pulse_field":{const cells=Math.max(4,complexity*2),cw=w/cells,ch=h/cells,t=Math.floor(speed*Math.max(1,flicker)*.08);for(let x=0;x<cells;x++)for(let y=0;y<cells;y++){const seed=Math.sin((x*12.9898+y*78.233+t*37.1))*43758.5453,on=(seed-Math.floor(seed))>.5;ctx.fillStyle=on?"#fff":"#000";ctx.fillRect(x*cw,y*ch,cw,ch)}break}
+
+  // ── CHROMATIC RIVALRY ────────────────────────────────────────────────────────
+  case"chroma_pulse":{ctx.globalCompositeOperation="lighter";const amp=Math.max(chroma,10),rx=Math.sin(speed*.3)*amp,ry=Math.cos(speed*.21)*amp,gx=Math.sin(speed*.3+2.1)*amp,gy=Math.cos(speed*.21+2.1)*amp,bx=Math.sin(speed*.3+4.2)*amp,by=Math.cos(speed*.21+4.2)*amp;ctx.fillStyle="#f00";ctx.fillRect(rx,ry,w,h);ctx.fillStyle="#0f0";ctx.fillRect(gx,gy,w,h);ctx.fillStyle="#00f";ctx.fillRect(bx,by,w,h);ctx.globalCompositeOperation="source-over";break}
+
+  case"anaglyph":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation="lighter";const dx=Math.sin(speed*.15)*Math.max(chroma,15),dy=Math.cos(speed*.12)*Math.max(chroma,15),cnt=Math.max(2,Math.min(complexity,12));ctx.fillStyle="#f00";for(let i=0;i<cnt;i++){ctx.beginPath();ctx.arc(w/2+dx+i*10,h/2+dy,w*.15,0,Math.PI*2);ctx.fill()}ctx.fillStyle="#0ff";for(let i=0;i<cnt;i++){ctx.beginPath();ctx.arc(w/2-dx-i*10,h/2-dy,w*.15,0,Math.PI*2);ctx.fill()}ctx.globalCompositeOperation="source-over";break}
+
+  case"complementary":{const pairs=["#0f0","#f0f","#00f","#ff0","#f00","#0ff"];ctx.fillStyle=pairs[Math.floor(speed*Math.max(1,flicker)*.1)%pairs.length];ctx.fillRect(0,0,w,h);break}
+
+  // ── HYBRID COMBOS ────────────────────────────────────────────────────────────
+  case"vortex_strobe":{ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.06);const sl=complexity*3,ang=Math.PI*2/sl;for(let i=0;i<sl;i++){const on=Math.floor(speed*Math.max(1,flicker)*.1+i)%2===0;ctx.fillStyle=on?"#fff":"#000";ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,w,i*ang,(i+1)*ang);ctx.fill()}ctx.restore();break}
+
+  case"fraser_tunnel":{ctx.save();ctx.translate(w/2,h/2);const rings=complexity*2;for(let i=rings;i>0;i--){const p=((i/rings)+(speed*.02))%1,r=w*.9*Math.pow(p,1.6),segs=12;for(let s=0;s<segs;s++){const a0=s/segs*Math.PI*2+p*Math.PI*.5,a1=a0+Math.PI*2/segs*.6;ctx.fillStyle=(s+i)%2===0?"#fff":"#000";ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,a0,a1);ctx.fill()}}ctx.restore();break}
+
+  case"chromatic_vertigo":{ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.04);ctx.globalCompositeOperation="lighter";const cOff=Math.max(chroma,10)*.5;for(let i=complexity;i>0;i--){const r=(i/complexity)*w*.7+Math.sin(speed*.1)*10;ctx.lineWidth=4;ctx.strokeStyle="#f00";ctx.beginPath();ctx.arc(cOff,0,r,0,Math.PI*2);ctx.stroke();ctx.strokeStyle="#0f0";ctx.beginPath();ctx.arc(-cOff*.5,cOff*.87,r,0,Math.PI*2);ctx.stroke();ctx.strokeStyle="#00f";ctx.beginPath();ctx.arc(-cOff*.5,-cOff*.87,r,0,Math.PI*2);ctx.stroke()}ctx.globalCompositeOperation="source-over";ctx.restore();break}
+
+  case"glare_storm":{const jx=(Math.random()-.5)*6,jy=(Math.random()-.5)*6;ctx.save();ctx.translate(jx,jy);const tog=Math.floor(speed*Math.max(1,flicker)*.1)%2===0;ctx.fillStyle=tog?"#000":"#111";ctx.fillRect(-20,-20,w+40,h+40);const sp=Math.max(2,w/(complexity*4));ctx.strokeStyle=tog?"#fff":"#ccc";ctx.lineWidth=1;ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.02);for(let i=-w;i<w;i+=sp){ctx.beginPath();ctx.moveTo(i,-h);ctx.lineTo(i,h);ctx.stroke()}ctx.rotate(.05);for(let i=-w;i<w;i+=sp){ctx.beginPath();ctx.moveTo(i,-h);ctx.lineTo(i,h);ctx.stroke()}ctx.restore();ctx.restore();break}
+
+  case"serpent_storm":{ctx.save();ctx.translate(w/2,h/2);ctx.rotate(speed*.05);const rings=Math.max(3,complexity),segs=20;for(let r=0;r<rings;r++){const rad=(r+1)/rings*w*.5,rw=w*.5/rings;for(let i=0;i<segs;i++){const a0=(i/segs)*Math.PI*2+(r%2===0?speed*.04:-speed*.04),a1=a0+(Math.PI*2/segs)*.55;ctx.fillStyle=["#000","#555","#fff","#999"][(i+r)%4];ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,rad+rw,a0,a1);ctx.arc(0,0,rad,a1,a0,true);ctx.closePath();ctx.fill()}}ctx.restore();break}
+
+  case"fortification":{ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);const arms=complexity*2,prog=(speed*.01)%1;for(let ring=0;ring<8;ring++){const rad=(ring+prog)*w*.08;ctx.beginPath();for(let i=0;i<=arms;i++){const a=i/arms*Math.PI*2,zig=i%2===0?1:1.3,x=Math.cos(a)*rad*zig,y=Math.sin(a)*rad*zig;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}ctx.closePath();ctx.strokeStyle=ring%2===0?"#fff":"#0ff";ctx.lineWidth=2;ctx.stroke()}ctx.restore();break}
+
+  case"saccade_trap":{const cols=Math.max(4,complexity),cs=w/cols;for(let x=0;x<cols;x++)for(let y=0;y<cols;y++){const jx=(Math.random()-.5)*5,jy=(Math.random()-.5)*5,ph=(x+y)*.5+speed*.2,l1=Math.sin(ph)*127+128;ctx.fillStyle=`rgb(${l1},${l1},${l1})`;ctx.fillRect(x*cs+jx,y*cs+jy,cs,cs);const l2=Math.cos(ph)*127+128;ctx.fillStyle=`rgb(${l2},${l2},${l2})`;ctx.fillRect(x*cs+cs*.25+jx,y*cs+cs*.25+jy,cs*.5,cs*.5)}break}
+
+  // ── ★ STATIC MOTION INDUCERS ─────────────────────────────────────────────────
+  // These produce strong perceived motion from geometry alone; animation amplifies it.
+
+  case"cafe_wall":{
+    // Staggered B/W rows with grey mortar — parallel mortar lines appear to tilt/wedge
+    const ts=Math.max(8,Math.floor(w/(complexity*2))),mortar=Math.max(2,Math.floor(ts*.14)),step=ts+mortar;
+    ctx.fillStyle="#808080";ctx.fillRect(0,0,w,h); // grey mortar
+    const rows=Math.ceil(h/step)+2,cols=Math.ceil(w/ts)+3;
+    const scrollY=(speed*.4)%step;
+    for(let row=0;row<rows;row++){
+      const y=(row-1)*step-scrollY;
+      // alternating half-tile offset is the key to the illusion
+      const offset=row%2===0?ts*.5:0;
+      const scrollX=(speed*.15)%(ts*2);
+      for(let col=-2;col<cols;col++){
+        ctx.fillStyle=col%2===0?"#fff":"#000";
+        ctx.fillRect(Math.round(col*ts+offset+scrollX-ts),Math.round(y),ts,ts)
+      }
+    }
+    break}
+
+  case"fraser_spiral":{
+    // Concentric circles made of bipartite rope-segments with alternating tilt —
+    // the circles LOOK like a spiral but are actually perfectly concentric.
+    ctx.fillStyle="#808080";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const numRings=Math.min(complexity,10),rot=speed*.008;
+    for(let ring=1;ring<=numRings;ring++){
+      const radius=ring*w*.046;
+      const circ=Math.PI*2*radius;
+      const nSegs=Math.max(16,Math.floor(circ/(radius*.22)));
+      const tiltDir=ring%2===0?1:-1; // opposite tilt per ring = spiral percept
+      for(let seg=0;seg<nSegs;seg++){
+        const ang=seg/nSegs*Math.PI*2+rot*tiltDir;
+        const cx=Math.cos(ang)*radius,cy=Math.sin(ang)*radius;
+        const hw=radius*.13,hh=radius*.055;
+        ctx.save();ctx.translate(cx,cy);ctx.rotate(ang+Math.PI*.5*tiltDir*.45);
+        ctx.fillStyle=seg%2===0?"#000":"#fff";ctx.fillRect(-hw,-hh,hw,hh*2);
+        ctx.fillStyle=seg%2===0?"#fff":"#000";ctx.fillRect(0,-hh,hw,hh*2);
+        ctx.restore()
+      }
+    }
+    ctx.restore();break}
+
+  case"pinna_rings":{
+    // Pinna-Brelstaff: bipartite patches on rings whose tilt encodes rotation direction.
+    // Animate with pulsing scale to simulate approach/recession triggering rotation percept.
+    ctx.fillStyle="#808080";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const pulse=1+.22*Math.sin(speed*.035);
+    ctx.scale(pulse,pulse);
+    const rings=Math.min(complexity,8);
+    for(let ring=1;ring<=rings;ring++){
+      const radius=ring*w*.055;
+      const nElem=Math.max(8,ring*10);
+      const es=radius*.22; // element size
+      const tilt=ring%2===0?Math.PI*.25:-Math.PI*.25; // direction codes CW vs CCW
+      for(let i=0;i<nElem;i++){
+        const ang=i/nElem*Math.PI*2;
+        ctx.save();ctx.rotate(ang);ctx.translate(radius,0);ctx.rotate(tilt);
+        ctx.fillStyle="#000";ctx.fillRect(-es/2,-es/2,es/2,es);
+        ctx.fillStyle="#fff";ctx.fillRect(0,-es/2,es/2,es);
+        ctx.restore()
+      }
+    }
+    ctx.restore();break}
+
+  case"chevron_drift":{
+    // Rows of V-chevrons with directional 4-step Kitaoka luminance ramp.
+    // Even rows drift right, odd rows drift left — creates strong lateral motion.
+    ctx.fillStyle="#111";ctx.fillRect(0,0,w,h);
+    const rows=Math.max(4,complexity*2),rowH=h/rows;
+    const chevW=Math.max(10,rowH*.9);
+    const ramp=[20,80,220,140]; // Kitaoka 4-step: dark→mid-dark→bright→mid-bright
+    for(let row=0;row<rows;row++){
+      const dir=row%2===0?1:-1;
+      const nChevs=Math.ceil(w/chevW)+4;
+      const off=((speed*.5*dir)%(chevW*2)+chevW*4)%(chevW*2);
+      for(let c=-3;c<nChevs;c++){
+        const cx=c*chevW+off;
+        for(let s=0;s<4;s++){
+          const lum=dir>0?ramp[s]:ramp[3-s];
+          ctx.fillStyle=`rgb(${lum},${lum},${lum})`;
+          // Upper chevron arm
+          ctx.fillRect(cx+s*chevW/4,row*rowH,chevW/4,rowH*.44);
+          // Lower chevron arm (mirrored V)
+          ctx.fillRect(cx+s*chevW/4,row*rowH+rowH*.56,chevW/4,rowH*.44)
+        }
+      }
+    }
+    break}
+
+  case"bilateral_drift":{
+    // Left half: 4-step ramp encodes rightward drift.
+    // Right half: reversed ramp encodes leftward drift.
+    // The two halves appear to slide apart — strong and immediate illusion.
+    const cols=Math.max(4,complexity*3),rows=cols,cw=w/cols,ch=h/rows;
+    const ramp=[0,64,255,128];
+    for(let x=0;x<cols;x++){
+      const isLeft=x*cw<w/2;
+      const si=Math.floor((x+speed*.4)%4+8)%4;
+      const lum=isLeft?ramp[si]:ramp[(4-si)%4];
+      ctx.fillStyle=`rgb(${lum},${lum},${lum})`;
+      ctx.fillRect(x*cw,0,cw,h)
+    }
+    // Add nested Fraser-Wilcox inner patches for extra depth
+    for(let x=0;x<cols;x++)for(let y=0;y<rows;y++){
+      const isLeft=x*cw<w/2;
+      const si2=Math.floor((x+y*.7+speed*.3)%4+8)%4;
+      const lum2=isLeft?ramp[si2]:ramp[(4-si2)%4];
+      ctx.fillStyle=`rgba(${lum2},${lum2},${lum2},0.55)`;
+      ctx.fillRect(x*cw+cw*.25,y*ch+ch*.25,cw*.5,ch*.5)
+    }
+    // Centre divider (makes the opposing motion explicit)
+    ctx.strokeStyle="#fff";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(w/2,0);ctx.lineTo(w/2,h);ctx.stroke();
+    break}
+
+  // ── ★ GRID & GLARE EXTREMES ──────────────────────────────────────────────────
+  case"lingelbach":{
+    // Ultra-dense scintillating grid — far more intersections than the classic version.
+    // White spots flicker at junctions causing phantom grey blobs and scintillation.
+    const cells=Math.max(8,complexity*3),cell=w/cells,lw=Math.max(1.5,cell*.2);
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    ctx.fillStyle="#fff";
+    for(let i=0;i<=cells;i++){ctx.fillRect(i*cell-lw/2,0,lw,h);ctx.fillRect(0,i*cell-lw/2,w,lw)}
+    for(let x=0;x<=cells;x++)for(let y=0;y<=cells;y++){
+      // Phase-desynchronised per-junction dots (not all on/off at once)
+      const ph=Math.sin(x*1.618+y*2.414+speed*.25);
+      const dotR=lw*.85;
+      if(ph>.05){const g=Math.floor(200+ph*55);ctx.fillStyle=`rgb(${g},${g},${g})`;ctx.beginPath();ctx.arc(x*cell,y*cell,dotR,0,Math.PI*2);ctx.fill()}
+      else{ctx.fillStyle="#000";ctx.beginPath();ctx.arc(x*cell,y*cell,dotR,0,Math.PI*2);ctx.fill()}
+    }
+    break}
+
+  case"ehrenstein":{
+    // Radial lines from evenly-spaced points create illusory bright discs at centres.
+    // The more lines, the stronger the glow — tune with complexity.
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    const spacing=Math.max(28,w/(complexity+2));
+    const lineLen=spacing*.42;
+    const gap=spacing*.13; // gap at centre is essential for the illusion
+    const nRays=Math.max(4,complexity*2);
+    ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(1.5,spacing*.055);
+    for(let x=spacing/2;x<w;x+=spacing)for(let y=spacing/2;y<h;y+=spacing){
+      for(let r=0;r<nRays;r++){
+        const ang=r/nRays*Math.PI*2+speed*.01;
+        ctx.beginPath();
+        ctx.moveTo(x+Math.cos(ang)*gap,y+Math.sin(ang)*gap);
+        ctx.lineTo(x+Math.cos(ang)*lineLen,y+Math.sin(ang)*lineLen);
+        ctx.stroke()
+      }
+    }
+    break}
+
+  case"contrast_beat":{
+    // Two gratings at slightly different angles create a low-frequency beating moiré.
+    // The beat appears to ripple and advance across the field.
+    const f=Math.max(4,complexity*3),spd=speed*.08;
+    const id=ctx.getImageData(0,0,w,h),px=id.data;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const cx=x-w/2,cy=y-h/2,a=.05; // tiny angle = slow beat
+      const g1=Math.sin((cx*Math.cos(a)+cy*Math.sin(a))/w*Math.PI*f*2+spd)>.0?255:0;
+      const g2=Math.sin((cx*Math.cos(-a)+cy*Math.sin(-a))/w*Math.PI*f*2-spd*.9)>.0?255:0;
+      // XOR of the two gratings = beat envelope
+      const lum=g1===g2?g1:128;
+      const i=(y*w+x)*4;px[i]=px[i+1]=px[i+2]=lum;px[i+3]=255
+    }
+    ctx.putImageData(id,0,0);break}
+
+  case"radiance":{
+    // Maximum-density radial lines from centre alternating B/W — intense star-burst glare.
+    // High-contrast radial pattern exhausts edge detectors and forces chromatic fringing.
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const nLines=complexity*14;
+    const tog=Math.floor(speed*.5)%2===0;
+    for(let i=0;i<nLines;i++){
+      const ang=i/nLines*Math.PI*2+speed*.015;
+      ctx.strokeStyle=i%2===0?(tog?"#fff":"#000"):(tog?"#000":"#fff");
+      ctx.lineWidth=Math.max(.5,Math.PI*w/nLines*.85);
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(ang)*w,Math.sin(ang)*w);ctx.stroke()
+    }
+    // Overexposed bloom at focal point
+    const gr=ctx.createRadialGradient(0,0,0,0,0,w*.18);
+    gr.addColorStop(0,`rgba(255,255,255,${tog?1:.75})`);
+    gr.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(0,0,w*.18,0,Math.PI*2);ctx.fill();
+    ctx.restore();break}
+
+  case"oblique_grating":{
+    // Two overlapping 45° gratings at near-identical frequency.
+    // Oblique orientation causes maximum V1 processing cost and spatial discomfort.
+    const f=Math.max(4,complexity*3),spd=speed*.12;
+    const id=ctx.getImageData(0,0,w,h),px=id.data;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const g1=Math.sin((x+y)/w*Math.PI*f+spd)>.0?255:0;      // 45°
+      const g2=Math.sin((x-y)/w*Math.PI*f*1.03-spd*.8)>.0?255:0; // 135°
+      const lum=(g1+g2)/2;
+      const i=(y*w+x)*4;px[i]=px[i+1]=px[i+2]=lum;px[i+3]=255
+    }
+    ctx.putImageData(id,0,0);break}
+
+  // ── ★ VORTEX & DEEP SPIRAL ───────────────────────────────────────────────────
+  case"log_spiral":{
+    // Logarithmic spiral arms — when slowly rotating creates a powerful zoom-in/out percept
+    // (looming detector firing) even at moderate speeds.
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const arms=Math.max(2,Math.floor(complexity/2)),rot=speed*.025;
+    ctx.lineWidth=Math.max(2,w*.009);
+    for(let arm=0;arm<arms;arm++){
+      const base=arm/arms*Math.PI*2;
+      ctx.beginPath();let first=true;
+      for(let t=0;t<Math.PI*8;t+=.04){
+        const r=Math.pow(1.18,t)*1.4;
+        if(r>w*.52)break;
+        const ang=t+base+rot;
+        const x=Math.cos(ang)*r,y=Math.sin(ang)*r;
+        first?ctx.moveTo(x,y):ctx.lineTo(x,y);first=false
+      }
+      ctx.strokeStyle=arm%2===0?"#fff":"#999";ctx.stroke()
+    }
+    // Second set of arms at double density for beat
+    for(let arm=0;arm<arms*2;arm++){
+      const base=arm/(arms*2)*Math.PI*2;
+      ctx.beginPath();let first=true;
+      for(let t=0;t<Math.PI*8;t+=.04){
+        const r=Math.pow(1.18,t)*1.4;
+        if(r>w*.52)break;
+        const ang=t+base-rot*.7;
+        const x=Math.cos(ang)*r,y=Math.sin(ang)*r;
+        first?ctx.moveTo(x,y):ctx.lineTo(x,y);first=false
+      }
+      ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.stroke()
+    }
+    ctx.restore();break}
+
+  case"counter_rings":{
+    // Concentric rings of alternating-colour segments rotating in OPPOSITE directions.
+    // Adjacent rings fight each other creating maximum motion rivalry.
+    ctx.save();ctx.translate(w/2,h/2);
+    const rings=Math.max(4,complexity);
+    for(let ring=rings;ring>=1;ring--){
+      const inner=(ring-1)/rings*w*.5,outer=ring/rings*w*.5;
+      const segs=Math.max(8,ring*8);
+      const dir=ring%2===0?1:-1;
+      const rot=speed*.045*dir;
+      for(let seg=0;seg<segs;seg++){
+        const a0=seg/segs*Math.PI*2+rot,a1=(seg+1)/segs*Math.PI*2+rot;
+        ctx.fillStyle=seg%2===0?"#fff":"#000";
+        ctx.beginPath();ctx.arc(0,0,outer,a0,a1);ctx.arc(0,0,inner,a1,a0,true);ctx.fill()
+      }
+    }
+    ctx.restore();break}
+
+  case"leviant":{
+    // Leviant "Enigma" illusion: dense radial spokes + coloured concentric rings =
+    // phantom motion inside the ring regions even with a STATIC image.
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    // Dense radial spokes
+    const nSpokes=complexity*10;
+    ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.lineWidth=.8;
+    for(let i=0;i<nSpokes;i++){
+      const ang=i/nSpokes*Math.PI*2+speed*.004;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(ang)*w,Math.sin(ang)*w);ctx.stroke()
+    }
+    // Wide coloured rings crossing the spokes — the crossing region "moves"
+    const rings=Math.max(3,Math.floor(complexity*.7));
+    for(let ring=1;ring<=rings;ring++){
+      const r=ring/(rings+1)*w*.48;
+      const rw=Math.max(8,w*.028);
+      ctx.lineWidth=rw;
+      // Slowly hue-cycling rings for extra chromatic fatigue
+      const hue=(ring*137+speed*.2)%360;
+      ctx.strokeStyle=`hsl(${hue},90%,45%)`;
+      ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke()
+    }
+    ctx.restore();break}
+
+  // ── ★ TEMPORAL ALIASING ──────────────────────────────────────────────────────
+  case"wagon_wheel":{
+    // Wagon wheel temporal aliasing: at certain speed:spoke ratios, the wheel
+    // appears to rotate BACKWARD. Implemented as modular apparent angle.
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    ctx.save();ctx.translate(w/2,h/2);
+    const spokes=Math.max(6,complexity*3);
+    const spokeAngle=Math.PI*2/spokes;
+    // True rotation
+    const trueRot=speed*.1;
+    // Alias: when true angle passes half a spoke-arc, perceived direction reverses
+    const alias=(trueRot%spokeAngle)/spokeAngle;
+    const apparentRot=alias>.5
+      ?(alias-1)*spokeAngle+trueRot  // back-spin zone
+      :alias*spokeAngle+trueRot;
+    ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(2,w*.013);
+    for(let i=0;i<spokes;i++){
+      const ang=i/spokes*Math.PI*2+apparentRot;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang)*w*.06,Math.sin(ang)*w*.06);
+      ctx.lineTo(Math.cos(ang)*w*.47,Math.sin(ang)*w*.47);
+      ctx.stroke()
+    }
+    ctx.lineWidth=Math.max(2,w*.01);
+    ctx.beginPath();ctx.arc(0,0,w*.47,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,w*.06,0,Math.PI*2);ctx.stroke();
+    ctx.restore();break}
+
+  case"reverse_phi":{
+    // Reverse-phi: dots jump rightward while simultaneously inverting contrast.
+    // Visual system interprets the contrast inversion as backward motion — leftward percept.
+    ctx.fillStyle="#808080";ctx.fillRect(0,0,w,h);
+    const nDots=Math.max(4,complexity*2);
+    const dotR=Math.max(6,w*.04);
+    const phase=Math.floor(speed*.35); // discrete steps = apparent motion frames
+    for(let i=0;i<nDots;i++){
+      const row=i/nDots*h*0.85+h*.075;
+      const xA=((i*.37%1)*w*.7+w*.1);
+      const xB=xA+w*.07; // rightward spatial jump
+      // When position shifts A→B, contrast also inverts (the key mechanism)
+      const isA=phase%2===0;
+      const x=isA?xA:xB;
+      const bright=isA; // contrast inverted with position
+      // Main dot
+      ctx.fillStyle=bright?"#fff":"#000";
+      ctx.beginPath();ctx.arc(x,row,dotR,0,Math.PI*2);ctx.fill();
+      // Trailing complement dot creates the apparent backward trail
+      ctx.fillStyle=bright?"#000":"#fff";
+      ctx.globalAlpha=.55;
+      ctx.beginPath();ctx.arc(isA?xB:xA,row,dotR*.8,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1
+    }
+    break}
+
+  case"stroboscopic":{
+    // Classic stroboscopic apparent motion: two offset dot grids alternating.
+    // Dots appear to LEAP between the two grid positions — strong pop-out motion.
+    const phase=Math.floor(speed*.55)%2===0;
+    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+    const gn=Math.max(4,complexity*2),sp=w/gn,dr=sp*.28;
+    const off=sp*.5;
+    ctx.fillStyle="#fff";
+    for(let x=0;x<gn+1;x++)for(let y=0;y<gn+1;y++){
+      const cx=phase?x*sp+sp*.5:x*sp+sp*.5+off;
+      const cy=phase?y*sp+sp*.5:y*sp+sp*.5+off;
+      if(cx<w&&cy<h){ctx.beginPath();ctx.arc(cx%w,cy%h,dr,0,Math.PI*2);ctx.fill()}
+    }
+    break}
+
+  } // end switch
+
+  compositePostFX(w,h,chroma,flicker,spin,zoom,contrast,speed);
+}
+
+function compositePostFX(w,h,chroma,flicker,spin,zoom,contrast,speed){
+  ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
+
+  // Spin + Zoom: apply as a combined transform before drawing the buffer
+  const spinAng=spin>0?speed*spin*.001:0;
+  const zoomFactor=zoom>0?1+(zoom/100)*Math.sin(speed*.08):1;
+  const needsTransform=spin>0||zoom>0;
+  if(needsTransform){
+    ctx.save();
+    ctx.translate(w/2,h/2);
+    if(spin>0)ctx.rotate(spinAng);
+    if(zoom>0)ctx.scale(zoomFactor,zoomFactor);
+    ctx.translate(-w/2,-h/2);
+  }
+
+  if(chroma>0){
+    const ang=speed*.05;
+    ctx.globalCompositeOperation="lighter";
+    drawChannel("#f00",Math.cos(ang)*chroma,Math.sin(ang)*chroma);
+    drawChannel("#0f0",Math.cos(ang+2.094)*chroma,Math.sin(ang+2.094)*chroma);
+    drawChannel("#00f",Math.cos(ang+4.189)*chroma,Math.sin(ang+4.189)*chroma);
+    ctx.globalCompositeOperation="source-over"
+  } else {
+    ctx.drawImage(bufCanvas,0,0)
+  }
+  if(needsTransform)ctx.restore();
+
+  // Invert pulse
+  if(flicker>0&&Math.floor(speed*flicker*.15)%5===0){
+    ctx.globalCompositeOperation="difference";ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);
+    ctx.globalCompositeOperation="source-over"
+  }
+
+  // Contrast Crush: post-composite imageData pass — amplifies deviation from 50% grey.
+  // At 100 it blows everything to pure B/W, creating extreme high-contrast on any effect.
+  if(contrast>0){
+    const factor=(259*(contrast+255))/(255*(259-contrast));
+    const id=ctx.getImageData(0,0,w,h),d=id.data;
+    for(let i=0;i<d.length;i+=4){
+      d[i]  =Math.max(0,Math.min(255,factor*(d[i]  -128)+128));
+      d[i+1]=Math.max(0,Math.min(255,factor*(d[i+1]-128)+128));
+      d[i+2]=Math.max(0,Math.min(255,factor*(d[i+2]-128)+128))
+    }
+    ctx.putImageData(id,0,0)
+  }
+}
+function drawChannel(color,ox,oy){
+  fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  fxCtx.drawImage(bufCanvas,0,0);
+  fxCtx.globalCompositeOperation="multiply";fxCtx.fillStyle=color;fxCtx.fillRect(0,0,fxCanvas.width,fxCanvas.height);
+  fxCtx.globalCompositeOperation="source-over";
+  ctx.drawImage(fxCanvas,ox,oy)
+}
+
+async function generateGIF(){
+  stopPreview();renderOverlay.classList.remove("hidden");renderOverlay.classList.add("rendering-active");
+  statusText.innerText="Initializing";updateProgressUI(0);
+  const fps=parseInt(cfg.fps.value),frames=parseInt(cfg.frames.value),w=canvas.width,h=canvas.height;
+  let workerBlobUrl='';
+  try{const r=await fetch("https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js");const t=await r.text();const b=new Blob([t],{type:"application/javascript"});workerBlobUrl=URL.createObjectURL(b)}catch(e){workerBlobUrl="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js"}
+  const gif=new GIF({workers:2,quality:10,width:w,height:h,workerScript:workerBlobUrl});
+  tick=0;statusText.innerText="Capturing Frames";
+  for(let i=0;i<frames;i++){drawFrame();gif.addFrame(ctx,{copy:true,delay:1000/fps});tick++;updateProgressUI(Math.round((i+1)/frames*50));if(i%10===0)await new Promise(r=>requestAnimationFrame(r))}
+  statusText.innerText="Encoding GIF";
+  gif.on("progress",p=>updateProgressUI(50+Math.round(p*50)));
+  gif.on("finished",blob=>{
+    renderOverlay.classList.add("hidden");renderOverlay.classList.remove("rendering-active");
+    if(workerBlobUrl.startsWith("blob:"))URL.revokeObjectURL(workerBlobUrl);
+    const url=URL.createObjectURL(blob);
+    const wrapper=document.createElement("div");
+    wrapper.className="control-card w-full flex flex-col items-center animate-in fade-in zoom-in duration-300";
+    wrapper.innerHTML=`<div class="w-full flex justify-between items-center mb-3"><span class="text-[10px] font-black text-red-600 uppercase tracking-widest">Render Complete</span><span class="text-[10px] text-zinc-600 font-mono">${(blob.size/1024/1024).toFixed(2)} MB</span></div><img src="${url}" class="rounded-lg shadow-2xl border border-zinc-800"/><div class="grid grid-cols-2 gap-2 w-full mt-4"><a href="${url}" download="lusion_${Date.now()}.gif" class="bg-red-600 text-white py-3 rounded-lg text-[10px] font-black uppercase text-center tracking-widest">Download</a><button onclick="this.parentElement.parentElement.remove()" class="bg-zinc-800 text-zinc-400 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-center">Discard</button></div>`;
+    document.getElementById("resultContainer").prepend(wrapper);
+    showMsg("Render Complete","bg-green-600")
+  });
+  gif.on("error",err=>{renderOverlay.classList.add("hidden");showMsg("Error: "+err)});
+  gif.render()
+}
+function updateProgressUI(p){progressEl.innerText=`${p}%`;circleEl.style.strokeDashoffset=213.6-(213.6*p/100)}
+
+handlePreset();updateSize();
+</script>
+</body>
+</html>
