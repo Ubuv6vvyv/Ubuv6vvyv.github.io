@@ -3,476 +3,365 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vibration Controller</title>
+    <title>Vibration Controller: Diagnostic Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-gradient: linear-gradient(45deg, #f5f5f5, #ffffff);
+            --bg-gradient: linear-gradient(135deg, #1a1a1a, #2d2d2d);
             --card-bg: #ffffff;
-            --text-primary: #333;
-            --text-secondary: #555;
-            --text-tertiary: #444;
-            --slider-bg: #ddd;
-            --slider-thumb: #666;
-            --btn-bg: #e5e5e5;
-            --btn-hover: #d5d5d5;
-            --btn-active: #666;
+            --text-primary: #111;
+            --text-secondary: #444;
+            --accent: #ff3b30;
+            --accent-hover: #cc2f26;
+            --start-bg: #34c759;
+            --start-hover: #2db04e;
+            --slider-bg: #e5e5ea;
+            --slider-thumb: #007aff;
+            --btn-bg: #f2f2f7;
+            --btn-active: #007aff;
             --btn-text-active: #fff;
-            --status-idle: #f0f0f0;
-            --status-active: #666;
-            --status-text-active: #fff;
-            --section-bg: #fafafa;
-            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-            --shadow-hover: 0 0 8px rgba(0,0,0,0.15);
-            --transition: all 0.2s ease;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         body {
-            font-family: 'Inter', Arial, sans-serif;
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 5px;
+            font-family: 'Inter', sans-serif;
+            margin: 0; 
+            padding: 10px;
             background: var(--bg-gradient);
             min-height: 100vh;
-            max-height: 100vh;
-            overflow: hidden;
-            animation: bg-shimmer 8s infinite alternate ease-in-out;
-        }
-
-        @keyframes bg-shimmer {
-            0% { background-position: 0% 50%; }
-            100% { background-position: 200% 50%; }
+            display: flex;
+            justify-content: center;
         }
 
         .control-section {
             background-color: var(--card-bg);
-            border-radius: 8px;
-            box-shadow: var(--shadow-sm);
-            padding: 10px;
-            margin: 5px;
-            max-width: 480px;
-            max-height: 95vh;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 12px;
+            width: 100%;
+            max-width: 520px;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            gap: 12px;
         }
 
-        h2 {
-            font-size: 1.5em;
+        h2, h3 { margin: 0; color: var(--text-primary); }
+        h2 { font-size: 1.2em; border-bottom: 2px solid var(--slider-bg); padding-bottom: 4px; }
+        h3 { font-size: 0.8em; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .master-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .master-btn {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
             font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+            color: white;
+            cursor: pointer;
+            text-transform: uppercase;
         }
+        
+        #startBtn { background-color: var(--start-bg); }
+        #startBtn:active { background-color: var(--start-hover); }
+        #stopBtn { background-color: var(--accent); }
+        #stopBtn:active { background-color: var(--accent-hover); }
 
-        h3 {
-            font-size: 1.2em;
-            font-weight: 400;
-            margin-bottom: 6px;
-            color: var(--text-secondary);
-        }
-
-        .slider-container {
-            display: flex;
-            flex-wrap: nowrap;
-            align-items: center;
-            margin-bottom: 8px;
-            gap: 5px;
-        }
-
-        .slider-container label {
-            flex: 1 1 80px;
-            min-width: 80px;
-            font-size: 0.8em;
-            color: var(--text-tertiary);
-        }
-
-        .slider-container input {
-            flex: 2 1 100px;
-            min-width: 100px;
-        }
-
-        .slider-container span {
-            flex: 0 0 50px;
-            text-align: right;
-            font-size: 0.8em;
-            color: var(--text-tertiary);
-        }
-
+        /* Compact Dense Grid Layout */
         .pattern-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 5px;
-            margin-bottom: 8px;
+            grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+            gap: 4px;
         }
 
         .pattern-btn {
-            padding: 8px;
+            padding: 6px 4px;
             background-color: var(--btn-bg);
-            border: none;
+            border: 1px solid #d1d1d6;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8em;
-            font-weight: 400;
+            font-size: 0.7em;
+            font-weight: 600;
+            transition: all 0.1s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             text-align: center;
-            min-height: 35px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-
-        .pattern-btn:hover {
-            background-color: var(--btn-hover);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-hover);
         }
 
         .pattern-btn.active {
             background-color: var(--btn-active);
             color: var(--btn-text-active);
-            box-shadow: var(--shadow-sm);
+            border-color: var(--btn-active);
         }
 
-        .controls-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 10px;
-            flex-grow: 1;
+        .category-group {
+            display: flex;
+            flex-direction: column;
         }
 
-        .status-indicator {
+        .slider-group {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        .slider-row:last-child { margin-bottom: 0; }
+        .slider-row label { flex: 0 0 75px; font-size: 0.75em; font-weight: 600;}
+        .slider-row input[type="range"] { flex: 1; cursor: pointer; }
+        .slider-row span { flex: 0 0 45px; text-align: right; font-size: 0.75em; font-family: monospace; }
+
+        .status {
             text-align: center;
             padding: 8px;
-            margin-top: 8px;
-            border-radius: 4px;
-            background-color: var(--status-idle);
-            font-size: 0.8em;
-            font-weight: 400;
-            color: var(--text-tertiary);
-            transition: var(--transition);
-        }
-
-        .status-active {
-            background-color: var(--status-active);
-            color: var(--status-text-active);
-        }
-
-        .section-container {
-            background-color: var(--section-bg);
-            padding: 8px;
+            background: var(--btn-bg);
             border-radius: 6px;
-            margin-bottom: 8px;
-        }
-
-        input[type="range"] {
-            -webkit-appearance: none;
-            height: 6px;
-            border-radius: 3px;
-            background: var(--slider-bg);
-            outline: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--slider-thumb);
-            cursor: pointer;
+            font-family: monospace;
+            font-size: 0.85em;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
     <div class="control-section">
-        <h2>Vibration Controller</h2>
-
-        <div class="section-container">
-            <h3>Presets</h3>
-            <div class="pattern-grid" id="presetPatterns"></div>
+        <h2>Vibration API Diagnostics</h2>
+        
+        <div class="master-controls">
+            <button class="master-btn" id="startBtn">Force Start</button>
+            <button class="master-btn" id="stopBtn">Halt / Kill</button>
         </div>
 
-        <div class="section-container">
-            <h3>Music Patterns</h3>
-            <div class="pattern-grid" id="musicPatterns"></div>
-        </div>
+        <div class="status" id="statusIndicator">STATE: OFFLINE</div>
 
-        <div class="controls-grid">
-            <div class="section-container">
-                <h3>Primary</h3>
-                <div class="slider-container">
-                    <label for="mainIntensitySlider">Intensity</label>
-                    <input type="range" id="mainIntensitySlider" min="0" max="5000" value="1000">
-                    <span id="mainIntensityValue">20%</span>
-                </div>
-                <div class="slider-container">
-                    <label for="patternSpeedSlider">Speed</label>
-                    <input type="range" id="patternSpeedSlider" min="10" max="5000" value="500">
-                    <span id="patternSpeedValue">500ms</span>
-                </div>
-                <div class="slider-container">
-                    <label for="burstDurationSlider">Burst</label>
-                    <input type="range" id="burstDurationSlider" min="10" max="2000" value="200">
-                    <span id="burstDurationValue">200ms</span>
-                </div>
+        <!-- Dynamic Container for Category Grids -->
+        <div id="categoryContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+
+        <!-- Manual Controls -->
+        <div class="slider-group">
+            <h3>Manual Override Parameters</h3>
+            
+            <div class="slider-row">
+                <label title="Repeat count for the array">Cycles</label>
+                <input type="range" id="intensity" min="1" max="20" value="5" step="1">
+                <span id="intensityVal">5x</span>
             </div>
-
-            <div class="section-container">
-                <h3>Advanced</h3>
-                <div class="slider-container">
-                    <label for="wavePatternSlider">Wave</label>
-                    <input type="range" id="wavePatternSlider" min="0" max="100" value="50">
-                    <span id="wavePatternValue">50%</span>
-                </div>
-                <div class="slider-container">
-                    <label for="pulseFrequencySlider">Frequency</label>
-                    <input type="range" id="pulseFrequencySlider" min="1" max="100" value="10">
-                    <span id="pulseFrequencyValue">10Hz</span>
-                </div>
-                <div class="slider-container">
-                    <label for="gapDurationSlider">Gap</label>
-                    <input type="range" id="gapDurationSlider" min="0" max="2000" value="100">
-                    <span id="gapDurationValue">100ms</span>
-                </div>
+            
+            <div class="slider-row">
+                <label title="Vibration duration in milliseconds">Burst (ms)</label>
+                <input type="range" id="burst" min="0.1" max="1000" value="200" step="0.1">
+                <span id="burstVal">200.0</span>
             </div>
-        </div>
-
-        <div class="status-indicator" id="statusIndicator">
-            Status: Idle
+            
+            <div class="slider-row">
+                <label title="Silence duration in milliseconds">Gap (ms)</label>
+                <input type="range" id="gap" min="0.1" max="1000" value="50" step="0.1">
+                <span id="gapVal">50.0</span>
+            </div>
         </div>
     </div>
 
     <script>
-        class VibrationController {
-            constructor() {
-                this.patterns = {
-                    presets: {
-                        'chaos-extreme': [2000,50, 0,25, 1500,100, 0,25, 2000,75, 0,25, 1000,200, 0,25, 2000,25, 0,25, 1800,50, 0,25, 1600,75, 0,25, 2000,100, 0,25, 1000,150, 0,25, 2000,200, 0,25, 1500,50, 2000,25],
-                        'earthquake': [2000,500, 0,100, 2000,400, 0,100, 2000,300, 0,100, 1800,400, 0,100, 1600,500, 0,100, 2000,600],
-                        'pulse-wave': [2000,100, 0,50, 1500,100, 0,50, 1000,100, 0,50, 1500,100, 0,50, 2000,100, 0,50],
-                        'heartbeat': [2000,200, 0,100, 2000,200, 0,400, 2000,200, 0,100, 2000,200, 0,400],
-                        'gentle-massage': [1000,300, 0,150, 800,300, 0,150, 600,300, 0,150, 800,300, 0,150, 1000,300, 0,150],
-                        'rapid-fire': [2000,50, 0,25, 2000,50, 0,25, 2000,50, 0,25, 2000,50, 0,25, 2000,50, 0,25, 2000,50, 0,100]
-                    },
-                    music: {
-                        'billie-jean': [1600,200, 0,100, 1600,200, 0,100, 800,100, 0,50, 1600,200, 0,100, 1600,200, 0,100, 800,100, 0,50],
-                        'uptown-funk': [2000,250, 0,125, 2000,250, 0,125, 1000,125, 0,50, 2000,250, 0,125, 2000,250, 0,125, 1000,125, 0,50],
-                        'cant-stop': [1600,200, 0,100, 2000,400, 0,200, 1600,200, 0,100, 2000,400, 0,200, 1600,200, 0,100],
-                        'shape-of-you': [2000,250, 0,150, 2000,250, 0,150, 1000,150, 0,50, 2000,250, 0,150, 2000,250, 0,150, 1000,150, 0,50],
-                        'bohemian-rhapsody': [2000,300, 0,150, 1200,150, 2000,300, 0,200, 2000,450, 0,250, 1200,150, 0,100],
-                        'seven-nation': [2000,300, 0,150, 2000,300, 0,150, 1600,200, 2000,300, 0,150, 1600,200, 0,100],
-                        'smooth-criminal': [2000,200, 0,100, 2000,200, 0,100, 1000,100, 2000,200, 0,100, 2000,300, 0,150],
-                        'another-one-bites': [2000,250, 0,125, 2000,250, 0,125, 1200,150, 2000,250, 0,125, 2000,350, 0,175],
-                        'we-will-rock-you': [2000,300, 0,150, 2000,300, 0,150, 2000,600, 0,300]
+        // Array of 150 items to test browser array length limits (Chrome caps at 99)
+        const longArrayTest = Array.from({length: 150}, (_, i) => i % 2 === 0 ? 50 : 20);
+
+        const patterns = {
+            "Stress & API Vectors": {
+                'jackhammer': [50, 10, 50, 10, 50, 10, 50, 10, 50, 10], 
+                'engine-rev': [100, 20, 200, 20, 300, 20, 400, 20, 500, 20],
+                'maximum-lock': [10000, 1, 10000, 1, 10000],
+                'micro-floats': [0.5, 0.5, 0.5, 0.5, 1.2, 1.2, 0.1, 0.1], 
+                'zero-gaps': [200, 0, 200, 0, 200, 0, 200], 
+                'array-limit': longArrayTest, 
+                'exp-accel': [200, 200, 150, 150, 100, 100, 50, 50, 25, 25, 10, 10],
+                'duty-swap': [10, 200, 200, 10, 10, 200, 200, 10]
+            },
+            "Alerts & Ringtones": {
+                'sos-distress': [100, 50, 100, 50, 100, 200, 300, 50, 300, 50, 300, 200, 100, 50, 100, 50, 100, 500],
+                'heartbeat': [150, 100, 150, 600],
+                'fast-heart': [100, 60, 100, 300],
+                'escalating': [500, 200, 400, 150, 300, 100, 200, 50, 100, 25],
+                'fade-in': [10, 50, 20, 50, 40, 50, 80, 50, 150, 50, 300, 50],
+                'fade-out': [300, 50, 150, 50, 80, 50, 40, 50, 20, 50, 10],
+                'radar-ping': [30, 800, 30, 800],
+                'triple-burst': [100, 80, 100, 80, 100, 400]
+            },
+            "UI Haptic Feedback": {
+                'select-tick': [15],
+                'success-double': [30, 60, 60],
+                'error-triple': [60, 40, 60, 40, 60],
+                'heavy-impact': [150],
+                'ramp-up': [10, 30, 30, 30, 80],
+                'long-press': [80, 40, 200],
+                'toggle-on': [20, 40, 50],
+                'toggle-off': [50, 40, 20]
+            },
+            "Sci-Fi & Machine FX": {
+                'geiger-counter': [10, 120, 10, 300, 10, 50, 10, 400, 10, 80],
+                'warp-drive': [10, 100, 20, 80, 40, 60, 80, 40, 160, 20],
+                'laser-burst': [120, 30, 80, 30, 40, 30, 10],
+                'cyber-pulse': [150, 50, 30, 50, 150, 50, 30, 50],
+                'engine-idle': [40, 120, 40, 120, 40, 120],
+                'shield-hit': [200, 40, 100, 40, 40]
+            },
+            "Rhythmic Melodies": {
+                'happy-birthday': [200, 100, 100, 150, 300, 150, 300, 300, 200, 100, 100, 150, 300, 150, 400, 500],
+                'smooth-criminal': [150, 100, 150, 50, 150, 250, 150, 50, 150, 250, 150, 50, 150, 200, 400, 500],
+                '20th-century': [50, 50, 50, 50, 50, 150, 200, 100, 200, 100, 200, 200, 50, 50, 50, 50, 50, 150, 400, 600],
+                'mario-theme': [150, 80, 150, 200, 150, 200, 150, 80, 150, 250, 300, 400],
+                'imperial-march': [400, 200, 400, 200, 400, 200, 250, 100, 150, 100, 600, 400],
+                'pink-panther': [100, 200, 100, 200, 100, 100, 100, 100, 300, 400],
+                'star-wars-main': [500, 100, 500, 100, 500, 100, 350, 50, 150, 50, 500, 400],
+                'zelda-secret': [100, 50, 100, 50, 100, 50, 100, 50, 100, 50, 100, 50, 100, 50, 300, 400],
+                'tetris-theme': [300, 150, 150, 150, 150, 150, 300, 150, 150, 150, 300, 400],
+                'beethoven-5th': [150, 100, 150, 100, 150, 300, 500, 600],
+                'mission-imp': [200, 100, 200, 250, 200, 100, 200, 250, 100, 50, 100, 50, 200, 400],
+                'pac-man': [80, 40, 80, 40, 80, 40, 80, 40, 160, 80, 160, 400]
+            }
+        };
+
+        let currentPattern = null;
+        let loopInterval = null;
+        let isRunning = false;
+
+        const dom = {
+            container: document.getElementById('categoryContainer'),
+            status: document.getElementById('statusIndicator'),
+            start: document.getElementById('startBtn'),
+            stop: document.getElementById('stopBtn'),
+            sliders: {
+                intensity: document.getElementById('intensity'),
+                burst: document.getElementById('burst'),
+                gap: document.getElementById('gap')
+            },
+            vals: {
+                intensity: document.getElementById('intensityVal'),
+                burst: document.getElementById('burstVal'),
+                gap: document.getElementById('gapVal')
+            }
+        };
+
+        function init() {
+            renderDynamicCategories();
+            
+            dom.start.addEventListener('click', executeVibration);
+            dom.stop.addEventListener('click', haltVibration);
+
+            Object.keys(dom.sliders).forEach(key => {
+                dom.sliders[key].addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    if (key === 'intensity') {
+                        dom.vals[key].textContent = val + 'x';
+                    } else {
+                        dom.vals[key].textContent = val.toFixed(1); 
                     }
-                };
-                this.currentMode = 'regular';
-                this.currentPattern = null;
-                this.vibeInterval = null;
-                this.isVibrating = false;
-                this.domElements = {
-                    presetPatterns: document.getElementById('presetPatterns'),
-                    musicPatterns: document.getElementById('musicPatterns'),
-                    statusIndicator: document.getElementById('statusIndicator'),
-                    sliders: {
-                        mainIntensity: document.getElementById('mainIntensitySlider'),
-                        patternSpeed: document.getElementById('patternSpeedSlider'),
-                        burstDuration: document.getElementById('burstDurationSlider'),
-                        wavePattern: document.getElementById('wavePatternSlider'),
-                        pulseFrequency: document.getElementById('pulseFrequencySlider'),
-                        gapDuration: document.getElementById('gapDurationSlider')
-                    },
-                    sliderValueDisplays: {
-                        mainIntensity: document.getElementById('mainIntensityValue'),
-                        patternSpeed: document.getElementById('patternSpeedValue'),
-                        burstDuration: document.getElementById('burstDurationValue'),
-                        wavePattern: document.getElementById('wavePatternValue'),
-                        pulseFrequency: document.getElementById('pulseFrequencyValue'),
-                        gapDuration: document.getElementById('gapDurationValue')
-                    }
-                };
-                this.init();
-            }
+                    
+                    if (isRunning && !currentPattern) executeVibration(); 
+                });
+            });
+        }
 
-            init() {
-                this.renderPatternButtons();
-                this.addEventListeners();
-                this.updateSliderValues();
-            }
+        // Generates UI categories dynamically from the patterns object
+        function renderDynamicCategories() {
+            dom.container.innerHTML = '';
+            
+            Object.keys(patterns).forEach(categoryName => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'category-group';
 
-            renderPatternButtons() {
-                const renderButtons = (container, patterns, type) => {
-                    container.innerHTML = '';
-                    Object.entries(patterns).forEach(([key, _]) => {
-                        const button = document.createElement('button');
-                        button.className = 'pattern-btn';
-                        button.dataset.type = type;
-                        button.dataset.pattern = key;
-                        button.textContent = key.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                        container.appendChild(button);
-                    });
-                };
-                renderButtons(this.domElements.presetPatterns, this.patterns.presets, 'preset');
-                renderButtons(this.domElements.musicPatterns, this.patterns.music, 'music');
-            }
+                const title = document.createElement('h3');
+                title.textContent = categoryName;
 
-            addEventListeners() {
-                document.querySelectorAll('.pattern-btn').forEach(button => {
-                    button.addEventListener('click', () => this.togglePattern(button));
-                    button.addEventListener('touchend', (e) => e.preventDefault());
+                const grid = document.createElement('div');
+                grid.className = 'pattern-grid';
+
+                Object.keys(patterns[categoryName]).forEach(patternKey => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pattern-btn';
+                    btn.title = patternKey.toUpperCase().replace(/-/g, ' ');
+                    btn.textContent = patternKey.replace(/-/g, ' ');
+                    
+                    btn.onclick = () => {
+                        document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        currentPattern = patterns[categoryName][patternKey];
+                        if (isRunning) executeVibration();
+                    };
+
+                    grid.appendChild(btn);
                 });
 
-                Object.values(this.domElements.sliders).forEach(slider => {
-                    ['input', 'change', 'touchend'].forEach(eventType => {
-                        slider.addEventListener(eventType, (e) => {
-                            e.preventDefault();
-                            this.updateSliderValues();
-                            this.handleSliderInteraction();
-                        });
-                    });
-                });
+                groupDiv.appendChild(title);
+                groupDiv.appendChild(grid);
+                dom.container.appendChild(groupDiv);
+            });
+        }
 
-                document.addEventListener('visibilitychange', () => {
-                    if (document.hidden) this.stopVibration();
-                });
-
-                window.addEventListener('blur', () => this.stopVibration());
-            }
-
-            updateSliderValues() {
-                this.domElements.sliderValueDisplays.mainIntensity.textContent = `${Math.round(this.domElements.sliders.mainIntensity.value / 50)}%`;
-                this.domElements.sliderValueDisplays.patternSpeed.textContent = `${this.domElements.sliders.patternSpeed.value}ms`;
-                this.domElements.sliderValueDisplays.burstDuration.textContent = `${this.domElements.sliders.burstDuration.value}ms`;
-                this.domElements.sliderValueDisplays.wavePattern.textContent = `${this.domElements.sliders.wavePattern.value}%`;
-                this.domElements.sliderValueDisplays.pulseFrequency.textContent = `${this.domElements.sliders.pulseFrequency.value}Hz`;
-                this.domElements.sliderValueDisplays.gapDuration.textContent = `${this.domElements.sliders.gapDuration.value}ms`;
-            }
-
-            togglePattern(button) {
-                const { type, pattern } = button.dataset;
-                if (this.currentMode === type && this.currentPattern === pattern) {
-                    this.stopVibration();
-                    button.classList.remove('active');
-                    this.currentMode = 'regular';
-                    this.currentPattern = null;
-                } else {
-                    this.stopVibration();
-                    document.querySelectorAll('.pattern-btn').forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                    this.currentMode = type;
-                    this.currentPattern = pattern;
-                    this.startPatternVibration();
+        function getManualPattern() {
+            const burst = parseFloat(dom.sliders.burst.value);
+            const gap = parseFloat(dom.sliders.gap.value);
+            const intensity = parseInt(dom.sliders.intensity.value, 10);
+            let arr = [];
+            
+            for (let i = 0; i < intensity; i++) {
+                arr.push(burst);
+                if (i < intensity - 1) {
+                    arr.push(gap);
                 }
             }
+            return arr;
+        }
 
-            handleSliderInteraction() {
-                if (this.currentMode !== 'regular') {
-                    this.stopVibration();
-                    document.querySelectorAll('.pattern-btn').forEach(btn => btn.classList.remove('active'));
-                    this.currentMode = 'regular';
-                    this.currentPattern = null;
-                }
-                this.startCustomVibration();
+        function executeVibration() {
+            if (!('vibrate' in navigator)) {
+                dom.status.textContent = 'ERR: API NOT SUPPORTED';
+                return;
             }
+            
+            haltVibration(false); 
+            isRunning = true;
+            dom.status.textContent = 'STATE: ACTUATOR ACTIVE';
+            dom.status.style.backgroundColor = '#34c759';
+            dom.status.style.color = '#fff';
 
-            startPatternVibration() {
-                if (!('vibrate' in navigator)) {
-                    alert('Vibration not supported');
-                    return;
-                }
+            const payload = currentPattern || getManualPattern();
+            const cycleDuration = payload.reduce((a, b) => a + b, 0);
 
-                const pattern = this.patterns[this.currentMode][this.currentPattern];
-                const intensityMultiplier = this.domElements.sliders.mainIntensity.value / 1000;
-                const scaledPattern = pattern.map((value, index) => index % 2 === 0 ? Math.round(value * intensityMultiplier) : value);
+            const trigger = () => {
+                navigator.vibrate(payload);
+                const timeoutDelay = Math.max(cycleDuration, 10); 
+                loopInterval = setTimeout(trigger, timeoutDelay);
+            };
+            
+            trigger();
+        }
 
-                const runPattern = () => {
-                    try {
-                        navigator.vibrate(scaledPattern);
-                        this.vibeInterval = setTimeout(runPattern, scaledPattern.reduce((a, b) => a + b, 0));
-                    } catch (error) {
-                        console.error('Vibration error:', error);
-                        this.stopVibration();
-                    }
-                };
-
-                this.isVibrating = true;
-                this.updateStatus(true, this.currentPattern);
-                runPattern();
-            }
-
-            startCustomVibration() {
-                if (!('vibrate' in navigator)) {
-                    alert('Vibration not supported');
-                    return;
-                }
-
-                const intensity = this.domElements.sliders.mainIntensity.value;
-                const patternSpeed = this.domElements.sliders.patternSpeed.value;
-                const burstDuration = this.domElements.sliders.burstDuration.value;
-                const gapDuration = this.domElements.sliders.gapDuration.value;
-                const pulseFrequency = this.domElements.sliders.pulseFrequency.value;
-                const wavePattern = this.domElements.sliders.wavePattern.value;
-
-                let pattern = [];
-                const cycleLength = Math.floor(1000 / pulseFrequency);
-                const waveIntensity = intensity * (wavePattern / 100);
-
-                for (let i = 0; i < pulseFrequency; i++) {
-                    pattern.push(
-                        Math.round(intensity - (waveIntensity * Math.sin(i * Math.PI / pulseFrequency))),
-                        parseInt(burstDuration),
-                        0,
-                        parseInt(gapDuration)
-                    );
-                }
-
-                const runPattern = () => {
-                    try {
-                        navigator.vibrate(pattern);
-                        this.vibeInterval = setTimeout(runPattern, parseInt(patternSpeed));
-                    } catch (error) {
-                        console.error('Vibration error:', error);
-                        this.stopVibration();
-                    }
-                };
-
-                this.isVibrating = true;
-                this.updateStatus(true, 'custom');
-                runPattern();
-            }
-
-            stopVibration() {
-                if (this.vibeInterval) {
-                    clearTimeout(this.vibeInterval);
-                    try {
-                        navigator.vibrate(0);
-                    } catch (error) {
-                        console.error('Error stopping vibration:', error);
-                    }
-                    this.isVibrating = false;
-                    this.updateStatus(false);
-                }
-            }
-
-            updateStatus(isActive, pattern = '') {
-                const statusText = isActive ?
-                    (pattern === 'custom' ? 'Custom Active' :
-                     pattern.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')) :
-                    'Idle';
-
-                this.domElements.statusIndicator.className = 'status-indicator' + (isActive ? ' status-active' : '');
-                this.domElements.statusIndicator.textContent = `Status: ${statusText}`;
+        function haltVibration(updateUI = true) {
+            clearTimeout(loopInterval);
+            navigator.vibrate(0); 
+            isRunning = false;
+            
+            if (updateUI) {
+                document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
+                currentPattern = null;
+                dom.status.textContent = 'STATE: OFFLINE';
+                dom.status.style.backgroundColor = 'var(--btn-bg)';
+                dom.status.style.color = 'var(--text-primary)';
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            new VibrationController();
-        });
+        init();
     </script>
 </body>
 </html>
