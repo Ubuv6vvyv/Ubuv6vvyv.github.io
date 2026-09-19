@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Gemini & Docs Clean Formatter</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    :root {
+      --bg:#09090b;--card-bg:#141417;--input-bg:#18181b;--border:#27272a;--border-hover:#3f3f46;
+      --text:#f4f4f5;--text-muted:#a1a1aa;--accent:#ffffff;--badge-user-bg:#ffffff;--badge-user-text:#000000;
+      --badge-gemini-bg:#27272a;--badge-gemini-text:#d4d4d8;--code-bg:#0d0d0e;--vh:1vh;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body {
+      height:100vh; height:calc(var(--vh,1vh) * 100); width:100vw; margin:0; padding:0;
+      overflow:hidden; overscroll-behavior:none;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      background-color:var(--bg); color:var(--text); display:flex; flex-direction:column;
+    }
+    header {
+      flex:0 0 auto; background-color:var(--card-bg); padding:10px 14px; border-bottom:1px solid var(--border);
+      display:flex; flex-wrap:wrap; row-gap:6px; justify-content:space-between; align-items:center; gap:8px; z-index:100;
+    }
+    h1 { font-size:0.85rem; font-weight:600; color:var(--text); letter-spacing:-0.01em; }
+    .view-toggles { display:flex; gap:2px; background:var(--bg); padding:2px; border-radius:6px; border:1px solid var(--border); }
+    .toggle-btn { background:transparent; color:var(--text-muted); border:none; padding:4px 10px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:500; }
+    .toggle-btn.active { background:var(--card-bg); color:var(--text); }
+    .actions { display:flex; gap:6px; align-items:center; }
+    button.btn { background-color:var(--accent); color:#000; border:1px solid var(--accent); padding:5px 10px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.75rem; transition:opacity .2s; }
+    button.btn:hover { opacity:.85; }
+    button.btn-sec { background-color:transparent; color:var(--text-muted); border:1px solid var(--border); }
+    button.btn-sec:hover { color:var(--text); background-color:var(--input-bg); }
+    .workspace { flex:1 1 auto; display:flex; flex-direction:column; overflow:hidden; min-height:0; }
+    .panel { flex:1 1 50%; display:flex; flex-direction:column; overflow:hidden; min-height:0; }
+    .panel-header {
+      flex:0 0 auto; background-color:var(--card-bg); padding:6px 12px; font-size:0.68rem; font-weight:600;
+      text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .mode-badge { font-size:0.62rem; padding:1px 6px; border-radius:3px; margin-left:6px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; vertical-align:middle; }
+    .mode-plain { background:var(--input-bg); color:var(--text-muted); border:1px solid var(--border); }
+    .mode-html  { background:rgba(59,130,246,.15); color:#93c5fd; border:1px solid rgba(59,130,246,.4); }
+    .mode-rich  { background:rgba(34,197,94,.15); color:#86efac; border:1px solid rgba(34,197,94,.4); }
+
+    .rich-input {
+      width:100%; flex:1 1 auto; background-color:#ffffff; color:#1a1a1a; padding:12px 14px;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:0.88rem;
+      overflow-y:auto; min-height:0; outline:none; line-height:1.5; -webkit-overflow-scrolling:touch;
+    }
+    .rich-input:empty:before { content:attr(data-placeholder); color:#8a8a8a; font-style:italic; }
+    .rich-input img { max-width:100%; }
+    .rich-input table { border-collapse:collapse; }
+    .rich-input pre, .rich-input code { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+
+    .preview-body { flex:1 1 auto; overflow-y:auto; padding:14px; background-color:var(--bg); min-height:0; -webkit-overflow-scrolling:touch; font-size:16px; }
+    .workspace[data-view="input"] .panel-preview { display:none; }
+    .workspace[data-view="preview"] .panel-input { display:none; }
+    @media (min-width:768px) {
+      .workspace { flex-direction:row; }
+      .workspace[data-view="split"] .panel-input { border-right:1px solid var(--border); }
+      .workspace[data-view="split"] .panel-preview { display:flex; }
+    }
+    
+    /* Using 'em' units so all elements perfectly scale when base font size is adjusted */
+    .rendered-content p { margin-bottom:12px; line-height:1.6; font-size:0.9em; color:#e4e4e7; }
+    .rendered-content strong { color:#ffffff; font-weight:600; }
+    .rendered-content em { color:#d4d4d8; font-style:italic; }
+    .rendered-content del { color:var(--text-muted); }
+    .rendered-content h1, .rendered-content h2, .rendered-content h3 { margin:18px 0 8px 0; color:#ffffff; font-weight:600; letter-spacing:-0.01em; }
+    .rendered-content h1 { font-size:1.2em; border-bottom:1px solid var(--border); padding-bottom:6px; }
+    .rendered-content h2 { font-size:1.05em; }
+    .rendered-content h3 { font-size:0.95em; }
+    .rendered-content ul, .rendered-content ol { margin-left:18px; margin-bottom:12px; font-size:0.9em; color:#e4e4e7; }
+    .rendered-content ul ul, .rendered-content ol ol, .rendered-content ul ol, .rendered-content ol ul { margin-top:6px; margin-bottom:0; }
+    .rendered-content li { margin-bottom:6px; line-height:1.5; }
+    .rendered-content a { color:#a1a1aa; text-decoration:underline; text-underline-offset:3px; }
+    .rendered-content a:hover { color:#ffffff; }
+    .rendered-content table { width:100%; border-collapse:collapse; margin:14px 0; font-size:0.85em; display:block; overflow-x:auto; }
+    .rendered-content th, .rendered-content td { border:1px solid var(--border); padding:6px 8px; text-align:left; }
+    .rendered-content th { background:var(--card-bg); color:#fff; font-weight:600; }
+    .rendered-content blockquote { border-left:3px solid var(--border-hover); margin:14px 0; padding:2px 14px; color:var(--text-muted); }
+    .rendered-content blockquote p { margin-bottom:6px; }
+    .rendered-content hr { border:none; border-top:1px solid var(--border); margin:20px 0; }
+    .kv-param { font-family:ui-monospace,monospace; font-size:0.82em; background:var(--input-bg); color:#f4f4f5; padding:1px 5px; border-radius:4px; border:1px solid var(--border); font-weight:600; }
+    .meta-badge { display:inline-block; font-size:0.72em; font-weight:600; background:var(--input-bg); color:var(--text-muted); border:1px solid var(--border-hover); padding:1px 6px; border-radius:4px; margin-right:4px; }
+    .turn-header { display:inline-block; font-size:0.68em; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:4px; margin:16px 0 10px 0; }
+    .turn-header.speaker-user { background-color:var(--badge-user-bg); color:var(--badge-user-text); }
+    .turn-header.speaker-gemini { background-color:var(--badge-gemini-bg); color:var(--badge-gemini-text); border:1px solid var(--border); }
+    .code-container { background-color:var(--code-bg); border:1px solid var(--border); border-radius:6px; margin:14px 0; overflow:hidden; }
+    .code-header { background-color:var(--card-bg); padding:4px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); font-family:ui-monospace,monospace; font-size:0.75em; color:var(--text-muted); }
+    .btn-copy { background:transparent; color:var(--text-muted); border:1px solid var(--border); padding:2px 6px; font-size:0.7em; border-radius:4px; cursor:pointer; }
+    .btn-copy:hover { color:var(--text); border-color:var(--border-hover); }
+    pre { padding:12px; overflow-x:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:0.82em; line-height:1.45; }
+    pre code { background:transparent !important; padding:0 !important; border:none !important; }
+    .placeholder-text { color:var(--text-muted); font-style:italic; font-size:0.85em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Gemini & Docs Converter</h1>
+    <div class="view-toggles">
+      <button class="toggle-btn" onclick="setView('input')">Edit</button>
+      <button class="toggle-btn active" onclick="setView('preview')">Preview</button>
+      <button class="toggle-btn" onclick="setView('split')">Split</button>
+    </div>
+    
+    <div class="actions">
+      <!-- File Input & Font Scales -->
+      <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(event)">
+      <button class="btn btn-sec" onclick="document.getElementById('file-input').click()">Browse File</button>
+      
+      <button class="btn btn-sec" onclick="adjustFontSize(2)" title="Increase Text Size">A+</button>
+      <button class="btn btn-sec" onclick="adjustFontSize(-2)" title="Decrease Text Size">A-</button>
+      
+      <button class="btn btn-sec" onclick="clearAll()">Clear</button>
+      <button class="btn btn-sec" onclick="downloadMarkdown()">MD</button>
+      <button class="btn" onclick="downloadHTML()">HTML</button>
+    </div>
+  </header>
+
+  <div class="workspace" id="workspace" data-view="preview">
+    <div class="panel panel-input">
+      <div class="panel-header">
+        <span>Paste Content <span id="paste-mode" class="mode-badge mode-plain">Waiting</span></span>
+        <span id="char-count">0 chars</span>
+      </div>
+      <div id="raw-input" class="rich-input" contenteditable="true"
+           data-placeholder="Paste directly from Google Docs, a chat response, exported HTML, or raw markdown here — it will render like a compose box..."
+           oninput="handleTyping()"></div>
+    </div>
+    <div class="panel panel-preview">
+      <div class="panel-header">Clean Monochrome Live Preview</div>
+      <div class="preview-body rendered-content" id="preview-output">
+        <p class="placeholder-text">Your formatted output will render here...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- Mobile viewport lock ---------- */
+    (function () {
+      function setVH() {
+        const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+      }
+      setVH();
+      window.addEventListener('resize', setVH);
+      window.addEventListener('orientationchange', setVH);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', setVH);
+    })();
+
+    const inputEl = document.getElementById('raw-input');
+    let isRichPaste = false;
+    let currentBaseFontSizePx = 16; // Standard base size tracking
+
+    inputEl.addEventListener('paste', function (e) {
+      const htmlData = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+      isRichPaste = !!(htmlData && /<[a-z]/i.test(htmlData) &&
+        (htmlData.includes('docs-internal-guid') ||
+         /font-family|<table|<ul|<ol|<b\b|<strong|<pre|<code|<span[^>]*style/i.test(htmlData)));
+      setTimeout(processConversion, 20);
+    });
+
+    function handleTyping() {
+      isRichPaste = false;
+      processConversion();
+    }
+
+    /* ---------- File Input and Scaling Controls ---------- */
+    function adjustFontSize(deltaPx) {
+      currentBaseFontSizePx += deltaPx;
+      if (currentBaseFontSizePx < 10) currentBaseFontSizePx = 10;
+      if (currentBaseFontSizePx > 36) currentBaseFontSizePx = 36;
+      document.getElementById('preview-output').style.fontSize = currentBaseFontSizePx + 'px';
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        inputEl.innerText = e.target.result;
+        isRichPaste = false; 
+        processConversion(); 
+      };
+      reader.readAsText(file);
+      event.target.value = ''; // Reset input to allow consecutive uploads of the same file
+    }
+
+    function getTimestampString() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    }
+    /* ----------------------------------------------------- */
+
+    function setView(mode) {
+      document.getElementById('workspace').setAttribute('data-view', mode);
+      document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.toLowerCase() === mode);
+      });
+    }
+    if (window.innerWidth < 768) { setView('input'); } else { setView('split'); }
+
+    function processConversion() {
+      const plainText = inputEl.innerText || '';
+      document.getElementById('char-count').innerText = `${plainText.length} chars`;
+      const modeBadge = document.getElementById('paste-mode');
+      const hasStructure = inputEl.querySelector('table, ul, ol, pre, code, blockquote, img, h1, h2, h3');
+
+      if (!plainText.trim() && !hasStructure) {
+        document.getElementById('preview-output').innerHTML = '<p class="placeholder-text">Your formatted output will render here...</p>';
+        isRichPaste = false;
+        modeBadge.textContent = 'Waiting';
+        modeBadge.className = 'mode-badge mode-plain';
+        return;
+      }
+
+      let renderedHtml = '';
+      if (isRichPaste) {
+        renderedHtml = parseRichHtmlFromNode(inputEl);
+        modeBadge.textContent = 'Rich HTML \u2713';
+        modeBadge.className = 'mode-badge mode-rich';
+      } else if (/<[a-z][\s\S]*>/i.test(plainText)) {
+        renderedHtml = parseRichHtmlFromString(plainText);
+        modeBadge.textContent = 'HTML Source';
+        modeBadge.className = 'mode-badge mode-html';
+      } else {
+        renderedHtml = parseMarkdownText(plainText);
+        modeBadge.textContent = 'Markdown';
+        modeBadge.className = 'mode-badge mode-plain';
+      }
+
+      const previewEl = document.getElementById('preview-output');
+      previewEl.innerHTML = renderedHtml;
+      if (window.hljs) {
+        previewEl.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+      }
+    }
+
+    /* ================= Rich HTML -> clean HTML (shared core) ================= */
+
+    function normalizeBoldItalicSpans(root) {
+      root.querySelectorAll('span').forEach(span => {
+        const style = span.getAttribute('style') || '';
+        const isBold = /font-weight:\s?(700|800|900|bold)/i.test(style);
+        const isItalic = /font-style:\s?italic/i.test(style);
+        if (isBold) {
+          const strong = document.createElement('strong');
+          strong.innerHTML = span.innerHTML;
+          span.parentNode.replaceChild(strong, span);
+        } else if (isItalic) {
+          const em = document.createElement('em');
+          em.innerHTML = span.innerHTML;
+          span.parentNode.replaceChild(em, span);
+        }
+      });
+    }
+
+    function unwrapSingleWrapper(root) {
+      let r = root;
+      while (r.children.length === 1 && r.children[0].children.length > 1 &&
+             ['B', 'SPAN', 'DIV', 'FONT'].includes(r.children[0].tagName)) {
+        r = r.children[0];
+      }
+      return r;
+    }
+
+    function looksLikeCode(text, style, el) {
+      if (['PRE', 'CODE', 'TT'].includes(el.tagName)) return true;
+      if (el.querySelector && el.querySelector('pre, code')) return true;
+      if (/courier|consolas|mono|menlo|monaco/i.test(style)) return true;
+      const t = text.trim();
+      if (!t) return false;
+      if (/^[{}\[\]();,]+$/.test(t)) return true;
+      if (/^["']?[\w.$]+["']?\s*:\s*.+[,{]?$/.test(t) && /[{}:"]/.test(t)) return true;
+      return false;
+    }
+
+    function renderChildren(rootEl) {
+      const root = unwrapSingleWrapper(rootEl);
+      const children = Array.from(root.children);
+      let outputHtml = '';
+      let codeBuffer = [];
+
+      function flushCodeBuffer() {
+        while (codeBuffer.length && codeBuffer[codeBuffer.length - 1] === '') codeBuffer.pop();
+        if (!codeBuffer.length) return;
+        const codeText = codeBuffer.join('\n');
+        const lang = codeText.trim().startsWith('{') || codeText.trim().startsWith('[') ? 'json' : 'text';
+        outputHtml += `<div class="code-container"><div class="code-header"><span>${lang}</span><button class="btn-copy" onclick="copySnippet(this)">Copy</button></div><pre><code class="language-${lang}">${escapeHtml(codeText)}</code></pre></div>`;
+        codeBuffer = [];
+      }
+
+      function renderList(listEl) {
+        const tag = listEl.tagName.toLowerCase();
+        let html = `<${tag}>`;
+        Array.from(listEl.children).forEach(li => {
+          if (li.tagName !== 'LI') return;
+          const liClone = li.cloneNode(true);
+          Array.from(liClone.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL').forEach(n => n.remove());
+          html += `<li>${cleanInlineHtml(liClone.innerHTML)}`;
+          Array.from(li.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL').forEach(n => { html += renderList(n); });
+          html += `</li>`;
+        });
+        return html + `</${tag}>`;
+      }
+
+      function renderTable(tableEl) {
+        const rows = Array.from(tableEl.querySelectorAll('tr'));
+        let html = '<table>';
+        rows.forEach((row, idx) => {
+          const cellTag = idx === 0 ? 'th' : 'td';
+          html += '<tr>' + Array.from(row.children).map(cell => `<${cellTag}>${cleanInlineHtml(cell.innerHTML)}</${cellTag}>`).join('') + '</tr>';
+        });
+        return html + '</table>';
+      }
+
+      children.forEach(child => {
+        const style = child.getAttribute('style') || '';
+        const rawText = (child.innerText || child.textContent || '').replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ');
+        const trimmedText = rawText.trim();
+
+        if (child.tagName === 'HR') { flushCodeBuffer(); outputHtml += '<hr>'; return; }
+        if (child.tagName === 'TABLE') { flushCodeBuffer(); outputHtml += renderTable(child); return; }
+        if (child.tagName === 'BLOCKQUOTE') { flushCodeBuffer(); outputHtml += `<blockquote>${cleanInlineHtml(child.innerHTML)}</blockquote>`; return; }
+
+        if (looksLikeCode(trimmedText, style, child)) {
+          if (['PRE', 'CODE'].includes(child.tagName) || (child.querySelector && child.querySelector('pre, code'))) {
+            const codeEl = child.tagName === 'PRE' || child.tagName === 'CODE' ? child : child.querySelector('pre, code');
+            codeBuffer.push((codeEl.innerText || codeEl.textContent || '').replace(/&nbsp;/g, ' '));
+          } else {
+            codeBuffer.push(rawText);
+          }
+          return;
+        }
+
+        if (!trimmedText) {
+          if (codeBuffer.length) codeBuffer.push('');
+          return;
+        }
+
+        flushCodeBuffer();
+
+        const userMatch = trimmedText.match(/^(User prompt|User|Human|You|Me)\s*:/i);
+        const aiMatch = !userMatch && trimmedText.match(/^(Response|Gemini|ChatGPT|Claude|Assistant|AI|Bot)\s*:/i);
+        if (userMatch) {
+          outputHtml += `<div class="turn-header speaker-user">User Prompt</div>`;
+          const content = child.innerHTML.replace(/^.*?:\s*/i, '');
+          if (content.trim()) outputHtml += `<p>${cleanInlineHtml(content)}</p>`;
+          return;
+        }
+        if (aiMatch) {
+          outputHtml += `<div class="turn-header speaker-gemini">AI Response</div>`;
+          const content = child.innerHTML.replace(/^.*?:\s*/i, '');
+          if (content.trim()) outputHtml += `<p>${cleanInlineHtml(content)}</p>`;
+          return;
+        }
+
+        if (/^H[1-4]$/.test(child.tagName) || /^(\d+\.\s+[^:]+)$/.test(trimmedText)) {
+  const tag = child.tagName === 'H1' ? 'h1' : 'h2';
+  outputHtml += `<${tag}>${cleanInlineHtml(child.innerHTML)}</${tag}>`;
+  return;
+}
+
+        if (child.tagName === 'UL' || child.tagName === 'OL') {
+          outputHtml += renderList(child);
+          return;
+        }
+
+        outputHtml += `<p>${cleanInlineHtml(child.innerHTML)}</p>`;
+      });
+
+      flushCodeBuffer();
+      return outputHtml;
+    }
+
+    function parseRichHtmlFromString(htmlString) {
+      const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+      doc.querySelectorAll('script, style, div[style*="position: absolute"]').forEach(el => el.remove());
+      normalizeBoldItalicSpans(doc);
+      return renderChildren(doc.body);
+    }
+
+    function parseRichHtmlFromNode(rootEl) {
+      const clone = rootEl.cloneNode(true);
+      clone.querySelectorAll('script, style, div[style*="position: absolute"]').forEach(el => el.remove());
+      normalizeBoldItalicSpans(clone);
+      return renderChildren(clone);
+    }
+
+    function cleanInlineHtml(html) {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      temp.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style'); el.removeAttribute('dir'); el.removeAttribute('aria-level'); el.removeAttribute('role');
+        if (el.tagName === 'SPAN' && !el.classList.length) {
+          const parent = el.parentNode;
+          while (el.firstChild) parent.insertBefore(el.firstChild, el);
+          parent.removeChild(el);
+        }
+      });
+      return temp.innerHTML
+        .replace(/^([a-zA-Z0-9_\s]{1,40}):(?!\/\/)/, '<span class="kv-param">$1</span>:')
+        .replace(/\[([A-Za-z0-9\s]+)\]/g, '<span class="meta-badge">$1</span>');
+    }
+
+    /* ================= Markdown -> clean HTML ================= */
+
+    function parseMarkdownText(rawText) {
+      const codeBlocksSaved = [];
+      let textToProcess = rawText.replace(/```([a-zA-Z0-9_+#-]*)\n?([\s\S]*?)```/g, function (match, lang, codeContent) {
+        const language = lang.trim() || 'text';
+        const placeholderId = `___CODE_BLOCK_${codeBlocksSaved.length}___`;
+        codeBlocksSaved.push(`<div class="code-container"><div class="code-header"><span>${language}</span><button class="btn-copy" onclick="copySnippet(this)">Copy</button></div><pre><code class="language-${language}">${escapeHtml(codeContent.trim())}</code></pre></div>`);
+        return placeholderId;
+      });
+
+      const lines = textToProcess.split('\n');
+      let html = '';
+      let i = 0;
+      const listStack = [];
+
+      function closeLists() {
+        while (listStack.length) {
+          const top = listStack.pop();
+          html += `</li></${top.tag}>`;
+        }
+      }
+
+      while (i < lines.length) {
+        const raw = lines[i];
+        const trimmed = raw.trim();
+
+        if (!trimmed) { closeLists(); i++; continue; }
+        if (trimmed.startsWith('___CODE_BLOCK_') && trimmed.endsWith('___')) { closeLists(); html += trimmed; i++; continue; }
+
+        if (/^\|.*\|$/.test(trimmed) && lines[i + 1] && /^\Vert{}?[\s:\vert{}-]+\Vert{}?$/.test(lines[i + 1].trim()) && lines[i + 1].includes('-')) {
+          closeLists();
+          const headerCells = trimmed.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+          html += '<table><thead><tr>' + headerCells.map(c => `<th>${parseMarkdownInline(c)}</th>`).join('') + '</tr></thead><tbody>';
+          i += 2;
+          while (i < lines.length && /^\|.*\|?$/.test(lines[i].trim()) && lines[i].trim()) {
+            const rowCells = lines[i].trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+            html += '<tr>' + rowCells.map(c => `<td>${parseMarkdownInline(c)}</td>`).join('') + '</tr>';
+            i++;
+          }
+          html += '</tbody></table>';
+          continue;
+        }
+
+        if (/^>\s?/.test(trimmed)) {
+          closeLists();
+          html += '<blockquote>';
+          while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+            html += `<p>${parseMarkdownInline(lines[i].trim().replace(/^>\s?/, ''))}</p>`;
+            i++;
+          }
+          html += '</blockquote>';
+          continue;
+        }
+
+        if (/^([-*_])\1{2,}$/.test(trimmed.replace(/\s/g, ''))) { closeLists(); html += '<hr>'; i++; continue; }
+
+        const speakerMatch = trimmed.match(/^(User prompt|User|Human|You|Me)\s*:\s*(.*)/i);
+        const aiMatch = !speakerMatch && trimmed.match(/^(Response|Gemini|ChatGPT|Claude|Assistant|AI|Bot)\s*:\s*(.*)/i);
+        if (speakerMatch || aiMatch) {
+          closeLists();
+          const m = speakerMatch || aiMatch;
+          const isUser = !!speakerMatch;
+          html += `<div class="turn-header ${isUser ? 'speaker-user' : 'speaker-gemini'}">${isUser ? 'User Prompt' : 'AI Response'}</div>`;
+          if (m[2]) html += `<p>${parseMarkdownInline(m[2])}</p>`;
+          i++; continue;
+        }
+
+        const headMatch = trimmed.match(/^(#{1,4})\s+(.*)/);
+        if (headMatch) {
+          closeLists();
+          const level = headMatch[1].length;
+          const tag = level === 1 ? 'h1' : (level === 2 ? 'h2' : 'h3');
+          html += `<${tag}>${parseMarkdownInline(headMatch[2])}</${tag}>`;
+          i++; continue;
+        }
+
+        if (/^(\d+\.\s+[^:]+)$/.test(trimmed) && trimmed.length < 80) {
+          closeLists();
+          html += `<h2>${parseMarkdownInline(trimmed.replace(/^\d+\.\s+/, ''))}</h2>`;
+          i++; continue;
+        }
+
+        const listMatch = raw.match(/^(\s*)([-*+]|\d+\.)\s+(.*)/);
+        if (listMatch) {
+          const indent = Math.floor(listMatch[1].replace(/\t/g, '  ').length / 2);
+          const tag = /\d+\./.test(listMatch[2]) ? 'ol' : 'ul';
+          const content = listMatch[3];
+          while (listStack.length && (
+            listStack[listStack.length - 1].indent > indent ||
+            (listStack[listStack.length - 1].indent === indent && listStack[listStack.length - 1].tag !== tag)
+          )) {
+            const top = listStack.pop();
+            html += `</li></${top.tag}>`;
+          }
+          if (!listStack.length || listStack[listStack.length - 1].indent < indent) {
+            listStack.push({ indent, tag });
+            html += `<${tag}><li>${parseMarkdownInline(content)}`;
+          } else {
+            html += `</li><li>${parseMarkdownInline(content)}`;
+          }
+          i++; continue;
+        }
+
+        closeLists();
+        html += `<p>${parseMarkdownInline(trimmed)}</p>`;
+        i++;
+      }
+      closeLists();
+
+      codeBlocksSaved.forEach((blockHtml, index) => {
+        html = html.split(`___CODE_BLOCK_${index}___`).join(blockHtml);
+      });
+      return html;
+    }
+
+    function parseMarkdownInline(str) {
+      /* Replaced lookbehinds with safe capture groups to prevent Syntax Errors on older engines */
+      return str
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(.+?)__/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>') 
+        .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
+        .replace(/~~(.+?)~~/g, '<del>$1</del>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replace(/(^|[^"(])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
+        .replace(/^([a-zA-Z0-9_\s]{1,40}):(?!\/\/)/, '<span class="kv-param">$1</span>:')
+        .replace(/\[([A-Za-z0-9\s]+)\]/g, '<span class="meta-badge">$1</span>');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    /* ================= Export: GitHub-flavored Markdown ================= */
+
+    function inlineToMarkdown(node) {
+      let md = '';
+      node.childNodes.forEach(child => {
+        if (child.nodeType === Node.TEXT_NODE) { md += child.textContent; return; }
+        if (child.nodeType !== Node.ELEMENT_NODE) return;
+        switch (child.tagName) {
+          case 'STRONG': case 'B': md += `**${inlineToMarkdown(child)}**`; break;
+          case 'EM': case 'I': md += `*${inlineToMarkdown(child)}*`; break;
+          case 'DEL': md += `~~${inlineToMarkdown(child)}~~`; break;
+          case 'CODE': md += `\`${child.textContent}\``; break;
+          case 'A': md += `[${inlineToMarkdown(child)}](${child.getAttribute('href') || ''})`; break;
+          case 'BR': md += '\n'; break;
+          case 'SPAN':
+            if (child.classList.contains('kv-param')) md += `\`${child.textContent}\``;
+            else if (child.classList.contains('meta-badge')) md += `[${child.textContent}]`;
+            else md += inlineToMarkdown(child);
+            break;
+          default: md += inlineToMarkdown(child);
+        }
+      });
+      return md;
+    }
+
+    function listToMarkdown(listEl, indent) {
+      let md = '';
+      const ordered = listEl.tagName === 'OL';
+      let n = 1;
+      Array.from(listEl.children).forEach(li => {
+        if (li.tagName !== 'LI') return;
+        const nestedLists = Array.from(li.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL');
+        const liClone = li.cloneNode(true);
+        Array.from(liClone.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL').forEach(c => c.remove());
+        const bullet = ordered ? `${n++}.` : '-';
+        md += `${'  '.repeat(indent)}${bullet} ${inlineToMarkdown(liClone).trim()}\n`;
+        nestedLists.forEach(nested => { md += listToMarkdown(nested, indent + 1); });
+      });
+      return md;
+    }
+
+    function blockToMarkdown(container) {
+      let md = '';
+      Array.from(container.children).forEach(child => {
+        switch (child.tagName) {
+          case 'H1': md += `# ${inlineToMarkdown(child).trim()}\n\n`; break;
+          case 'H2': md += `## ${inlineToMarkdown(child).trim()}\n\n`; break;
+          case 'H3': md += `### ${inlineToMarkdown(child).trim()}\n\n`; break;
+          case 'P': { const t = inlineToMarkdown(child).trim(); if (t) md += `${t}\n\n`; break; }
+          case 'UL': case 'OL': md += listToMarkdown(child, 0) + '\n'; break;
+          case 'BLOCKQUOTE': md += child.textContent.trim().split('\n').map(l => `> ${l.trim()}`).join('\n') + '\n\n'; break;
+          case 'HR': md += '---\n\n'; break;
+          case 'TABLE': {
+            const rows = Array.from(child.querySelectorAll('tr'));
+            rows.forEach((row, ridx) => {
+              const cells = Array.from(row.children).map(c => inlineToMarkdown(c).trim().replace(/\|/g, '\\|') || ' ');
+              md += `| ${cells.join(' | ')} |\n`;
+              if (ridx === 0) md += `|${cells.map(() => ' --- ').join('|')}|\n`;
+            });
+            md += '\n';
+            break;
+          }
+          case 'DIV':
+            if (child.classList.contains('code-container')) {
+              let lang = (child.querySelector('.code-header span') || {}).textContent || '';
+              lang = lang.trim();
+              if (lang === 'text' || lang === 'code') lang = '';
+              const code = (child.querySelector('pre code') || {}).textContent || '';
+              md += `\`\`\`${lang}\n${code}\n\`\`\`\n\n`;
+            } else if (child.classList.contains('turn-header')) {
+              md += `**${child.textContent.trim()}**\n\n`;
+            } else {
+              md += blockToMarkdown(child);
+            }
+            break;
+          default: md += blockToMarkdown(child);
+        }
+      });
+      return md;
+    }
+
+    function downloadMarkdown() {
+      const preview = document.getElementById('preview-output');
+      if (preview.querySelector('.placeholder-text')) return;
+      const markdown = blockToMarkdown(preview).replace(/\n{3,}/g, '\n\n').trim() + '\n';
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const link = document.createElement('a');
+      link.download = `clean_export_${getTimestampString()}.md`;
+      link.href = window.URL.createObjectURL(blob);
+      link.click();
+    }
+
+    function copySnippet(buttonElement) {
+      const codeContainer = buttonElement.closest('.code-container');
+      const codeText = codeContainer.querySelector('pre code').innerText;
+      navigator.clipboard.writeText(codeText).then(() => {
+        const originalText = buttonElement.innerText;
+        buttonElement.innerText = "Copied!";
+        setTimeout(() => { buttonElement.innerText = originalText; }, 1800);
+      });
+    }
+
+    function clearAll() {
+      inputEl.innerHTML = "";
+      isRichPaste = false;
+      processConversion();
+    }
+
+    function downloadHTML() {
+      const currentPreview = document.getElementById('preview-output').innerHTML;
+      
+      // I broke the closing script tag string literal (`</scr` + `ipt>`) below to ensure minifiers and HTML parsers never choke on it.
+      const fullBlobTemplate = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Formatted Export</title><style>' +
+        'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#09090b;color:#f4f4f5;padding:16px;line-height:1.6; font-size:' + currentBaseFontSizePx + 'px;}' +
+        'p{margin-bottom:12px;font-size:.9em;color:#e4e4e7;}strong{color:#fff;font-weight:600;}em{color:#d4d4d8;font-style:italic;}' +
+        'del{color:#a1a1aa;}h1,h2,h3{margin:18px 0 8px 0;color:#fff;}h1{font-size:1.2em;border-bottom:1px solid #27272a;padding-bottom:6px;}' +
+        'h2{font-size:1.05em;}h3{font-size:.95em;}ul,ol{margin-left:18px;margin-bottom:12px;}li{margin-bottom:6px;}a{color:#a1a1aa;text-decoration:underline;}' +
+        'table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.85em;display:block;overflow-x:auto;}' +
+        'th,td{border:1px solid #27272a;padding:6px 8px;text-align:left;}th{background:#141417;color:#fff;font-weight:600;}' +
+        'blockquote{border-left:3px solid #3f3f46;margin:14px 0;padding:2px 14px;color:#a1a1aa;}hr{border:none;border-top:1px solid #27272a;margin:20px 0;}' +
+        '.kv-param{font-family:monospace;font-size:.82em;background:#18181b;padding:1px 5px;border-radius:4px;border:1px solid #27272a;font-weight:600;}' +
+        '.meta-badge{font-size:.72em;font-weight:600;background:#18181b;color:#a1a1aa;border:1px solid #3f3f46;padding:1px 6px;border-radius:4px;margin-right:4px;}' +
+        '.turn-header{display:inline-block;font-size:.68em;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:4px;margin:16px 0 10px 0;}' +
+        '.turn-header.speaker-user{background-color:#fff;color:#000;}.turn-header.speaker-gemini{background-color:#27272a;color:#d4d4d8;border:1px solid #27272a;}' +
+        '.code-container{background:#0d0d0e;border:1px solid #27272a;border-radius:6px;margin:14px 0;overflow:hidden;}' +
+        '.code-header{background:#141417;padding:4px 10px;display:flex;justify-content:space-between;font-family:monospace;font-size:.75em;color:#a1a1aa;border-bottom:1px solid #27272a;}' +
+        '.btn-copy{background:transparent;color:#a1a1aa;border:1px solid #27272a;padding:2px 6px;font-size:.7em;border-radius:4px;cursor:pointer;}' +
+        'pre{padding:12px;overflow-x:auto;font-family:monospace;font-size:.82em;}</style></head><body><div>' +
+        currentPreview + '</div><script>function copySnippet(btn){const txt=btn.closest(".code-container").querySelector("pre code").innerText;' +
+        'navigator.clipboard.writeText(txt).then(()=>{btn.innerText="Copied!";setTimeout(()=>{btn.innerText="Copy";},1800);});}</scr' + 'ipt></body></html>';
+
+      const blob = new Blob([fullBlobTemplate], { type: 'text/html' });
+      const link = document.createElement('a');
+      link.download = `clean_gemini_export_${getTimestampString()}.html`;
+      link.href = window.URL.createObjectURL(blob);
+      link.click();
+    }
+  </script>
+</body>
+</html>
+
