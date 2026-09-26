@@ -101,9 +101,13 @@
   <header>
     <h1>Gemini & Docs Converter</h1>
     <div class="view-toggles">
-      <button class="toggle-btn" onclick="setView('input')">Edit</button>
-      <button class="toggle-btn active" onclick="setView('preview')">Preview</button>
-      <button class="toggle-btn" onclick="setView('split')">Split</button>
+      <button class="toggle-btn view-toggle-btn" onclick="setView('input')">Edit</button>
+      <button class="toggle-btn view-toggle-btn active" onclick="setView('preview')">Preview</button>
+      <button class="toggle-btn view-toggle-btn" onclick="setView('split')">Split</button>
+    </div>
+    <div class="view-toggles" title="WhatsApp/Meta AI (Muse, Spark) use *word* for BOLD and ~word~ for strikethrough — the opposite of standard Markdown. Toggle this when pasting/typing content from those.">
+      <button class="toggle-btn" id="mode-standard-btn" onclick="setSyntaxMode(false)">Standard MD</button>
+      <button class="toggle-btn" id="mode-wa-btn" onclick="setSyntaxMode(true)">WhatsApp</button>
     </div>
     
     <div class="actions">
@@ -155,12 +159,47 @@
     let isRichPaste = false;
     let currentBaseFontSizePx = 16; // Standard base size tracking
 
+    // WhatsApp / Meta AI (Muse, Spark) send *bold* and ~strikethrough~ with SINGLE
+    // markers, which is the opposite of standard Markdown's *italic* and needs
+    // strikethrough recognized with one tilde instead of two. Declared up top,
+    // before anything else runs, so a later error can never leave this uninitialized.
+    let waSyntaxMode = localStorage.getItem('md-tool-wa-mode') === '1';
+    function setSyntaxMode(isWhatsApp) {
+      waSyntaxMode = isWhatsApp;
+      localStorage.setItem('md-tool-wa-mode', isWhatsApp ? '1' : '0');
+      const stdBtn = document.getElementById('mode-standard-btn');
+      const waBtn = document.getElementById('mode-wa-btn');
+      if (stdBtn) stdBtn.classList.toggle('active', !isWhatsApp);
+      if (waBtn) waBtn.classList.toggle('active', isWhatsApp);
+      processConversion();
+    }
+
+    // Broad "does this clipboard HTML actually carry structure" test.
+    // Covers Google Docs (docs-internal-guid), Gemini (data-sfc-* attrs + real tags),
+    // ChatGPT/Claude/Notion style exports, and generic bold/italic/mono inline styling.
+    const RICH_HTML_MARKERS = /docs-internal-guid|data-sfc-|<table|<thead|<tbody|<tr[\s>]|<td[\s>]|<th[\s>]|<ul[\s>]|<ol[\s>]|<li[\s>]|<pre[\s>]|<code[\s>]|<blockquote|<h[1-6][\s>]|<img[\s>]|<b\b|<strong|<em\b|<i\b|<hr\b|font-weight\s*:\s*(bold|[6-9]00)|font-style\s*:\s*italic|font-family\s*:[^;"']*(mono|courier|consolas)/i;
+
     inputEl.addEventListener('paste', function (e) {
-      const htmlData = e.clipboardData ? e.clipboardData.getData('text/html') : '';
-      isRichPaste = !!(htmlData && /<[a-z]/i.test(htmlData) &&
-        (htmlData.includes('docs-internal-guid') ||
-         /font-family|<table|<ul|<ol|<b\b|<strong|<pre|<code|<span[^>]*style/i.test(htmlData)));
-      setTimeout(processConversion, 20);
+      const cd = e.clipboardData;
+      const htmlData = cd ? cd.getData('text/html') : '';
+      const rich = !!(htmlData && /<[a-z]/i.test(htmlData) && RICH_HTML_MARKERS.test(htmlData));
+
+      if (rich) {
+        // Do NOT let the browser insert its own (often mangled, especially on
+        // mobile/Android contenteditable) version of the paste. Parse the raw
+        // clipboard HTML ourselves and drop that exact structure into the editor,
+        // so headings/pre/code/table survive untouched.
+        e.preventDefault();
+        isRichPaste = true;
+        const parsedBody = new DOMParser().parseFromString(htmlData, 'text/html').body;
+        inputEl.innerHTML = parsedBody.innerHTML;
+        processConversion();
+      } else {
+        // Plain text (WhatsApp, Meta AI/Muse/Spark chat exports, typed markdown, etc.)
+        // Let the default paste happen; the resulting 'input' event runs the
+        // markdown-text path via handleTyping().
+        isRichPaste = false;
+      }
     });
 
     function handleTyping() {
@@ -198,11 +237,12 @@
 
     function setView(mode) {
       document.getElementById('workspace').setAttribute('data-view', mode);
-      document.querySelectorAll('.toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.toLowerCase() === mode);
+      document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn.innerText || btn.textContent || '').toLowerCase() === mode);
       });
     }
     if (window.innerWidth < 768) { setView('input'); } else { setView('split'); }
+    setSyntaxMode(waSyntaxMode);
 
     function processConversion() {
       const plainText = inputEl.innerText || '';
@@ -285,12 +325,21 @@
       let outputHtml = '';
       let codeBuffer = [];
 
+      function extractLang(codeEl) {
+        const cls = (codeEl && codeEl.className) || '';
+        const m = cls.match(/language-([\w+#-]+)/i);
+        return m ? m[1].toLowerCase() : '';
+      }
+
+      function emitCodeBlock(text, lang) {
+        const language = lang || (text.trim().startsWith('{') || text.trim().startsWith('[') ? 'json' : 'text');
+        outputHtml += `<div class="code-container"><div class="code-header"><span>${language}</span><button class="btn-copy" onclick="copySnippet(this)">Copy</button></div><pre><code class="language-${language}">${escapeHtml(text)}</code></pre></div>`;
+      }
+
       function flushCodeBuffer() {
         while (codeBuffer.length && codeBuffer[codeBuffer.length - 1] === '') codeBuffer.pop();
         if (!codeBuffer.length) return;
-        const codeText = codeBuffer.join('\n');
-        const lang = codeText.trim().startsWith('{') || codeText.trim().startsWith('[') ? 'json' : 'text';
-        outputHtml += `<div class="code-container"><div class="code-header"><span>${lang}</span><button class="btn-copy" onclick="copySnippet(this)">Copy</button></div><pre><code class="language-${lang}">${escapeHtml(codeText)}</code></pre></div>`;
+        emitCodeBlock(codeBuffer.join('\n'), '');
         codeBuffer = [];
       }
 
@@ -299,10 +348,15 @@
         let html = `<${tag}>`;
         Array.from(listEl.children).forEach(li => {
           if (li.tagName !== 'LI') return;
+          // Gemini/Docs often wrap a nested <ul>/<ol> one div deep inside the <li>
+          // (e.g. <li>...<div><div>&nbsp;</div><ul>...</ul></div></li>), so look one
+          // level past direct children too, not just li.children itself.
+          const nested = Array.from(li.querySelectorAll(':scope > ul, :scope > ol, :scope > div > ul, :scope > div > ol'));
           const liClone = li.cloneNode(true);
-          Array.from(liClone.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL').forEach(n => n.remove());
+          liClone.querySelectorAll('ul, ol').forEach(n => n.remove());
+          Array.from(liClone.querySelectorAll('div')).reverse().forEach(d => { if (!d.textContent.trim() && !d.querySelector('*')) d.remove(); });
           html += `<li>${cleanInlineHtml(liClone.innerHTML)}`;
-          Array.from(li.children).filter(c => c.tagName === 'UL' || c.tagName === 'OL').forEach(n => { html += renderList(n); });
+          nested.forEach(n => { html += renderList(n); });
           html += `</li>`;
         });
         return html + `</${tag}>`;
@@ -326,6 +380,19 @@
         if (child.tagName === 'HR') { flushCodeBuffer(); outputHtml += '<hr>'; return; }
         if (child.tagName === 'TABLE') { flushCodeBuffer(); outputHtml += renderTable(child); return; }
         if (child.tagName === 'BLOCKQUOTE') { flushCodeBuffer(); outputHtml += `<blockquote>${cleanInlineHtml(child.innerHTML)}</blockquote>`; return; }
+
+        // A real <pre> (optionally wrapped in a container div, as Gemini/ChatGPT do) is
+        // treated as its own, immediately-flushed code block so its actual
+        // language class (e.g. language-typescript) and boundaries are preserved,
+        // instead of being merged with neighboring code via the style-guessing buffer below.
+        const preEl = child.tagName === 'PRE' ? child : (child.querySelector ? child.querySelector('pre') : null);
+        if (preEl) {
+          flushCodeBuffer();
+          const codeEl = preEl.querySelector('code') || preEl;
+          const codeText = (preEl.innerText || preEl.textContent || '').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+          emitCodeBlock(codeText, extractLang(codeEl));
+          return;
+        }
 
         if (looksLikeCode(trimmedText, style, child)) {
           if (['PRE', 'CODE'].includes(child.tagName) || (child.querySelector && child.querySelector('pre, code'))) {
@@ -360,13 +427,23 @@
         }
 
         if (/^H[1-4]$/.test(child.tagName) || /^(\d+\.\s+[^:]+)$/.test(trimmedText)) {
-  const tag = child.tagName === 'H1' ? 'h1' : 'h2';
-  outputHtml += `<${tag}>${cleanInlineHtml(child.innerHTML)}</${tag}>`;
-  return;
-}
+          const headingMap = { H1: 'h1', H2: 'h2', H3: 'h3', H4: 'h3' };
+          const tag = headingMap[child.tagName] || 'h2';
+          outputHtml += `<${tag}>${cleanInlineHtml(child.innerHTML)}</${tag}>`;
+          return;
+        }
 
         if (child.tagName === 'UL' || child.tagName === 'OL') {
           outputHtml += renderList(child);
+          return;
+        }
+
+        // A plain <div> wrapping real block content (Gemini/Docs commonly nest a
+        // whole section's ul/table/blockquote/heading inside one) needs to be
+        // unwrapped and re-processed, not dumped as raw markup inside a <p>.
+        if (child.tagName === 'DIV' && child.querySelector('ul, ol, table, pre, blockquote, h1, h2, h3, h4, hr')) {
+          flushCodeBuffer();
+          outputHtml += renderChildren(child);
           return;
         }
 
@@ -525,13 +602,25 @@
 
     function parseMarkdownInline(str) {
       /* Replaced lookbehinds with safe capture groups to prevent Syntax Errors on older engines */
-      return str
+      let out = str
         .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/__(.+?)__/g, '<strong>$1</strong>')
-        .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>') 
-        .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
-        .replace(/~~(.+?)~~/g, '<del>$1</del>')
+        .replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+      if (waSyntaxMode) {
+        // WhatsApp / Meta AI (Muse, Spark): *bold*, _italic_, ~strikethrough~ — all single markers.
+        out = out
+          .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<strong>$2</strong>')
+          .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>')
+          .replace(/(^|[^~])~([^~\n]+)~(?!~)/g, '$1<del>$2</del>');
+      } else {
+        out = out
+          .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+          .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+      }
+
+      return out
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
         .replace(/(^|[^"(])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
@@ -684,4 +773,3 @@
   </script>
 </body>
 </html>
-
